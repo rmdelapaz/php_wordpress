@@ -1,0 +1,2358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern JavaScript: ES6+ Features Overview</title>
+    <link rel="stylesheet" href="/styles/main.css">
+    <link rel="icon" href="/favicon.png">
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+      mermaid.initialize({ startOnLoad: true });
+
+            </div>
+            
+            <div class="ajax_example">
+                <h3>Example: AJAX with Fetch and async/await</h3>
+                <pre><code>// modern-admin.js - WordPress admin UI enhancement
+class PostManager {
+  constructor() {
+    this.posts = [];
+    this.container = document.querySelector('#posts-container');
+    this.filterForm = document.querySelector('#post-filter-form');
+    
+    // Event binding with arrow functions to maintain 'this' context
+    this.filterForm.addEventListener('submit', (e) => this.handleFilterSubmit(e));
+    
+    // Initialize
+    this.init();
+  }
+  
+  async init() {
+    try {
+      await this.loadPosts();
+      this.renderPosts();
+    } catch (error) {
+      this.showError('Failed to load posts.');
+      console.error(error);
+    }
+  }
+  
+  // Using async/await with the Fetch API
+  async loadPosts(filters = {}) {
+    this.showLoading();
+    
+    // Build query parameters using Object methods
+    const queryParams = new URLSearchParams(
+      Object.entries(filters).filter(([_, value]) => value)
+    ).toString();
+    
+    try {
+      const response = await fetch(`/wp-json/wp/v2/posts?${queryParams}`);
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      this.posts = await response.json();
+      return this.posts;
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+      throw error;
+    } finally {
+      this.hideLoading();
+    }
+  }
+  
+  // Using template literals for HTML generation
+  renderPosts() {
+    if (!this.posts.length) {
+      this.container.innerHTML = '&lt;p&gt;No posts found.&lt;/p&gt;';
+      return;
+    }
+    
+    // Using map and join for HTML generation
+    this.container.innerHTML = this.posts
+      .map(post => `
+        &lt;div class="post-card" id="post-${post.id}"&gt;
+          &lt;h3&gt;${post.title.rendered}&lt;/h3&gt;
+          &lt;div class="post-meta"&gt;
+            ${new Date(post.date).toLocaleDateString()}
+          &lt;/div&gt;
+          &lt;div class="post-actions"&gt;
+            &lt;button data-id="${post.id}" class="edit-post"&gt;Edit&lt;/button&gt;
+            &lt;button data-id="${post.id}" class="delete-post"&gt;Delete&lt;/button&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      `)
+      .join('');
+    
+    // Event delegation with arrow functions
+    this.container.addEventListener('click', e => {
+      if (e.target.classList.contains('edit-post')) {
+        const postId = e.target.dataset.id;
+        this.editPost(postId);
+      } else if (e.target.classList.contains('delete-post')) {
+        const postId = e.target.dataset.id;
+        this.confirmDeletePost(postId);
+      }
+    });
+  }
+  
+  async handleFilterSubmit(e) {
+    e.preventDefault();
+    
+    // FormData and Object.fromEntries for form processing
+    const formData = new FormData(this.filterForm);
+    const filters = Object.fromEntries(formData);
+    
+    try {
+      await this.loadPosts(filters);
+      this.renderPosts();
+    } catch (error) {
+      this.showError('Error applying filters.');
+    }
+  }
+  
+  // More methods omitted for brevity...
+  
+  showLoading() {
+    // Show loading indicator
+  }
+  
+  hideLoading() {
+    // Hide loading indicator
+  }
+  
+  showError(message) {
+    // Display error message
+  }
+}
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  new PostManager();
+});</code></pre>
+            </div>
+            
+            <div class="performance_tips">
+                <h3>Performance Tips When Using ES6+ in WordPress</h3>
+                <ul>
+                    <li><strong>Bundle size awareness</strong> - Modern features can increase file size when transpiled</li>
+                    <li><strong>Code splitting</strong> - Use dynamic imports to load code only when needed</li>
+                    <li><strong>Transpilation</strong> - Use Babel to ensure compatibility with older browsers</li>
+                    <li><strong>Minification</strong> - Use terser or similar tools to reduce file size</li>
+                    <li><strong>Polyfills</strong> - Include only necessary polyfills for features you use</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="compatibility">
+            <h2>Browser Compatibility and Transpilation</h2>
+            
+            <p>While ES6+ features are powerful, not all browsers (especially older ones) support them natively. This is particularly important for WordPress developers who need to support a wide range of users.</p>
+            
+            <div class="mermaid">
+            flowchart LR
+                A[Modern ES6+ Code] --> B[Babel Transpiler]
+                B --> C[ES5 Compatible Code]
+                C --> D[Browser Execution]
+                
+                E[Development Dependencies] --> B
+                E --> F[Webpack/Gulp]
+                F --> G[Bundling]
+                G --> C
+            </div>
+            
+            <div class="transpilation">
+                <h3>Setting Up Transpilation for WordPress Projects</h3>
+                <pre><code>// package.json example for a WordPress theme/plugin
+{
+  "name": "my-wordpress-project",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "webpack --mode production",
+    "dev": "webpack --mode development --watch"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.5",
+    "@babel/preset-env": "^7.20.2",
+    "babel-loader": "^9.1.0",
+    "webpack": "^5.75.0",
+    "webpack-cli": "^5.0.1"
+  }
+}
+
+// webpack.config.js
+const path = require('path');
+
+module.exports = {
+  entry: {
+    main: './src/js/main.js',
+    admin: './src/js/admin.js'
+  },
+  output: {
+    filename: '[name].js',
+    path: path.resolve(__dirname, 'dist/js')
+  },
+  module: {
+    rules: [
+      {
+        test: /\.js$/,
+        exclude: /node_modules/,
+        use: {
+          loader: 'babel-loader',
+          options: {
+            presets: ['@babel/preset-env']
+          }
+        }
+      }
+    ]
+  }
+};</code></pre>
+            </div>
+            
+            <div class="compatibility_strategies">
+                <h3>Compatibility Strategies</h3>
+                <ol>
+                    <li><strong>Feature detection</strong> - Check if features exist before using them</li>
+                    <li><strong>Polyfills</strong> - Add missing functionality for older browsers</li>
+                    <li><strong>Progressive enhancement</strong> - Provide basic functionality for all users, enhanced for modern browsers</li>
+                </ol>
+                
+                <pre><code>// Feature detection example
+if (window.fetch) {
+  // Use fetch API
+} else {
+  // Fall back to XMLHttpRequest
+}
+
+// Using core-js for polyfills (imported selectively)
+import 'core-js/features/promise';
+import 'core-js/features/object/entries';
+import 'core-js/features/array/from';</code></pre>
+            </div>
+        </section>
+
+        <section class="learning_resources">
+            <h2>Learning Resources and Tools</h2>
+            
+            <div class="resources">
+                <h3>Essential Resources</h3>
+                <ul>
+                    <li><strong>MDN Web Docs</strong> - Comprehensive JavaScript reference</li>
+                    <li><strong>Babel</strong> - The JavaScript compiler/transpiler</li>
+                    <li><strong>ESLint</strong> - Code quality tool that helps enforce ES6+ best practices</li>
+                    <li><strong>WordPress Coding Standards</strong> - JavaScript guidelines for WordPress development</li>
+                    <li><strong>WordPress Block Editor Handbook</strong> - Documentation for Gutenberg development</li>
+                </ul>
+            </div>
+            
+            <div class="tools">
+                <h3>Development Tools</h3>
+                <ul>
+                    <li><strong>webpack</strong> - Module bundler for JavaScript applications</li>
+                    <li><strong>npm/yarn</strong> - Package managers for JavaScript libraries</li>
+                    <li><strong>VS Code</strong> - Editor with excellent ES6+ support and extensions</li>
+                    <li><strong>Chrome DevTools</strong> - For debugging and performance analysis</li>
+                    <li><strong>@wordpress/scripts</strong> - WordPress package for common JS tools configuration</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="recap">
+            <h2>Recap and Summary</h2>
+            
+            <div class="key_points">
+                <h3>Key Takeaways</h3>
+                <ul>
+                    <li>ES6+ introduced powerful features that make JavaScript more expressive and maintainable</li>
+                    <li>Block-scoped variables (<code>let</code> and <code>const</code>) provide better scoping control than <code>var</code></li>
+                    <li>Arrow functions offer concise syntax and lexical <code>this</code> binding</li>
+                    <li>Template literals make string manipulation and HTML generation cleaner</li>
+                    <li>Destructuring simplifies extracting values from objects and arrays</li>
+                    <li>Classes provide a cleaner syntax for object-oriented programming</li>
+                    <li>Modules allow better code organization and dependency management</li>
+                    <li>Promises and async/await simplify asynchronous programming</li>
+                    <li>Spread and rest operators make working with arrays and objects more powerful</li>
+                    <li>WordPress development increasingly relies on modern JavaScript, especially for Gutenberg blocks</li>
+                </ul>
+            </div>
+            
+            <div class="next_steps">
+                <h3>Next Steps</h3>
+                <p>In our next session, we'll explore jQuery and see how it compares to modern JavaScript. While jQuery was once essential for cross-browser compatibility, many of its features are now available natively through ES6+ and modern browser APIs. We'll learn when it's appropriate to use jQuery in WordPress development and when native JavaScript is a better choice.</p>
+            </div>
+        </section>
+
+        <section class="practice">
+            <h2>Practice Exercises</h2>
+            
+            <div class="exercises">
+                <h3>Basic Exercises</h3>
+                <ol>
+                    <li>Convert an existing JavaScript function to use arrow functions, template literals, and destructuring.</li>
+                    <li>Refactor a series of callback functions into an async/await pattern.</li>
+                    <li>Create a simple class to represent a WordPress post with appropriate methods and properties.</li>
+                </ol>
+                
+                <h3>Advanced Challenge</h3>
+                <p>Build a simple content filtering system for WordPress posts that:
+                <ol>
+                    <li>Fetches posts from the WordPress REST API</li>
+                    <li>Allows filtering by category, tag, and date using ES6+ features</li>
+                    <li>Renders the filtered posts with template literals</li>
+                    <li>Uses Promises or async/await for all asynchronous operations</li>
+                </ol>
+                </p>
+            </div>
+        </section>
+    </main>
+    
+    <footer>
+        <p>&copy; 2025 PHP WordPress Development Course</p>
+    </footer>
+</body>
+</html>
+    </script>
+</head>
+<body>
+    <header>
+        <h1>Modern JavaScript: ES6+ Features Overview</h1>
+        <p><a href="index.html">← Back to Syllabus</a></p>
+    </header>
+    
+    <main>
+        <section class="intro">
+            <h2>Introduction to Modern JavaScript</h2>
+            <p>Welcome to our exploration of ES6+ features! JavaScript has evolved dramatically since the release of ECMAScript 2015 (ES6), which introduced numerous powerful features that transformed how we write JavaScript. These modern features make our code more expressive, concise, and maintainable.</p>
+            
+            <p>Today, we'll explore the most important ES6+ features that you'll use frequently in modern web development, especially when working with WordPress and PHP. Think of ES6+ as a set of power tools added to your basic JavaScript toolbox—they don't replace the fundamentals but make complex jobs much easier.</p>
+        </section>
+
+        <section class="timeline">
+            <h2>The Evolution of JavaScript</h2>
+            <p>Before diving into specific features, let's understand the context of JavaScript's evolution:</p>
+            
+            <div class="mermaid">
+            timeline
+                title JavaScript Evolution Timeline
+                1995 : JavaScript created by Brendan Eich
+                1997 : ECMAScript 1 (First standardization)
+                2009 : ECMAScript 5 (ES5)
+                2015 : ECMAScript 2015 (ES6) - Major update
+                2016 : ECMAScript 2016 (ES7)
+                2017 : ECMAScript 2017 (ES8)
+                2018 : ECMAScript 2018 (ES9)
+                2019 : ECMAScript 2019 (ES10)
+                2020 : ECMAScript 2020 (ES11)
+                2021 : ECMAScript 2021 (ES12)
+                2022 : ECMAScript 2022 (ES13)
+                2023 : ECMAScript 2023 (ES14)
+                2024 : ECMAScript 2024 (ES15)
+            </div>
+            
+            <p>After the massive ES6 update in 2015, JavaScript now follows an annual release cycle with incremental improvements. When we talk about "ES6+", we mean ES6 and all subsequent versions combined.</p>
+        </section>
+
+        <section class="let_const">
+            <h2>Block-Scoped Declarations: let and const</h2>
+            
+            <p>Prior to ES6, we only had <code>var</code> for variable declarations, which had function scope. ES6 introduced <code>let</code> and <code>const</code> which provide block scope - a more intuitive way to handle variable access.</p>
+            
+            <div class="comparison">
+                <h3>Traditional var vs Modern let/const</h3>
+                <pre><code>// The old way with var
+var name = "John";
+var age = 30;
+if (true) {
+  var name = "Jane"; // Overwrites the outer 'name'
+  var greeting = "Hello";
+}
+console.log(name); // "Jane" - var is function scoped
+console.log(greeting); // "Hello" - var leaks outside the block
+
+// The new way with let and const
+let name = "John";
+const age = 30;
+if (true) {
+  let name = "Jane"; // Different variable, block-scoped
+  const greeting = "Hello";
+}
+console.log(name); // "John" - outer variable unchanged
+// console.log(greeting); // Error! 'greeting' not defined outside block</code></pre>
+            </div>
+            
+            <div class="real_world">
+                <h3>Real-World Application</h3>
+                <p>In WordPress theme development, when you're writing JavaScript for multiple UI components on a page, block scoping with <code>let</code> and <code>const</code> prevents variable collisions between components.</p>
+                <pre><code>// Navigation menu component
+const navToggle = document.querySelector('.nav-toggle');
+const navItems = document.querySelectorAll('.nav-item');
+
+// Image gallery component on same page
+const galleryImages = document.querySelectorAll('.gallery-image');
+const lightbox = document.querySelector('.lightbox');</code></pre>
+                <p>Because these variables are declared with <code>const</code>, they are scoped to their respective blocks and won't interfere with each other, even if you were to use the same variable names in different components.</p>
+            </div>
+            
+            <div class="analogy">
+                <h3>Analogy: Variables as Containers</h3>
+                <p>Think of <code>var</code> as a bucket that can be seen and modified from almost anywhere in your house (function), while <code>let</code> and <code>const</code> are like containers that only exist in specific rooms (blocks) of your house:</p>
+                <ul>
+                    <li><code>var</code> - Large plastic bucket that can be carried anywhere in the house and its contents changed</li>
+                    <li><code>let</code> - Lunchbox that only exists in one room; contents can be changed</li>
+                    <li><code>const</code> - Sealed container that only exists in one room; contents cannot be changed after creation</li>
+                </ul>
+            </div>
+            
+            <div class="best_practices">
+                <h3>Best Practices</h3>
+                <ul>
+                    <li>Use <code>const</code> by default for most variables</li>
+                    <li>Use <code>let</code> when you need to reassign a variable</li>
+                    <li>Avoid <code>var</code> in modern code</li>
+                    <li>Keep variables scoped as tightly as possible to prevent bugs</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="template_literals">
+            <h2>Template Literals</h2>
+            
+            <p>Template literals provide a cleaner way to create strings, especially when they include variables or span multiple lines.</p>
+            
+            <div class="comparison">
+                <h3>Old vs. New String Creation</h3>
+                <pre><code>// Old way
+var name = "Alice";
+var greeting = "Hello, " + name + "!\n" +
+  "Welcome to our " + siteTitle + " website.\n" +
+  "You have " + notifications + " unread messages.";
+
+// New way with template literals
+const name = "Alice";
+const greeting = `Hello, ${name}!
+Welcome to our ${siteTitle} website.
+You have ${notifications} unread messages.`;</code></pre>
+            </div>
+            
+            <div class="advantages">
+                <h3>Advantages of Template Literals</h3>
+                <ol>
+                    <li>Multi-line strings without concatenation or escape characters</li>
+                    <li>Expression interpolation with <code>${expression}</code> syntax</li>
+                    <li>Cleaner code, especially for HTML templates</li>
+                </ol>
+            </div>
+            
+            <div class="real_world">
+                <h3>Real-World Example: Dynamic Content in WordPress</h3>
+                <pre><code>// Generating dynamic HTML for a WordPress plugin
+function renderUserCard(user) {
+  return `
+    &lt;div class="user-card" id="user-${user.id}"&gt;
+      &lt;img src="${user.avatar}" alt="${user.name}" class="avatar"&gt;
+      &lt;div class="user-info"&gt;
+        &lt;h3&gt;${user.name}&lt;/h3&gt;
+        &lt;p&gt;${user.bio || 'No bio available'}&lt;/p&gt;
+        &lt;p&gt;Member since: ${formatDate(user.joinDate)}&lt;/p&gt;
+        ${user.isAdmin ? '&lt;span class="badge admin-badge"&gt;Admin&lt;/span&gt;' : ''}
+      &lt;/div&gt;
+    &lt;/div&gt;
+  `;
+}</code></pre>
+                <p>Notice how clean the HTML structure remains even with dynamic content injected throughout.</p>
+            </div>
+            
+            <div class="advanced_template_literals">
+                <h3>Advanced: Tagged Template Literals</h3>
+                <p>Template literals can be "tagged" with a function to process the template:</p>
+                <pre><code>// A tag function for sanitizing HTML
+function sanitize(strings, ...values) {
+  return strings.reduce((result, string, i) => {
+    const value = values[i - 1] || '';
+    // Simple HTML sanitization
+    const sanitizedValue = String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+    return result + sanitizedValue + string;
+  });
+}
+
+// Example usage: registering multiple blocks with modern JS
+const blocks = [
+  { name: 'testimonial', title: 'Testimonial', icon: 'format-quote' },
+  { name: 'team-member', title: 'Team Member', icon: 'admin-users' },
+  { name: 'feature-box', title: 'Feature Box', icon: 'star-filled' }
+];
+
+// Using array methods and arrow functions
+blocks.forEach(({ name, title, icon }) => {
+  registerBlockType(`my-plugin/${name}`, {
+    title,
+    icon,
+    category: 'common',
+    // ... other block properties
+  });
+});
+
+// Using the tag
+const userName = '&lt;script&gt;alert("XSS")&lt;/script&gt;';
+const safeHTML = sanitize`&lt;div&gt;Hello, ${userName}&lt;/div&gt;`;
+// Result: &lt;div&gt;Hello, &lt;script&gt;alert("XSS")&lt;/script&gt;&lt;/div&gt;
+// Where the script tags are properly escaped</code></pre>
+            </div>
+        </section>
+
+        <section class="arrow_functions">
+            <h2>Arrow Functions</h2>
+            
+            <p>Arrow functions provide a more concise syntax for writing functions and solve common issues with the <code>this</code> keyword binding.</p>
+            
+            <div class="comparison">
+                <h3>Traditional vs. Arrow Functions</h3>
+                <pre><code>// Traditional function expression
+function add(a, b) {
+  return a + b;
+}
+
+// Arrow function
+const add = (a, b) => a + b;
+
+// Traditional function with multiple statements
+function greet(name) {
+  const timeOfDay = getTimeOfDay();
+  return `Good ${timeOfDay}, ${name}!`;
+}
+
+// Arrow function with multiple statements
+const greet = (name) => {
+  const timeOfDay = getTimeOfDay();
+  return `Good ${timeOfDay}, ${name}!`;
+};</code></pre>
+            </div>
+            
+            <div class="this_binding">
+                <h3>The this Keyword and Arrow Functions</h3>
+                <pre><code>// Traditional functions create their own 'this'
+const user = {
+  name: 'John',
+  greetTraditional: function() {
+    setTimeout(function() {
+      console.log('Hello, ' + this.name); // 'this' is not 'user'
+    }, 1000);
+  },
+  greetArrow: function() {
+    setTimeout(() => {
+      console.log('Hello, ' + this.name); // 'this' is 'user'
+    }, 1000);
+  }
+};
+
+user.greetTraditional(); // Hello, undefined
+user.greetArrow(); // Hello, John</code></pre>
+            </div>
+            
+            <div class="mermaid">
+            flowchart TB
+                subgraph "Traditional Function"
+                A["function() {...}"] --> B["Creates new 'this' context"]
+                end
+                
+                subgraph "Arrow Function"
+                C["() => {...}"] --> D["Inherits 'this' from outside"]
+                end
+            </div>
+            
+            <div class="real_world">
+                <h3>Real-World Example: Event Handlers in WordPress</h3>
+                <pre><code>// WordPress AJAX handler with arrow functions
+class PostEditor {
+  constructor() {
+    this.postId = document.querySelector('#post-id').value;
+    this.title = document.querySelector('#title');
+    this.content = document.querySelector('#content');
+    this.saveButton = document.querySelector('#save');
+    
+    // Arrow function preserves 'this' context
+    this.saveButton.addEventListener('click', () => {
+      this.savePost(); // 'this' refers to the PostEditor instance
+    });
+  }
+  
+  savePost() {
+    const data = {
+      action: 'save_post',
+      post_id: this.postId,
+      title: this.title.value,
+      content: this.content.value
+    };
+    
+    // Arrow function in callback
+    jQuery.post(ajaxurl, data, (response) => {
+      this.handleResponse(response); // 'this' still refers to PostEditor
+    });
+  }
+  
+  handleResponse(response) {
+    // Process the server response
+  }
+}</code></pre>
+            </div>
+            
+            <div class="when_not_to_use">
+                <h3>When Not to Use Arrow Functions</h3>
+                <ul>
+                    <li>Object methods (when you need to access the object via <code>this</code>)</li>
+                    <li>Constructor functions (arrow functions cannot be used with <code>new</code>)</li>
+                    <li>When you need access to the <code>arguments</code> object</li>
+                    <li>Event handlers where <code>this</code> should refer to the event target</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="destructuring">
+            <h2>Destructuring Assignment</h2>
+            
+            <p>Destructuring allows you to extract values from arrays or properties from objects into distinct variables.</p>
+            
+            <div class="comparison">
+                <h3>Object Destructuring</h3>
+                <pre><code>// Old way
+var user = {
+  name: 'Sarah',
+  email: 'sarah@example.com',
+  address: {
+    city: 'Boston',
+    state: 'MA'
+  }
+};
+var name = user.name;
+var email = user.email;
+var city = user.address.city;
+
+// With destructuring
+const { name, email, address: { city, state } } = user;
+console.log(name, email, city, state); // Sarah sarah@example.com Boston MA</code></pre>
+            </div>
+            
+            <div class="array_destructuring">
+                <h3>Array Destructuring</h3>
+                <pre><code>// Old way
+var coordinates = [10, 20, 30];
+var x = coordinates[0];
+var y = coordinates[1];
+var z = coordinates[2];
+
+// With destructuring
+const [x, y, z] = coordinates;
+console.log(x, y, z); // 10 20 30
+
+// Skipping elements
+const [first, , third] = ['apple', 'banana', 'cherry'];
+console.log(first, third); // apple cherry</code></pre>
+            </div>
+            
+            <div class="default_values">
+                <h3>Default Values and Rest Patterns</h3>
+                <pre><code>// Default values
+const { name, role = 'User' } = { name: 'Alex' };
+console.log(name, role); // Alex User
+
+// Rest pattern with arrays
+const [head, ...tail] = [1, 2, 3, 4, 5];
+console.log(head, tail); // 1 [2, 3, 4, 5]
+
+// Rest pattern with objects
+const { id, ...userDetails } = { 
+  id: 42, 
+  name: 'Mia', 
+  email: 'mia@example.com', 
+  age: 28 
+};
+console.log(id, userDetails); 
+// 42 { name: 'Mia', email: 'mia@example.com', age: 28 }</code></pre>
+            </div>
+            
+            <div class="real_world">
+                <h3>Real-World Example: WordPress REST API Response</h3>
+                <pre><code>// Processing WordPress REST API data
+async function fetchPostDetails(postId) {
+  const response = await fetch(`/wp-json/wp/v2/posts/${postId}`);
+  const post = await response.json();
+  
+  // Destructure exactly what we need
+  const { 
+    title: { rendered: title }, 
+    content: { rendered: content },
+    author,
+    featured_media: imageId,
+    _embedded
+  } = post;
+  
+  // Destructure author info from _embedded
+  const { 
+    author: [{ name: authorName, avatar_urls: { 96: authorAvatar } }] 
+  } = _embedded;
+  
+  return {
+    title,
+    content,
+    authorId: author,
+    authorName,
+    authorAvatar,
+    imageId
+  };
+}</code></pre>
+                <p>Destructuring makes it much cleaner to extract nested data from complex API responses, which is common when working with WordPress's REST API.</p>
+            </div>
+            
+            <div class="function_parameters">
+                <h3>Destructuring in Function Parameters</h3>
+                <pre><code>// Without destructuring
+function displayUser(user) {
+  console.log(`${user.name} (${user.email})`);
+}
+
+// With destructuring
+function displayUser({ name, email }) {
+  console.log(`${name} (${email})`);
+}
+
+// With default values
+function createWidget({ width = 300, height = 200, color = 'blue' } = {}) {
+  // The = {} ensures the function works even when called with no arguments
+  console.log(`Creating a ${color} widget: ${width}x${height}px`);
+}</code></pre>
+            </div>
+        </section>
+
+        <section class="spread_rest">
+            <h2>Spread and Rest Operators</h2>
+            
+            <p>The <code>...</code> syntax serves two purposes: spreading elements and collecting them into arrays or objects.</p>
+            
+            <div class="spread_syntax">
+                <h3>Spread Syntax</h3>
+                <pre><code>// Spread in arrays
+const fruits = ['apple', 'banana'];
+const moreFruits = [...fruits, 'cherry', 'date'];
+console.log(moreFruits); // ['apple', 'banana', 'cherry', 'date']
+
+// Spread in objects
+const baseConfig = { 
+  theme: 'dark', 
+  animationEnabled: true 
+};
+const userConfig = { 
+  theme: 'light', 
+  notifications: true 
+};
+const finalConfig = { ...baseConfig, ...userConfig };
+console.log(finalConfig); 
+// { theme: 'light', animationEnabled: true, notifications: true }</code></pre>
+                <p>Note that with objects, properties from later spreads will overwrite earlier ones with the same name.</p>
+            </div>
+            
+            <div class="array_operations">
+                <h3>Common Array Operations with Spread</h3>
+                <pre><code>// Copy an array
+const original = [1, 2, 3];
+const copy = [...original];
+
+// Concatenate arrays
+const arr1 = [1, 2];
+const arr2 = [3, 4];
+const combined = [...arr1, ...arr2]; // [1, 2, 3, 4]
+
+// Convert string to array of characters
+const chars = [...'hello']; // ['h', 'e', 'l', 'l', 'o']
+
+// Function arguments
+const numbers = [1, 2, 3];
+console.log(Math.max(...numbers)); // 3</code></pre>
+            </div>
+            
+            <div class="rest_operator">
+                <h3>Rest Operator</h3>
+                <pre><code>// Rest in function parameters
+function sum(...numbers) {
+  return numbers.reduce((total, num) => total + num, 0);
+}
+console.log(sum(1, 2, 3, 4)); // 10
+
+// Rest with destructuring
+const [first, second, ...remaining] = [1, 2, 3, 4, 5];
+console.log(first, second, remaining); // 1 2 [3, 4, 5]</code></pre>
+            </div>
+            
+            <div class="real_world">
+                <h3>Real-World Example: WordPress Theme Options</h3>
+                <pre><code>// Merging theme default options with user options
+function initThemeOptions(userOptions = {}) {
+  const defaultOptions = {
+    colorScheme: 'light',
+    fontSize: 'medium',
+    sidebarPosition: 'right',
+    headerStyle: 'minimal',
+    footerWidgets: true,
+    socialIcons: ['facebook', 'twitter'],
+    performance: {
+      lazyLoading: true,
+      minifyCss: true,
+      minifyJs: true
+    }
+  };
+  
+  // Deep merge with user options
+  const options = {
+    ...defaultOptions,
+    ...userOptions,
+    // Deep merge for nested objects
+    performance: {
+      ...defaultOptions.performance,
+      ...(userOptions.performance || {})
+    },
+    // Combine arrays instead of replacing
+    socialIcons: [
+      ...defaultOptions.socialIcons,
+      ...(userOptions.socialIcons || [])
+    ]
+  };
+  
+  return options;
+}
+
+// Usage
+const userSelectedOptions = {
+  colorScheme: 'dark',
+  fontSize: 'large',
+  socialIcons: ['instagram'],
+  performance: {
+    minifyJs: false
+  }
+};
+
+const finalOptions = initThemeOptions(userSelectedOptions);
+// Result includes defaults + user options</code></pre>
+            </div>
+            
+            <div class="mermaid">
+            graph TD
+                A[Spread Operator] --> B["Arrays [...array]"]
+                A --> C["Objects {...object}"]
+                A --> D["Function calls fn(...args)"]
+                
+                E[Rest Operator] --> F["Function parameters (...args)"]
+                E --> G["Destructuring [a, ...rest]"]
+                E --> H["Destructuring {a, ...rest}"]
+            </div>
+        </section>
+
+        <section class="default_parameters">
+            <h2>Default Parameters</h2>
+            
+            <p>ES6 introduced a clean way to specify default values for function parameters.</p>
+            
+            <div class="comparison">
+                <h3>Before vs. After</h3>
+                <pre><code>// Old way
+function createProfile(name, age, isPremium) {
+  name = name || 'Anonymous';
+  age = age !== undefined ? age : 30;
+  isPremium = isPremium !== undefined ? isPremium : false;
+  
+  return {
+    name: name,
+    age: age,
+    accountType: isPremium ? 'Premium' : 'Basic'
+  };
+}
+
+// ES6 way
+function createProfile(name = 'Anonymous', age = 30, isPremium = false) {
+  return {
+    name,
+    age,
+    accountType: isPremium ? 'Premium' : 'Basic'
+  };
+}</code></pre>
+            </div>
+            
+            <div class="expressions">
+                <h3>Expressions as Default Values</h3>
+                <pre><code>// Default parameters can be expressions
+function getTimestamp(date = new Date()) {
+  return date.getTime();
+}
+
+// They can use previous parameters
+function createRange(start = 1, end = start + 10) {
+  return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+}
+console.log(createRange(5)); // [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]</code></pre>
+            </div>
+            
+            <div class="real_world">
+                <h3>Real-World Example: WordPress Shortcode Generator</h3>
+                <pre><code>// Generating shortcodes with default attributes
+function generateGalleryShortcode({
+  ids = [],
+  columns = 3,
+  size = 'medium',
+  link = 'file',
+  orderby = 'menu_order',
+  order = 'ASC'
+} = {}) {
+  // Validate and process IDs
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return ''; // Can't create gallery without images
+  }
+  
+  const attributes = {
+    ids: ids.join(','),
+    columns,
+    size,
+    link,
+    orderby,
+    order
+  };
+  
+  // Generate shortcode
+  const attrString = Object.entries(attributes)
+    .map(([key, value]) => `${key}="${value}"`)
+    .join(' ');
+  
+  return `[gallery ${attrString}]`;
+}
+
+// Usage examples
+generateGalleryShortcode({ ids: [101, 102, 103] });
+// [gallery ids="101,102,103" columns="3" size="medium" link="file" orderby="menu_order" order="ASC"]
+
+generateGalleryShortcode({ ids: [101, 102], size: 'large', columns: 2 });
+// [gallery ids="101,102" columns="2" size="large" link="file" orderby="menu_order" order="ASC"]</code></pre>
+            </div>
+        </section>
+
+        <section class="classes">
+            <h2>Classes and Object-Oriented Programming</h2>
+            
+            <p>ES6 introduced a class syntax that makes it easier to implement object-oriented programming patterns in JavaScript.</p>
+            
+            <div class="comparison">
+                <h3>Traditional Prototype vs. ES6 Class</h3>
+                <pre><code>// Pre-ES6 constructor function and prototype
+function User(name, email) {
+  this.name = name;
+  this.email = email;
+  this.createdAt = new Date();
+}
+
+User.prototype.getProfile = function() {
+  return `${this.name} (${this.email})`;
+};
+
+User.prototype.sendEmail = function(subject, body) {
+  console.log(`Sending email to ${this.email}: ${subject}`);
+  // Email sending logic
+};
+
+// ES6 Class syntax
+class User {
+  constructor(name, email) {
+    this.name = name;
+    this.email = email;
+    this.createdAt = new Date();
+  }
+  
+  getProfile() {
+    return `${this.name} (${this.email})`;
+  }
+  
+  sendEmail(subject, body) {
+    console.log(`Sending email to ${this.email}: ${subject}`);
+    // Email sending logic
+  }
+}</code></pre>
+            </div>
+            
+            <div class="inheritance">
+                <h3>Inheritance with extends</h3>
+                <pre><code>// Base class
+class User {
+  constructor(name, email) {
+    this.name = name;
+    this.email = email;
+    this.role = 'user';
+  }
+  
+  hasPermission(permission) {
+    return false; // Basic users have no special permissions
+  }
+}
+
+// Derived class
+class Admin extends User {
+  constructor(name, email) {
+    super(name, email); // Call parent constructor
+    this.role = 'admin';
+  }
+  
+  hasPermission(permission) {
+    return true; // Admins have all permissions
+  }
+  
+  resetUserPassword(userId) {
+    console.log(`Admin ${this.name} resetting password for user ${userId}`);
+    // Password reset logic
+  }
+}</code></pre>
+            </div>
+            
+            <div class="static_methods">
+                <h3>Static Methods and Properties</h3>
+                <pre><code>class MathUtils {
+  // Static method
+  static sum(...numbers) {
+    return numbers.reduce((total, num) => total + num, 0);
+  }
+  
+  static multiply(...numbers) {
+    return numbers.reduce((product, num) => product * num, 1);
+  }
+  
+  // Static property (ES2022+)
+  static PI = 3.14159265359;
+}
+
+console.log(MathUtils.sum(1, 2, 3, 4)); // 10
+console.log(MathUtils.PI); // 3.14159265359</code></pre>
+            </div>
+            
+            <div class="getter_setter">
+                <h3>Getters and Setters</h3>
+                <pre><code>class Circle {
+  constructor(radius) {
+    this._radius = radius;
+  }
+  
+  // Getter
+  get radius() {
+    return this._radius;
+  }
+  
+  // Setter
+  set radius(value) {
+    if (value <= 0) {
+      throw new Error('Radius must be positive');
+    }
+    this._radius = value;
+  }
+  
+  // Getter
+  get area() {
+    return Math.PI * this._radius * this._radius;
+  }
+  
+  // Getter
+  get circumference() {
+    return 2 * Math.PI * this._radius;
+  }
+}
+
+const circle = new Circle(5);
+console.log(circle.radius); // 5
+console.log(circle.area); // ~78.54
+circle.radius = 10;
+console.log(circle.area); // ~314.16</code></pre>
+            </div>
+            
+            <div class="real_world">
+                <h3>Real-World Example: WordPress Plugin Architecture</h3>
+                <pre><code>// Base Plugin class
+class WPPlugin {
+  constructor(pluginName, version) {
+    this.pluginName = pluginName;
+    this.version = version;
+    this.actions = [];
+    this.filters = [];
+  }
+  
+  init() {
+    this.registerHooks();
+    console.log(`${this.pluginName} v${this.version} initialized`);
+  }
+  
+  registerHooks() {
+    // To be implemented by subclasses
+  }
+  
+  addAction(hook, callback, priority = 10) {
+    this.actions.push({ hook, callback, priority });
+    // WordPress equivalent: add_action(hook, callback, priority);
+  }
+  
+  addFilter(hook, callback, priority = 10) {
+    this.filters.push({ hook, callback, priority });
+    // WordPress equivalent: add_filter(hook, callback, priority);
+  }
+  
+  // Static helper method
+  static sanitizeHtml(html) {
+    // Sanitization logic
+    return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  }
+}
+
+// Specific plugin implementation
+class ContactFormPlugin extends WPPlugin {
+  constructor() {
+    super('Contact Form Plus', '1.2.0');
+    this.formFields = [
+      { name: 'name', label: 'Full Name', required: true },
+      { name: 'email', label: 'Email Address', required: true },
+      { name: 'message', label: 'Message', type: 'textarea', required: true }
+    ];
+  }
+  
+  registerHooks() {
+    this.addAction('wp_enqueue_scripts', () => this.enqueueAssets());
+    this.addAction('init', () => this.registerShortcode());
+    this.addAction('wp_ajax_submit_contact', () => this.processForm());
+    this.addAction('wp_ajax_nopriv_submit_contact', () => this.processForm());
+  }
+  
+  enqueueAssets() {
+    // Enqueue scripts and styles
+  }
+  
+  registerShortcode() {
+    // Register [contact_form] shortcode
+  }
+  
+  renderForm() {
+    // Render the contact form HTML
+    return `
+      &lt;form class="contact-form" method="post"&gt;
+        ${this.formFields.map(field => this.renderField(field)).join('')}
+        &lt;button type="submit"&gt;Send Message&lt;/button&gt;
+      &lt;/form&gt;
+    `;
+  }
+  
+  renderField(field) {
+    // Render individual form field
+  }
+  
+  processForm() {
+    // Process form submission
+  }
+}
+
+// Usage
+const contactForm = new ContactFormPlugin();
+contactForm.init();</code></pre>
+                <p>This example shows how ES6 classes provide a clean way to structure WordPress plugins with inheritance, encapsulation, and code organization.</p>
+            </div>
+            
+            <div class="private_class_features">
+                <h3>Private Class Features (ES2022+)</h3>
+                <pre><code>class BankAccount {
+  // Private field
+  #balance = 0;
+  #transactionHistory = [];
+  
+  constructor(initialDeposit = 0) {
+    if (initialDeposit > 0) {
+      this.deposit(initialDeposit);
+    }
+  }
+  
+  // Public methods
+  deposit(amount) {
+    if (amount <= 0) throw new Error('Deposit amount must be positive');
+    this.#balance += amount;
+    this.#addTransaction('deposit', amount);
+    return this.#balance;
+  }
+  
+  withdraw(amount) {
+    if (amount <= 0) throw new Error('Withdrawal amount must be positive');
+    if (amount > this.#balance) throw new Error('Insufficient funds');
+    
+    this.#balance -= amount;
+    this.#addTransaction('withdrawal', amount);
+    return this.#balance;
+  }
+  
+  getBalance() {
+    return this.#balance;
+  }
+  
+  getTransactionHistory() {
+    // Return a copy to prevent modification
+    return [...this.#transactionHistory];
+  }
+  
+  // Private method
+  #addTransaction(type, amount) {
+    this.#transactionHistory.push({
+      type,
+      amount,
+      timestamp: new Date(),
+      balance: this.#balance
+    });
+  }
+}
+
+const account = new BankAccount(1000);
+account.deposit(500);
+account.withdraw(200);
+console.log(account.getBalance()); // 1300
+console.log(account.getTransactionHistory()); // Transaction history
+
+// These would throw errors:
+// console.log(account.#balance); // SyntaxError
+// account.#addTransaction('hack', 1000000); // SyntaxError</code></pre>
+            </div>
+            
+            <div class="mermaid">
+            classDiagram
+                class User {
+                    +String name
+                    +String email
+                    +Date createdAt
+                    +getProfile()
+                    +sendEmail(subject, body)
+                }
+                
+                class Admin {
+                    +resetUserPassword(userId)
+                    +hasPermission(permission)
+                }
+                
+                class Editor {
+                    +Array permissions
+                    +hasPermission(permission)
+                    +editContent(contentId)
+                }
+                
+                User <|-- Admin
+                User <|-- Editor
+            </div>
+        </section>
+
+        <section class="promises_async">
+            <h2>Promises and Async/Await</h2>
+            
+            <p>Modern JavaScript provides powerful ways to handle asynchronous operations, making code cleaner and more maintainable.</p>
+            
+            <div class="promises">
+                <h3>Promises</h3>
+                <pre><code>// Creating a promise
+const fetchUserData = (userId) => {
+  return new Promise((resolve, reject) => {
+    // Simulating API call
+    setTimeout(() => {
+      if (userId > 0) {
+        resolve({
+          id: userId,
+          name: 'User ' + userId,
+          email: `user${userId}@example.com`
+        });
+      } else {
+        reject(new Error('Invalid user ID'));
+      }
+    }, 1000);
+  });
+};
+
+// Using promises
+fetchUserData(42)
+  .then(user => {
+    console.log('User data:', user);
+    return fetchUserPosts(user.id);
+  })
+  .then(posts => {
+    console.log('User posts:', posts);
+  })
+  .catch(error => {
+    console.error('Error:', error.message);
+  })
+  .finally(() => {
+    console.log('Operation completed');
+  });</code></pre>
+            </div>
+            
+            <div class="async_await">
+                <h3>Async/Await (ES2017)</h3>
+                <pre><code>// Async function
+async function getUserAndPosts(userId) {
+  try {
+    // Await pauses execution until promise resolves
+    const user = await fetchUserData(userId);
+    console.log('User data:', user);
+    
+    const posts = await fetchUserPosts(user.id);
+    console.log('User posts:', posts);
+    
+    return { user, posts };
+  } catch (error) {
+    console.error('Error:', error.message);
+    throw error; // Re-throw if needed
+  } finally {
+    console.log('Operation completed');
+  }
+}
+
+// Using an async function
+getUserAndPosts(42)
+  .then(result => {
+    console.log('Everything loaded successfully');
+  })
+  .catch(error => {
+    console.log('Something went wrong');
+  });</code></pre>
+            </div>
+            
+            <div class="mermaid">
+            flowchart TB
+                A[Promise Creation] --> B(Pending State)
+                B --> C{Result?}
+                C -->|Success| D[Resolved]
+                C -->|Error| E[Rejected]
+                D --> F[.then() handlers]
+                E --> G[.catch() handlers]
+                F --> H[Promise Chain]
+                G --> H
+                H --> I[.finally() handler]
+            </div>
+            
+            <div class="parallel_operations">
+                <h3>Parallel Promise Operations</h3>
+                <pre><code>// Promise.all - waits for all promises to resolve
+async function loadDashboardData(userId) {
+  try {
+    // Run these operations in parallel
+    const [user, posts, comments, stats] = await Promise.all([
+      fetchUserData(userId),
+      fetchUserPosts(userId),
+      fetchUserComments(userId),
+      fetchUserStats(userId)
+    ]);
+    
+    return {
+      user,
+      posts,
+      comments,
+      stats
+    };
+  } catch (error) {
+    console.error('Error loading dashboard:', error);
+    throw error;
+  }
+}
+
+// Promise.race - resolves as soon as one promise resolves
+async function fetchWithTimeout(url, timeoutMs) {
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Request timed out')), timeoutMs);
+  });
+  
+  const responsePromise = fetch(url);
+  
+  // Whichever finishes first wins the race
+  return Promise.race([responsePromise, timeoutPromise]);
+}</code></pre>
+            </div>
+            
+            <div class="real_world">
+                <h3>Real-World Example: WordPress REST API Interactions</h3>
+                <pre><code>// WordPress theme/plugin REST API interactions
+class WPAPIClient {
+  constructor(baseUrl = '/wp-json/wp/v2') {
+    this.baseUrl = baseUrl;
+    this.defaultHeaders = {
+      'Content-Type': 'application/json',
+      'X-WP-Nonce': wpApiSettings.nonce // WordPress provided nonce
+    };
+  }
+  
+  // Get data from API
+  async get(endpoint, params = {}) {
+    const url = new URL(this.baseUrl + endpoint, window.location.origin);
+    
+    // Add query parameters
+    Object.entries(params).forEach(([key, value]) => {
+      url.searchParams.append(key, value);
+    });
+    
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: this.defaultHeaders,
+        credentials: 'same-origin'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error(`Error fetching ${endpoint}:`, error);
+      throw error;
+    }
+  }
+  
+  // Create data via API
+  async post(endpoint, data = {}) {
+    try {
+      const response = await fetch(this.baseUrl + endpoint, {
+        method: 'POST',
+        headers: this.defaultHeaders,
+        credentials: 'same-origin',
+        body: JSON.stringify(data)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `API error: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error(`Error posting to ${endpoint}:`, error);
+      throw error;
+    }
+  }
+  
+  // Update data via API
+  async update(endpoint, id, data = {}) {
+    return this.post(`${endpoint}/${id}`, data);
+  }
+  
+  // Delete data via API
+  async delete(endpoint, id) {
+    try {
+      const response = await fetch(`${this.baseUrl}${endpoint}/${id}`, {
+        method: 'DELETE',
+        headers: {
+          ...this.defaultHeaders,
+          'X-HTTP-Method-Override': 'DELETE'
+        },
+        credentials: 'same-origin'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error(`Error deleting ${endpoint}/${id}:`, error);
+      throw error;
+    }
+  }
+}
+
+// Usage example: Building a post editor
+async function initPostEditor() {
+  const api = new WPAPIClient();
+  const editor = {
+    postId: document.getElementById('post-id').value,
+    titleField: document.getElementById('title'),
+    contentField: document.getElementById('content'),
+    saveButton: document.getElementById('save'),
+    statusMessage: document.getElementById('status')
+  };
+  
+  try {
+    // Load existing post data
+    if (editor.postId) {
+      const post = await api.get(`/posts/${editor.postId}`);
+      editor.titleField.value = post.title.raw;
+      editor.contentField.value = post.content.raw;
+    }
+    
+    // Set up save handler
+    editor.saveButton.addEventListener('click', async () => {
+      try {
+        editor.statusMessage.textContent = 'Saving...';
+        editor.saveButton.disabled = true;
+        
+        const postData = {
+          title: editor.titleField.value,
+          content: editor.contentField.value,
+          status: 'publish'
+        };
+        
+        let result;
+        if (editor.postId) {
+          result = await api.update('/posts', editor.postId, postData);
+        } else {
+          result = await api.post('/posts', postData);
+          // Update URL with new post ID
+          window.history.replaceState(
+            {}, 
+            document.title, 
+            `?post=${result.id}&action=edit`
+          );
+        }
+        
+        editor.statusMessage.textContent = 'Post saved successfully!';
+        editor.postId = result.id;
+      } catch (error) {
+        editor.statusMessage.textContent = `Error: ${error.message}`;
+      } finally {
+        editor.saveButton.disabled = false;
+      }
+    });
+  } catch (error) {
+    console.error('Error initializing editor:', error);
+    editor.statusMessage.textContent = 'Error loading post data';
+  }
+}
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', initPostEditor);</code></pre>
+                <p>This example shows how Promises and async/await provide a clean way to handle complex asynchronous operations when building interactive WordPress interfaces.</p>
+            </div>
+            
+            <div class="promise_patterns">
+                <h3>Additional Promise Patterns (ES2020+)</h3>
+                <pre><code>// Promise.allSettled - get results of all promises, even rejected ones
+async function fetchAllUserData(userIds) {
+  const results = await Promise.allSettled(
+    userIds.map(id => fetchUserData(id))
+  );
+  
+  // Process all results, including errors
+  const successfulFetches = results
+    .filter(result => result.status === 'fulfilled')
+    .map(result => result.value);
+    
+  const failedFetches = results
+    .filter(result => result.status === 'rejected')
+    .map(result => result.reason);
+    
+  console.log(`Successfully fetched: ${successfulFetches.length} users`);
+  console.log(`Failed to fetch: ${failedFetches.length} users`);
+  
+  return {
+    successful: successfulFetches,
+    failed: failedFetches
+  };
+}
+
+// Promise.any - resolve when any promise resolves (ES2021)
+async function fetchFromFastestMirror(urls) {
+  try {
+    const response = await Promise.any(
+      urls.map(url => fetch(url))
+    );
+    return await response.json();
+  } catch (error) {
+    // AggregateError if all promises reject
+    console.error('All mirrors failed:', error);
+    throw new Error('Could not fetch data from any mirror');
+  }
+}</code></pre>
+            </div>
+        </section>
+
+        <section class="modules">
+            <h2>ES Modules</h2>
+            
+            <p>ES6 introduced a standardized module system for organizing and sharing JavaScript code.</p>
+            
+            <div class="modules_basics">
+                <h3>Basic Module Syntax</h3>
+                <pre><code>// utils.js - exporting functionality
+export function formatDate(date) {
+  return new Intl.DateTimeFormat('en-US').format(date);
+}
+
+export function formatCurrency(amount) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD'
+  }).format(amount);
+}
+
+export const TAX_RATE = 0.07;
+
+// main.js - importing functionality
+import { formatDate, formatCurrency, TAX_RATE } from './utils.js';
+
+const orderDate = new Date();
+const orderAmount = 99.99;
+const tax = orderAmount * TAX_RATE;
+const total = orderAmount + tax;
+
+console.log(`Order Date: ${formatDate(orderDate)}`);
+console.log(`Subtotal: ${formatCurrency(orderAmount)}`);
+console.log(`Tax: ${formatCurrency(tax)}`);
+console.log(`Total: ${formatCurrency(total)}`);</code></pre>
+            </div>
+            
+            <div class="default_exports">
+                <h3>Default Exports and Imports</h3>
+                <pre><code>// user.js
+export default class User {
+  constructor(name, email) {
+    this.name = name;
+    this.email = email;
+  }
+  
+  getProfile() {
+    return `${this.name} (${this.email})`;
+  }
+}
+
+// You can also export constants, functions, etc. as default
+export default function createUser(name, email) {
+  return new User(name, email);
+}
+
+// Importing a default export
+import User from './user.js';
+const user = new User('John', 'john@example.com');</code></pre>
+            </div>
+            
+            <div class="mixed_exports">
+                <h3>Mixed Default and Named Exports</h3>
+                <pre><code>// api.js
+export default class API {
+  constructor(baseUrl) {
+    this.baseUrl = baseUrl;
+  }
+  
+  // API methods...
+}
+
+export const API_VERSION = '1.0.0';
+export function formatResponse(data) {
+  // Format logic...
+}
+
+// Importing mixed exports
+import API, { API_VERSION, formatResponse } from './api.js';</code></pre>
+            </div>
+            
+            <div class="rename_imports">
+                <h3>Renaming Imports and Exports</h3>
+                <pre><code>// math.js
+export const PI = 3.14159;
+export const E = 2.71828;
+
+// Renaming during export
+export { PI as MATH_PI, E as EULER_NUMBER };
+
+// Importing with different names
+import { 
+  PI, 
+  E,
+  MATH_PI as π,
+  EULER_NUMBER as e
+} from './math.js';</code></pre>
+            </div>
+            
+            <div class="dynamic_imports">
+                <h3>Dynamic Imports (ES2020)</h3>
+                <pre><code>// Lazy-load modules when needed
+async function loadEditor() {
+  try {
+    // Load module dynamically when needed
+    const { default: Editor } = await import('./editor.js');
+    
+    // Initialize editor
+    const editor = new Editor('#content');
+    editor.init();
+    
+    return editor;
+  } catch (error) {
+    console.error('Error loading editor:', error);
+  }
+}
+
+// Use when needed
+document.querySelector('#edit-button').addEventListener('click', () => {
+  loadEditor();
+});</code></pre>
+            </div>
+            
+            <div class="real_world">
+                <h3>Real-World Example: WordPress Plugin Architecture</h3>
+                <pre><code>// src/utils/formatting.js
+export function formatDate(date) {
+  return new Date(date).toLocaleDateString();
+}
+
+export function truncateText(text, length = 100) {
+  if (text.length <= length) return text;
+  return text.substring(0, length) + '...';
+}
+
+// src/components/PostCard.js
+import { formatDate, truncateText } from '../utils/formatting.js';
+
+export default class PostCard {
+  constructor(post) {
+    this.post = post;
+  }
+  
+  render() {
+    return `
+      &lt;div class="post-card" id="post-${this.post.id}"&gt;
+        &lt;h3&gt;${this.post.title}&lt;/h3&gt;
+        &lt;div class="post-meta"&gt;
+          &lt;span class="date"&gt;${formatDate(this.post.date)}&lt;/span&gt;
+          &lt;span class="author"&gt;by ${this.post.author}&lt;/span&gt;
+        &lt;/div&gt;
+        &lt;div class="post-excerpt"&gt;
+          ${truncateText(this.post.content, 150)}
+        &lt;/div&gt;
+        &lt;a href="${this.post.url}" class="read-more"&gt;Read More&lt;/a&gt;
+      &lt;/div&gt;
+    `;
+  }
+}
+
+// src/components/PostList.js
+import PostCard from './PostCard.js';
+
+export default class PostList {
+  constructor(container, posts = []) {
+    this.container = document.querySelector(container);
+    this.posts = posts;
+  }
+  
+  async loadPosts() {
+    try {
+      const response = await fetch('/wp-json/wp/v2/posts');
+      this.posts = await response.json();
+      this.render();
+    } catch (error) {
+      console.error('Error loading posts:', error);
+    }
+  }
+  
+  render() {
+    if (!this.container) return;
+    
+    this.container.innerHTML = this.posts
+      .map(post => new PostCard(post).render())
+      .join('');
+  }
+}
+
+// src/index.js - Main entry point
+import PostList from './components/PostList.js';
+
+document.addEventListener('DOMContentLoaded', () => {
+  const postList = new PostList('#blog-posts');
+  postList.loadPosts();
+});</code></pre>
+                <p>This modular approach makes it easier to organize code, reuse components, and maintain WordPress themes and plugins.</p>
+            </div>
+            
+            <div class="wordpress_note">
+                <h3>Using ES Modules with WordPress</h3>
+                <p>To use ES modules in WordPress, you'll need to:</p>
+                <ol>
+                    <li>Enqueue your script with the <code>type="module"</code> attribute:
+                    <pre><code>// In your theme's functions.php or plugin file
+function enqueue_module_scripts() {
+  wp_enqueue_script(
+    'my-module-script',
+    get_template_directory_uri() . '/js/module.js',
+    [],
+    '1.0.0',
+    true
+  );
+  
+  // Add type="module" attribute
+  add_filter('script_loader_tag', function($tag, $handle, $src) {
+    if ($handle === 'my-module-script') {
+      $tag = '&lt;script type="module" src="' . esc_url($src) . '"&gt;&lt;/script&gt;';
+    }
+    return $tag;
+  }, 10, 3);
+}
+add_action('wp_enqueue_scripts', 'enqueue_module_scripts');</code></pre>
+                    </li>
+                    <li>Consider browser compatibility and provide fallbacks for older browsers</li>
+                    <li>Use a bundler like Webpack or Rollup during development for older browsers</li>
+                </ol>
+            </div>
+        </section>
+
+        <section class="additional_features">
+            <h2>Other Important ES6+ Features</h2>
+            
+            <div class="map_set">
+                <h3>Map and Set Collections</h3>
+                <pre><code>// Map - key-value pairs where keys can be any type
+const userRoles = new Map();
+userRoles.set(42, 'admin');
+userRoles.set('jane@example.com', 'editor');
+userRoles.set(user1, 'contributor'); // Can use objects as keys
+
+console.log(userRoles.get(42)); // 'admin'
+console.log(userRoles.has('jane@example.com')); // true
+console.log(userRoles.size); // 3
+
+// Set - collection of unique values
+const uniqueCategories = new Set();
+uniqueCategories.add('JavaScript');
+uniqueCategories.add('PHP');
+uniqueCategories.add('WordPress');
+uniqueCategories.add('JavaScript'); // Duplicate, won't be added
+
+console.log(uniqueCategories.size); // 3
+console.log(uniqueCategories.has('PHP')); // true
+
+// Convert Set to Array
+const categoriesArray = [...uniqueCategories];</code></pre>
+            </div>
+            
+            <div class="symbol">
+                <h3>Symbol - Unique Identifiers</h3>
+                <pre><code>// Create unique property keys
+const id = Symbol('id');
+const user = {
+  name: 'Alice',
+  [id]: 42 // Using a Symbol as a property key
+};
+
+console.log(user[id]); // 42
+console.log(Object.keys(user)); // ['name'] - Symbols are not enumerable
+
+// Well-known Symbols
+class CustomCollection {
+  constructor() {
+    this.items = [];
+  }
+  
+  add(item) {
+    this.items.push(item);
+  }
+  
+  // Make the class iterable
+  [Symbol.iterator]() {
+    let index = 0;
+    return {
+      next: () => {
+        if (index < this.items.length) {
+          return { value: this.items[index++], done: false };
+        } else {
+          return { done: true };
+        }
+      }
+    };
+  }
+}
+
+const collection = new CustomCollection();
+collection.add('a');
+collection.add('b');
+collection.add('c');
+
+// Now we can use for...of
+for (const item of collection) {
+  console.log(item); // 'a', 'b', 'c'
+}</code></pre>
+            </div>
+            
+            <div class="array_methods">
+                <h3>Array Methods</h3>
+                <pre><code>// Array.from - create arrays from array-like objects
+const nodeList = document.querySelectorAll('.item');
+const itemsArray = Array.from(nodeList);
+
+// With mapping function
+const numbersAsStrings = ['1', '2', '3', '4'];
+const numbers = Array.from(numbersAsStrings, str => parseInt(str, 10));
+
+// Array.find and Array.findIndex
+const posts = [
+  { id: 1, title: 'Hello World', status: 'published' },
+  { id: 2, title: 'Draft Post', status: 'draft' },
+  { id: 3, title: 'Another Post', status: 'published' }
+];
+
+const publishedPost = posts.find(post => post.status === 'published');
+// { id: 1, title: 'Hello World', status: 'published' }
+
+const draftIndex = posts.findIndex(post => post.status === 'draft');
+// 1
+
+// Array.includes
+const categories = ['JavaScript', 'PHP', 'WordPress'];
+console.log(categories.includes('PHP')); // true
+
+// Array.flat and Array.flatMap (ES2019)
+const nestedArray = [1, 2, [3, 4, [5, 6]]];
+console.log(nestedArray.flat()); // [1, 2, 3, 4, [5, 6]]
+console.log(nestedArray.flat(2)); // [1, 2, 3, 4, 5, 6]
+
+// flatMap combines map and flat
+const sentences = ['Hello world', 'How are you'];
+const words = sentences.flatMap(sentence => sentence.split(' '));
+// ['Hello', 'world', 'How', 'are', 'you']</code></pre>
+            </div>
+            
+            <div class="object_methods">
+                <h3>Object Methods</h3>
+                <pre><code>// Object.entries and Object.fromEntries
+const person = { name: 'John', age: 30, role: 'developer' };
+
+// Convert object to array of [key, value] pairs
+const entries = Object.entries(person);
+// [['name', 'John'], ['age', 30], ['role', 'developer']]
+
+// Process entries
+const processedEntries = entries.map(([key, value]) => {
+  if (key === 'age') return [key, value + 1];
+  return [key, value];
+});
+
+// Convert back to object
+const updatedPerson = Object.fromEntries(processedEntries);
+// { name: 'John', age: 31, role: 'developer' }
+
+// Object.values
+const values = Object.values(person);
+// ['John', 30, 'developer']
+
+// Object spread (ES2018)
+const defaults = { theme: 'light', notifications: true, fontSize: 'medium' };
+const userPreferences = { theme: 'dark', fontSize: 'large' };
+
+const settings = { ...defaults, ...userPreferences };
+// { theme: 'dark', notifications: true, fontSize: 'large' }</code></pre>
+            </div>
+            
+            <div class="string_methods">
+                <h3>String Methods</h3>
+                <pre><code>// String.padStart and String.padEnd
+const productId = '42';
+const paddedId = productId.padStart(5, '0'); // '00042'
+
+const fileName = 'report';
+const fullFileName = fileName.padEnd(10, '_') + '.pdf'; // 'report_____.pdf'
+
+// String.trimStart and String.trimEnd
+const input = '  user@example.com  ';
+const trimmedInput = input.trim(); // 'user@example.com'
+const trimmedStart = input.trimStart(); // 'user@example.com  '
+const trimmedEnd = input.trimEnd(); // '  user@example.com'
+
+// String.replaceAll (ES2021)
+const template = 'Hello {{name}}, welcome to {{site}}!';
+const message = template
+  .replaceAll('{{name}}', 'John')
+  .replaceAll('{{site}}', 'WordPress Dev Course');
+// 'Hello John, welcome to WordPress Dev Course!'</code></pre>
+            </div>
+            
+            <div class="nullish_coalescing">
+                <h3>Nullish Coalescing and Optional Chaining (ES2020)</h3>
+                <pre><code>// Nullish coalescing operator (??)
+// Only falls back if value is null or undefined
+function getUserSettings(userId) {
+  const user = getUser(userId);
+  
+  // Old way: might fallback unintentionally for "" or 0 or false
+  const username = user.username || 'Anonymous';
+  const postsPerPage = user.preferences.postsPerPage || 10;
+  
+  // New way: only falls back for null/undefined
+  const username = user.username ?? 'Anonymous';
+  // If user has postsPerPage: 0, this will correctly use 0
+  const postsPerPage = user.preferences.postsPerPage ?? 10;
+}
+
+// Optional chaining (?.)
+// Prevents errors when accessing properties of undefined
+function displayUserProfile(userId) {
+  const user = getUser(userId);
+  
+  // Old way: verbose checks to avoid errors
+  const city = user && user.address && user.address.city;
+  
+  // New way: concise and safe property access
+  const city = user?.address?.city;
+  
+  // Also works with methods
+  user?.sendEmail?.('Welcome!');
+  
+  // And array access
+  const firstTag = user?.tags?.[0];
+}</code></pre>
+            </div>
+        </section>
+
+        <section class="practical_application">
+            <h2>Practical Application: Modern JavaScript in WordPress Development</h2>
+            
+            <div class="mermaid">
+            flowchart TD
+                A[WordPress Development] -->|Backend| B[PHP + WP Core]
+                A -->|Frontend| C[JavaScript & ES6+]
+                C --> D[Theme Development]
+                C --> E[Plugin Development]
+                C --> F[Gutenberg Blocks]
+                C --> G[REST API Interactions]
+                C --> H[Admin UI Enhancements]
+            </div>
+            
+            <p>Modern JavaScript is essential for WordPress development, especially since the introduction of the Block Editor (Gutenberg) which is built with React and relies heavily on ES6+ features.</p>
+            
+            <div class="wordpress_usage">
+                <h3>Where ES6+ Features Are Used in WordPress</h3>
+                <ul>
+                    <li><strong>Block Editor (Gutenberg)</strong> - Built with React, uses ES6+ extensively</li>
+                    <li><strong>Theme Development</strong> - Modern themes use ES6 for interactive features</li>
+                    <li><strong>Custom Blocks</strong> - Block development relies on ES6 classes, async/await, etc.</li>
+                    <li><strong>AJAX Interactions</strong> - Fetch API and Promises for server communication</li>
+                    <li><strong>Plugin Development</strong> - Modern plugins use ES6+ for organization and maintainability</li>
+                </ul>
+            </div>
+            
+            <div class="gutenberg_example">
+                <h3>Example: Creating a Custom Gutenberg Block</h3>
+                <p>The following example demonstrates how various ES6+ features (arrow functions, destructuring, template literals, etc.) are used when creating a custom testimonial block for the WordPress Gutenberg editor:</p>
+                <pre><code>// blocks/testimonial/index.js
+import { registerBlockType } from '@wordpress/blocks';
+import { RichText, MediaUpload, InspectorControls } from '@wordpress/block-editor';
+import { PanelBody, TextControl, SelectControl } from '@wordpress/components';
+
+// Register block using ES6+ features
+registerBlockType('my-plugin/testimonial', {
+  title: 'Testimonial',
+  icon: 'format-quote',
+  category: 'common',
+  
+  // Using object destructuring in parameters
+  attributes: {
+    quote: {
+      type: 'string',
+      source: 'html',
+      selector: '.testimonial-text'
+    },
+    author: {
+      type: 'string',
+      source: 'html',
+      selector: '.testimonial-author'
+    },
+    avatarUrl: {
+      type: 'string',
+      default: ''
+    },
+    backgroundColor: {
+      type: 'string',
+      default: '#f7f7f7'
+    }
+  },
+  
+  // Arrow function with destructured parameters
+  edit: ({ attributes, setAttributes }) => {
+    const { quote, author, avatarUrl, backgroundColor } = attributes;
+    
+    // Using template literals for inline styles
+    const blockStyle = {
+      backgroundColor,
+      padding: '20px',
+      borderRadius: '4px'
+    };
+    
+    // Event handler using arrow function
+    const onChangeQuote = (newQuote) => {
+      setAttributes({ quote: newQuote });
+    };
+    
+    const onChangeAuthor = (newAuthor) => {
+      setAttributes({ author: newAuthor });
+    };
+    
+    const onSelectImage = (media) => {
+      setAttributes({ avatarUrl: media.url });
+    };
+    
+    const onChangeBackgroundColor = (newColor) => {
+      setAttributes({ backgroundColor: newColor });
+    };
+    
+    // Using JSX (transpiled from ES6+)
+    return (
+      <>
+        <InspectorControls>
+          <PanelBody title="Testimonial Settings">
+            <TextControl
+              label="Background Color"
+              value={backgroundColor}
+              onChange={onChangeBackgroundColor}
+            />
+          </PanelBody>
+        </InspectorControls>
+        
+        <div style={blockStyle}>
+          <div className="testimonial-content">
+            <RichText
+              tagName="blockquote"
+              className="testimonial-text"
+              value={quote}
+              onChange={onChangeQuote}
+              placeholder="Enter testimonial text..."
+            />
+            
+            <div className="testimonial-meta">
+              {avatarUrl && (
+                <img 
+                  src={avatarUrl} 
+                  className="testimonial-avatar" 
+                  alt="Author avatar"
+                />
+              )}
+              
+              <MediaUpload
+                onSelect={onSelectImage}
+                type="image"
+                render={({ open }) => (
+                  <button onClick={open}>
+                    {avatarUrl ? 'Change Avatar' : 'Add Avatar'}
+                  </button>
+                )}
+              />
+              
+              <RichText
+                tagName="cite"
+                className="testimonial-author"
+                value={author}
+                onChange={onChangeAuthor}
+                placeholder="Testimonial author..."
+              />
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  },
+  
+  // Using template literals in the save function
+  save: ({ attributes }) => {
+    const { quote, author, avatarUrl, backgroundColor } = attributes;
+    
+    return (
+      <div 
+        className="testimonial"
+        style={{ backgroundColor, padding: '20px', borderRadius: '4px' }}
+      >
+        <blockquote className="testimonial-text">
+          {quote}
+        </blockquote>
+        
+        <div className="testimonial-meta">
+          {avatarUrl && (
+            <img 
+              src={avatarUrl} 
+              className="testimonial-avatar" 
+              alt="Author avatar"
+            />
+          )}
+          
+          <cite className="testimonial-author">
+            {author}
+          </cite>
+        </div>
+      </div>
+    );
+  }
+});
+</div>
+            
+            <div class="performance_tips">
+                <h3>Performance Tips When Using ES6+ in WordPress</h3>
+                <ul>
+                    <li><strong>Bundle size awareness</strong> - Modern features can increase file size when transpiled</li>
+                    <li><strong>Code splitting</strong> - Use dynamic imports to load code only when needed</li>
+                    <li><strong>Transpilation</strong> - Use Babel to ensure compatibility with older browsers</li>
+                    <li><strong>Minification</strong> - Use terser or similar tools to reduce file size</li>
+                    <li><strong>Polyfills</strong> - Include only necessary polyfills for features you use</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="compatibility">
+            <h2>Browser Compatibility and Transpilation</h2>
+            
+            <p>While ES6+ features are powerful, not all browsers (especially older ones) support them natively. This is particularly important for WordPress developers who need to support a wide range of users.</p>
+            
+            <div class="mermaid">
+            flowchart LR
+                A[Modern ES6+ Code] --> B[Babel Transpiler]
+                B --> C[ES5 Compatible Code]
+                C --> D[Browser Execution]
+                
+                E[Development Dependencies] --> B
+                E --> F[Webpack/Gulp]
+                F --> G[Bundling]
+                G --> C
+            </div>
+            
+            <div class="transpilation">
+                <h3>Setting Up Transpilation for WordPress Projects</h3>
+                <pre><code>// package.json example for a WordPress theme/plugin
+{
+  "name": "my-wordpress-project",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "webpack --mode production",
+    "dev": "webpack --mode development --watch"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.5",
+    "@babel/preset-env": "^7.20.2",
+    "babel-loader": "^9.1.0",
+    "webpack": "^5.75.0",
+    "webpack-cli": "^5.0.1"
+  }
+}
+
+// webpack.config.js
+const path = require('path');
+
+module.exports = {
+  entry: {
+    main: './src/js/main.js',
+    admin: './src/js/admin.js'
+  },
+  output: {
+    filename: '[name].js',
+    path: path.resolve(__dirname, 'dist/js')
+  },
+  module: {
+    rules: [
+      {
+        test: /\.js$/,
+        exclude: /node_modules/,
+        use: {
+          loader: 'babel-loader',
+          options: {
+            presets: ['@babel/preset-env']
+          }
+        }
+      }
+    ]
+  }
+};</code></pre>
+            </div>
+            
+            <div class="compatibility_strategies">
+                <h3>Compatibility Strategies</h3>
+                <ol>
+                    <li><strong>Feature detection</strong> - Check if features exist before using them</li>
+                    <li><strong>Polyfills</strong> - Add missing functionality for older browsers</li>
+                    <li><strong>Progressive enhancement</strong> - Provide basic functionality for all users, enhanced for modern browsers</li>
+                </ol>
+                
+                <pre><code>// Feature detection example
+if (window.fetch) {
+  // Use fetch API
+} else {
+  // Fall back to XMLHttpRequest
+}
+
+// Using core-js for polyfills (imported selectively)
+import 'core-js/features/promise';
+import 'core-js/features/object/entries';
+import 'core-js/features/array/from';</code></pre>
+            </div>
+        </section>
+
+        <section class="learning_resources">
+            <h2>Learning Resources and Tools</h2>
+            
+            <div class="resources">
+                <h3>Essential Resources</h3>
+                <ul>
+                    <li><strong>MDN Web Docs</strong> - Comprehensive JavaScript reference</li>
+                    <li><strong>Babel</strong> - The JavaScript compiler/transpiler</li>
+                    <li><strong>ESLint</strong> - Code quality tool that helps enforce ES6+ best practices</li>
+                    <li><strong>WordPress Coding Standards</strong> - JavaScript guidelines for WordPress development</li>
+                    <li><strong>WordPress Block Editor Handbook</strong> - Documentation for Gutenberg development</li>
+                </ul>
+            </div>
+            
+            <div class="tools">
+                <h3>Development Tools</h3>
+                <ul>
+                    <li><strong>webpack</strong> - Module bundler for JavaScript applications</li>
+                    <li><strong>npm/yarn</strong> - Package managers for JavaScript libraries</li>
+                    <li><strong>VS Code</strong> - Editor with excellent ES6+ support and extensions</li>
+                    <li><strong>Chrome DevTools</strong> - For debugging and performance analysis</li>
+                    <li><strong>@wordpress/scripts</strong> - WordPress package for common JS tools configuration</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="recap">
+            <h2>Recap and Summary</h2>
+            
+            <div class="key_points">
+                <h3>Key Takeaways</h3>
+                <ul>
+                    <li>ES6+ introduced powerful features that make JavaScript more expressive and maintainable</li>
+                    <li>Block-scoped variables (<code>let</code> and <code>const</code>) provide better scoping control than <code>var</code></li>
+                    <li>Arrow functions offer concise syntax and lexical <code>this</code> binding</li>
+                    <li>Template literals make string manipulation and HTML generation cleaner</li>
+                    <li>Destructuring simplifies extracting values from objects and arrays</li>
+                    <li>Classes provide a cleaner syntax for object-oriented programming</li>
+                    <li>Modules allow better code organization and dependency management</li>
+                    <li>Promises and async/await simplify asynchronous programming</li>
+                    <li>Spread and rest operators make working with arrays and objects more powerful</li>
+                    <li>WordPress development increasingly relies on modern JavaScript, especially for Gutenberg blocks</li>
+                </ul>
+            </div>
+            
+            <div class="next_steps">
+                <h3>Next Steps</h3>
+                <p>In our next session, we'll explore jQuery and see how it compares to modern JavaScript. While jQuery was once essential for cross-browser compatibility, many of its features are now available natively through ES6+ and modern browser APIs. We'll learn when it's appropriate to use jQuery in WordPress development and when native JavaScript is a better choice.</p>
+            </div>
+        </section>
+
+        <section class="practice">
+            <h2>Practice Exercises</h2>
+            
+            <div class="exercises">
+                <h3>Basic Exercises</h3>
+                <ol>
+                    <li>Convert an existing JavaScript function to use arrow functions, template literals, and destructuring.</li>
+                    <li>Refactor a series of callback functions into an async/await pattern.</li>
+                    <li>Create a simple class to represent a WordPress post with appropriate methods and properties.</li>
+                </ol>
+                
+                <h3>Advanced Challenge</h3>
+                <p>Build a simple content filtering system for WordPress posts that:
+                <ol>
+                    <li>Fetches posts from the WordPress REST API</li>
+                    <li>Allows filtering by category, tag, and date using ES6+ features</li>
+                    <li>Renders the filtered posts with template literals</li>
+                    <li>Uses Promises or async/await for all asynchronous operations</li>
+                </ol>
+                </p>
+            </div>
+        </section>
+    </main>
+    
+    <footer>
+        <p>&copy; 2025 PHP WordPress Development Course</p>
+    </footer>
+</body>
+</html>
