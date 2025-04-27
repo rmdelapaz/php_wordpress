@@ -9,311 +9,6 @@
     <script type="module">
       import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
       mermaid.initialize({ startOnLoad: true });
-
-            </div>
-            
-            <div class="ajax_example">
-                <h3>Example: AJAX with Fetch and async/await</h3>
-                <pre><code>// modern-admin.js - WordPress admin UI enhancement
-class PostManager {
-  constructor() {
-    this.posts = [];
-    this.container = document.querySelector('#posts-container');
-    this.filterForm = document.querySelector('#post-filter-form');
-    
-    // Event binding with arrow functions to maintain 'this' context
-    this.filterForm.addEventListener('submit', (e) => this.handleFilterSubmit(e));
-    
-    // Initialize
-    this.init();
-  }
-  
-  async init() {
-    try {
-      await this.loadPosts();
-      this.renderPosts();
-    } catch (error) {
-      this.showError('Failed to load posts.');
-      console.error(error);
-    }
-  }
-  
-  // Using async/await with the Fetch API
-  async loadPosts(filters = {}) {
-    this.showLoading();
-    
-    // Build query parameters using Object methods
-    const queryParams = new URLSearchParams(
-      Object.entries(filters).filter(([_, value]) => value)
-    ).toString();
-    
-    try {
-      const response = await fetch(`/wp-json/wp/v2/posts?${queryParams}`);
-      
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
-      
-      this.posts = await response.json();
-      return this.posts;
-    } catch (error) {
-      console.error('Error fetching posts:', error);
-      throw error;
-    } finally {
-      this.hideLoading();
-    }
-  }
-  
-  // Using template literals for HTML generation
-  renderPosts() {
-    if (!this.posts.length) {
-      this.container.innerHTML = '&lt;p&gt;No posts found.&lt;/p&gt;';
-      return;
-    }
-    
-    // Using map and join for HTML generation
-    this.container.innerHTML = this.posts
-      .map(post => `
-        &lt;div class="post-card" id="post-${post.id}"&gt;
-          &lt;h3&gt;${post.title.rendered}&lt;/h3&gt;
-          &lt;div class="post-meta"&gt;
-            ${new Date(post.date).toLocaleDateString()}
-          &lt;/div&gt;
-          &lt;div class="post-actions"&gt;
-            &lt;button data-id="${post.id}" class="edit-post"&gt;Edit&lt;/button&gt;
-            &lt;button data-id="${post.id}" class="delete-post"&gt;Delete&lt;/button&gt;
-          &lt;/div&gt;
-        &lt;/div&gt;
-      `)
-      .join('');
-    
-    // Event delegation with arrow functions
-    this.container.addEventListener('click', e => {
-      if (e.target.classList.contains('edit-post')) {
-        const postId = e.target.dataset.id;
-        this.editPost(postId);
-      } else if (e.target.classList.contains('delete-post')) {
-        const postId = e.target.dataset.id;
-        this.confirmDeletePost(postId);
-      }
-    });
-  }
-  
-  async handleFilterSubmit(e) {
-    e.preventDefault();
-    
-    // FormData and Object.fromEntries for form processing
-    const formData = new FormData(this.filterForm);
-    const filters = Object.fromEntries(formData);
-    
-    try {
-      await this.loadPosts(filters);
-      this.renderPosts();
-    } catch (error) {
-      this.showError('Error applying filters.');
-    }
-  }
-  
-  // More methods omitted for brevity...
-  
-  showLoading() {
-    // Show loading indicator
-  }
-  
-  hideLoading() {
-    // Hide loading indicator
-  }
-  
-  showError(message) {
-    // Display error message
-  }
-}
-
-// Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-  new PostManager();
-});</code></pre>
-            </div>
-            
-            <div class="performance_tips">
-                <h3>Performance Tips When Using ES6+ in WordPress</h3>
-                <ul>
-                    <li><strong>Bundle size awareness</strong> - Modern features can increase file size when transpiled</li>
-                    <li><strong>Code splitting</strong> - Use dynamic imports to load code only when needed</li>
-                    <li><strong>Transpilation</strong> - Use Babel to ensure compatibility with older browsers</li>
-                    <li><strong>Minification</strong> - Use terser or similar tools to reduce file size</li>
-                    <li><strong>Polyfills</strong> - Include only necessary polyfills for features you use</li>
-                </ul>
-            </div>
-        </section>
-
-        <section class="compatibility">
-            <h2>Browser Compatibility and Transpilation</h2>
-            
-            <p>While ES6+ features are powerful, not all browsers (especially older ones) support them natively. This is particularly important for WordPress developers who need to support a wide range of users.</p>
-            
-            <div class="mermaid">
-            flowchart LR
-                A[Modern ES6+ Code] --> B[Babel Transpiler]
-                B --> C[ES5 Compatible Code]
-                C --> D[Browser Execution]
-                
-                E[Development Dependencies] --> B
-                E --> F[Webpack/Gulp]
-                F --> G[Bundling]
-                G --> C
-            </div>
-            
-            <div class="transpilation">
-                <h3>Setting Up Transpilation for WordPress Projects</h3>
-                <pre><code>// package.json example for a WordPress theme/plugin
-{
-  "name": "my-wordpress-project",
-  "version": "1.0.0",
-  "scripts": {
-    "build": "webpack --mode production",
-    "dev": "webpack --mode development --watch"
-  },
-  "devDependencies": {
-    "@babel/core": "^7.20.5",
-    "@babel/preset-env": "^7.20.2",
-    "babel-loader": "^9.1.0",
-    "webpack": "^5.75.0",
-    "webpack-cli": "^5.0.1"
-  }
-}
-
-// webpack.config.js
-const path = require('path');
-
-module.exports = {
-  entry: {
-    main: './src/js/main.js',
-    admin: './src/js/admin.js'
-  },
-  output: {
-    filename: '[name].js',
-    path: path.resolve(__dirname, 'dist/js')
-  },
-  module: {
-    rules: [
-      {
-        test: /\.js$/,
-        exclude: /node_modules/,
-        use: {
-          loader: 'babel-loader',
-          options: {
-            presets: ['@babel/preset-env']
-          }
-        }
-      }
-    ]
-  }
-};</code></pre>
-            </div>
-            
-            <div class="compatibility_strategies">
-                <h3>Compatibility Strategies</h3>
-                <ol>
-                    <li><strong>Feature detection</strong> - Check if features exist before using them</li>
-                    <li><strong>Polyfills</strong> - Add missing functionality for older browsers</li>
-                    <li><strong>Progressive enhancement</strong> - Provide basic functionality for all users, enhanced for modern browsers</li>
-                </ol>
-                
-                <pre><code>// Feature detection example
-if (window.fetch) {
-  // Use fetch API
-} else {
-  // Fall back to XMLHttpRequest
-}
-
-// Using core-js for polyfills (imported selectively)
-import 'core-js/features/promise';
-import 'core-js/features/object/entries';
-import 'core-js/features/array/from';</code></pre>
-            </div>
-        </section>
-
-        <section class="learning_resources">
-            <h2>Learning Resources and Tools</h2>
-            
-            <div class="resources">
-                <h3>Essential Resources</h3>
-                <ul>
-                    <li><strong>MDN Web Docs</strong> - Comprehensive JavaScript reference</li>
-                    <li><strong>Babel</strong> - The JavaScript compiler/transpiler</li>
-                    <li><strong>ESLint</strong> - Code quality tool that helps enforce ES6+ best practices</li>
-                    <li><strong>WordPress Coding Standards</strong> - JavaScript guidelines for WordPress development</li>
-                    <li><strong>WordPress Block Editor Handbook</strong> - Documentation for Gutenberg development</li>
-                </ul>
-            </div>
-            
-            <div class="tools">
-                <h3>Development Tools</h3>
-                <ul>
-                    <li><strong>webpack</strong> - Module bundler for JavaScript applications</li>
-                    <li><strong>npm/yarn</strong> - Package managers for JavaScript libraries</li>
-                    <li><strong>VS Code</strong> - Editor with excellent ES6+ support and extensions</li>
-                    <li><strong>Chrome DevTools</strong> - For debugging and performance analysis</li>
-                    <li><strong>@wordpress/scripts</strong> - WordPress package for common JS tools configuration</li>
-                </ul>
-            </div>
-        </section>
-
-        <section class="recap">
-            <h2>Recap and Summary</h2>
-            
-            <div class="key_points">
-                <h3>Key Takeaways</h3>
-                <ul>
-                    <li>ES6+ introduced powerful features that make JavaScript more expressive and maintainable</li>
-                    <li>Block-scoped variables (<code>let</code> and <code>const</code>) provide better scoping control than <code>var</code></li>
-                    <li>Arrow functions offer concise syntax and lexical <code>this</code> binding</li>
-                    <li>Template literals make string manipulation and HTML generation cleaner</li>
-                    <li>Destructuring simplifies extracting values from objects and arrays</li>
-                    <li>Classes provide a cleaner syntax for object-oriented programming</li>
-                    <li>Modules allow better code organization and dependency management</li>
-                    <li>Promises and async/await simplify asynchronous programming</li>
-                    <li>Spread and rest operators make working with arrays and objects more powerful</li>
-                    <li>WordPress development increasingly relies on modern JavaScript, especially for Gutenberg blocks</li>
-                </ul>
-            </div>
-            
-            <div class="next_steps">
-                <h3>Next Steps</h3>
-                <p>In our next session, we'll explore jQuery and see how it compares to modern JavaScript. While jQuery was once essential for cross-browser compatibility, many of its features are now available natively through ES6+ and modern browser APIs. We'll learn when it's appropriate to use jQuery in WordPress development and when native JavaScript is a better choice.</p>
-            </div>
-        </section>
-
-        <section class="practice">
-            <h2>Practice Exercises</h2>
-            
-            <div class="exercises">
-                <h3>Basic Exercises</h3>
-                <ol>
-                    <li>Convert an existing JavaScript function to use arrow functions, template literals, and destructuring.</li>
-                    <li>Refactor a series of callback functions into an async/await pattern.</li>
-                    <li>Create a simple class to represent a WordPress post with appropriate methods and properties.</li>
-                </ol>
-                
-                <h3>Advanced Challenge</h3>
-                <p>Build a simple content filtering system for WordPress posts that:
-                <ol>
-                    <li>Fetches posts from the WordPress REST API</li>
-                    <li>Allows filtering by category, tag, and date using ES6+ features</li>
-                    <li>Renders the filtered posts with template literals</li>
-                    <li>Uses Promises or async/await for all asynchronous operations</li>
-                </ol>
-                </p>
-            </div>
-        </section>
-    </main>
-    
-    <footer>
-        <p>&copy; 2025 PHP WordPress Development Course</p>
-    </footer>
-</body>
-</html>
     </script>
 </head>
 <body>
@@ -1104,7 +799,8 @@ class WPPlugin {
   // Static helper method
   static sanitizeHtml(html) {
     // Sanitization logic
-    return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    return html.replace(&#47;&lt;script\b[^&lt;]*(?:(?!&lt;&#47;script&gt;)&lt;[^&lt;]*)*&lt;&#47;script&gt;&#47;gi, '');
+
   }
 }
 
@@ -1688,7 +1384,8 @@ document.querySelector('#edit-button').addEventListener('click', () => {
             
             <div class="real_world">
                 <h3>Real-World Example: WordPress Plugin Architecture</h3>
-                <pre><code>// src/utils/formatting.js
+     <pre><code>
+        // src/utils/formatting.js
 export function formatDate(date) {
   return new Date(date).toLocaleDateString();
 }
@@ -2015,180 +1712,300 @@ function displayUserProfile(userId) {
             <p>Modern JavaScript is essential for WordPress development, especially since the introduction of the Block Editor (Gutenberg) which is built with React and relies heavily on ES6+ features.</p>
             
             <div class="wordpress_usage">
-                <h3>Where ES6+ Features Are Used in WordPress</h3>
-                <ul>
-                    <li><strong>Block Editor (Gutenberg)</strong> - Built with React, uses ES6+ extensively</li>
-                    <li><strong>Theme Development</strong> - Modern themes use ES6 for interactive features</li>
-                    <li><strong>Custom Blocks</strong> - Block development relies on ES6 classes, async/await, etc.</li>
-                    <li><strong>AJAX Interactions</strong> - Fetch API and Promises for server communication</li>
-                    <li><strong>Plugin Development</strong> - Modern plugins use ES6+ for organization and maintainability</li>
-                </ul>
-            </div>
-            
-            <div class="gutenberg_example">
-                <h3>Example: Creating a Custom Gutenberg Block</h3>
-                <p>The following example demonstrates how various ES6+ features (arrow functions, destructuring, template literals, etc.) are used when creating a custom testimonial block for the WordPress Gutenberg editor:</p>
-                <pre><code>// blocks/testimonial/index.js
-import { registerBlockType } from '@wordpress/blocks';
-import { RichText, MediaUpload, InspectorControls } from '@wordpress/block-editor';
-import { PanelBody, TextControl, SelectControl } from '@wordpress/components';
-
-// Register block using ES6+ features
-registerBlockType('my-plugin/testimonial', {
-  title: 'Testimonial',
-  icon: 'format-quote',
-  category: 'common',
-  
-  // Using object destructuring in parameters
-  attributes: {
-    quote: {
-      type: 'string',
-      source: 'html',
-      selector: '.testimonial-text'
-    },
-    author: {
-      type: 'string',
-      source: 'html',
-      selector: '.testimonial-author'
-    },
-    avatarUrl: {
-      type: 'string',
-      default: ''
-    },
-    backgroundColor: {
-      type: 'string',
-      default: '#f7f7f7'
-    }
-  },
-  
-  // Arrow function with destructured parameters
-  edit: ({ attributes, setAttributes }) => {
-    const { quote, author, avatarUrl, backgroundColor } = attributes;
-    
-    // Using template literals for inline styles
-    const blockStyle = {
-      backgroundColor,
-      padding: '20px',
-      borderRadius: '4px'
-    };
-    
-    // Event handler using arrow function
-    const onChangeQuote = (newQuote) => {
-      setAttributes({ quote: newQuote });
-    };
-    
-    const onChangeAuthor = (newAuthor) => {
-      setAttributes({ author: newAuthor });
-    };
-    
-    const onSelectImage = (media) => {
-      setAttributes({ avatarUrl: media.url });
-    };
-    
-    const onChangeBackgroundColor = (newColor) => {
-      setAttributes({ backgroundColor: newColor });
-    };
-    
-    // Using JSX (transpiled from ES6+)
-    return (
-      <>
-        <InspectorControls>
-          <PanelBody title="Testimonial Settings">
-            <TextControl
-              label="Background Color"
-              value={backgroundColor}
-              onChange={onChangeBackgroundColor}
-            />
-          </PanelBody>
-        </InspectorControls>
-        
-        <div style={blockStyle}>
-          <div className="testimonial-content">
-            <RichText
-              tagName="blockquote"
-              className="testimonial-text"
-              value={quote}
-              onChange={onChangeQuote}
-              placeholder="Enter testimonial text..."
-            />
-            
-            <div className="testimonial-meta">
-              {avatarUrl && (
-                <img 
-                  src={avatarUrl} 
-                  className="testimonial-avatar" 
-                  alt="Author avatar"
-                />
-              )}
-              
-              <MediaUpload
-                onSelect={onSelectImage}
-                type="image"
-                render={({ open }) => (
-                  <button onClick={open}>
-                    {avatarUrl ? 'Change Avatar' : 'Add Avatar'}
-                  </button>
-                )}
-              />
-              
-              <RichText
-                tagName="cite"
-                className="testimonial-author"
-                value={author}
-                onChange={onChangeAuthor}
-                placeholder="Testimonial author..."
-              />
-            </div>
+              <h3>Where ES6+ Features Are Used in WordPress</h3>
+              <ul>
+                  <li><strong>Block Editor (Gutenberg)</strong> - Built with React, uses ES6+ extensively</li>
+                  <li><strong>Theme Development</strong> - Modern themes use ES6 for interactive features</li>
+                  <li><strong>Custom Blocks</strong> - Block development relies on ES6 classes, async/await, etc.</li>
+                  <li><strong>AJAX Interactions</strong> - Fetch API and Promises for server communication</li>
+                  <li><strong>Plugin Development</strong> - Modern plugins use ES6+ for organization and maintainability</li>
+              </ul>
           </div>
-        </div>
-      </>
-    );
-  },
-  
-  // Using template literals in the save function
-  save: ({ attributes }) => {
-    const { quote, author, avatarUrl, backgroundColor } = attributes;
-    
-    return (
-      <div 
-        className="testimonial"
-        style={{ backgroundColor, padding: '20px', borderRadius: '4px' }}
-      >
-        <blockquote className="testimonial-text">
-          {quote}
-        </blockquote>
-        
-        <div className="testimonial-meta">
-          {avatarUrl && (
-            <img 
-              src={avatarUrl} 
-              className="testimonial-avatar" 
-              alt="Author avatar"
-            />
-          )}
           
-          <cite className="testimonial-author">
-            {author}
-          </cite>
-        </div>
-      </div>
-    );
-  }
-});
-</div>
+          <div class="gutenberg_example">
+              <h3>Example: Creating a Custom Gutenberg Block</h3>
+              <p>The following example demonstrates how various ES6+ features (arrow functions, destructuring, template literals, etc.) are used when creating a custom testimonial block for the WordPress Gutenberg editor:</p>
+              <pre><code>// blocks/testimonial/index.js
+          import { registerBlockType } from '@wordpress/blocks';
+          import { RichText, MediaUpload, InspectorControls } from '@wordpress/block-editor';
+          import { PanelBody, TextControl, SelectControl } from '@wordpress/components';
+          
+          // Register block using ES6+ features
+          registerBlockType('my-plugin/testimonial', {
+            title: 'Testimonial',
+            icon: 'format-quote',
+            category: 'common',
             
-            <div class="performance_tips">
-                <h3>Performance Tips When Using ES6+ in WordPress</h3>
-                <ul>
-                    <li><strong>Bundle size awareness</strong> - Modern features can increase file size when transpiled</li>
-                    <li><strong>Code splitting</strong> - Use dynamic imports to load code only when needed</li>
-                    <li><strong>Transpilation</strong> - Use Babel to ensure compatibility with older browsers</li>
-                    <li><strong>Minification</strong> - Use terser or similar tools to reduce file size</li>
-                    <li><strong>Polyfills</strong> - Include only necessary polyfills for features you use</li>
-                </ul>
-            </div>
-        </section>
+            // Using object destructuring in parameters
+            attributes: {
+              quote: {
+                type: 'string',
+                source: 'html',
+                selector: '.testimonial-text'
+              },
+              author: {
+                type: 'string',
+                source: 'html',
+                selector: '.testimonial-author'
+              },
+              avatarUrl: {
+                type: 'string',
+                default: ''
+              },
+              backgroundColor: {
+                type: 'string',
+                default: '#f7f7f7'
+              }
+            },
+            
+            // Arrow function with destructured parameters
+            edit: ({ attributes, setAttributes }) => {
+              const { quote, author, avatarUrl, backgroundColor } = attributes;
+              
+              // Using template literals for inline styles
+              const blockStyle = {
+                backgroundColor,
+                padding: '20px',
+                borderRadius: '4px'
+              };
+              
+              // Event handler using arrow function
+              const onChangeQuote = (newQuote) => {
+                setAttributes({ quote: newQuote });
+              };
+              
+              const onChangeAuthor = (newAuthor) => {
+                setAttributes({ author: newAuthor });
+              };
+              
+              const onSelectImage = (media) => {
+                setAttributes({ avatarUrl: media.url });
+              };
+              
+              const onChangeBackgroundColor = (newColor) => {
+                setAttributes({ backgroundColor: newColor });
+              };
+              
+              // Using JSX (transpiled from ES6+)
+              return (
+                &amp;lt;InspectorControls&amp;gt;
+  &amp;lt;PanelBody title=&quot;Testimonial Settings&quot;&amp;gt;
+    &amp;lt;TextControl
+      label=&quot;Background Color&quot;
+      value=&#123;backgroundColor&#125;
+      onChange=&#123;onChangeBackgroundColor&#125;
+    /&amp;gt;
+  &amp;lt;/PanelBody&amp;gt;
+&amp;lt;/InspectorControls&amp;gt;
 
+&amp;lt;div style=&#123;blockStyle&#125;&amp;gt;
+  &amp;lt;div className=&quot;testimonial-content&quot;&amp;gt;
+    &amp;lt;RichText
+      tagName=&quot;blockquote&quot;
+      className=&quot;testimonial-text&quot;
+      value=&#123;quote&#125;
+      onChange=&#123;onChangeQuote&#125;
+      placeholder=&quot;Enter testimonial text...&quot;
+    /&amp;gt;
+
+    &amp;lt;div className=&quot;testimonial-meta&quot;&amp;gt;
+      &#123;avatarUrl &amp;amp;&amp;amp; (
+        &amp;lt;img 
+          src=&#123;avatarUrl&#125;
+          className=&quot;testimonial-avatar&quot;
+          alt=&quot;Author avatar&quot;
+        /&amp;gt;
+      )&#125;
+
+      &amp;lt;MediaUpload
+        onSelect=&#123;onSelectImage&#125;
+        type=&quot;image&quot;
+        render=&#123;(&#123; open &#125;) =&amp;gt; (
+          &amp;lt;button onClick=&#123;open&#125;&amp;gt;
+            &#123;avatarUrl ? 'Change Avatar' : 'Add Avatar'&#125;
+          &amp;lt;/button&amp;gt;
+        )&#125;
+      /&amp;gt;
+
+      &amp;lt;RichText
+        tagName=&quot;cite&quot;
+        className=&quot;testimonial-author&quot;
+        value=&#123;author&#125;
+        onChange=&#123;onChangeAuthor&#125;
+        placeholder=&quot;Testimonial author...&quot;
+      /&amp;gt;
+    &amp;lt;/div&amp;gt;
+  &amp;lt;/div&amp;gt;
+&amp;lt;/div&amp;gt;
+
+            
+            // Using template literals in the save function
+            save: ({ attributes }) => {
+              const { quote, author, avatarUrl, backgroundColor } = attributes;
+              
+              return (
+                &amp;lt;div 
+                  className=&quot;testimonial&quot;
+                  style=&#123;&#123; backgroundColor, padding: '20px', borderRadius: '4px' &#125;&#125;
+                &amp;gt;
+                  &amp;lt;blockquote className=&quot;testimonial-text&quot;&amp;gt;
+                    &#123;quote&#125;
+                  &amp;lt;/blockquote&amp;gt;
+                  
+                  &amp;lt;div className=&quot;testimonial-meta&quot;&amp;gt;
+                    &#123;avatarUrl &amp;amp;&amp;amp; (
+                      &amp;lt;img 
+                        src=&#123;avatarUrl&#125;
+                        className=&quot;testimonial-avatar&quot;
+                        alt=&quot;Author avatar&quot;
+                      /&amp;gt;
+                    )&#125;
+                    
+                    &amp;lt;cite className=&quot;testimonial-author&quot;&amp;gt;
+                      &#123;author&#125;
+                    &amp;lt;/cite&amp;gt;
+                  &amp;lt;/div&amp;gt;
+                &amp;lt;/div&amp;gt;
+              );
+              &#125;
+              &#125;)
+              ;</code></pre>
+          </div>
+          <div class="performance_tips">
+            <h3>Performance Tips When Using ES6+ in WordPress</h3>
+            <ul>
+                <li><strong>Bundle size awareness</strong> - Modern features can increase file size when transpiled</li>
+                <li><strong>Code splitting</strong> - Use dynamic imports to load code only when needed</li>
+                <li><strong>Transpilation</strong> - Use Babel to ensure compatibility with older browsers</li>
+                <li><strong>Minification</strong> - Use terser or similar tools to reduce file size</li>
+                <li><strong>Polyfills</strong> - Include only necessary polyfills for features you use</li>
+            </ul>
+        </div>
+        
+        <div class="ajax_example">
+            <h3>Example: AJAX with Fetch and async/await</h3>
+            <pre><code>// modern-admin.js - WordPress admin UI enhancement
+        class PostManager {
+          constructor() {
+            this.posts = [];
+            this.container = document.querySelector('#posts-container');
+            this.filterForm = document.querySelector('#post-filter-form');
+            
+            // Event binding with arrow functions to maintain 'this' context
+            this.filterForm.addEventListener('submit', (e) => this.handleFilterSubmit(e));
+            
+            // Initialize
+            this.init();
+          }
+          
+          async init() {
+            try {
+              await this.loadPosts();
+              this.renderPosts();
+            } catch (error) {
+              this.showError('Failed to load posts.');
+              console.error(error);
+            }
+          }
+          
+          // Using async/await with the Fetch API
+          async loadPosts(filters = {}) {
+            this.showLoading();
+            
+            // Build query parameters using Object methods
+            const queryParams = new URLSearchParams(
+              Object.entries(filters).filter(([_, value]) => value)
+            ).toString();
+            
+            try {
+              const response = await fetch(`/wp-json/wp/v2/posts?${queryParams}`);
+              
+              if (!response.ok) {
+                throw new Error(`API error: ${response.status}`);
+              }
+              
+              this.posts = await response.json();
+              return this.posts;
+            } catch (error) {
+              console.error('Error fetching posts:', error);
+              throw error;
+            } finally {
+              this.hideLoading();
+            }
+          }
+          
+          // Using template literals for HTML generation
+          renderPosts() {
+            if (!this.posts.length) {
+              this.container.innerHTML = '&lt;p&gt;No posts found.&lt;/p&gt;';
+              return;
+            }
+            
+            // Using map and join for HTML generation
+            this.container.innerHTML = this.posts
+              .map(post => `
+                &lt;div class="post-card" id="post-${post.id}"&gt;
+                  &lt;h3&gt;${post.title.rendered}&lt;/h3&gt;
+                  &lt;div class="post-meta"&gt;
+                    ${new Date(post.date).toLocaleDateString()}
+                  &lt;/div&gt;
+                  &lt;div class="post-actions"&gt;
+                    &lt;button data-id="${post.id}" class="edit-post"&gt;Edit&lt;/button&gt;
+                    &lt;button data-id="${post.id}" class="delete-post"&gt;Delete&lt;/button&gt;
+                  &lt;/div&gt;
+                &lt;/div&gt;
+              `)
+              .join('');
+            
+            // Event delegation with arrow functions
+            this.container.addEventListener('click', e => {
+              if (e.target.classList.contains('edit-post')) {
+                const postId = e.target.dataset.id;
+                this.editPost(postId);
+              } else if (e.target.classList.contains('delete-post')) {
+                const postId = e.target.dataset.id;
+                this.confirmDeletePost(postId);
+              }
+            });
+          }
+          
+          async handleFilterSubmit(e) {
+            e.preventDefault();
+            
+            // FormData and Object.fromEntries for form processing
+            const formData = new FormData(this.filterForm);
+            const filters = Object.fromEntries(formData);
+            
+            try {
+              await this.loadPosts(filters);
+              this.renderPosts();
+            } catch (error) {
+              this.showError('Error applying filters.');
+            }
+          }
+          
+          // More methods omitted for brevity...
+          
+          showLoading() {
+            // Show loading indicator
+          }
+          
+          hideLoading() {
+            // Hide loading indicator
+          }
+          
+          showError(message) {
+            // Display error message
+          }
+        }
+        
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+          new PostManager();
+        });</code></pre>
+        </div>
+        </section>
+        
         <section class="compatibility">
             <h2>Browser Compatibility and Transpilation</h2>
             
@@ -2209,49 +2026,49 @@ registerBlockType('my-plugin/testimonial', {
             <div class="transpilation">
                 <h3>Setting Up Transpilation for WordPress Projects</h3>
                 <pre><code>// package.json example for a WordPress theme/plugin
-{
-  "name": "my-wordpress-project",
-  "version": "1.0.0",
-  "scripts": {
-    "build": "webpack --mode production",
-    "dev": "webpack --mode development --watch"
-  },
-  "devDependencies": {
-    "@babel/core": "^7.20.5",
-    "@babel/preset-env": "^7.20.2",
-    "babel-loader": "^9.1.0",
-    "webpack": "^5.75.0",
-    "webpack-cli": "^5.0.1"
-  }
-}
-
-// webpack.config.js
-const path = require('path');
-
-module.exports = {
-  entry: {
-    main: './src/js/main.js',
-    admin: './src/js/admin.js'
-  },
-  output: {
-    filename: '[name].js',
-    path: path.resolve(__dirname, 'dist/js')
-  },
-  module: {
-    rules: [
-      {
-        test: /\.js$/,
-        exclude: /node_modules/,
-        use: {
-          loader: 'babel-loader',
-          options: {
-            presets: ['@babel/preset-env']
+        {
+          "name": "my-wordpress-project",
+          "version": "1.0.0",
+          "scripts": {
+            "build": "webpack --mode production",
+            "dev": "webpack --mode development --watch"
+          },
+          "devDependencies": {
+            "@babel/core": "^7.20.5",
+            "@babel/preset-env": "^7.20.2",
+            "babel-loader": "^9.1.0",
+            "webpack": "^5.75.0",
+            "webpack-cli": "^5.0.1"
           }
         }
-      }
-    ]
-  }
-};</code></pre>
+        
+        // webpack.config.js
+        const path = require('path');
+        
+        module.exports = {
+          entry: {
+            main: './src/js/main.js',
+            admin: './src/js/admin.js'
+          },
+          output: {
+            filename: '[name].js',
+            path: path.resolve(__dirname, 'dist/js')
+          },
+          module: {
+            rules: [
+              {
+                test: /\.js$/,
+                exclude: /node_modules/,
+                use: {
+                  loader: 'babel-loader',
+                  options: {
+                    presets: ['@babel/preset-env']
+                  }
+                }
+              }
+            ]
+          }
+        };</code></pre>
             </div>
             
             <div class="compatibility_strategies">
@@ -2263,19 +2080,19 @@ module.exports = {
                 </ol>
                 
                 <pre><code>// Feature detection example
-if (window.fetch) {
-  // Use fetch API
-} else {
-  // Fall back to XMLHttpRequest
-}
-
-// Using core-js for polyfills (imported selectively)
-import 'core-js/features/promise';
-import 'core-js/features/object/entries';
-import 'core-js/features/array/from';</code></pre>
+        if (window.fetch) {
+          // Use fetch API
+        } else {
+          // Fall back to XMLHttpRequest
+        }
+        
+        // Using core-js for polyfills (imported selectively)
+        import 'core-js/features/promise';
+        import 'core-js/features/object/entries';
+        import 'core-js/features/array/from';</code></pre>
             </div>
         </section>
-
+        
         <section class="learning_resources">
             <h2>Learning Resources and Tools</h2>
             
@@ -2301,7 +2118,7 @@ import 'core-js/features/array/from';</code></pre>
                 </ul>
             </div>
         </section>
-
+        
         <section class="recap">
             <h2>Recap and Summary</h2>
             
@@ -2326,7 +2143,7 @@ import 'core-js/features/array/from';</code></pre>
                 <p>In our next session, we'll explore jQuery and see how it compares to modern JavaScript. While jQuery was once essential for cross-browser compatibility, many of its features are now available natively through ES6+ and modern browser APIs. We'll learn when it's appropriate to use jQuery in WordPress development and when native JavaScript is a better choice.</p>
             </div>
         </section>
-
+        
         <section class="practice">
             <h2>Practice Exercises</h2>
             
@@ -2349,10 +2166,12 @@ import 'core-js/features/array/from';</code></pre>
                 </p>
             </div>
         </section>
-    </main>
-    
-    <footer>
-        <p>&copy; 2025 PHP WordPress Development Course</p>
-    </footer>
-</body>
-</html>
+      </div>
+    </section>
+        </main>
+        
+        <footer>
+            <p>&copy; 2025 PHP WordPress Development Course</p>
+        </footer>
+    </body>
+    </html>
