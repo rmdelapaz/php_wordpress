@@ -1,0 +1,1836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accessing Form Data with $_GET and $_POST</title>
+    <link rel="stylesheet" href="/styles/main.css">
+    <link rel="icon" href="/favicon.png">
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+      mermaid.initialize({ startOnLoad: true });
+    </script>
+</head>
+<body>
+    <header>
+        <h1>Accessing Form Data with $_GET and $_POST</h1>
+        <p><a href="index.html">← Back to Syllabus</a></p>
+    </header>
+    
+    <main>
+        <section class="intro">
+            <h2>Understanding PHP Superglobals for Form Data</h2>
+            <p>One of PHP's most powerful features is its ability to easily access data submitted through HTML forms. PHP makes this data available through special predefined arrays called "superglobals." In this lecture, we'll focus on the two superglobals most commonly used for form data: <code>$_GET</code> and <code>$_POST</code>.</p>
+            
+            <div class="analogy">
+                <h3>The Mailroom Analogy</h3>
+                <p>Think of PHP as a mailroom in a large office building:</p>
+                <ul>
+                    <li><strong>$_GET</strong> is like the public bulletin board where messages are posted for everyone to see. It's accessible, visible, and limited in size.</li>
+                    <li><strong>$_POST</strong> is like the secure internal mail system where sealed envelopes are delivered directly to the recipient. It's more private and can handle larger messages.</li>
+                    <li><strong>The PHP processor</strong> is like the mail clerk who sorts incoming messages and makes them available to the correct department (your script).</li>
+                    <li><strong>Form fields</strong> are like the different parts of a form letter or package – each with its own label and content.</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="superglobals_overview">
+            <h2>Introduction to PHP Superglobals</h2>
+            <p>Superglobals are special predefined arrays in PHP that are always accessible, regardless of scope. They contain data from various sources.</p>
+            
+            <div class="superglobals_list">
+                <h3>PHP's Superglobal Arrays</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Superglobal</th>
+                            <th>Contains</th>
+                            <th>Form Relevance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>$_GET</code></td>
+                            <td>Data sent through URL parameters</td>
+                            <td>Data from forms with method="get"</td>
+                        </tr>
+                        <tr>
+                            <td><code>$_POST</code></td>
+                            <td>Data sent through HTTP POST method</td>
+                            <td>Data from forms with method="post"</td>
+                        </tr>
+                        <tr>
+                            <td><code>$_REQUEST</code></td>
+                            <td>Combined data from $_GET, $_POST, and $_COOKIE</td>
+                            <td>Can access form data regardless of method (not recommended)</td>
+                        </tr>
+                        <tr>
+                            <td><code>$_FILES</code></td>
+                            <td>Information about uploaded files</td>
+                            <td>Used for file upload forms</td>
+                        </tr>
+                        <tr>
+                            <td><code>$_SERVER</code></td>
+                            <td>Server and execution environment information</td>
+                            <td>Contains REQUEST_METHOD to check form submission method</td>
+                        </tr>
+                        <tr>
+                            <td><code>$_ENV</code></td>
+                            <td>Environment variables</td>
+                            <td>Limited form relevance</td>
+                        </tr>
+                        <tr>
+                            <td><code>$_COOKIE</code></td>
+                            <td>HTTP cookie values</td>
+                            <td>Can store form preferences or session data</td>
+                        </tr>
+                        <tr>
+                            <td><code>$_SESSION</code></td>
+                            <td>Session variables</td>
+                            <td>Can store form data across multiple pages</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="mermaid_diagram">
+                <h3>Form Data Flow to Superglobals</h3>
+                <div class="mermaid">
+flowchart TD
+    A[HTML Form] --> B{method?}
+    B -->|GET| C[URL Parameters]
+    B -->|POST| D[Request Body]
+    C --> E[PHP Server]
+    D --> E
+    E --> F[PHP Script]
+    F --> G[["$_GET Array"]]
+    F --> H[["$_POST Array"]]
+    F --> I[["$_REQUEST Array"]]
+    F --> J[["$_FILES Array"]]
+                </div>
+            </div>
+        </section>
+
+        <section class="get_access">
+            <h2>Accessing Data with $_GET</h2>
+            <p>The <code>$_GET</code> superglobal array contains all variables sent to the script through URL parameters. These parameters are visible in the browser's address bar.</p>
+            
+            <div class="get_basics">
+                <h3>Basic $_GET Access</h3>
+                <pre><code>&lt;!-- HTML Form (search_form.html) --&gt;
+&lt;form action="search.php" method="get"&gt;
+    &lt;label for="query"&gt;Search:&lt;/label&gt;
+    &lt;input type="text" id="query" name="query"&gt;
+    
+    &lt;label for="category"&gt;Category:&lt;/label&gt;
+    &lt;select id="category" name="category"&gt;
+        &lt;option value="all"&gt;All Categories&lt;/option&gt;
+        &lt;option value="articles"&gt;Articles&lt;/option&gt;
+        &lt;option value="products"&gt;Products&lt;/option&gt;
+    &lt;/select&gt;
+    
+    &lt;button type="submit"&gt;Search&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;!-- PHP Processing (search.php) --&gt;
+&lt;?php
+// Check if the query parameter exists
+if (isset($_GET['query'])) {
+    // Access the value using the parameter name
+    $query = $_GET['query'];
+    $category = $_GET['category'] ?? 'all'; // PHP 7+ null coalescing operator
+    
+    echo "You searched for: " . htmlspecialchars($query) . "&lt;br&gt;";
+    echo "In category: " . htmlspecialchars($category);
+    
+    // Now you can use these variables to perform a search
+    // ...
+} else {
+    echo "No search query provided.";
+}
+?&gt;</code></pre>
+
+                <h3>When the form is submitted, the URL might look like:</h3>
+                <code>search.php?query=wordpress+themes&category=products</code>
+            </div>
+            
+            <div class="get_arrays">
+                <h3>Handling Array Data in $_GET</h3>
+                <p>HTML forms can send array data by using square brackets in the field names.</p>
+                
+                <pre><code>&lt;!-- HTML Form with Array Data --&gt;
+&lt;form action="process_filter.php" method="get"&gt;
+    &lt;h3&gt;Filter Products:&lt;/h3&gt;
+    
+    &lt;fieldset&gt;
+        &lt;legend&gt;Categories&lt;/legend&gt;
+        &lt;label&gt;&lt;input type="checkbox" name="categories[]" value="electronics"&gt; Electronics&lt;/label&gt;
+        &lt;label&gt;&lt;input type="checkbox" name="categories[]" value="clothing"&gt; Clothing&lt;/label&gt;
+        &lt;label&gt;&lt;input type="checkbox" name="categories[]" value="books"&gt; Books&lt;/label&gt;
+    &lt;/fieldset&gt;
+    
+    &lt;div class="price-range"&gt;
+        &lt;label for="min_price"&gt;Min Price:&lt;/label&gt;
+        &lt;input type="number" id="min_price" name="price[min]" min="0"&gt;
+        
+        &lt;label for="max_price"&gt;Max Price:&lt;/label&gt;
+        &lt;input type="number" id="max_price" name="price[max]" min="0"&gt;
+    &lt;/div&gt;
+    
+    &lt;button type="submit"&gt;Apply Filters&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;!-- PHP Processing --&gt;
+&lt;?php
+// Handle checkbox array data
+if (isset($_GET['categories']) && is_array($_GET['categories'])) {
+    echo "Selected Categories:&lt;br&gt;";
+    foreach ($_GET['categories'] as $category) {
+        echo "- " . htmlspecialchars($category) . "&lt;br&gt;";
+    }
+}
+
+// Handle associative array data
+if (isset($_GET['price'])) {
+    $min_price = $_GET['price']['min'] ?? 0;
+    $max_price = $_GET['price']['max'] ?? 1000;
+    
+    echo "Price Range: $" . htmlspecialchars($min_price) . " - $" . htmlspecialchars($max_price);
+}
+?&gt;</code></pre>
+
+                <h3>The resulting URL might look like:</h3>
+                <code>process_filter.php?categories[]=electronics&categories[]=books&price[min]=10&price[max]=100</code>
+            </div>
+            
+            <div class="get_url_parsing">
+                <h3>Parsing GET URLs Manually</h3>
+                <p>Sometimes you might need to work with URL parameters directly:</p>
+                
+                <pre><code>&lt;?php
+// Get the current URL
+$current_url = "https://example.com/page.php?id=123&action=view";
+
+// Parse the URL to get components including query string
+$url_parts = parse_url($current_url);
+
+// Parse the query string into an array (similar to $_GET)
+if (isset($url_parts['query'])) {
+    parse_str($url_parts['query'], $query_params);
+    
+    // Now $query_params contains the GET parameters
+    echo "ID: " . $query_params['id'] . "&lt;br&gt;";
+    echo "Action: " . $query_params['action'];
+}
+?&gt;</code></pre>
+            </div>
+        </section>
+
+        <section class="post_access">
+            <h2>Accessing Data with $_POST</h2>
+            <p>The <code>$_POST</code> superglobal array contains all variables sent to the script through the HTTP POST method. These values are not visible in the URL.</p>
+            
+            <div class="post_basics">
+                <h3>Basic $_POST Access</h3>
+                <pre><code>&lt;!-- HTML Form (login_form.html) --&gt;
+&lt;form action="process_login.php" method="post"&gt;
+    &lt;label for="username"&gt;Username:&lt;/label&gt;
+    &lt;input type="text" id="username" name="username" required&gt;
+    
+    &lt;label for="password"&gt;Password:&lt;/label&gt;
+    &lt;input type="password" id="password" name="password" required&gt;
+    
+    &lt;label&gt;
+        &lt;input type="checkbox" name="remember" value="1"&gt;
+        Remember me
+    &lt;/label&gt;
+    
+    &lt;button type="submit"&gt;Login&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;!-- PHP Processing (process_login.php) --&gt;
+&lt;?php
+// Check if the form was submitted
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Access form data from $_POST array
+    $username = $_POST['username'] ?? '';
+    $password = $_POST['password'] ?? '';
+    $remember = isset($_POST['remember']) ? true : false;
+    
+    // Always sanitize and validate user input
+    $username = htmlspecialchars($username);
+    
+    echo "Attempting login for: " . $username . "&lt;br&gt;";
+    if ($remember) {
+        echo "Remember me option selected.";
+    }
+    
+    // Now you would typically validate credentials against a database
+    // and start a session if valid
+    // ...
+} else {
+    // If the script was accessed directly without a POST request
+    echo "Form not submitted. Please return to the login page.";
+}
+?&gt;</code></pre>
+            </div>
+            
+            <div class="post_arrays">
+                <h3>Handling Complex Form Data with $_POST</h3>
+                <p>POST can handle more complex data structures, including nested arrays and multi-dimensional data.</p>
+                
+                <pre><code>&lt;!-- HTML Form (registration_form.html) --&gt;
+&lt;form action="process_registration.php" method="post"&gt;
+    &lt;!-- Basic Info --&gt;
+    &lt;fieldset&gt;
+        &lt;legend&gt;Basic Information&lt;/legend&gt;
+        
+        &lt;label for="first_name"&gt;First Name:&lt;/label&gt;
+        &lt;input type="text" id="first_name" name="user[name][first]" required&gt;
+        
+        &lt;label for="last_name"&gt;Last Name:&lt;/label&gt;
+        &lt;input type="text" id="last_name" name="user[name][last]" required&gt;
+        
+        &lt;label for="email"&gt;Email:&lt;/label&gt;
+        &lt;input type="email" id="email" name="user[email]" required&gt;
+    &lt;/fieldset&gt;
+    
+    &lt;!-- Address (Multiple) --&gt;
+    &lt;fieldset&gt;
+        &lt;legend&gt;Addresses&lt;/legend&gt;
+        
+        &lt;h4&gt;Home Address&lt;/h4&gt;
+        &lt;label for="home_street"&gt;Street:&lt;/label&gt;
+        &lt;input type="text" id="home_street" name="user[addresses][home][street]"&gt;
+        
+        &lt;label for="home_city"&gt;City:&lt;/label&gt;
+        &lt;input type="text" id="home_city" name="user[addresses][home][city]"&gt;
+        
+        &lt;label for="home_zip"&gt;ZIP:&lt;/label&gt;
+        &lt;input type="text" id="home_zip" name="user[addresses][home][zip]"&gt;
+        
+        &lt;h4&gt;Work Address&lt;/h4&gt;
+        &lt;label for="work_street"&gt;Street:&lt;/label&gt;
+        &lt;input type="text" id="work_street" name="user[addresses][work][street]"&gt;
+        
+        &lt;label for="work_city"&gt;City:&lt;/label&gt;
+        &lt;input type="text" id="work_city" name="user[addresses][work][city]"&gt;
+        
+        &lt;label for="work_zip"&gt;ZIP:&lt;/label&gt;
+        &lt;input type="text" id="work_zip" name="user[addresses][work][zip]"&gt;
+    &lt;/fieldset&gt;
+    
+    &lt;!-- Skills (Multiple options) --&gt;
+    &lt;fieldset&gt;
+        &lt;legend&gt;Skills&lt;/legend&gt;
+        &lt;label&gt;&lt;input type="checkbox" name="user[skills][]" value="html"&gt; HTML&lt;/label&gt;
+        &lt;label&gt;&lt;input type="checkbox" name="user[skills][]" value="css"&gt; CSS&lt;/label&gt;
+        &lt;label&gt;&lt;input type="checkbox" name="user[skills][]" value="javascript"&gt; JavaScript&lt;/label&gt;
+        &lt;label&gt;&lt;input type="checkbox" name="user[skills][]" value="php"&gt; PHP&lt;/label&gt;
+        &lt;label&gt;&lt;input type="checkbox" name="user[skills][]" value="mysql"&gt; MySQL&lt;/label&gt;
+    &lt;/fieldset&gt;
+    
+    &lt;button type="submit"&gt;Register&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;!-- PHP Processing (process_registration.php) --&gt;
+&lt;?php
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Access the user data array
+    $user = $_POST['user'] ?? [];
+    
+    // Access nested data
+    if (isset($user['name'])) {
+        $firstName = htmlspecialchars($user['name']['first'] ?? '');
+        $lastName = htmlspecialchars($user['name']['last'] ?? '');
+        echo "Name: $firstName $lastName&lt;br&gt;";
+    }
+    
+    if (isset($user['email'])) {
+        $email = htmlspecialchars($user['email']);
+        echo "Email: $email&lt;br&gt;";
+    }
+    
+    // Process addresses (nested associative arrays)
+    if (isset($user['addresses']) && is_array($user['addresses'])) {
+        echo "&lt;h3&gt;Addresses:&lt;/h3&gt;";
+        
+        foreach ($user['addresses'] as $type => $address) {
+            echo "&lt;h4&gt;" . ucfirst($type) . " Address:&lt;/h4&gt;";
+            
+            if (!empty($address['street'])) {
+                echo "Street: " . htmlspecialchars($address['street']) . "&lt;br&gt;";
+            }
+            
+            if (!empty($address['city'])) {
+                echo "City: " . htmlspecialchars($address['city']) . "&lt;br&gt;";
+            }
+            
+            if (!empty($address['zip'])) {
+                echo "ZIP: " . htmlspecialchars($address['zip']) . "&lt;br&gt;";
+            }
+        }
+    }
+    
+    // Process skills (array of values)
+    if (isset($user['skills']) && is_array($user['skills'])) {
+        echo "&lt;h3&gt;Skills:&lt;/h3&gt;";
+        echo "&lt;ul&gt;";
+        
+        foreach ($user['skills'] as $skill) {
+            echo "&lt;li&gt;" . htmlspecialchars($skill) . "&lt;/li&gt;";
+        }
+        
+        echo "&lt;/ul&gt;";
+    }
+    
+    // In a real application, you would validate and save this data
+    // ...
+}
+?&gt;</code></pre>
+            </div>
+            
+            <div class="svg_diagram">
+                <h3>Accessing Nested Form Data</h3>
+                <svg viewBox="0 0 700 350" xmlns="http://www.w3.org/2000/svg">
+                    <!-- HTML Form -->
+                    <rect x="50" y="50" width="300" height="250" rx="5" fill="#f0f0f0" stroke="#333" stroke-width="1"/>
+                    <text x="80" y="80" font-family="Arial" font-size="16">HTML Form</text>
+                    
+                    <!-- Form Fields -->
+                    <rect x="70" y="100" width="260" height="30" rx="3" fill="#ffffff" stroke="#333" stroke-width="1"/>
+                    <text x="80" y="120" font-family="Arial" font-size="12">name="user[name][first]" value="John"</text>
+                    
+                    <rect x="70" y="140" width="260" height="30" rx="3" fill="#ffffff" stroke="#333" stroke-width="1"/>
+                    <text x="80" y="160" font-family="Arial" font-size="12">name="user[name][last]" value="Doe"</text>
+                    
+                    <rect x="70" y="180" width="260" height="30" rx="3" fill="#ffffff" stroke="#333" stroke-width="1"/>
+                    <text x="80" y="200" font-family="Arial" font-size="12">name="user[email]" value="john@example.com"</text>
+                    
+                    <rect x="70" y="220" width="260" height="30" rx="3" fill="#ffffff" stroke="#333" stroke-width="1"/>
+                    <text x="80" y="240" font-family="Arial" font-size="12">name="user[skills][]" value="php" ✓</text>
+                    
+                    <!-- PHP Array -->
+                    <rect x="450" y="50" width="200" height="250" rx="5" fill="#e6f7ff" stroke="#0066cc" stroke-width="1"/>
+                    <text x="480" y="80" font-family="Arial" font-size="16">$_POST Array</text>
+                    
+                    <!-- Array Structure -->
+                    <text x="460" y="110" font-family="monospace" font-size="12">$_POST = [</text>
+                    <text x="470" y="130" font-family="monospace" font-size="12">'user' => [</text>
+                    <text x="480" y="150" font-family="monospace" font-size="12">'name' => [</text>
+                    <text x="490" y="170" font-family="monospace" font-size="12">'first' => 'John',</text>
+                    <text x="490" y="190" font-family="monospace" font-size="12">'last' => 'Doe'</text>
+                    <text x="480" y="210" font-family="monospace" font-size="12">],</text>
+                    <text x="480" y="230" font-family="monospace" font-size="12">'email' => 'john@example.com',</text>
+                    <text x="480" y="250" font-family="monospace" font-size="12">'skills' => ['php']</text>
+                    <text x="470" y="270" font-family="monospace" font-size="12">]</text>
+                    <text x="460" y="290" font-family="monospace" font-size="12">]</text>
+                    
+                    <!-- Arrows -->
+                    <path d="M330 115 L450 115" stroke="#333" stroke-width="1.5" fill="none"/>
+                    <polygon points="450,115 440,110 440,120" fill="#333"/>
+                    
+                    <path d="M330 155 L450 155" stroke="#333" stroke-width="1.5" fill="none"/>
+                    <polygon points="450,155 440,150 440,160" fill="#333"/>
+                    
+                    <path d="M330 195 L450 195" stroke="#333" stroke-width="1.5" fill="none"/>
+                    <polygon points="450,195 440,190 440,200" fill="#333"/>
+                    
+                    <path d="M330 235 L450 235" stroke="#333" stroke-width="1.5" fill="none"/>
+                    <polygon points="450,235 440,230 440,240" fill="#333"/>
+                </svg>
+            </div>
+        </section>
+
+        <section class="checking_existence">
+            <h2>Checking for Form Data Existence</h2>
+            <p>One of the most critical aspects of handling form data is checking whether values exist before trying to use them. PHP provides several functions for this purpose.</p>
+            
+            <div class="checking_methods">
+                <h3>Methods for Checking Data Existence</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Method</th>
+                            <th>Description</th>
+                            <th>Example</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>isset()</code></td>
+                            <td>Checks if a variable is set and not null</td>
+                            <td><code>if (isset($_POST['username'])) { ... }</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>empty()</code></td>
+                            <td>Checks if a variable is empty (null, 0, false, empty string, etc.)</td>
+                            <td><code>if (!empty($_GET['query'])) { ... }</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>array_key_exists()</code></td>
+                            <td>Checks if a specific key exists in an array</td>
+                            <td><code>if (array_key_exists('email', $_POST)) { ... }</code></td>
+                        </tr>
+                        <tr>
+                            <td>Null coalescing operator (??)</td>
+                            <td>Returns the right operand if the left is null</td>
+                            <td><code>$username = $_POST['username'] ?? 'Guest';</code></td>
+                        </tr>
+                        <tr>
+                            <td>Checking REQUEST_METHOD</td>
+                            <td>Verifies the form submission method</td>
+                            <td><code>if ($_SERVER['REQUEST_METHOD'] === 'POST') { ... }</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <h3>Existence Checking Examples</h3>
+                <pre><code>&lt;?php
+// Common mistakes and correct approaches
+
+// INCORRECT - May cause "Undefined array key" notice if 'name' doesn't exist
+$name = $_POST['name'];
+
+// CORRECT - Option 1: Check with isset before accessing
+if (isset($_POST['name'])) {
+    $name = $_POST['name'];
+} else {
+    $name = ''; // Default value
+}
+
+// CORRECT - Option 2: Use null coalescing operator (PHP 7+)
+$name = $_POST['name'] ?? '';
+
+// CORRECT - Option 3: Use filter_input function
+$name = filter_input(INPUT_POST, 'name', FILTER_SANITIZE_STRING);
+
+// CORRECT - Option 4: Check for empty values
+if (!empty($_POST['email'])) {
+    $email = $_POST['email'];
+    // Process email...
+}
+
+// CORRECT - Option 5: Validate method and existence together
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit'])) {
+    // Form was submitted via POST and the submit button was pressed
+    // Process form...
+}
+?&gt;</code></pre>
+            </div>
+            
+            <div class="checking_arrays">
+                <h3>Checking Existence of Array Elements</h3>
+                <pre><code>&lt;?php
+// Checking simple array element
+if (isset($_POST['colors']) && is_array($_POST['colors'])) {
+    // Now it's safe to loop through colors
+    foreach ($_POST['colors'] as $color) {
+        echo "Selected color: " . htmlspecialchars($color) . "&lt;br&gt;";
+    }
+} else {
+    echo "No colors selected.";
+}
+
+// Checking nested array elements
+if (isset($_POST['user']['address']['city'])) {
+    $city = $_POST['user']['address']['city'];
+    echo "City: " . htmlspecialchars($city);
+}
+
+// Safer approach for deeply nested arrays (avoids errors if parent keys don't exist)
+$city = $_POST['user']['address']['city'] ?? '';
+
+// Alternative approach using array_key_exists for nested arrays
+$user = $_POST['user'] ?? [];
+$address = $user['address'] ?? [];
+$city = $address['city'] ?? '';
+?&gt;</code></pre>
+            </div>
+        </section>
+
+        <section class="filtering_sanitizing">
+            <h2>Filtering and Sanitizing Form Data</h2>
+            <p>Before using form data, it's crucial to properly filter and sanitize it to prevent security issues like XSS attacks or SQL injection.</p>
+            
+            <div class="sanitization_methods">
+                <h3>Basic Sanitization Methods</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Function</th>
+                            <th>Purpose</th>
+                            <th>Example</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>htmlspecialchars()</code></td>
+                            <td>Convert special characters to HTML entities</td>
+                            <td><code>$safe_text = htmlspecialchars($_POST['comment']);</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>strip_tags()</code></td>
+                            <td>Remove HTML and PHP tags</td>
+                            <td><code>$no_html = strip_tags($_POST['input']);</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>filter_var()</code></td>
+                            <td>Filter a variable with a specified filter</td>
+                            <td><code>$email = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>filter_input()</code></td>
+                            <td>Get and filter input from a superglobal</td>
+                            <td><code>$id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>mysqli_real_escape_string()</code></td>
+                            <td>Escape SQL injection in strings (for MySQLi)</td>
+                            <td><code>$safe_input = mysqli_real_escape_string($conn, $input);</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>trim()</code></td>
+                            <td>Remove whitespace from beginning and end</td>
+                            <td><code>$username = trim($_POST['username']);</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <h3>Using Filter Functions</h3>
+                <pre><code>&lt;?php
+// Sanitizing different types of data
+
+// Email sanitization and validation
+$email = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL);
+if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    echo "Valid email: $email";
+} else {
+    echo "Invalid email format";
+}
+
+// Integer validation
+$age = filter_input(INPUT_POST, 'age', FILTER_VALIDATE_INT, [
+    'options' => [
+        'min_range' => 1,
+        'max_range' => 120
+    ]
+]);
+
+if ($age !== false) {
+    echo "Valid age: $age";
+} else {
+    echo "Invalid age";
+}
+
+// URL sanitization and validation
+$website = filter_input(INPUT_POST, 'website', FILTER_SANITIZE_URL);
+if (filter_var($website, FILTER_VALIDATE_URL)) {
+    echo "Valid URL: $website";
+} else {
+    echo "Invalid URL format";
+}
+
+// Handling checkboxes (they only appear in $_POST if checked)
+$subscribe = filter_input(INPUT_POST, 'subscribe', FILTER_VALIDATE_BOOLEAN);
+// or more explicitly:
+$subscribe = isset($_POST['subscribe']) ? true : false;
+
+// Sanitizing text for display (prevent XSS)
+$comment = filter_input(INPUT_POST, 'comment', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+// or
+$comment = htmlspecialchars($_POST['comment'] ?? '');
+
+echo "Comment: $comment";
+?&gt;</code></pre>
+            </div>
+            
+            <div class="practical_sanitization">
+                <h3>Practical Sanitization Example</h3>
+                <pre><code>&lt;!-- Form for collecting user profile data --&gt;
+&lt;form action="save_profile.php" method="post"&gt;
+    &lt;label for="full_name"&gt;Full Name:&lt;/label&gt;
+    &lt;input type="text" id="full_name" name="full_name" required&gt;
+    
+    &lt;label for="email"&gt;Email:&lt;/label&gt;
+    &lt;input type="email" id="email" name="email" required&gt;
+    
+    &lt;label for="age"&gt;Age:&lt;/label&gt;
+    &lt;input type="number" id="age" name="age" min="1" max="120"&gt;
+    
+    &lt;label for="website"&gt;Website:&lt;/label&gt;
+    &lt;input type="url" id="website" name="website"&gt;
+    
+    &lt;label for="bio"&gt;Bio:&lt;/label&gt;
+    &lt;textarea id="bio" name="bio" rows="4"&gt;&lt;/textarea&gt;
+    
+    &lt;button type="submit"&gt;Save Profile&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;!-- Processing script (save_profile.php) --&gt;
+&lt;?php
+// Check if form was submitted
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Initialize an array for sanitized data
+    $profile = [];
+    
+    // Sanitize and validate each field
+    $profile['full_name'] = filter_input(INPUT_POST, 'full_name', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    if (empty($profile['full_name'])) {
+        $errors[] = "Name is required.";
+    }
+    
+    $profile['email'] = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL);
+    if (!filter_var($profile['email'], FILTER_VALIDATE_EMAIL)) {
+        $errors[] = "Valid email is required.";
+    }
+    
+    $profile['age'] = filter_input(INPUT_POST, 'age', FILTER_VALIDATE_INT, [
+        'options' => ['min_range' => 1, 'max_range' => 120]
+    ]);
+    if ($profile['age'] === false && !empty($_POST['age'])) {
+        $errors[] = "Age must be between 1 and 120.";
+    }
+    
+    $profile['website'] = filter_input(INPUT_POST, 'website', FILTER_SANITIZE_URL);
+    if (!empty($profile['website']) && !filter_var($profile['website'], FILTER_VALIDATE_URL)) {
+        $errors[] = "Website must be a valid URL.";
+    }
+    
+    $profile['bio'] = filter_input(INPUT_POST, 'bio', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    // Limit bio length
+    if (strlen($profile['bio']) > 1000) {
+        $errors[] = "Bio must be less than 1000 characters.";
+    }
+    
+    // Check for errors
+    if (!empty($errors)) {
+        // Display errors
+        echo "&lt;div class='errors'&gt;";
+        echo "&lt;h3&gt;Please fix the following errors:&lt;/h3&gt;";
+        echo "&lt;ul&gt;";
+        foreach ($errors as $error) {
+            echo "&lt;li&gt;" . $error . "&lt;/li&gt;";
+        }
+        echo "&lt;/ul&gt;";
+        echo "&lt;/div&gt;";
+    } else {
+        // Process valid data (e.g., save to database)
+        echo "&lt;div class='success'&gt;";
+        echo "Profile saved successfully!";
+        echo "&lt;/div&gt;";
+        
+        // Display sanitized data
+        echo "&lt;h3&gt;Profile Information:&lt;/h3&gt;";
+        echo "&lt;p&gt;&lt;strong&gt;Name:&lt;/strong&gt; " . $profile['full_name'] . "&lt;/p&gt;";
+        echo "&lt;p&gt;&lt;strong&gt;Email:&lt;/strong&gt; " . $profile['email'] . "&lt;/p&gt;";
+        
+        if ($profile['age']) {
+            echo "&lt;p&gt;&lt;strong&gt;Age:&lt;/strong&gt; " . $profile['age'] . "&lt;/p&gt;";
+        }
+        
+        if (!empty($profile['website'])) {
+            echo "&lt;p&gt;&lt;strong&gt;Website:&lt;/strong&gt; " . $profile['website'] . "&lt;/p&gt;";
+        }
+        
+        if (!empty($profile['bio'])) {
+            echo "&lt;p&gt;&lt;strong&gt;Bio:&lt;/strong&gt; " . $profile['bio'] . "&lt;/p&gt;";
+        }
+    }
+}
+?&gt;</code></pre>
+            </div>
+        </section>
+
+        <section class="handling_special_data">
+            <h2>Handling Special Types of Form Data</h2>
+            <p>Different form field types require special handling techniques beyond basic text fields.</p>
+            
+            <div class="handling_checkboxes">
+                <h3>Handling Checkboxes</h3>
+                <p>Checkboxes have a unique behavior: they only appear in $_POST or $_GET when checked.</p>
+                
+                <pre><code>&lt;!-- HTML Form with Checkboxes --&gt;
+&lt;form action="process_preferences.php" method="post"&gt;
+    &lt;h3&gt;Newsletter Preferences&lt;/h3&gt;
+    
+    &lt;label&gt;
+        &lt;input type="checkbox" name="subscribe" value="1"&gt;
+        Subscribe to newsletter
+    &lt;/label&gt;
+    
+    &lt;h3&gt;Interests&lt;/h3&gt;
+    &lt;label&gt;&lt;input type="checkbox" name="interests[]" value="technology"&gt; Technology&lt;/label&gt;
+    &lt;label&gt;&lt;input type="checkbox" name="interests[]" value="sports"&gt; Sports&lt;/label&gt;
+    &lt;label&gt;&lt;input type="checkbox" name="interests[]" value="cooking"&gt; Cooking&lt;/label&gt;
+    
+    &lt;button type="submit"&gt;Save Preferences&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;!-- PHP Processing --&gt;
+&lt;?php
+// Check single checkbox (will only exist in $_POST if checked)
+$subscribed = isset($_POST['subscribe']) ? true : false;
+// or
+$subscribed = filter_input(INPUT_POST, 'subscribe', FILTER_VALIDATE_BOOLEAN);
+
+echo "Newsletter subscription: " . ($subscribed ? "Yes" : "No") . "&lt;br&gt;";
+
+// Check for checkbox array
+$interests = $_POST['interests'] ?? [];
+
+// Validate it's actually an array
+if (is_array($interests)) {
+    echo "Selected interests:&lt;br&gt;";
+    if (empty($interests)) {
+        echo "None selected";
+    } else {
+        echo "&lt;ul&gt;";
+        foreach ($interests as $interest) {
+            echo "&lt;li&gt;" . htmlspecialchars($interest) . "&lt;/li&gt;";
+        }
+        echo "&lt;/ul&gt;";
+    }
+}
+?&gt;</code></pre>
+            </div>
+            
+            <div class="handling_radio">
+                <h3>Handling Radio Buttons</h3>
+                <pre><code>&lt;!-- HTML Form with Radio Buttons --&gt;
+&lt;form action="process_survey.php" method="post"&gt;
+    &lt;h3&gt;What's your favorite color?&lt;/h3&gt;
+    
+    &lt;label&gt;&lt;input type="radio" name="favorite_color" value="red"&gt; Red&lt;/label&gt;
+    &lt;label&gt;&lt;input type="radio" name="favorite_color" value="blue"&gt; Blue&lt;/label&gt;
+    &lt;label&gt;&lt;input type="radio" name="favorite_color" value="green"&gt; Green&lt;/label&gt;
+    &lt;label&gt;&lt;input type="radio" name="favorite_color" value="other"&gt; Other&lt;/label&gt;
+    
+    &lt;button type="submit"&gt;Submit&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;!-- PHP Processing --&gt;
+&lt;?php
+// Get selected radio button value (will be absent if none selected)
+$favorite_color = $_POST['favorite_color'] ?? 'None selected';
+
+echo "Your favorite color: " . htmlspecialchars($favorite_color);
+?&gt;</code></pre>
+            </div>
+            
+            <div class="handling_select">
+                <h3>Handling Select Dropdowns</h3>
+                <pre><code>&lt;!-- HTML Form with Select Dropdown --&gt;
+&lt;form action="process_order.php" method="post"&gt;
+    &lt;label for="product"&gt;Select a product:&lt;/label&gt;
+    &lt;select id="product" name="product"&gt;
+        &lt;option value=""&gt;Choose a product...&lt;/option&gt;
+        &lt;option value="laptop"&gt;Laptop&lt;/option&gt;
+        &lt;option value="tablet"&gt;Tablet&lt;/option&gt;
+        &lt;option value="phone"&gt;Smartphone&lt;/option&gt;
+    &lt;/select&gt;
+    
+    &lt;label for="quantity"&gt;Quantity:&lt;/label&gt;
+    &lt;select id="quantity" name="quantity"&gt;
+        &lt;option value="1"&gt;1&lt;/option&gt;
+        &lt;option value="2"&gt;2&lt;/option&gt;
+        &lt;option value="3"&gt;3&lt;/option&gt;
+        &lt;option value="4"&gt;4&lt;/option&gt;
+        &lt;option value="5"&gt;5&lt;/option&gt;
+    &lt;/select&gt;
+    
+    &lt;!-- Multiple select --&gt;
+    &lt;label for="accessories"&gt;Select accessories (hold Ctrl/Cmd to select multiple):&lt;/label&gt;
+    &lt;select id="accessories" name="accessories[]" multiple&gt;
+        &lt;option value="case"&gt;Protective Case&lt;/option&gt;
+        &lt;option value="charger"&gt;Extra Charger&lt;/option&gt;
+        &lt;option value="headphones"&gt;Headphones&lt;/option&gt;
+        &lt;option value="warranty"&gt;Extended Warranty&lt;/option&gt;
+    &lt;/select&gt;
+    
+    &lt;button type="submit"&gt;Add to Cart&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;!-- PHP Processing --&gt;
+&lt;?php
+// Get selected product
+$product = $_POST['product'] ?? '';
+
+if (empty($product)) {
+    echo "Please select a product.";
+} else {
+    // Get quantity (convert to integer)
+    $quantity = (int)($_POST['quantity'] ?? 1);
+    
+    // Ensure quantity is at least 1
+    $quantity = max(1, $quantity);
+    
+    echo "Selected product: " . htmlspecialchars($product) . "&lt;br&gt;";
+    echo "Quantity: " . $quantity . "&lt;br&gt;";
+    
+    // Handle multiple select
+    $accessories = $_POST['accessories'] ?? [];
+    
+    if (is_array($accessories) && !empty($accessories)) {
+        echo "Selected accessories:&lt;br&gt;";
+        echo "&lt;ul&gt;";
+        foreach ($accessories as $accessory) {
+            echo "&lt;li&gt;" . htmlspecialchars($accessory) . "&lt;/li&gt;";
+        }
+        echo "&lt;/ul&gt;";
+    } else {
+        echo "No accessories selected.";
+    }
+}
+?&gt;</code></pre>
+            </div>
+            
+            <div class="handling_dates">
+                <h3>Handling Date and Time Inputs</h3>
+                <pre><code>&lt;!-- HTML Form with Date/Time Fields --&gt;
+&lt;form action="process_event.php" method="post"&gt;
+    &lt;label for="event_date"&gt;Event Date:&lt;/label&gt;
+    &lt;input type="date" id="event_date" name="event_date" required&gt;
+    
+    &lt;label for="event_time"&gt;Event Time:&lt;/label&gt;
+    &lt;input type="time" id="event_time" name="event_time" required&gt;
+    
+    &lt;button type="submit"&gt;Schedule Event&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;!-- PHP Processing --&gt;
+&lt;?php
+// Get date and time values
+$date = $_POST['event_date'] ?? '';
+$time = $_POST['event_time'] ?? '';
+
+if (empty($date) || empty($time)) {
+    echo "Date and time are required.";
+} else {
+    // Validate date format (YYYY-MM-DD)
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        // Validate time format (HH:MM)
+        if (preg_match('/^\d{2}:\d{2}$/', $time)) {
+            // Create DateTime object
+            $event_datetime = new DateTime("$date $time");
+            
+            // Format for display
+            $formatted_date = $event_datetime->format('F j, Y');
+            $formatted_time = $event_datetime->format('g:i A');
+            
+            echo "Event scheduled for $formatted_date at $formatted_time";
+            
+            // For database storage, you might use:
+            $mysql_datetime = $event_datetime->format('Y-m-d H:i:s');
+        } else {
+            echo "Invalid time format.";
+        }
+    } else {
+        echo "Invalid date format.";
+    }
+}
+?&gt;</code></pre>
+            </div>
+        </section>
+
+        <section class="redirecting">
+            <h2>Redirecting After Form Processing</h2>
+            <p>After processing form data, it's often good practice to redirect the user to another page to prevent form resubmission.</p>
+            
+            <div class="redirect_examples">
+                <h3>POST-Redirect-GET Pattern</h3>
+                <pre><code>&lt;!-- HTML Form (contact_form.html) --&gt;
+&lt;form action="process_contact.php" method="post"&gt;
+    &lt;label for="name"&gt;Name:&lt;/label&gt;
+    &lt;input type="text" id="name" name="name" required&gt;
+    
+    &lt;label for="email"&gt;Email:&lt;/label&gt;
+    &lt;input type="email" id="email" name="email" required&gt;
+    
+    &lt;label for="message"&gt;Message:&lt;/label&gt;
+    &lt;textarea id="message" name="message" required&gt;&lt;/textarea&gt;
+    
+    &lt;button type="submit"&gt;Send Message&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;!-- PHP Processing with Redirect (process_contact.php) --&gt;
+&lt;?php
+// Start session to store messages
+session_start();
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Validate and sanitize form data
+    $name = filter_input(INPUT_POST, 'name', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    $email = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL);
+    $message = filter_input(INPUT_POST, 'message', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    
+    $errors = [];
+    
+    // Validate data
+    if (empty($name)) {
+        $errors[] = "Name is required.";
+    }
+    
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $errors[] = "Valid email is required.";
+    }
+    
+    if (empty($message)) {
+        $errors[] = "Message is required.";
+    }
+    
+    // Process form if no errors
+    if (empty($errors)) {
+        // Process the data (e.g., send email, save to database)
+        // ...
+        
+        // Set success message in session
+        $_SESSION['message'] = "Thank you! Your message has been sent.";
+        $_SESSION['message_type'] = "success";
+        
+        // Redirect to thank you page
+        header("Location: thank_you.php");
+        exit;
+    } else {
+        // Store errors and form data in session
+        $_SESSION['errors'] = $errors;
+        $_SESSION['form_data'] = [
+            'name' => $name,
+            'email' => $email,
+            'message' => $message
+        ];
+        
+        // Redirect back to form
+        header("Location: contact_form.php");
+        exit;
+    }
+}
+
+// If someone accesses this script directly without POST
+header("Location: contact_form.php");
+exit;
+?&gt;
+
+&lt;!-- Contact Form with Error Handling (contact_form.php) --&gt;
+&lt;?php
+session_start();
+
+// Check for errors
+$errors = $_SESSION['errors'] ?? [];
+$form_data = $_SESSION['form_data'] ?? [];
+
+// Clear session data
+unset($_SESSION['errors']);
+unset($_SESSION['form_data']);
+?&gt;
+
+&lt;!-- Display errors if any --&gt;
+&lt;?php if (!empty($errors)): ?&gt;
+    &lt;div class="errors"&gt;
+        &lt;h3&gt;Please fix the following errors:&lt;/h3&gt;
+        &lt;ul&gt;
+            &lt;?php foreach ($errors as $error): ?&gt;
+                &lt;li&gt;&lt;?php echo $error; ?&gt;&lt;/li&gt;
+            &lt;?php endforeach; ?&gt;
+        &lt;/ul&gt;
+    &lt;/div&gt;
+&lt;?php endif; ?&gt;
+
+&lt;form action="process_contact.php" method="post"&gt;
+    &lt;label for="name"&gt;Name:&lt;/label&gt;
+    &lt;input type="text" id="name" name="name" value="&lt;?php echo htmlspecialchars($form_data['name'] ?? ''); ?&gt;" required&gt;
+    
+    &lt;label for="email"&gt;Email:&lt;/label&gt;
+    &lt;input type="email" id="email" name="email" value="&lt;?php echo htmlspecialchars($form_data['email'] ?? ''); ?&gt;" required&gt;
+    
+    &lt;label for="message"&gt;Message:&lt;/label&gt;
+    &lt;textarea id="message" name="message" required&gt;&lt;?php echo htmlspecialchars($form_data['message'] ?? ''); ?&gt;&lt;/textarea&gt;
+    
+    &lt;button type="submit"&gt;Send Message&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;!-- Thank You Page (thank_you.php) --&gt;
+&lt;?php
+session_start();
+
+// Get message from session
+$message = $_SESSION['message'] ?? '';
+$message_type = $_SESSION['message_type'] ?? '';
+
+// Clear session data
+unset($_SESSION['message']);
+unset($_SESSION['message_type']);
+
+// Redirect if no message (direct access)
+if (empty($message)) {
+    header("Location: contact_form.php");
+    exit;
+}
+?&gt;
+
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;Thank You&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;div class="&lt;?php echo $message_type; ?&gt;"&gt;
+        &lt;?php echo $message; ?&gt;
+    &lt;/div&gt;
+    
+    &lt;p&gt;&lt;a href="contact_form.php"&gt;Back to Contact Form&lt;/a&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+            </div>
+        </section>
+
+        <section class="common_patterns">
+            <h2>Common Patterns for Form Processing</h2>
+            <p>Here are some common patterns and best practices for processing form data in PHP applications.</p>
+            
+            <div class="pattern_examples">
+                <h3>Self-Processing Form</h3>
+                <pre><code>&lt;!-- Self-Processing Form (same file handles display and processing) --&gt;
+&lt;?php
+$errors = [];
+$form_data = [];
+
+// Check if form was submitted
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Process form data
+    $form_data['name'] = filter_input(INPUT_POST, 'name', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    $form_data['email'] = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL);
+    
+    // Validate
+    if (empty($form_data['name'])) {
+        $errors['name'] = "Name is required.";
+    }
+    
+    if (!filter_var($form_data['email'], FILTER_VALIDATE_EMAIL)) {
+        $errors['email'] = "Valid email is required.";
+    }
+    
+    // If no errors, process the data
+    if (empty($errors)) {
+        $success = true;
+        // Process data (e.g., save to database)
+        // ...
+    }
+}
+?&gt;
+
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;Contact Form&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;?php if (isset($success)): ?&gt;
+        &lt;div class="success"&gt;
+            Thank you! Your message has been sent.
+        &lt;/div&gt;
+    &lt;?php else: ?&gt;
+        &lt;form method="post"&gt;
+            &lt;div&gt;
+                &lt;label for="name"&gt;Name:&lt;/label&gt;
+                &lt;input type="text" id="name" name="name" value="&lt;?php echo htmlspecialchars($form_data['name'] ?? ''); ?&gt;"&gt;
+                &lt;?php if (isset($errors['name'])): ?&gt;
+                    &lt;span class="error"&gt;&lt;?php echo $errors['name']; ?&gt;&lt;/span&gt;
+                &lt;?php endif; ?&gt;
+            &lt;/div&gt;
+            
+            &lt;div&gt;
+                &lt;label for="email"&gt;Email:&lt;/label&gt;
+                &lt;input type="email" id="email" name="email" value="&lt;?php echo htmlspecialchars($form_data['email'] ?? ''); ?&gt;"&gt;
+                &lt;?php if (isset($errors['email'])): ?&gt;
+                    &lt;span class="error"&gt;&lt;?php echo $errors['email']; ?&gt;&lt;/span&gt;
+                &lt;?php endif; ?&gt;
+            &lt;/div&gt;
+            
+            &lt;button type="submit"&gt;Submit&lt;/button&gt;
+        &lt;/form&gt;
+    &lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+                
+                <h3>Form Handler Class</h3>
+                <pre><code>&lt;?php
+// FormHandler.php - Reusable class for form processing
+
+class FormHandler {
+    private $data = [];
+    private $errors = [];
+    private $rules = [];
+    
+    // Constructor can take validation rules
+    public function __construct(array $rules = []) {
+        $this->rules = $rules;
+    }
+    
+    // Process form submission
+    public function process(array $data) {
+        $this->data = $data;
+        $this->validate();
+        return empty($this->errors);
+    }
+    
+    // Validate form data
+    private function validate() {
+        foreach ($this->rules as $field => $rule) {
+            // Skip if field not present and not required
+            if (!isset($this->data[$field]) && !in_array('required', $rule)) {
+                continue;
+            }
+            
+            // Check required fields
+            if (in_array('required', $rule) && empty($this->data[$field])) {
+                $this->errors[$field] = ucfirst($field) . " is required.";
+                continue;
+            }
+            
+            // Skip further validation if field is empty
+            if (empty($this->data[$field])) {
+                continue;
+            }
+            
+            // Validate email
+            if (in_array('email', $rule) && !filter_var($this->data[$field], FILTER_VALIDATE_EMAIL)) {
+                $this->errors[$field] = "Please enter a valid email address.";
+            }
+            
+            // Validate number
+            if (in_array('number', $rule) && !is_numeric($this->data[$field])) {
+                $this->errors[$field] = ucfirst($field) . " must be a number.";
+            }
+            
+            // Validate minimum length
+            if (isset($rule['min']) && strlen($this->data[$field]) < $rule['min']) {
+                $this->errors[$field] = ucfirst($field) . " must be at least " . $rule['min'] . " characters.";
+            }
+            
+            // Validate maximum length
+            if (isset($rule['max']) && strlen($this->data[$field]) > $rule['max']) {
+                $this->errors[$field] = ucfirst($field) . " must be no more than " . $rule['max'] . " characters.";
+            }
+        }
+    }
+    
+    // Get sanitized data
+    public function getSanitized($field = null) {
+        if ($field) {
+            return htmlspecialchars($this->data[$field] ?? '');
+        }
+        
+        $sanitized = [];
+        foreach ($this->data as $key => $value) {
+            $sanitized[$key] = htmlspecialchars($value);
+        }
+        return $sanitized;
+    }
+    
+    // Get all errors
+    public function getErrors() {
+        return $this->errors;
+    }
+    
+    // Get specific error
+    public function getError($field) {
+        return $this->errors[$field] ?? '';
+    }
+    
+    // Check if field has error
+    public function hasError($field) {
+        return isset($this->errors[$field]);
+    }
+}
+
+// Usage example:
+// In your form processing script:
+/*
+$rules = [
+    'name' => ['required', 'min' => 2, 'max' => 50],
+    'email' => ['required', 'email'],
+    'age' => ['number'],
+    'message' => ['required', 'min' => 10]
+];
+
+$handler = new FormHandler($rules);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if ($handler->process($_POST)) {
+        // Form is valid, process data
+        $name = $handler->getSanitized('name');
+        $email = $handler->getSanitized('email');
+        // ...
+    } else {
+        // Form has errors
+        $errors = $handler->getErrors();
+    }
+}
+*/
+?&gt;</code></pre>
+            </div>
+        </section>
+
+        <section class="security_best_practices">
+            <h2>Security Best Practices for Form Data</h2>
+            <p>Handling form data securely is essential for protecting your applications and users.</p>
+            
+            <div class="security_tips">
+                <h3>Key Security Considerations</h3>
+                <ul>
+                    <li><strong>Always validate and sanitize all input</strong>: Never trust user input, even if you have client-side validation.</li>
+                    <li><strong>Use prepared statements for database queries</strong>: Prevent SQL injection attacks.</li>
+                    <li><strong>Implement CSRF protection</strong>: Prevent Cross-Site Request Forgery attacks.</li>
+                    <li><strong>Validate file uploads carefully</strong>: Check file types, sizes, and content.</li>
+                    <li><strong>Use HTTPS</strong>: Encrypt form data in transit.</li>
+                    <li><strong>Be cautious with $_REQUEST</strong>: It combines $_GET, $_POST, and $_COOKIE, which can lead to unexpected behavior.</li>
+                    <li><strong>Validate data types</strong>: Ensure numbers are numbers, emails are emails, etc.</li>
+                    <li><strong>Handle errors gracefully</strong>: Don't expose technical details to users.</li>
+                </ul>
+                
+                <h3>CSRF Protection Example</h3>
+                <pre><code>&lt;?php
+// Start session
+session_start();
+
+// Generate CSRF token if needed
+if (!isset($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+// Form with CSRF protection
+?&gt;
+
+&lt;form action="process.php" method="post"&gt;
+    &lt;!-- Include CSRF token as hidden field --&gt;
+    &lt;input type="hidden" name="csrf_token" value="&lt;?php echo $_SESSION['csrf_token']; ?&gt;"&gt;
+    
+    &lt;!-- Form fields --&gt;
+    &lt;label for="username"&gt;Username:&lt;/label&gt;
+    &lt;input type="text" id="username" name="username" required&gt;
+    
+    &lt;button type="submit"&gt;Submit&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;?php
+// In the processing script (process.php)
+session_start();
+
+// Verify CSRF token
+if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+    // Token is invalid - possible CSRF attack
+    die('Security validation failed. Please try again.');
+}
+
+// Token is valid, process the form
+// ...
+?&gt;</code></pre>
+            </div>
+        </section>
+
+        <section class="debugging_form_data">
+            <h2>Debugging Form Data</h2>
+            <p>When working with form data, debugging techniques can help you identify and fix issues quickly.</p>
+            
+            <div class="debugging_techniques">
+                <h3>Viewing Form Data Contents</h3>
+                <pre><code>&lt;?php
+// Safely display the contents of a superglobal array
+function debug_array($array) {
+    echo "&lt;pre&gt;";
+    print_r($array);
+    echo "&lt;/pre&gt;";
+}
+
+// Display GET data
+echo "&lt;h3&gt;GET Data:&lt;/h3&gt;";
+debug_array($_GET);
+
+// Display POST data
+echo "&lt;h3&gt;POST Data:&lt;/h3&gt;";
+debug_array($_POST);
+
+// Display all request variables
+echo "&lt;h3&gt;REQUEST Data:&lt;/h3&gt;";
+debug_array($_REQUEST);
+
+// Display file upload information
+if (!empty($_FILES)) {
+    echo "&lt;h3&gt;FILES Data:&lt;/h3&gt;";
+    debug_array($_FILES);
+}
+?&gt;</code></pre>
+                
+                <h3>Logging Form Submissions</h3>
+                <pre><code>&lt;?php
+// Function to log form submissions for debugging
+function log_form_submission($data, $type = 'POST') {
+    // Create logs directory if it doesn't exist
+    $log_dir = __DIR__ . '/logs';
+    if (!file_exists($log_dir)) {
+        mkdir($log_dir, 0755, true);
+    }
+    
+    // Create log entry
+    $log_entry = [
+        'timestamp' => date('Y-m-d H:i:s'),
+        'ip' => $_SERVER['REMOTE_ADDR'],
+        'type' => $type,
+        'data' => $data
+    ];
+    
+    // Write to log file
+    $log_file = $log_dir . '/form_submissions.log';
+    $log_entry_str = json_encode($log_entry) . "\n";
+    file_put_contents($log_file, $log_entry_str, FILE_APPEND);
+}
+
+// Usage:
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Log the submission (be careful with sensitive data!)
+    log_form_submission($_POST);
+    
+    // Process form...
+}
+?&gt;</code></pre>
+                
+                <h3>Common Issues and Solutions</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Issue</th>
+                            <th>Possible Cause</th>
+                            <th>Solution</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Empty $_POST array</td>
+                            <td>Form method is set to "get" instead of "post"</td>
+                            <td>Check the form's method attribute</td>
+                        </tr>
+                        <tr>
+                            <td>Missing field in $_POST</td>
+                            <td>Field name is misspelled or not set in the form</td>
+                            <td>Verify field names match exactly between HTML and PHP</td>
+                        </tr>
+                        <tr>
+                            <td>Array expected but string received</td>
+                            <td>Missing square brackets in input name</td>
+                            <td>Use name="field[]" for arrays</td>
+                        </tr>
+                        <tr>
+                            <td>Form resets after submission</td>
+                            <td>Page is refreshing without preserving input</td>
+                            <td>Use sessions to store form data or use self-processing form pattern</td>
+                        </tr>
+                        <tr>
+                            <td>File uploads not working</td>
+                            <td>Missing enctype="multipart/form-data" on form</td>
+                            <td>Add proper enctype attribute to the form</td>
+                        </tr>
+                        <tr>
+                            <td>Special characters corrupted</td>
+                            <td>Character encoding issues</td>
+                            <td>Set proper content-type headers and use htmlspecialchars</td>
+                        </tr>
+                        <tr>
+                            <td>"Undefined array key" notice</td>
+                            <td>Trying to access a non-existent array key</td>
+                            <td>Use isset() or the null coalescing operator (??)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="wordpress_integration">
+            <h2>Working with Form Data in WordPress</h2>
+            <p>WordPress provides several functions and security features for handling form data.</p>
+            
+            <div class="wp_form_handling">
+                <h3>WordPress Sanitization Functions</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Function</th>
+                            <th>Purpose</th>
+                            <th>Example</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>sanitize_text_field()</code></td>
+                            <td>Sanitizes text input</td>
+                            <td><code>$name = sanitize_text_field($_POST['name']);</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>sanitize_email()</code></td>
+                            <td>Sanitizes email address</td>
+                            <td><code>$email = sanitize_email($_POST['email']);</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>sanitize_title()</code></td>
+                            <td>Sanitizes string for use in URL or slug</td>
+                            <td><code>$slug = sanitize_title($_POST['title']);</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>absint()</code></td>
+                            <td>Converts to positive integer</td>
+                            <td><code>$id = absint($_GET['id']);</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>wp_kses()</code></td>
+                            <td>Allows specific HTML tags</td>
+                            <td><code>$content = wp_kses($_POST['content'], $allowed_html);</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <h3>Handling Form Submissions in WordPress</h3>
+                <pre><code>&lt;!-- WordPress Form in a Page Template --&gt;
+&lt;?php
+/* 
+Template Name: Contact Form
+*/
+
+get_header();
+
+// Check if the form was submitted
+$form_submitted = false;
+$form_errors = [];
+
+if (isset($_POST['contact_submit'])) {
+    // Verify nonce for security
+    if (!isset($_POST['contact_nonce']) || !wp_verify_nonce($_POST['contact_nonce'], 'contact_form')) {
+        $form_errors[] = 'Security verification failed. Please try again.';
+    } else {
+        // Sanitize and validate form data
+        $name = sanitize_text_field($_POST['name'] ?? '');
+        $email = sanitize_email($_POST['email'] ?? '');
+        $message = sanitize_textarea_field($_POST['message'] ?? '');
+        
+        // Validate
+        if (empty($name)) {
+            $form_errors[] = 'Please enter your name.';
+        }
+        
+        if (empty($email) || !is_email($email)) {
+            $form_errors[] = 'Please enter a valid email address.';
+        }
+        
+        if (empty($message)) {
+            $form_errors[] = 'Please enter a message.';
+        }
+        
+        // If no errors, process the form
+        if (empty($form_errors)) {
+            // Send email
+            $to = get_option('admin_email');
+            $subject = 'New Contact Form Submission';
+            $body = "Name: $name\n\nEmail: $email\n\nMessage:\n$message";
+            $headers = ['From: ' . $name . ' <' . $email . '>'];
+            
+            $sent = wp_mail($to, $subject, $body, $headers);
+            
+            if ($sent) {
+                $form_submitted = true;
+            } else {
+                $form_errors[] = 'There was a problem sending your message. Please try again.';
+            }
+        }
+    }
+}
+?&gt;
+
+&lt;div class="container"&gt;
+    &lt;div class="row"&gt;
+        &lt;div class="col-md-8 offset-md-2"&gt;
+            &lt;h1&gt;&lt;?php the_title(); ?&gt;&lt;/h1&gt;
+            
+            &lt;?php the_content(); ?&gt;
+            
+            &lt;?php if ($form_submitted): ?&gt;
+                &lt;div class="alert alert-success"&gt;
+                    Thank you for your message! We'll get back to you soon.
+                &lt;/div&gt;
+            &lt;?php else: ?&gt;
+                &lt;?php if (!empty($form_errors)): ?&gt;
+                    &lt;div class="alert alert-danger"&gt;
+                        &lt;ul&gt;
+                            &lt;?php foreach ($form_errors as $error): ?&gt;
+                                &lt;li&gt;&lt;?php echo $error; ?&gt;&lt;/li&gt;
+                            &lt;?php endforeach; ?&gt;
+                        &lt;/ul&gt;
+                    &lt;/div&gt;
+                &lt;?php endif; ?&gt;
+                
+                &lt;form method="post" class="contact-form"&gt;
+                    &lt;?php wp_nonce_field('contact_form', 'contact_nonce'); ?&gt;
+                    
+                    &lt;div class="form-group"&gt;
+                        &lt;label for="name"&gt;Name:&lt;/label&gt;
+                        &lt;input type="text" id="name" name="name" class="form-control" value="&lt;?php echo esc_attr($_POST['name'] ?? ''); ?&gt;" required&gt;
+                    &lt;/div&gt;
+                    
+                    &lt;div class="form-group"&gt;
+                        &lt;label for="email"&gt;Email:&lt;/label&gt;
+                        &lt;input type="email" id="email" name="email" class="form-control" value="&lt;?php echo esc_attr($_POST['email'] ?? ''); ?&gt;" required&gt;
+                    &lt;/div&gt;
+                    
+                    &lt;div class="form-group"&gt;
+                        &lt;label for="message"&gt;Message:&lt;/label&gt;
+                        &lt;textarea id="message" name="message" class="form-control" rows="5" required&gt;&lt;?php echo esc_textarea($_POST['message'] ?? ''); ?&gt;&lt;/textarea&gt;
+                    &lt;/div&gt;
+                    
+                    &lt;button type="submit" name="contact_submit" class="btn btn-primary"&gt;Send Message&lt;/button&gt;
+                &lt;/form&gt;
+            &lt;?php endif; ?&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;?php get_footer(); ?&gt;</code></pre>
+                
+                <h3>AJAX Form Handling in WordPress</h3>
+                <pre><code>&lt;!-- WordPress AJAX Form --&gt;
+&lt;form id="ajax-contact-form" class="contact-form"&gt;
+    &lt;div class="form-group"&gt;
+        &lt;label for="name"&gt;Name:&lt;/label&gt;
+        &lt;input type="text" id="name" name="name" class="form-control" required&gt;
+    &lt;/div&gt;
+    
+    &lt;div class="form-group"&gt;
+        &lt;label for="email"&gt;Email:&lt;/label&gt;
+        &lt;input type="email" id="email" name="email" class="form-control" required&gt;
+    &lt;/div&gt;
+    
+    &lt;div class="form-group"&gt;
+        &lt;label for="message"&gt;Message:&lt;/label&gt;
+        &lt;textarea id="message" name="message" class="form-control" rows="5" required&gt;&lt;/textarea&gt;
+    &lt;/div&gt;
+    
+    &lt;div id="form-response"&gt;&lt;/div&gt;
+    
+    &lt;button type="submit" class="btn btn-primary"&gt;Send Message&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;!-- JavaScript for AJAX form submission --&gt;
+&lt;script&gt;
+jQuery(document).ready(function($) {
+    $('#ajax-contact-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        var formData = $(this).serialize();
+        formData += '&action=process_contact_form'; // WordPress AJAX action
+        formData += '&security=' + ajax_object.nonce; // Add nonce
+        
+        $.ajax({
+            type: 'POST',
+            url: ajax_object.ajax_url,
+            data: formData,
+            success: function(response) {
+                $('#form-response').html(response.data);
+                
+                if (response.success) {
+                    $('#ajax-contact-form').trigger('reset');
+                }
+            },
+            error: function() {
+                $('#form-response').html('&lt;div class="alert alert-danger"&gt;An error occurred. Please try again.&lt;/div&gt;');
+            }
+        });
+    });
+});
+&lt;/script&gt;
+
+&lt;!-- Process AJAX request in functions.php --&gt;
+&lt;?php
+// Enqueue script with AJAX variables
+function enqueue_ajax_form_scripts() {
+    wp_enqueue_script('ajax-contact-form', get_template_directory_uri() . '/js/ajax-form.js', ['jquery'], '1.0', true);
+    
+    // Pass AJAX URL and nonce to script
+    wp_localize_script('ajax-contact-form', 'ajax_object', [
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('contact_form_nonce')
+    ]);
+}
+add_action('wp_enqueue_scripts', 'enqueue_ajax_form_scripts');
+
+// AJAX handler for contact form
+function process_ajax_contact_form() {
+    // Check nonce
+    check_ajax_referer('contact_form_nonce', 'security');
+    
+    // Sanitize and validate form data
+    $name = sanitize_text_field($_POST['name'] ?? '');
+    $email = sanitize_email($_POST['email'] ?? '');
+    $message = sanitize_textarea_field($_POST['message'] ?? '');
+    
+    $errors = [];
+    
+    // Validate
+    if (empty($name)) {
+        $errors[] = 'Please enter your name.';
+    }
+    
+    if (empty($email) || !is_email($email)) {
+        $errors[] = 'Please enter a valid email address.';
+    }
+    
+    if (empty($message)) {
+        $errors[] = 'Please enter a message.';
+    }
+    
+    // If errors, return them
+    if (!empty($errors)) {
+        $error_html = '&lt;div class="alert alert-danger"&gt;&lt;ul&gt;';
+        foreach ($errors as $error) {
+            $error_html .= '&lt;li&gt;' . $error . '&lt;/li&gt;';
+        }
+        $error_html .= '&lt;/ul&gt;&lt;/div&gt;';
+        
+        wp_send_json_error($error_html);
+    }
+    
+    // Process the form (e.g., send email)
+    $to = get_option('admin_email');
+    $subject = 'New Contact Form Submission';
+    $body = "Name: $name\n\nEmail: $email\n\nMessage:\n$message";
+    $headers = ['From: ' . $name . ' <' . $email . '>'];
+    
+    $sent = wp_mail($to, $subject, $body, $headers);
+    
+    if ($sent) {
+        wp_send_json_success('&lt;div class="alert alert-success"&gt;Thank you for your message! We\'ll get back to you soon.&lt;/div&gt;');
+    } else {
+        wp_send_json_error('&lt;div class="alert alert-danger"&gt;There was a problem sending your message. Please try again.&lt;/div&gt;');
+    }
+    
+    // Always die in functions handling AJAX
+    die();
+}
+
+// Hook for both logged in and non-logged in users
+add_action('wp_ajax_process_contact_form', 'process_ajax_contact_form');
+add_action('wp_ajax_nopriv_process_contact_form', 'process_ajax_contact_form');
+?&gt;</code></pre>
+            </div>
+        </section>
+
+        <section class="homework">
+            <h2>Homework: Form Data Processing</h2>
+            <p>Complete the following exercises to practice accessing and processing form data with PHP.</p>
+            
+            <div class="homework_tasks">
+                <h3>Task 1: Basic Form Processing</h3>
+                <p>Create a registration form with the following fields:</p>
+                <ul>
+                    <li>Full Name (text input)</li>
+                    <li>Email Address (email input)</li>
+                    <li>Password (password input)</li>
+                    <li>Confirm Password (password input)</li>
+                    <li>Date of Birth (date input)</li>
+                    <li>Gender (radio buttons)</li>
+                    <li>Interests (multiple checkboxes)</li>
+                    <li>Country (select dropdown)</li>
+                </ul>
+                <p>Then create a PHP script that:</p>
+                <ol>
+                    <li>Processes the form when submitted</li>
+                    <li>Validates all fields (required fields, matching passwords, valid email, etc.)</li>
+                    <li>Displays appropriate error messages</li>
+                    <li>If all validation passes, displays a success message with all the submitted data</li>
+                </ol>
+                
+                <h3>Task 2: Self-Processing Form with Data Persistence</h3>
+                <p>Create a self-processing form that:</p>
+                <ol>
+                    <li>Displays and processes the form in the same PHP file</li>
+                    <li>Preserves user input when validation fails (the form should be pre-filled with previous entries)</li>
+                    <li>Implements proper sanitization for all fields</li>
+                    <li>Includes at least one field of each type: text, checkbox, radio, select, and textarea</li>
+                </ol>
+                
+                <h3>Task 3: Advanced Array Handling</h3>
+                <p>Create a form that collects the following information:</p>
+                <ul>
+                    <li>Personal Information (name, email)</li>
+                    <li>Multiple addresses (home and work) with street, city, state, and zip for each</li>
+                    <li>Education history (multiple schools with name, year, and degree)</li>
+                </ul>
+                <p>Use nested arrays in your form fields and demonstrate how to:</p>
+                <ol>
+                    <li>Structure the HTML form with proper array notation</li>
+                    <li>Access and validate the nested data in PHP</li>
+                    <li>Display the processed data in a formatted way</li>
+                </ol>
+                
+                <h3>Bonus Challenge: Create a Multi-Step Form</h3>
+                <p>Create a multi-step form that:</p>
+                <ol>
+                    <li>Spans across 3 different pages/steps</li>
+                    <li>Uses sessions to store data between steps</li>
+                    <li>Allows users to go back to previous steps and edit data</li>
+                    <li>Shows a final confirmation page with all data for review</li>
+                    <li>Processes all data only after final confirmation</li>
+                </ol>
+            </div>
+        </section>
+
+        <section class="additional_resources">
+            <h2>Additional Resources</h2>
+            
+            <div class="resources_list">
+                <h3>Documentation</h3>
+                <ul>
+                    <li><a href="https://www.php.net/manual/en/reserved.variables.get.php" target="_blank">PHP Manual: $_GET</a></li>
+                    <li><a href="https://www.php.net/manual/en/reserved.variables.post.php" target="_blank">PHP Manual: $_POST</a></li>
+                    <li><a href="https://www.php.net/manual/en/function.filter-input.php" target="_blank">PHP Manual: filter_input()</a></li>
+                    <li><a href="https://www.php.net/manual/en/book.filter.php" target="_blank">PHP Manual: Filter Functions</a></li>
+                </ul>
+                
+                <h3>Security Resources</h3>
+                <ul>
+                    <li><a href="https://owasp.org/www-project-top-ten/" target="_blank">OWASP Top Ten Security Risks</a></li>
+                    <li><a href="https://www.php.net/manual/en/security.php" target="_blank">PHP Manual: Security</a></li>
+                    <li><a href="https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Request_Forgery_Prevention_Cheat_Sheet.html" target="_blank">OWASP CSRF Prevention Cheat Sheet</a></li>
+                </ul>
+                
+                <h3>WordPress-Specific Resources</h3>
+                <ul>
+                    <li><a href="https://developer.wordpress.org/themes/theme-security/data-sanitization-escaping/" target="_blank">WordPress Data Sanitization & Escaping</a></li>
+                    <li><a href="https://developer.wordpress.org/plugins/security/nonces/" target="_blank">WordPress Nonces</a></li>
+                    <li><a href="https://developer.wordpress.org/plugins/javascript/ajax/" target="_blank">WordPress AJAX</a></li>
+                </ul>
+                
+                <h3>Tutorials and Articles</h3>
+                <ul>
+                    <li><a href="https://phptherightway.com/" target="_blank">PHP The Right Way</a></li>
+                    <li><a href="https://www.smashingmagazine.com/2012/11/building-forms-in-php/" target="_blank">Smashing Magazine: Building Forms in PHP</a></li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="next_lesson_preview">
+            <h2>Coming Up Next: Form Validation Techniques</h2>
+            <p>In our next lecture, we'll dive deeper into form validation:</p>
+            <ul>
+                <li>Server-side vs. client-side validation</li>
+                <li>Regular expressions for pattern validation</li>
+                <li>Advanced validation techniques</li>
+                <li>Creating reusable validation libraries</li>
+                <li>Error handling and user feedback</li>
+            </ul>
+            <p>Be sure to complete the homework exercises to reinforce your understanding of $_GET and $_POST before moving on!</p>
+        </section>
+    </main>
+    
+    <footer>
+        <p>&copy; 2025 PHP WordPress Development Course</p>
+        <p><a href="get_vs_post_methods.html">Previous Lesson: GET vs POST Methods</a> | <a href="index.html">Back to Syllabus</a> | <a href="form_validation_techniques.html">Next Lesson: Form Validation Techniques</a></p>
+    </footer>
+</body>
+</html>
