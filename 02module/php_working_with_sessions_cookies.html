@@ -1,0 +1,2016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Working with Sessions and Cookies in PHP</title>
+    <link rel="stylesheet" href="/styles/main.css">
+    <link rel="icon" href="/favicon.png">
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+      mermaid.initialize({ startOnLoad: true });
+    </script>
+</head>
+<body>
+    <header>
+        <h1>Working with Sessions and Cookies in PHP</h1>
+        <p><a href="index.html">← Back to Syllabus</a></p>
+    </header>
+    
+    <main>
+        <section class="intro">
+            <h2>Introduction to State Management in Web Applications</h2>
+            <p>Welcome to our exploration of sessions and cookies in PHP! This fundamental topic allows us to create dynamic, personalized web experiences by solving one of the web's most fundamental challenges: maintaining state in a stateless protocol.</p>
+            
+            <div class="analogy">
+                <h3>The Amnesia Analogy</h3>
+                <p>Imagine HTTP (the protocol that powers the web) as a person with severe amnesia. Each time you interact with them, they completely forget who you are and all previous conversations. Without any mechanism to maintain "memory," every webpage would treat you like a stranger with each click, regardless of whether you had just logged in or added items to a shopping cart.</p>
+                
+                <p>Cookies and sessions are like the memory aids we provide to this amnesiac:</p>
+                <ul>
+                    <li><strong>Cookies</strong> are like sticky notes we attach directly to the visitor. They carry small bits of information that remain with the user as they browse.</li>
+                    <li><strong>Sessions</strong> are like a personal file we keep on our side, with a unique identifier tag we give to the visitor. When they return with that tag, we can retrieve all their information from our files.</li>
+                </ul>
+            </div>
+            
+            <div class="mermaid-diagram">
+                <h3>HTTP's Stateless Nature</h3>
+                <div class="mermaid">
+sequenceDiagram
+    participant User
+    participant Browser
+    participant Server
+    
+    User->>Browser: Click link/submit form
+    Browser->>Server: HTTP Request
+    Note over Server: Server processes request<br>with no memory of previous requests
+    Server->>Browser: HTTP Response
+    Browser->>User: Display page
+    
+    User->>Browser: Click another link
+    Browser->>Server: New HTTP Request
+    Note over Server: Server has no knowledge<br>of the previous request
+    Server->>Browser: HTTP Response
+    Browser->>User: Display new page
+                </div>
+            </div>
+            
+            <p>Without cookies or sessions, each interaction with a website requires starting from scratch—re-entering credentials, losing shopping carts, and personalizations that make modern web applications useful. Let's explore how PHP helps us overcome this limitation.</p>
+        </section>
+        
+        <section class="cookies">
+            <h2>Understanding Cookies</h2>
+            
+            <h3>What Are Cookies?</h3>
+            <p>Cookies are small text files stored on the user's browser. They contain small pieces of data specific to a particular website and user, allowing websites to "remember" information about visitors between page views.</p>
+            
+            <div class="analogy">
+                <h3>The Concert Stamp Analogy</h3>
+                <p>Think of cookies like hand stamps at a concert:</p>
+                <ul>
+                    <li>They're placed directly on the visitor</li>
+                    <li>They allow re-entry without repeating the ticket process</li>
+                    <li>They have a specific duration (one night)</li>
+                    <li>They can only be read by the venue that issued them</li>
+                    <li>They contain minimal information (just "admitted")</li>
+                </ul>
+                <p>Similarly, cookies mark your browser with small bits of data that websites can check when you return, letting them recognize you without requiring re-authentication or preference setting with each click.</p>
+            </div>
+            
+            <div class="mermaid-diagram">
+                <h3>How Cookies Work</h3>
+                <div class="mermaid">
+sequenceDiagram
+    participant User
+    participant Browser
+    participant Server
+    
+    User->>Browser: Visit website
+    Browser->>Server: HTTP Request
+    Server->>Browser: HTTP Response with Set-Cookie header
+    Note over Browser: Stores cookie
+    Browser->>User: Display page
+    
+    User->>Browser: Visit another page on the same site
+    Browser->>Server: HTTP Request including Cookie header
+    Note over Server: Reads cookie<br>Recognizes the user
+    Server->>Browser: Personalized HTTP Response
+    Browser->>User: Display personalized page
+                </div>
+            </div>
+            
+            <h3>Creating Cookies in PHP</h3>
+            <p>PHP provides the <code>setcookie()</code> function to create cookies. This function must be called before any output is sent to the browser, as it sets HTTP headers.</p>
+            
+            <div class="code-example">
+                <h4>Basic Cookie Creation</h4>
+                <pre><code>&lt;?php
+// Setting a simple cookie that expires in one hour
+setcookie("user_name", "John", time() + 3600);
+
+// Setting a cookie with more options
+setcookie(
+    "user_preferences",            // Cookie name
+    json_encode(["theme" => "dark", "fontSize" => "medium"]), // Value (must be a string)
+    time() + 86400 * 30,          // Expiration time (30 days)
+    "/",                          // Path on the server
+    "example.com",                // Domain
+    true,                         // Secure (HTTPS only)
+    true                          // HttpOnly (inaccessible to JavaScript)
+);
+?&gt;</code></pre>
+            </div>
+            
+            <div class="parameters-table">
+                <h4>setcookie() Parameters Explained</h4>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Description</th>
+                            <th>Example</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>name</td>
+                            <td>The name of the cookie</td>
+                            <td>"user_name"</td>
+                        </tr>
+                        <tr>
+                            <td>value</td>
+                            <td>The value to store (must be a string)</td>
+                            <td>"John"</td>
+                        </tr>
+                        <tr>
+                            <td>expires</td>
+                            <td>When the cookie expires (as Unix timestamp)</td>
+                            <td>time() + 3600 (1 hour)</td>
+                        </tr>
+                        <tr>
+                            <td>path</td>
+                            <td>The path on the server where the cookie is available</td>
+                            <td>"/" (entire domain)</td>
+                        </tr>
+                        <tr>
+                            <td>domain</td>
+                            <td>The domain where the cookie is available</td>
+                            <td>"example.com"</td>
+                        </tr>
+                        <tr>
+                            <td>secure</td>
+                            <td>Cookie should only be transmitted over HTTPS</td>
+                            <td>true</td>
+                        </tr>
+                        <tr>
+                            <td>httponly</td>
+                            <td>Cookie accessible only through HTTP protocol (not JavaScript)</td>
+                            <td>true</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <h3>Reading Cookies in PHP</h3>
+            <p>Reading cookies is straightforward; PHP automatically populates the <code>$_COOKIE</code> superglobal array with all cookies sent by the browser.</p>
+            
+            <div class="code-example">
+                <h4>Reading Cookies</h4>
+                <pre><code>&lt;?php
+// Check if a cookie exists
+if (isset($_COOKIE['user_name'])) {
+    echo "Welcome back, " . htmlspecialchars($_COOKIE['user_name']) . "!";
+} else {
+    echo "Welcome, new visitor!";
+}
+
+// Reading a JSON cookie
+if (isset($_COOKIE['user_preferences'])) {
+    $preferences = json_decode($_COOKIE['user_preferences'], true);
+    $theme = $preferences['theme'] ?? 'light';
+    $fontSize = $preferences['fontSize'] ?? 'medium';
+    
+    echo "Your preferences: Theme: $theme, Font Size: $fontSize";
+}
+?&gt;</code></pre>
+            </div>
+            
+            <h3>Modifying and Deleting Cookies</h3>
+            <p>To modify a cookie, simply set it again with the same name. To delete a cookie, set it with an expiration time in the past.</p>
+            
+            <div class="code-example">
+                <h4>Modifying and Deleting Cookies</h4>
+                <pre><code>&lt;?php
+// Modifying a cookie
+setcookie("user_name", "Jane", time() + 3600); // Changes value from "John" to "Jane"
+
+// Deleting a cookie
+setcookie("user_name", "", time() - 3600); // Sets expiration in the past
+?&gt;</code></pre>
+            </div>
+            
+            <div class="note">
+                <h3>Important Cookie Considerations</h3>
+                <ul>
+                    <li><strong>Size Limitations:</strong> Cookies are limited to about 4KB in size.</li>
+                    <li><strong>Security:</strong> Never store sensitive information (passwords, credit card numbers) in cookies.</li>
+                    <li><strong>Headers:</strong> <code>setcookie()</code> must be called before any output is sent to the browser.</li>
+                    <li><strong>Cookie Law:</strong> Many jurisdictions require explicit user consent for non-essential cookies.</li>
+                    <li><strong>Accessibility:</strong> Don't rely exclusively on cookies; some users disable them.</li>
+                </ul>
+            </div>
+            
+            <h3>Real-World Cookie Applications</h3>
+            <ul>
+                <li><strong>User Preferences:</strong> Saving display settings, language choices, theme preferences</li>
+                <li><strong>Remembering Form Data:</strong> Preventing re-entry of information</li>
+                <li><strong>"Remember Me" Functionality:</strong> Keeping users logged in between sessions</li>
+                <li><strong>Basic Analytics:</strong> Tracking returning visitors</li>
+                <li><strong>Shopping Carts:</strong> For non-logged-in users (though sessions are often preferred)</li>
+            </ul>
+            
+            <div class="example">
+                <h4>Cookie-Based Theme Switcher Example</h4>
+                <pre><code>&lt;?php
+// theme_switcher.php
+
+// Set default theme if no cookie exists
+$theme = $_COOKIE['theme'] ?? 'light';
+
+// Process theme switch request
+if (isset($_GET['theme']) && in_array($_GET['theme'], ['light', 'dark', 'blue'])) {
+    $theme = $_GET['theme'];
+    setcookie('theme', $theme, time() + 30 * 24 * 60 * 60, '/');
+}
+
+// Apply theme
+$backgroundColor = '';
+$textColor = '';
+
+switch ($theme) {
+    case 'dark':
+        $backgroundColor = '#333';
+        $textColor = '#fff';
+        break;
+    case 'blue':
+        $backgroundColor = '#e6f2ff';
+        $textColor = '#00366c';
+        break;
+    default: // light
+        $backgroundColor = '#fff';
+        $textColor = '#333';
+}
+?&gt;
+
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;Theme Switcher Demo&lt;/title&gt;
+    &lt;style&gt;
+        body {
+            background-color: &lt;?php echo $backgroundColor; ?&gt;;
+            color: &lt;?php echo $textColor; ?&gt;;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+    &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;h1&gt;Cookie-Based Theme Switcher&lt;/h1&gt;
+    
+    &lt;p&gt;Current theme: &lt;strong&gt;&lt;?php echo ucfirst($theme); ?&gt;&lt;/strong&gt;&lt;/p&gt;
+    
+    &lt;h2&gt;Change Theme:&lt;/h2&gt;
+    &lt;ul&gt;
+        &lt;li&gt;&lt;a href="?theme=light"&gt;Light Theme&lt;/a&gt;&lt;/li&gt;
+        &lt;li&gt;&lt;a href="?theme=dark"&gt;Dark Theme&lt;/a&gt;&lt;/li&gt;
+        &lt;li&gt;&lt;a href="?theme=blue"&gt;Blue Theme&lt;/a&gt;&lt;/li&gt;
+    &lt;/ul&gt;
+    
+    &lt;p&gt;This preference will be remembered across visits using cookies.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+            </div>
+        </section>
+        
+        <section class="sessions">
+            <h2>Understanding Sessions</h2>
+            
+            <h3>What Are Sessions?</h3>
+            <p>Sessions are a server-side mechanism for maintaining state. Unlike cookies, which store data on the client's browser, session data is stored on the server, with only a session identifier stored as a cookie on the client.</p>
+            
+            <div class="analogy">
+                <h3>The Coat Check Analogy</h3>
+                <p>Think of sessions like a coat check at a fancy restaurant:</p>
+                <ul>
+                    <li>You arrive (start browsing) and hand over your belongings (data)</li>
+                    <li>The coat check gives you a numbered ticket (session ID cookie)</li>
+                    <li>While you dine (browse), the restaurant securely holds your belongings</li>
+                    <li>When you need something, you present your ticket and get access to your stuff</li>
+                    <li>When you leave (close browser), they eventually dispose of unclaimed items (session expires)</li>
+                </ul>
+                <p>The key distinction from regular cookies is that with sessions, your actual belongings (data) stay at the restaurant (server) rather than you carrying them around, making them more secure and allowing for larger amounts of data.</p>
+            </div>
+            
+            <div class="mermaid-diagram">
+                <h3>How Sessions Work</h3>
+                <div class="mermaid">
+sequenceDiagram
+    participant User
+    participant Browser
+    participant Server
+    participant SessionStorage
+    
+    User->>Browser: Visit website
+    Browser->>Server: HTTP Request
+    Server->>SessionStorage: Create new session
+    SessionStorage->>Server: Session ID
+    Server->>Browser: Set cookie with Session ID
+    Browser->>User: Display page
+    
+    User->>Browser: Visit another page
+    Browser->>Server: Request with Session ID cookie
+    Server->>SessionStorage: Retrieve session data using ID
+    SessionStorage->>Server: Session data
+    Server->>Browser: Personalized response
+    Browser->>User: Display personalized page
+                </div>
+            </div>
+            
+            <h3>Starting and Configuring Sessions in PHP</h3>
+            <p>PHP makes session management straightforward with built-in functions. Like cookies, session operations must occur before any output is sent to the browser.</p>
+            
+            <div class="code-example">
+                <h4>Starting a Session</h4>
+                <pre><code>&lt;?php
+// Start a new session or resume an existing one
+session_start();
+
+// Configure session before starting (optional)
+// Set session cookie parameters
+session_set_cookie_params([
+    'lifetime' => 3600,         // Session cookie lifetime in seconds
+    'path' => '/',              // Cookie path
+    'domain' => 'example.com',  // Cookie domain
+    'secure' => true,           // Send only over HTTPS
+    'httponly' => true          // Not accessible via JavaScript
+]);
+
+// Then start the session
+session_start();
+
+// Or use ini_set to configure session behavior
+ini_set('session.gc_maxlifetime', 3600);  // Session data lifetime on server
+ini_set('session.cookie_lifetime', 3600); // Session cookie lifetime
+?&gt;</code></pre>
+            </div>
+            
+            <h3>Working with Session Data</h3>
+            <p>After starting a session, you can read and write session data using the <code>$_SESSION</code> superglobal array.</p>
+            
+            <div class="code-example">
+                <h4>Storing and Retrieving Session Data</h4>
+                <pre><code>&lt;?php
+// Start the session
+session_start();
+
+// Storing data in the session
+$_SESSION['user_id'] = 123;
+$_SESSION['username'] = 'johndoe';
+$_SESSION['is_admin'] = false;
+$_SESSION['cart'] = [
+    ['product_id' => 456, 'name' => 'Laptop', 'price' => 999.99, 'quantity' => 1],
+    ['product_id' => 789, 'name' => 'Mouse', 'price' => 24.99, 'quantity' => 2]
+];
+
+// Retrieving data from the session
+if (isset($_SESSION['username'])) {
+    echo "Welcome back, " . htmlspecialchars($_SESSION['username']) . "!";
+}
+
+// Checking for admin privileges
+if ($_SESSION['is_admin'] ?? false) {
+    echo "Admin panel link"; 
+}
+
+// Displaying cart items
+if (isset($_SESSION['cart']) && count($_SESSION['cart']) > 0) {
+    echo "You have " . count($_SESSION['cart']) . " items in your cart.";
+    $total = 0;
+    
+    foreach ($_SESSION['cart'] as $item) {
+        $itemTotal = $item['price'] * $item['quantity'];
+        $total += $itemTotal;
+        echo htmlspecialchars($item['name']) . " - $" . number_format($itemTotal, 2) . "<br>";
+    }
+    
+    echo "Total: $" . number_format($total, 2);
+} else {
+    echo "Your cart is empty.";
+}
+?&gt;</code></pre>
+            </div>
+            
+            <h3>Modifying and Removing Session Data</h3>
+            <p>You can modify session values just like any array, and remove items using <code>unset()</code>.</p>
+            
+            <div class="code-example">
+                <h4>Modifying and Removing Session Data</h4>
+                <pre><code>&lt;?php
+// Start the session
+session_start();
+
+// Modifying existing data
+$_SESSION['visit_count'] = ($_SESSION['visit_count'] ?? 0) + 1;
+
+// Adding items to an array in the session
+if (!isset($_SESSION['cart'])) {
+    $_SESSION['cart'] = [];
+}
+
+// Add a new product to cart
+$_SESSION['cart'][] = [
+    'product_id' => 101,
+    'name' => 'Keyboard',
+    'price' => 49.99,
+    'quantity' => 1
+];
+
+// Removing a specific item from the session
+unset($_SESSION['temporary_data']);
+
+// Remove a specific product from cart (by product_id)
+$product_id_to_remove = 789;
+foreach ($_SESSION['cart'] as $key => $item) {
+    if ($item['product_id'] == $product_id_to_remove) {
+        unset($_SESSION['cart'][$key]);
+        // Reindex the array
+        $_SESSION['cart'] = array_values($_SESSION['cart']);
+        break;
+    }
+}
+
+// Clearing all session data but keeping the session active
+$_SESSION = [];
+
+// Destroying the session completely
+session_destroy();
+?&gt;</code></pre>
+            </div>
+            
+            <div class="warning">
+                <h3>Important Session Considerations</h3>
+                <ul>
+                    <li><strong>Session Hijacking:</strong> Protect the session ID from theft (use HTTPS and httponly cookies)</li>
+                    <li><strong>Session Fixation:</strong> Regenerate session IDs upon privilege changes (like login)</li>
+                    <li><strong>Server Storage:</strong> Sessions consume server resources; use carefully with high-traffic sites</li>
+                    <li><strong>Session Lifetime:</strong> Consider both cookie lifetime and server garbage collection settings</li>
+                    <li><strong>Session Files:</strong> Default storage is in temporary files; production should use a more robust solution</li>
+                </ul>
+            </div>
+            
+            <h3>Session Security Best Practices</h3>
+            <div class="code-example">
+                <h4>Secure Session Implementation</h4>
+                <pre><code>&lt;?php
+// Configure secure session parameters
+ini_set('session.cookie_httponly', 1); // Prevent JavaScript access
+ini_set('session.use_only_cookies', 1); // Force use of cookies for session
+ini_set('session.cookie_secure', 1);    // HTTPS only
+
+// Start the session
+session_start();
+
+// Regenerate session ID when logging in to prevent session fixation
+function secureLogin($user_id, $username) {
+    // Regenerate the session ID
+    session_regenerate_id(true);
+    
+    // Set session variables
+    $_SESSION['user_id'] = $user_id;
+    $_SESSION['username'] = $username;
+    $_SESSION['authenticated'] = true;
+    $_SESSION['last_activity'] = time();
+    $_SESSION['created'] = time();
+    
+    // Store the user agent to help detect session theft
+    $_SESSION['user_agent'] = $_SERVER['HTTP_USER_AGENT'];
+    
+    // Store the IP address for additional verification
+    $_SESSION['ip_address'] = $_SERVER['REMOTE_ADDR'];
+}
+
+// Check session validity on each request
+function validateSession() {
+    // If session doesn't exist or user is not authenticated
+    if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {
+        return false;
+    }
+    
+    // Check if user agent matches (basic theft detection)
+    if ($_SESSION['user_agent'] != $_SERVER['HTTP_USER_AGENT']) {
+        return false;
+    }
+    
+    // Optional: Check if IP address matches
+    // Caution: IPs can change legitimately in some cases
+    if ($_SESSION['ip_address'] != $_SERVER['REMOTE_ADDR']) {
+        return false;
+    }
+    
+    // Check for session timeout
+    $timeout = 30 * 60; // 30 minutes
+    if (time() - $_SESSION['last_activity'] > $timeout) {
+        return false;
+    }
+    
+    // Regenerate session ID periodically (e.g., every 30 minutes)
+    $regenerate_time = 30 * 60; // 30 minutes
+    if (time() - $_SESSION['created'] > $regenerate_time) {
+        session_regenerate_id(true);
+        $_SESSION['created'] = time();
+    }
+    
+    // Update last activity time
+    $_SESSION['last_activity'] = time();
+    
+    return true;
+}
+
+// Example usage
+if (isset($_POST['login'])) {
+    // Verify credentials (simplified for example)
+    $user_id = 123; // From database
+    $username = "johndoe"; // From database
+    
+    // Perform secure login
+    secureLogin($user_id, $username);
+    header("Location: dashboard.php");
+    exit;
+}
+
+// On protected pages
+if (!validateSession()) {
+    // Clear session data
+    $_SESSION = [];
+    
+    // Clear the session cookie
+    if (ini_get("session.use_cookies")) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000,
+            $params["path"], $params["domain"],
+            $params["secure"], $params["httponly"]
+        );
+    }
+    
+    // Destroy the session
+    session_destroy();
+    
+    // Redirect to login
+    header("Location: login.php?error=session_expired");
+    exit;
+}
+?&gt;</code></pre>
+            </div>
+            
+            <h3>Alternative Session Storage</h3>
+            <p>By default, PHP stores session data in files on the server. For production applications, especially those with multiple servers, you may want to use alternative storage mechanisms.</p>
+            
+            <div class="code-example">
+                <h4>Custom Session Handlers</h4>
+                <pre><code>&lt;?php
+// Example: Using database for session storage
+// (simplified for demonstration)
+
+// Custom Session Handler Class
+class DatabaseSessionHandler implements SessionHandlerInterface
+{
+    private $db;
+    
+    public function __construct($db) {
+        $this->db = $db;
+    }
+    
+    public function open($savePath, $sessionName) {
+        return true;
+    }
+    
+    public function close() {
+        return true;
+    }
+    
+    public function read($id) {
+        $stmt = $this->db->prepare("SELECT data FROM sessions WHERE id = ? AND expires > ?");
+        $stmt->execute([$id, time()]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        return $row ? $row['data'] : '';
+    }
+    
+    public function write($id, $data) {
+        $expires = time() + ini_get('session.gc_maxlifetime');
+        
+        $stmt = $this->db->prepare("REPLACE INTO sessions (id, data, expires) VALUES (?, ?, ?)");
+        return $stmt->execute([$id, $data, $expires]);
+    }
+    
+    public function destroy($id) {
+        $stmt = $this->db->prepare("DELETE FROM sessions WHERE id = ?");
+        return $stmt->execute([$id]);
+    }
+    
+    public function gc($maxlifetime) {
+        $stmt = $this->db->prepare("DELETE FROM sessions WHERE expires < ?");
+        return $stmt->execute([time()]);
+    }
+}
+
+// Example database connection
+$dsn = 'mysql:host=localhost;dbname=myapp;charset=utf8mb4';
+$username = 'db_user';
+$password = 'db_password';
+$options = [
+    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    PDO::ATTR_EMULATE_PREPARES => false,
+];
+
+try {
+    $pdo = new PDO($dsn, $username, $password, $options);
+    
+    // Initialize the session handler
+    $handler = new DatabaseSessionHandler($pdo);
+    session_set_save_handler($handler, true);
+    
+    // Start the session
+    session_start();
+    
+} catch (PDOException $e) {
+    // Fall back to default file-based sessions
+    error_log("Database session handler failed: " . $e->getMessage());
+    session_start();
+}
+
+// Now use sessions as normal
+$_SESSION['last_visit'] = time();
+?&gt;</code></pre>
+            </div>
+            
+            <div class="note">
+                <h3>Production Alternatives for Session Storage</h3>
+                <ul>
+                    <li><strong>Redis:</strong> In-memory data store, excellent for session data</li>
+                    <li><strong>Memcached:</strong> Distributed memory caching system</li>
+                    <li><strong>Database:</strong> MySQL, PostgreSQL, etc.</li>
+                    <li><strong>MongoDB:</strong> NoSQL alternative for flexible session data</li>
+                </ul>
+                <p>For WordPress-specific applications, note that WordPress has its own session handling that internally uses cookies rather than PHP's native sessions.</p>
+            </div>
+        </section>
+        
+        <section class="practical_applications">
+            <h2>Practical Applications: Sessions vs. Cookies</h2>
+            
+            <div class="comparison-table">
+                <h3>When to Use What?</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th>Cookies</th>
+                            <th>Sessions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Storage Location</td>
+                            <td>Client (Browser)</td>
+                            <td>Server (with only ID stored on client)</td>
+                        </tr>
+                        <tr>
+                            <td>Size Limit</td>
+                            <td>~4KB</td>
+                            <td>Limited only by server resources</td>
+                        </tr>
+                        <tr>
+                            <td>Lifespan</td>
+                            <td>Can persist for years</td>
+                            <td>Typically until browser closes or timeout</td>
+                        </tr>
+                        <tr>
+                            <td>Security</td>
+                            <td>Less secure (client-side)</td>
+                            <td>More secure (server-side)</td>
+                        </tr>
+                        <tr>
+                            <td>Accessibility</td>
+                            <td>Accessible to JavaScript</td>
+                            <td>Not directly accessible to client-side code</td>
+                        </tr>
+                        <tr>
+                            <td>Server Load</td>
+                            <td>Minimal (client handles storage)</td>
+                            <td>Higher (server manages storage)</td>
+                        </tr>
+                        <tr>
+                            <td>Scale Considerations</td>
+                            <td>Works well at any scale</td>
+                            <td>Requires special handling for distributed systems</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="use-cases">
+                <h3>Best Use Cases</h3>
+                <div class="row">
+                    <div class="column">
+                        <h4>Use Cookies For:</h4>
+                        <ul>
+                            <li>Remembering language preferences</li>
+                            <li>Theme selections</li>
+                            <li>"Remember me" login functionality</li>
+                            <li>Tracking anonymous users</li>
+                            <li>Storing non-sensitive user preferences</li>
+                            <li>Performance optimization (avoiding database queries)</li>
+                        </ul>
+                    </div>
+                    <div class="column">
+                        <h4>Use Sessions For:</h4>
+                        <ul>
+                            <li>User authentication state</li>
+                            <li>Shopping carts</li>
+                            <li>Temporary workflow data</li>
+                            <li>Storing sensitive user information</li>
+                            <li>Form data between multi-step forms</li>
+                            <li>Flash messages</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <h3>Real-World Application Examples</h3>
+            
+            <div class="example">
+                <h4>Shopping Cart Implementation</h4>
+                <pre><code>&lt;?php
+// cart_functions.php
+
+// Start the session
+session_start();
+
+// Initialize cart if not exists
+if (!isset($_SESSION['cart'])) {
+    $_SESSION['cart'] = [];
+}
+
+/**
+ * Add a product to the shopping cart
+ * 
+ * @param int $product_id The product ID
+ * @param string $name The product name
+ * @param float $price The product price
+ * @param int $quantity The quantity to add
+ * @return bool Success status
+ */
+function addToCart($product_id, $name, $price, $quantity = 1) {
+    // Validate inputs
+    if (!is_numeric($product_id) || !is_string($name) || !is_numeric($price) || !is_numeric($quantity)) {
+        return false;
+    }
+    
+    // Ensure positive values
+    $product_id = abs((int)$product_id);
+    $price = abs((float)$price);
+    $quantity = max(1, (int)$quantity);
+    
+    // Check if product already exists in cart
+    $found = false;
+    foreach ($_SESSION['cart'] as &$item) {
+        if ($item['product_id'] == $product_id) {
+            // Update quantity
+            $item['quantity'] += $quantity;
+            $found = true;
+            break;
+        }
+    }
+    
+    // If product not found, add it
+    if (!$found) {
+        $_SESSION['cart'][] = [
+            'product_id' => $product_id,
+            'name' => $name,
+            'price' => $price,
+            'quantity' => $quantity
+        ];
+    }
+    
+    return true;
+}
+
+/**
+ * Update the quantity of a product in the cart
+ * 
+ * @param int $product_id The product ID
+ * @param int $quantity The new quantity
+ * @return bool Success status
+ */
+function updateCartQuantity($product_id, $quantity) {
+    // Validate inputs
+    if (!is_numeric($product_id) || !is_numeric($quantity)) {
+        return false;
+    }
+    
+    $product_id = abs((int)$product_id);
+    $quantity = (int)$quantity;
+    
+    // If quantity is zero or negative, remove the item
+    if ($quantity <= 0) {
+        return removeFromCart($product_id);
+    }
+    
+    // Update quantity
+    foreach ($_SESSION['cart'] as &$item) {
+        if ($item['product_id'] == $product_id) {
+            $item['quantity'] = $quantity;
+            return true;
+        }
+    }
+    
+    return false; // Product not found
+}
+
+/**
+ * Remove a product from the cart
+ * 
+ * @param int $product_id The product ID
+ * @return bool Success status
+ */
+function removeFromCart($product_id) {
+    // Validate input
+    if (!is_numeric($product_id)) {
+        return false;
+    }
+    
+    $product_id = abs((int)$product_id);
+    
+    // Find and remove the product
+    foreach ($_SESSION['cart'] as $key => $item) {
+        if ($item['product_id'] == $product_id) {
+            unset($_SESSION['cart'][$key]);
+            // Reindex the array
+            $_SESSION['cart'] = array_values($_SESSION['cart']);
+            return true;
+        }
+    }
+    
+    return false; // Product not found
+}
+
+/**
+ * Get the total price of the cart
+ * 
+ * @return float The total price
+ */
+function getCartTotal() {
+    $total = 0;
+    foreach ($_SESSION['cart'] as $item) {
+        $total += $item['price'] * $item['quantity'];
+    }
+    return $total;
+}
+
+/**
+ * Get the total number of items in the cart
+ * 
+ * @return int The total number of items
+ */
+function getCartItemCount() {
+    $count = 0;
+    foreach ($_SESSION['cart'] as $item) {
+        $count += $item['quantity'];
+    }
+    return $count;
+}
+
+/**
+ * Clear the entire cart
+ * 
+ * @return void
+ */
+function clearCart() {
+    $_SESSION['cart'] = [];
+}
+
+/**
+ * Get the cart contents
+ * 
+ * @return array The cart contents
+ */
+function getCart() {
+    return $_SESSION['cart'];
+}
+?&gt;</code></pre>
+            </div>
+            
+            <div class="example">
+                <h4>User Authentication with Sessions</h4>
+                <pre><code>&lt;?php
+// auth_functions.php
+
+// Start the session
+session_start();
+
+/**
+ * Authenticate a user and create a session
+ * 
+ * @param string $username The username
+ * @param string $password The password
+ * @return bool Success status
+ */
+function login($username, $password) {
+    // In a real app, you would:
+    // 1. Validate input
+    // 2. Query the database for the user
+    // 3. Verify the password hash
+    
+    // Simplified example (replace with database query)
+    $users = [
+        'admin' => [
+            'password_hash' => '$2y$10$HEMtpelOYsJ5VTPorrJ4Cewu8AJA/1Ny362ljmrCnUWY.juHArJSe', // "admin123"
+            'id' => 1,
+            'role' => 'admin'
+        ],
+        'user' => [
+            'password_hash' => '$2y$10$LfLlJLhAMvER4Gzi1MdU0uFlPvtli1PJlR09gJ2hPQj0jY/.zXAZu', // "user123"
+            'id' => 2,
+            'role' => 'user'
+        ]
+    ];
+    
+    // Check if user exists
+    if (!isset($users[$username])) {
+        return false;
+    }
+    
+    // Verify password
+    if (!password_verify($password, $users[$username]['password_hash'])) {
+        return false;
+    }
+    
+    // Authentication successful - create session
+    
+    // Regenerate session ID to prevent session fixation
+    session_regenerate_id(true);
+    
+    // Store user data in session
+    $_SESSION['user'] = [
+        'id' => $users[$username]['id'],
+        'username' => $username,
+        'role' => $users[$username]['role'],
+        'logged_in' => true,
+        'login_time' => time()
+    ];
+    
+    return true;
+}
+
+/**
+ * Check if user is logged in
+ * 
+ * @return bool Whether user is logged in
+ */
+function isLoggedIn() {
+    return isset($_SESSION['user']) && $_SESSION['user']['logged_in'] === true;
+}
+
+/**
+ * Check if user has a specific role
+ * 
+ * @param string $role The role to check
+ * @return bool Whether user has the role
+ */
+function hasRole($role) {
+    return isLoggedIn() && $_SESSION['user']['role'] === $role;
+}
+
+/**
+ * Get current user data
+ * 
+ * @return array|null User data or null if not logged in
+ */
+function getCurrentUser() {
+    return isLoggedIn() ? $_SESSION['user'] : null;
+}
+
+/**
+ * Log out the current user
+ * 
+ * @return void
+ */
+function logout() {
+    // Clear user data
+    unset($_SESSION['user']);
+    
+    // Clear session
+    $_SESSION = [];
+    
+    // Clear the session cookie
+    if (ini_get("session.use_cookies")) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000,
+            $params["path"], $params["domain"],
+            $params["secure"], $params["httponly"]
+        );
+    }
+    
+    // Destroy the session
+    session_destroy();
+}
+
+/**
+ * Require user to be logged in for a page
+ * If not logged in, redirect to login page
+ * 
+ * @param string $redirect_url URL to redirect to if not logged in
+ * @return void
+ */
+function requireLogin($redirect_url = 'login.php') {
+    if (!isLoggedIn()) {
+        // Store the requested URL for redirection after login
+        if (!isset($_SESSION['redirect_after_login'])) {
+            $_SESSION['redirect_after_login'] = $_SERVER['REQUEST_URI'];
+        }
+        
+        header("Location: $redirect_url");
+        exit;
+    }
+}
+
+/**
+ * Require user to have a specific role for a page
+ * If not authorized, redirect to error page
+ * 
+ * @param string $role Required role
+ * @param string $redirect_url URL to redirect to if not authorized
+ * @return void
+ */
+function requireRole($role, $redirect_url = 'unauthorized.php') {
+    requireLogin();
+    
+    if (!hasRole($role)) {
+        header("Location: $redirect_url");
+        exit;
+    }
+}
+?&gt;</code></pre>
+            </div>
+            
+            <div class="example">
+                <h4>Remember Me Functionality (Cookies + Sessions)</h4>
+                <pre><code>&lt;?php
+// remember_me.php
+
+// Configuration
+$cookie_name = "remember_token";
+$cookie_expiry = 30 * 24 * 60 * 60; // 30 days
+
+// Start the session
+session_start();
+
+/**
+ * Set a "remember me" cookie when user logs in
+ * 
+ * @param int $user_id The user ID
+ * @return string The token created
+ */
+function setRememberMeCookie($user_id) {
+    global $cookie_name, $cookie_expiry;
+    
+    // Generate a secure token
+    $token = bin2hex(random_bytes(32));
+    
+    // In a real app, you would store this in the database
+    // storeRememberToken($user_id, $token, time() + $cookie_expiry);
+    
+    // Set the cookie
+    $secure = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+    setcookie(
+        $cookie_name,
+        $user_id . ':' . $token, 
+        [
+            'expires' => time() + $cookie_expiry,
+            'path' => '/',
+            'domain' => '',
+            'secure' => $secure,
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]
+    );
+    
+    return $token;
+}
+
+/**
+ * Check if a valid "remember me" cookie exists and log the user in
+ * 
+ * @return bool Whether auto-login was successful
+ */
+function attemptAutoLogin() {
+    global $cookie_name;
+    
+    // Don't attempt if user is already logged in
+    if (isset($_SESSION['user']) && $_SESSION['user']['logged_in'] === true) {
+        return true;
+    }
+    
+    // Check if the cookie exists
+    if (!isset($_COOKIE[$cookie_name])) {
+        return false;
+    }
+    
+    // Parse the cookie value
+    $cookie_value = $_COOKIE[$cookie_name];
+    $parts = explode(':', $cookie_value);
+    
+    if (count($parts) !== 2) {
+        deleteRememberMeCookie();
+        return false;
+    }
+    
+    $user_id = $parts[0];
+    $token = $parts[1];
+    
+    // In a real app, you would verify this token in the database
+    // $valid = verifyRememberToken($user_id, $token);
+    $valid = true; // Simulated success for example
+    
+    if (!$valid) {
+        deleteRememberMeCookie();
+        return false;
+    }
+    
+    // Token is valid, log the user in
+    // Simulated user data (in real app, retrieve from database)
+    $_SESSION['user'] = [
+        'id' => $user_id,
+        'username' => 'auto_login_user',
+        'role' => 'user',
+        'logged_in' => true,
+        'login_time' => time(),
+        'auto_login' => true
+    ];
+    
+    // Regenerate session ID
+    session_regenerate_id(true);
+    
+    // Renew the cookie
+    setRememberMeCookie($user_id);
+    
+    return true;
+}
+
+/**
+ * Delete the "remember me" cookie
+ * 
+ * @return void
+ */
+function deleteRememberMeCookie() {
+    global $cookie_name;
+    
+    // In a real app, you would also delete token from database
+    // deleteRememberToken($user_id, $token);
+    
+    // Delete the cookie by setting expiration in the past
+    setcookie(
+        $cookie_name,
+        '', 
+        [
+            'expires' => time() - 3600,
+            'path' => '/',
+            'domain' => '',
+            'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]
+    );
+}
+
+// Attempt auto-login when this file is included
+attemptAutoLogin();
+?&gt;</code></pre>
+            </div>
+            
+            <div class="example">
+                <h4>Flash Messages with Sessions</h4>
+                <pre><code>&lt;?php
+// flash_messages.php
+
+// Start the session if not already started
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
+
+/**
+ * Set a flash message to be displayed on the next page load
+ * 
+ * @param string $type Message type (success, error, warning, info)
+ * @param string $message The message to display
+ * @return void
+ */
+function setFlashMessage($type, $message) {
+    // Initialize flash messages array if it doesn't exist
+    if (!isset($_SESSION['flash_messages'])) {
+        $_SESSION['flash_messages'] = [];
+    }
+    
+    // Add the message
+    $_SESSION['flash_messages'][] = [
+        'type' => $type,
+        'message' => $message,
+        'created' => time()
+    ];
+}
+
+/**
+ * Get all flash messages and clear them
+ * 
+ * @return array Flash messages
+ */
+function getFlashMessages() {
+    $messages = $_SESSION['flash_messages'] ?? [];
+    
+    // Clear the messages
+    $_SESSION['flash_messages'] = [];
+    
+    return $messages;
+}
+
+/**
+ * Display flash messages with basic styling
+ * 
+ * @param bool $autoClear Whether to automatically clear messages after displaying
+ * @return void
+ */
+function displayFlashMessages($autoClear = true) {
+    $messages = $_SESSION['flash_messages'] ?? [];
+    
+    if (empty($messages)) {
+        return;
+    }
+    
+    echo '<div class="flash-messages">';
+    
+    foreach ($messages as $msg) {
+        $type = htmlspecialchars($msg['type']);
+        $message = htmlspecialchars($msg['message']);
+        
+        echo "<div class=\"flash-message flash-{$type}\">{$message}</div>";
+    }
+    
+    echo '</div>';
+    
+    // Clear messages if auto-clear is enabled
+    if ($autoClear) {
+        $_SESSION['flash_messages'] = [];
+    }
+}
+
+// Helper functions for common message types
+function setSuccessMessage($message) {
+    setFlashMessage('success', $message);
+}
+
+function setErrorMessage($message) {
+    setFlashMessage('error', $message);
+}
+
+function setWarningMessage($message) {
+    setFlashMessage('warning', $message);
+}
+
+function setInfoMessage($message) {
+    setFlashMessage('info', $message);
+}
+?&gt;</code></pre>
+            </div>
+        </section>
+        
+        <section class="wordpress_specifics">
+            <h2>Sessions and Cookies in WordPress</h2>
+            
+            <p>While we've covered general PHP session and cookie handling, WordPress has its own approach to state management. Understanding how WordPress handles sessions and cookies is essential for developing WordPress plugins and themes.</p>
+            
+            <h3>WordPress and Sessions</h3>
+            <p>WordPress does not use PHP sessions by default. This is primarily for scalability and performance reasons, as PHP sessions can cause issues in distributed environments. Instead, WordPress relies heavily on cookies for maintaining state.</p>
+            
+            <div class="note">
+                <h4>Why WordPress Avoids PHP Sessions</h4>
+                <ul>
+                    <li><strong>Performance:</strong> Sessions create files on the server for each user, which can lead to filesystem bottlenecks</li>
+                    <li><strong>Scalability:</strong> Session files cause issues in load-balanced environments with multiple servers</li>
+                    <li><strong>Compatibility:</strong> Some hosting environments restrict or modify session handling</li>
+                    <li><strong>Cleanup:</strong> Orphaned session files can accumulate if not properly managed</li>
+                </ul>
+            </div>
+            
+            <h3>WordPress Authentication Cookies</h3>
+            <p>WordPress uses a sophisticated cookie-based authentication system:</p>
+            <ul>
+                <li><strong>wordpress_[hash]:</strong> Authentication cookie for logged-in users</li>
+                <li><strong>wordpress_logged_in_[hash]:</strong> Contains username and login expiration</li>
+                <li><strong>wordpress_sec_[hash]:</strong> Secure version of the auth cookie (HTTPS)</li>
+                <li><strong>wp-settings-{user_id}:</strong> User-specific interface settings</li>
+            </ul>
+            
+            <div class="code-example">
+                <h4>WordPress Authentication</h4>
+                <pre><code>&lt;?php
+// Example of how WordPress sets authentication cookies
+// (Simplified from wp-includes/pluggable.php)
+
+function wp_set_auth_cookie($user_id, $remember = false, $secure = '') {
+    if ($remember) {
+        $expiration = time() + 14 * DAY_IN_SECONDS; // 14 days
+        $expire = $expiration + 12 * HOUR_IN_SECONDS;
+    } else {
+        $expiration = time() + 2 * DAY_IN_SECONDS; // 2 days
+        $expire = 0;
+    }
+    
+    // Generate random tokens
+    $token = wp_generate_password(64, false);
+    $hash = wp_hash($user_id . '|' . $token . '|' . $expiration);
+    
+    // Store in user meta
+    update_user_meta($user_id, 'session_tokens', [
+        $token => [
+            'expiration' => $expiration,
+            'ip' => $_SERVER['REMOTE_ADDR'],
+            'ua' => $_SERVER['HTTP_USER_AGENT']
+        ]
+    ]);
+    
+    // Set cookies
+    setcookie('wordpress_' . COOKIEHASH, $user_id . '|' . $token . '|' . $expiration, $expire, COOKIEPATH, COOKIE_DOMAIN, $secure, true);
+    setcookie('wordpress_logged_in_' . COOKIEHASH, $user_id . '|' . $token . '|' . $expiration, $expire, COOKIEPATH, COOKIE_DOMAIN, $secure, true);
+}
+?&gt;</code></pre>
+            </div>
+            
+            <h3>Adding Session Support to WordPress</h3>
+            <p>If you need traditional session functionality in WordPress, you have several options:</p>
+            
+            <div class="code-example">
+                <h4>Custom Session Handler for WordPress</h4>
+                <pre><code>&lt;?php
+// Example plugin to add session support to WordPress
+
+/**
+ * Plugin Name: Simple Session Manager
+ * Description: Adds PHP session support to WordPress
+ * Version: 1.0
+ * Author: Your Name
+ */
+
+class Simple_Session_Manager {
+    
+    // Session initialization status
+    private $initialized = false;
+    
+    // Constructor
+    public function __construct() {
+        // Add initialization hooks
+        add_action('init', [$this, 'initialize_session'], 1); // Priority 1 to run early
+        add_action('wp_logout', [$this, 'destroy_session']);
+        add_action('wp_login', [$this, 'destroy_session']);
+        
+        // Handle session cleanup
+        add_action('shutdown', [$this, 'session_write_close']);
+        
+        // For admin - add cleanup on plugin deactivation
+        register_deactivation_hook(__FILE__, [$this, 'plugin_deactivation']);
+    }
+    
+    /**
+     * Initialize the session
+     */
+    public function initialize_session() {
+        // Don't initialize twice
+        if ($this->initialized) {
+            return;
+        }
+        
+        // Don't initialize for AJAX, CRON, or CLI requests
+        if (defined('DOING_AJAX') || defined('DOING_CRON') || defined('WP_CLI')) {
+            return;
+        }
+        
+        // Optional - customize session name to avoid conflicts
+        session_name('wp_session_' . COOKIEHASH);
+        
+        // Start or resume the session
+        if (!session_id()) {
+            session_start();
+        }
+        
+        $this->initialized = true;
+    }
+    
+    /**
+     * Destroy the session
+     */
+    public function destroy_session() {
+        if (!$this->initialized) {
+            return;
+        }
+        
+        // Clear session data
+        $_SESSION = [];
+        
+        // Clear the session cookie
+        if (ini_get("session.use_cookies")) {
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000,
+                $params["path"], $params["domain"],
+                $params["secure"], $params["httponly"]
+            );
+        }
+        
+        // Destroy the session
+        session_destroy();
+        
+        $this->initialized = false;
+    }
+    
+    /**
+     * Ensure session data is written and closed properly
+     */
+    public function session_write_close() {
+        if ($this->initialized && session_id()) {
+            session_write_close();
+        }
+    }
+    
+    /**
+     * Clean up on plugin deactivation
+     */
+    public function plugin_deactivation() {
+        // Destroy any active sessions
+        $this->destroy_session();
+        
+        // Optional: Clean up any session files in the PHP session directory
+        // Depends on server configuration, may require additional privileges
+    }
+}
+
+// Initialize the session manager
+$simple_session_manager = new Simple_Session_Manager();
+
+// Helper functions to use in your theme or plugin
+function get_session_var($key, $default = null) {
+    return isset($_SESSION[$key]) ? $_SESSION[$key] : $default;
+}
+
+function set_session_var($key, $value) {
+    $_SESSION[$key] = $value;
+}
+
+function unset_session_var($key) {
+    unset($_SESSION[$key]);
+}
+?&gt;</code></pre>
+            </div>
+            
+            <div class="warning">
+                <h4>Important Considerations for WordPress Sessions</h4>
+                <ul>
+                    <li>Using sessions in WordPress can cause compatibility issues with some caching plugins</li>
+                    <li>Session-based plugins may not work properly in load-balanced environments without special configuration</li>
+                    <li>Consider using WordPress transients or user meta for persistent data when possible</li>
+                    <li>If you must use sessions, consider a database-backed session handler for better compatibility</li>
+                </ul>
+            </div>
+            
+            <h3>Alternative State Management in WordPress</h3>
+            <p>Instead of sessions, WordPress provides several built-in mechanisms for state management:</p>
+            
+            <div class="code-example">
+                <h4>WordPress Transients</h4>
+                <pre><code>&lt;?php
+// Storing temporary data with transients
+
+// Set a transient with 1-hour expiration
+set_transient('user_recent_products_' . get_current_user_id(), $product_ids, HOUR_IN_SECONDS);
+
+// Later, retrieve the transient
+$recent_products = get_transient('user_recent_products_' . get_current_user_id());
+
+// Delete the transient
+delete_transient('user_recent_products_' . get_current_user_id());
+?&gt;</code></pre>
+            </div>
+            
+            <div class="code-example">
+                <h4>User Meta for Persistent User Data</h4>
+                <pre><code>&lt;?php
+// Storing user-specific data in user meta
+
+// Get current user ID
+$user_id = get_current_user_id();
+
+// Update user meta
+update_user_meta($user_id, 'last_viewed_products', $product_ids);
+
+// Get user meta
+$last_viewed = get_user_meta($user_id, 'last_viewed_products', true);
+
+// Delete user meta
+delete_user_meta($user_id, 'last_viewed_products');
+?&gt;</code></pre>
+            </div>
+            
+            <div class="code-example">
+                <h4>Custom Cookies in WordPress</h4>
+                <pre><code>&lt;?php
+// Using WP's COOKIEPATH and COOKIE_DOMAIN constants
+
+// Set a cookie for 30 days
+function set_my_cookie($name, $value, $expiry = 30) {
+    setcookie(
+        $name,
+        $value,
+        time() + (DAY_IN_SECONDS * $expiry),
+        COOKIEPATH,
+        COOKIE_DOMAIN,
+        is_ssl(),
+        true
+    );
+}
+
+// Get a cookie
+function get_my_cookie($name) {
+    return isset($_COOKIE[$name]) ? $_COOKIE[$name] : null;
+}
+
+// Clear a cookie
+function clear_my_cookie($name) {
+    setcookie(
+        $name,
+        '',
+        time() - 3600,
+        COOKIEPATH,
+        COOKIE_DOMAIN,
+        is_ssl(),
+        true
+    );
+}
+
+// Example usage
+set_my_cookie('recently_viewed', json_encode([101, 102, 103]));
+$recently_viewed = json_decode(get_my_cookie('recently_viewed'), true);
+?&gt;</code></pre>
+            </div>
+        </section>
+        
+        <section class="future_trends">
+            <h2>Future Trends and Best Practices</h2>
+            
+            <h3>Modern Approaches to State Management</h3>
+            <ul>
+                <li><strong>JWT (JSON Web Tokens):</strong> Signed tokens that can securely store user data</li>
+                <li><strong>OAuth and OpenID Connect:</strong> Standardized protocols for authentication</li>
+                <li><strong>LocalStorage and SessionStorage:</strong> Client-side storage through JavaScript</li>
+                <li><strong>Stateless APIs:</strong> RESTful and GraphQL APIs that don't rely on sessions</li>
+            </ul>
+            
+            <div class="code-example">
+                <h4>JWT Implementation Example</h4>
+                <pre><code>&lt;?php
+// Using Firebase JWT library 
+// (install via composer: composer require firebase/php-jwt)
+
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
+
+// Your secret key (store securely, e.g., in environment variable)
+$key = getenv('JWT_SECRET_KEY');
+
+// Create a JWT token
+function createJwtToken($user_id, $username, $role) {
+    global $key;
+    
+    $payload = [
+        'iss' => 'https://yourdomain.com', // Issuer
+        'aud' => 'https://yourdomain.com', // Audience
+        'iat' => time(),                    // Issued at
+        'exp' => time() + (60 * 60),        // Expires (1 hour)
+        'user_id' => $user_id,
+        'username' => $username,
+        'role' => $role
+    ];
+    
+    return JWT::encode($payload, $key, 'HS256');
+}
+
+// Set JWT cookie
+function setJwtCookie($token) {
+    setcookie(
+        'auth_token',
+        $token,
+        [
+            'expires' => time() + 3600, // 1 hour
+            'path' => '/',
+            'domain' => '',
+            'secure' => true,
+            'httponly' => true,
+            'samesite' => 'Strict'
+        ]
+    );
+}
+
+// Verify JWT token
+function verifyJwtToken() {
+    global $key;
+    
+    if (!isset($_COOKIE['auth_token'])) {
+        return false;
+    }
+    
+    try {
+        $decoded = JWT::decode($_COOKIE['auth_token'], new Key($key, 'HS256'));
+        return $decoded;
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
+// Login example
+function jwtLogin($username, $password) {
+    // Verify credentials (in a real app, check against database)
+    if ($username === 'demo' && $password === 'password') {
+        $token = createJwtToken(123, 'demo', 'user');
+        setJwtCookie($token);
+        return true;
+    }
+    return false;
+}
+
+// Logout
+function jwtLogout() {
+    setcookie(
+        'auth_token',
+        '',
+        [
+            'expires' => time() - 3600,
+            'path' => '/',
+            'domain' => '',
+            'secure' => true,
+            'httponly' => true,
+            'samesite' => 'Strict'
+        ]
+    );
+}
+
+// Authorization check
+function requireJwtAuth() {
+    $user = verifyJwtToken();
+    if (!$user) {
+        header('HTTP/1.0 401 Unauthorized');
+        echo json_encode(['error' => 'Unauthorized']);
+        exit;
+    }
+    return $user;
+}
+?&gt;</code></pre>
+            </div>
+            
+            <h3>Privacy Regulations and Cookies</h3>
+            <p>Modern web development must consider privacy regulations such as GDPR in Europe and CCPA in California:</p>
+            
+            <ul>
+                <li><strong>Cookie Consent:</strong> Explicit permission needed for non-essential cookies</li>
+                <li><strong>Privacy by Design:</strong> Default to privacy-preserving approaches</li>
+                <li><strong>Data Minimization:</strong> Collect and store only what's necessary</li>
+                <li><strong>Right to Access and Deletion:</strong> Users must be able to see and remove their data</li>
+            </ul>
+            
+            <div class="example">
+                <h4>Simple Cookie Consent Banner</h4>
+                <pre><code>&lt;?php
+// cookie_consent.php
+
+// Check if user has already made a choice
+$has_consent = isset($_COOKIE['cookie_consent']) && $_COOKIE['cookie_consent'] === 'accepted';
+$has_rejected = isset($_COOKIE['cookie_consent']) && $_COOKIE['cookie_consent'] === 'rejected';
+
+// Function to set consent cookie
+function set_consent_cookie($value) {
+    setcookie(
+        'cookie_consent',
+        $value,
+        [
+            'expires' => time() + 365 * 24 * 60 * 60, // 1 year
+            'path' => '/',
+            'domain' => '',
+            'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]
+    );
+}
+
+// Process consent submission
+if (isset($_POST['cookie_consent_action'])) {
+    $action = $_POST['cookie_consent_action'];
+    
+    if ($action === 'accept') {
+        set_consent_cookie('accepted');
+        $has_consent = true;
+    } else if ($action === 'reject') {
+        set_consent_cookie('rejected');
+        $has_rejected = true;
+        
+        // Remove any existing tracking cookies
+        // This would need to be customized based on your specific tracking setup
+    }
+}
+?&gt;
+
+&lt;!-- Cookie consent banner HTML -->
+&lt;?php if (!$has_consent && !$has_rejected): ?&gt;
+    &lt;div id="cookie-consent-banner" style="position: fixed; bottom: 0; left: 0; right: 0; background-color: #f1f1f1; padding: 20px; text-align: center; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 9999;"&gt;
+        &lt;p&gt;This website uses cookies to enhance your browsing experience and provide personalized services. 
+        By continuing to use this site, you consent to our use of cookies.&lt;/p&gt;
+        &lt;form method="post"&gt;
+            &lt;button type="submit" name="cookie_consent_action" value="accept" style="background-color: #4CAF50; color: white; padding: 10px 20px; margin: 5px; border: none; cursor: pointer;"&gt;Accept&lt;/button&gt;
+            &lt;button type="submit" name="cookie_consent_action" value="reject" style="background-color: #f44336; color: white; padding: 10px 20px; margin: 5px; border: none; cursor: pointer;"&gt;Reject&lt;/button&gt;
+        &lt;/form&gt;
+        &lt;a href="privacy-policy.php" style="display: block; margin-top: 10px;"&gt;Learn more about our privacy policy&lt;/a&gt;
+    &lt;/div&gt;
+&lt;?php endif; ?&gt;
+
+&lt;!-- Rest of your website content --&gt;
+&lt;div class="content"&gt;
+    &lt;h1&gt;Welcome to Our Website&lt;/h1&gt;
+    
+    &lt;?php if ($has_consent): ?&gt;
+        &lt;p&gt;Thank you for accepting cookies. We use this information to improve your experience.&lt;/p&gt;
+        
+        &lt;!-- This section only loads if user has given consent --&gt;
+        &lt;script&gt;
+            // Analytics code would go here
+            console.log('Analytics loaded - user gave consent');
+        &lt;/script&gt;
+    &lt;?php endif; ?&gt;
+    
+    &lt;?php if ($has_rejected): ?&gt;
+        &lt;p&gt;You've chosen to reject cookies. We respect your privacy choice.&lt;/p&gt;
+        &lt;p&gt;&lt;a href="?show_consent=1"&gt;Change cookie preferences&lt;/a&gt;&lt;/p&gt;
+    &lt;?php endif; ?&gt;
+&lt;/div&gt;</code></pre>
+            </div>
+        </section>
+        
+        <section class="best_practices">
+            <h2>Security Best Practices Summary</h2>
+            
+            <div class="mermaid-diagram">
+                <h3>Security Considerations Hierarchy</h3>
+                <div class="mermaid">
+mindmap
+  root((Session/Cookie Security))
+    Configuration
+      Cookie Parameters
+        Secure Flag
+        HttpOnly Flag
+        SameSite Attribute
+      Session Settings
+        Session Timeout
+        Cookie Lifetime
+        Regenerate ID
+    Authentication Protection
+      Session Fixation
+      Session Hijacking
+      CSRF Protection
+    Data Management
+      Sensitive Data Handling
+      Size Limitations
+      Encryption
+    Implementation
+      HTTPS Everywhere
+      Proper Logout Procedures
+      Token-based Approaches
+                </div>
+            </div>
+            
+            <div class="checklist">
+                <h3>Essential Security Checklist</h3>
+                <ul>
+                    <li><strong>Use HTTPS exclusively</strong> - Secure transmission for all cookies and session data</li>
+                    <li><strong>Set the Secure flag</strong> - Ensures cookies are sent only over HTTPS connections</li>
+                    <li><strong>Set the HttpOnly flag</strong> - Prevents JavaScript access to cookies</li>
+                    <li><strong>Use SameSite attribute</strong> - Prevents CSRF attacks (Strict or Lax)</li>
+                    <li><strong>Set appropriate expiration times</strong> - Balance security and user experience</li>
+                    <li><strong>Regenerate session IDs</strong> - Especially after authentication or privilege changes</li>
+                    <li><strong>Never store sensitive data in cookies</strong> - Use server-side storage instead</li>
+                    <li><strong>Implement proper logout procedures</strong> - Clear all session data and cookies</li>
+                    <li><strong>Use CSRF tokens</strong> - For all form submissions that modify data</li>
+                    <li><strong>Consider alternative storage mechanisms</strong> - Database or Redis instead of files</li>
+                    <li><strong>Validate session data</strong> - Check consistency and origin on each request</li>
+                    <li><strong>Implement session timeouts</strong> - Both absolute and idle timeouts</li>
+                </ul>
+            </div>
+            
+            <div class="code-example">
+                <h3>Secure Session Configuration</h3>
+                <pre><code>&lt;?php
+// secure_session.php - Include at the beginning of each script
+
+// Session configuration
+ini_set('session.cookie_httponly', 1);
+ini_set('session.use_only_cookies', 1);
+ini_set('session.cookie_secure', 1);
+ini_set('session.cookie_samesite', 'Lax'); // Or 'Strict' for higher security
+ini_set('session.gc_maxlifetime', 1800); // 30 minutes
+ini_set('session.cookie_lifetime', 0); // Until browser closes
+
+// Session handler - customize as needed
+// Example shows file-based, but production should use alternative storage
+// session_set_save_handler(...);
+
+// Start the session
+session_start();
+
+// Security checks
+function session_is_valid() {
+    // Check if session exists
+    if (!isset($_SESSION['created'])) {
+        return false;
+    }
+    
+    // Check for absolute timeout (12 hours)
+    if (time() - $_SESSION['created'] > 12 * 3600) {
+        return false;
+    }
+    
+    // Check for idle timeout (30 minutes)
+    if (isset($_SESSION['last_activity']) && time() - $_SESSION['last_activity'] > 1800) {
+        return false;
+    }
+    
+    // Check user agent consistency (basic check)
+    if ($_SESSION['user_agent'] !== $_SERVER['HTTP_USER_AGENT']) {
+        return false;
+    }
+    
+    // Update last activity time
+    $_SESSION['last_activity'] = time();
+    
+    // Regenerate session ID periodically (every 30 minutes)
+    if (!isset($_SESSION['last_regeneration']) || time() - $_SESSION['last_regeneration'] > 1800) {
+        regenerate_session_id();
+    }
+    
+    return true;
+}
+
+// Regenerate session ID securely
+function regenerate_session_id() {
+    // Save current session data
+    $old_session_data = $_SESSION;
+    
+    // Generate new session ID
+    session_regenerate_id(true);
+    
+    // Restore session data
+    $_SESSION = $old_session_data;
+    
+    // Update regeneration time
+    $_SESSION['last_regeneration'] = time();
+}
+
+// Initialize a secure session
+function initialize_secure_session() {
+    // Clear existing session data
+    $_SESSION = [];
+    
+    // Set session creation time
+    $_SESSION['created'] = time();
+    
+    // Set last activity time
+    $_SESSION['last_activity'] = time();
+    
+    // Set last regeneration time
+    $_SESSION['last_regeneration'] = time();
+    
+    // Store user agent
+    $_SESSION['user_agent'] = $_SERVER['HTTP_USER_AGENT'];
+    
+    // Generate fresh session ID
+    regenerate_session_id();
+}
+
+// Destroy session securely
+function destroy_secure_session() {
+    // Clear session data
+    $_SESSION = [];
+    
+    // Clear the session cookie
+    if (ini_get("session.use_cookies")) {
+        $params = session_get_cookie_params();
+        setcookie(
+            session_name(),
+            '',
+            time() - 42000,
+            $params["path"],
+            $params["domain"],
+            $params["secure"],
+            $params["httponly"]
+        );
+    }
+    
+    // Destroy the session
+    session_destroy();
+}
+
+// Check if session needs initialization
+if (!isset($_SESSION['created'])) {
+    initialize_secure_session();
+}
+
+// Validate session on each request
+if (!session_is_valid()) {
+    destroy_secure_session();
+    // Redirect to login page or show error
+    header("Location: login.php?error=session_expired");
+    exit;
+}
+?&gt;</code></pre>
+            </div>
+        </section>
+        
+        <section class="conclusion">
+            <h2>Conclusion and Next Steps</h2>
+            
+            <p>Sessions and cookies are fundamental to creating dynamic, personalized web applications with PHP. They allow you to maintain state in the stateless HTTP protocol, remember user preferences, implement authentication, and create seamless user experiences.</p>
+            
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li><strong>Cookies are client-side</strong> - Small text files stored in the user's browser</li>
+                <li><strong>Sessions are server-side</strong> - Data stored on the server with only an ID stored on the client</li>
+                <li><strong>Security is critical</strong> - Always implement best practices for cookie and session security</li>
+                <li><strong>Different use cases</strong> - Choose cookies for non-sensitive, long-term data and sessions for sensitive, temporary data</li>
+                <li><strong>WordPress has its own approach</strong> - Understand WordPress's cookie-based authentication system</li>
+            </ul>
+            
+            <h3>Next Topic: Creating Reusable PHP Components</h3>
+            <p>In our next session, we'll build on our knowledge of sessions and cookies to create reusable PHP components that can be shared across multiple pages or projects. We'll explore techniques for building modular, maintainable code that simplifies development and improves code quality.</p>
+            
+            <h3>Additional Resources</h3>
+            <ul>
+                <li><a href="https://www.php.net/manual/en/book.session.php">PHP Session Documentation</a></li>
+                <li><a href="https://www.php.net/manual/en/features.cookies.php">PHP Cookie Documentation</a></li>
+                <li><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies">MDN Web Docs: HTTP Cookies</a></li>
+                <li><a href="https://www.owasp.org/index.php/Session_Management_Cheat_Sheet">OWASP Session Management Cheat Sheet</a></li>
+                <li><a href="https://developer.wordpress.org/plugins/users/">WordPress Authentication Documentation</a></li>
+            </ul>
+            
+            <div class="assignment">
+                <h3>Practice Assignment</h3>
+                <p><strong>Shopping Cart Implementation</strong></p>
+                <p>Create a simple shopping cart system using PHP sessions that allows users to:</p>
+                <ol>
+                    <li>Add products to their cart</li>
+                    <li>Update product quantities</li>
+                    <li>Remove products from their cart</li>
+                    <li>View their cart with subtotal and total calculations</li>
+                    <li>Clear their entire cart</li>
+                </ol>
+                
+                <p><strong>Requirements:</strong></p>
+                <ul>
+                    <li>Implement secure session handling following best practices</li>
+                    <li>Create a product listing page with "Add to Cart" functionality</li>
+                    <li>Implement a cart page that displays all cart items and totals</li>
+                    <li>Include quantity adjustments and product removal options</li>
+                    <li>Add a "Continue Shopping" button that returns to product listings</li>
+                    <li>Implement a "Checkout" button (just simulate the process)</li>
+                </ul>
+                
+                <p><strong>Bonus Challenge:</strong></p>
+                <ul>
+                    <li>Add a "Remember Cart" feature using cookies that persists for 7 days</li>
+                    <li>Implement cart merging when a user logs in (combine their stored cart with their session cart)</li>
+                </ul>
+            </div>
+        </section>
+    </main>
+    
+    <footer>
+        <p>&copy; 2025 PHP WordPress Development Course</p>
+
+    </footer>
+</body>
+</html>

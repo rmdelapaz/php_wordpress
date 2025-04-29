@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Namespaces in PHP: Organizing Your Code</title>
+    <link rel="stylesheet" href="/styles/main.css">
+    <link rel="icon" href="/favicon.png">
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+      mermaid.initialize({ startOnLoad: true });
+    </script>
+</head>
+<body>
+    <header>
+        <h1>Namespaces in PHP</h1>
+        <p><a href="index.html">← Back to Syllabus</a></p>
+    </header>
+    
+    <main>
+        <section class="module-intro">
+            <h2>Bringing Order to Your Code</h2>
+            <p>Welcome to our exploration of namespaces in PHP! In our previous lessons, we've covered classes, inheritance, abstract classes, and interfaces. Today, we'll be diving into namespaces - a powerful organizational tool that helps you structure your code and avoid naming conflicts in larger projects.</p>
+            
+            <div class="note">
+                <p><strong>Why Namespaces Matter:</strong> In WordPress development, especially when building larger plugins or themes, namespaces help you avoid conflicts with other plugins and WordPress core. They're essential for creating professional, maintainable code that plays well with the broader WordPress ecosystem.</p>
+            </div>
+        </section>
+
+        <section id="namespace-basics">
+            <h2>What Are Namespaces?</h2>
+            
+            <p>Think of namespaces as addresses or zip codes for your code. Just as two people can have the same name but live at different addresses, two classes can have the same name but exist in different namespaces.</p>
+            
+            <div class="diagram">
+                <h3>Namespace Hierarchy</h3>
+                <div class="mermaid">
+                    graph TD
+                        A[Global Namespace] --> B[MyPlugin Namespace]
+                        B --> C[Admin Namespace]
+                        B --> D[Frontend Namespace]
+                        B --> E[API Namespace]
+                        C --> F[Settings]
+                        C --> G[Dashboard]
+                        D --> H[Shortcodes]
+                        D --> I[Widgets]
+                        E --> J[Endpoints]
+                        E --> K[Auth]
+                </div>
+            </div>
+            
+            <p>In this diagram, we have a hierarchical structure of namespaces for a WordPress plugin. Each namespace contains related classes and functions, organized by their purpose.</p>
+            
+            <div class="analogy">
+                <h3>The Library Analogy</h3>
+                <p>Think of namespaces as sections in a library. Without namespaces, all books (classes, functions) would be piled together in one big heap, making it hard to find what you need and causing confusion when two books have the same title.</p>
+                <p>With namespaces, books are organized into different sections (Fiction, Non-Fiction, Reference, etc.), and then further organized into subsections. This structure makes it easier to find what you're looking for and prevents confusion between books with the same title but in different sections.</p>
+                <p>Just as you would specify "Science Fiction: War of the Worlds" to distinguish from "History: War of the Worlds," you use namespaces like <code>\SciFi\WellsHG\WarOfTheWorlds</code> and <code>\History\WorldWars\WarOfTheWorlds</code> to distinguish between similarly named classes.</p>
+            </div>
+        </section>
+
+        <section id="namespace-syntax">
+            <h2>Namespace Syntax in PHP</h2>
+            
+            <p>In PHP, namespaces are declared using the <code>namespace</code> keyword at the beginning of a file, before any other code (except for the <code>declare</code> statement).</p>
+            
+            <div class="code-example">
+                <h3>Basic Namespace Declaration</h3>
+                <pre><code>
+<?php
+// Declare the namespace for this file
+namespace MyPlugin;
+
+// Classes in this file will be in the MyPlugin namespace
+class Plugin {
+    public function __construct() {
+        echo "MyPlugin\\Plugin initialized";
+    }
+}
+
+// Functions in this namespace
+function activate() {
+    echo "MyPlugin activated";
+}
+
+// Constants in this namespace
+const VERSION = '1.0.0';
+
+// Usage within the same namespace
+$plugin = new Plugin(); // No need to specify namespace
+activate(); // No need to specify namespace
+echo VERSION; // No need to specify namespace
+?>
+                </code></pre>
+            </div>
+            
+            <h3>Nested Namespaces</h3>
+            
+            <p>Namespaces can be nested to create a hierarchy, similar to directories in a file system. The backslash (\) is used as a separator.</p>
+            
+            <div class="code-example">
+                <h3>Nested Namespace Example</h3>
+                <pre><code>
+<?php
+// Declare a nested namespace
+namespace MyPlugin\Admin\Settings;
+
+class Page {
+    public function __construct() {
+        echo "Settings page initialized";
+    }
+}
+
+// This function is in the MyPlugin\Admin\Settings namespace
+function save_options() {
+    echo "Options saved";
+}
+?>
+                </code></pre>
+            </div>
+            
+            <div class="pro-tip">
+                <h3>Namespace Standards</h3>
+                <p>While PHP allows any valid identifier for namespace names, it's common practice to use StudlyCaps (PascalCase) for namespace names, mirroring the convention for class names. Namespaces are case-insensitive, but maintaining consistent capitalization makes your code more readable.</p>
+                <pre><code>
+// Good: Consistent capitalization with StudlyCaps
+namespace MyPlugin\Admin\Settings;
+
+// Avoid: Inconsistent capitalization or naming
+namespace My_Plugin\admin\SETTINGS;
+                </code></pre>
+            </div>
+        </section>
+
+        <section id="namespace-referencing">
+            <h2>Referencing Namespaced Code</h2>
+            
+            <p>There are three ways to reference namespaced code in PHP: fully qualified names, relative names, and imported names using the <code>use</code> statement.</p>
+            
+            <div class="code-example">
+                <h3>Fully Qualified Names</h3>
+                <pre><code>
+<?php
+namespace MyPlugin\Frontend;
+
+class Widget {
+    public function run() {
+        // Fully qualified name (absolute path)
+        $settings = new \MyPlugin\Admin\Settings\Page();
+        
+        // Calling a function in another namespace
+        \MyPlugin\Admin\Settings\save_options();
+        
+        // Using a constant from another namespace
+        echo \MyPlugin\VERSION;
+    }
+}
+?>
+                </code></pre>
+            </div>
+            
+            <div class="code-example">
+                <h3>Relative Names</h3>
+                <pre><code>
+<?php
+namespace MyPlugin\Admin;
+
+class Dashboard {
+    public function initialize() {
+        // Relative namespace reference (from current namespace)
+        $settings = new Settings\Page(); // Resolves to MyPlugin\Admin\Settings\Page
+        
+        // Calling a function in a relative namespace
+        Settings\save_options(); // Resolves to MyPlugin\Admin\Settings\save_options()
+    }
+}
+?>
+                </code></pre>
+            </div>
+            
+            <div class="code-example">
+                <h3>Importing with the 'use' Statement</h3>
+                <pre><code>
+<?php
+namespace MyPlugin\Frontend\Widgets;
+
+// Import classes from other namespaces
+use MyPlugin\Admin\Settings\Page as SettingsPage;
+use MyPlugin\Admin\Dashboard;
+use MyPlugin\Frontend\Templates;
+
+class RecentPosts {
+    protected $settings;
+    protected $dashboard;
+    
+    public function __construct() {
+        // Use the imported class (no namespace needed)
+        $this->settings = new SettingsPage();
+        $this->dashboard = new Dashboard();
+        
+        // Using the imported namespace
+        Templates::render('recent-posts');
+    }
+}
+?>
+                </code></pre>
+            </div>
+            
+            <div class="pro-tip">
+                <h3>Group Use Declarations (PHP 7.0+)</h3>
+                <p>Since PHP 7.0, you can group multiple use declarations from the same namespace:</p>
+                <pre><code>
+<?php
+namespace MyPlugin\Admin;
+
+// Individual use statements
+use MyPlugin\Frontend\Widgets\RecentPosts;
+use MyPlugin\Frontend\Widgets\PopularPosts;
+use MyPlugin\Frontend\Widgets\CategoryList;
+
+// Group use statements (PHP 7.0+)
+use MyPlugin\Frontend\Widgets\{
+    RecentPosts,
+    PopularPosts,
+    CategoryList
+};
+
+// Can mix declarations with aliases
+use MyPlugin\Frontend\{
+    Templates,
+    Assets\Scripts,
+    Assets\Styles as StyleManager
+};
+?>
+                </code></pre>
+            </div>
+        </section>
+
+        <section id="namespace-global">
+            <h2>The Global Namespace</h2>
+            
+            <p>Code that's not explicitly declared in a namespace belongs to the "global namespace". This includes all PHP built-in functions and classes, as well as code written without a namespace declaration.</p>
+            
+            <div class="code-example">
+                <h3>Working with the Global Namespace</h3>
+                <pre><code>
+<?php
+namespace MyPlugin;
+
+class DateTime {
+    // A custom DateTime class in the MyPlugin namespace
+}
+
+function process() {
+    // Using our namespaced DateTime class
+    $localDate = new DateTime();
+    
+    // Using PHP's built-in DateTime class from the global namespace
+    $globalDate = new \DateTime();
+    
+    // Using other PHP functions from the global namespace
+    $content = \file_get_contents('https://example.com');
+    $parsed = \json_decode($content);
+}
+?>
+                </code></pre>
+            </div>
+            
+            <div class="note">
+                <h3>Global Functions and Constants</h3>
+                <p>When using functions and constants from the global namespace within a namespaced file, you need to prefix them with a backslash (\) to reference them explicitly, or import them with a use statement. Otherwise, PHP will look for them in the current namespace first.</p>
+                <pre><code>
+<?php
+namespace MyPlugin;
+
+// This looks for strlen() in the MyPlugin namespace first,
+// then falls back to the global function if not found
+$length = strlen("test");
+
+// This explicitly uses the global strlen() function
+$length = \strlen("test");
+
+// Alternative approach: import the function
+use function strlen;
+$length = strlen("test"); // Now refers to the global function directly
+?>
+                </code></pre>
+            </div>
+        </section>
+
+        <section id="namespace-resolving">
+            <h2>How PHP Resolves Names</h2>
+            
+            <p>Understanding how PHP resolves names in namespaced code is crucial for avoiding unexpected behavior.</p>
+            
+            <div class="code-example">
+                <h3>Name Resolution Rules</h3>
+                <pre><code>
+<?php
+namespace MyPlugin\Admin;
+
+// Here's how PHP resolves different types of references:
+
+// 1. Unqualified name (no namespace)
+$obj = new Dashboard();
+// Looks for: MyPlugin\Admin\Dashboard
+
+// 2. Qualified name (partial namespace)
+$obj = new Settings\Page();
+// Looks for: MyPlugin\Admin\Settings\Page
+
+// 3. Fully qualified name (starting with \)
+$obj = new \MyPlugin\Frontend\Widget();
+// Looks for: MyPlugin\Frontend\Widget (absolute path)
+
+// 4. Imported name (using 'use')
+use MyPlugin\Frontend\Widget;
+$obj = new Widget();
+// Looks for: MyPlugin\Frontend\Widget
+
+// 5. Imported name with alias
+use MyPlugin\Frontend\Widget as FrontendWidget;
+$obj = new FrontendWidget();
+// Looks for: MyPlugin\Frontend\Widget
+
+// Functions and constants follow the same rules
+?>
+                </code></pre>
+            </div>
+            
+            <h3>Special Name Resolution for PHP Internal Classes</h3>
+            
+            <p>For backward compatibility, PHP applies special rules when resolving names of internal (built-in) classes:</p>
+            
+            <div class="code-example">
+                <h3>PHP Internal Class Resolution</h3>
+                <pre><code>
+<?php
+namespace MyPlugin;
+
+class Exception extends \Exception {
+    // This correctly extends PHP's Exception class
+}
+
+// This works - looks for PHP's built-in Exception if MyPlugin\Exception doesn't exist
+try {
+    // code
+} catch (Exception $e) {
+    // This will catch both MyPlugin\Exception and \Exception
+}
+
+// But this is more explicit and recommended:
+try {
+    // code
+} catch (\Exception $e) {
+    // This will catch only the global Exception
+}
+?>
+                </code></pre>
+            </div>
+        </section>
+
+        <section id="namespace-benefits">
+            <h2>Benefits of Using Namespaces</h2>
+            
+            <h3>Avoiding Name Collisions</h3>
+            
+            <p>The primary benefit of namespaces is avoiding naming conflicts, especially when integrating third-party code.</p>
+            
+            <div class="code-example">
+                <h3>Name Collision Example</h3>
+                <pre><code>
+<?php
+// Without namespaces - these would conflict!
+// Only one class can exist with the same name in the same scope
+class Logger {
+    public function log($message) {
+        file_put_contents('app.log', $message . PHP_EOL, FILE_APPEND);
+    }
+}
+
+class Logger {
+    public function log($message) {
+        echo "[LOG] " . $message;
+    }
+}
+
+// With namespaces - both can coexist
+namespace MyPlugin\Utilities;
+class Logger {
+    public function log($message) {
+        file_put_contents('app.log', $message . PHP_EOL, FILE_APPEND);
+    }
+}
+
+namespace AnotherPlugin\Debug;
+class Logger {
+    public function log($message) {
+        echo "[LOG] " . $message;
+    }
+}
+
+// Using both loggers
+$fileLogger = new \MyPlugin\Utilities\Logger();
+$displayLogger = new \AnotherPlugin\Debug\Logger();
+?>
+                </code></pre>
+            </div>
+            
+            <h3>Better Code Organization</h3>
+            
+            <p>Namespaces allow you to organize your code logically, grouping related functionality together.</p>
+            
+            <div class="diagram">
+                <h3>Organized Code Structure</h3>
+                <div class="mermaid">
+                    graph TD
+                    subgraph "Project Structure"
+                        A[src/]
+                        B[MyPlugin/]
+                        C[Admin/]
+                        D[Frontend/]
+                        E[Admin/Settings.php]
+                        F[Admin/Dashboard.php]
+                        G[Frontend/Widgets.php]
+                        H[Frontend/Shortcodes.php]
+                    end
+                    
+                    subgraph "Namespace Structure"
+                        I[\MyPlugin]
+                        J[\MyPlugin\Admin]
+                        K[\MyPlugin\Frontend]
+                        L[\MyPlugin\Admin\Settings]
+                        M[\MyPlugin\Admin\Dashboard]
+                        N[\MyPlugin\Frontend\Widgets]
+                        O[\MyPlugin\Frontend\Shortcodes]
+                    end
+                    
+                    A --> B
+                    B --> C
+                    B --> D
+                    C --> E
+                    C --> F
+                    D --> G
+                    D --> H
+                    
+                    I --> J
+                    I --> K
+                    J --> L
+                    J --> M
+                    K --> N
+                    K --> O
+                </div>
+            </div>
+            
+            <p>This diagram shows how the file structure and namespace structure can mirror each other, creating a logical organization for your code.</p>
+            
+            <h3>Autoloading Compatibility</h3>
+            
+            <p>Namespaces work hand-in-hand with autoloading standards like PSR-4, which map namespace structures to file directories for automatic class loading.</p>
+            
+            <div class="code-example">
+                <h3>PSR-4 Autoloading Example</h3>
+                <pre><code>
+// composer.json
+{
+    "autoload": {
+        "psr-4": {
+            "MyPlugin\\": "src/MyPlugin/"
+        }
+    }
+}
+
+// With this configuration, the class:
+// \MyPlugin\Admin\Settings\Page
+// would be loaded from:
+// src/MyPlugin/Admin/Settings/Page.php
+                </code></pre>
+            </div>
+        </section>
+
+        <section id="namespace-wordpress">
+            <h2>Namespaces in WordPress Development</h2>
+            
+            <p>WordPress core still largely operates without namespaces for backward compatibility reasons. However, modern WordPress development, especially for plugins and themes, increasingly uses namespaces.</p>
+            
+            <h3>Plugin Namespaces</h3>
+            
+            <p>When creating WordPress plugins, it's a good practice to namespace your code to avoid conflicts with other plugins or WordPress core.</p>
+            
+            <div class="code-example">
+                <h3>WordPress Plugin with Namespaces</h3>
+                <pre><code>
+<?php
+/**
+ * Plugin Name: My Awesome Plugin
+ * Description: A sample plugin using namespaces
+ * Version: 1.0.0
+ * Author: Your Name
+ */
+
+// Prevent direct access
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+// Define the plugin's namespace
+namespace MyAwesomePlugin;
+
+// Plugin main class
+class Plugin {
+    private static $instance = null;
+    
+    public static function get_instance() {
+        if (null === self::$instance) {
+            self::$instance = new self();
+        }
+        return self::$instance;
+    }
+    
+    private function __construct() {
+        // Load dependencies
+        $this->load_dependencies();
+        
+        // Register hooks
+        add_action('init', [$this, 'init']);
+        add_action('admin_menu', [$this, 'admin_menu']);
+    }
+    
+    private function load_dependencies() {
+        // Load other plugin files
+        require_once plugin_dir_path(__FILE__) . 'includes/class-admin.php';
+        require_once plugin_dir_path(__FILE__) . 'includes/class-frontend.php';
+    }
+    
+    public function init() {
+        // Initialize plugin components
+        $admin = new Admin\Admin();
+        $frontend = new Frontend\Frontend();
+    }
+    
+    public function admin_menu() {
+        // Create admin menu pages
+        $admin = new Admin\Admin();
+        $admin->create_menu_pages();
+    }
+}
+
+// Initialize the plugin
+function initialize() {
+    return Plugin::get_instance();
+}
+
+// Start the plugin
+add_action('plugins_loaded', __NAMESPACE__ . '\\initialize');
+?>
+                </code></pre>
+            </div>
+            
+            <h3>Admin Class in a Namespace</h3>
+            
+            <div class="code-example">
+                <h3>Admin Class (includes/class-admin.php)</h3>
+                <pre><code>
+<?php
+namespace MyAwesomePlugin\Admin;
+
+class Admin {
+    public function __construct() {
+        // Admin initialization
+    }
+    
+    public function create_menu_pages() {
+        add_menu_page(
+            'My Awesome Plugin',
+            'Awesome Plugin',
+            'manage_options',
+            'my-awesome-plugin',
+            [$this, 'render_main_page'],
+            'dashicons-star-filled'
+        );
+        
+        add_submenu_page(
+            'my-awesome-plugin',
+            'Settings',
+            'Settings',
+            'manage_options',
+            'my-awesome-plugin-settings',
+            [$this, 'render_settings_page']
+        );
+    }
+    
+    public function render_main_page() {
+        echo '&lt;div class="wrap"&gt;';
+        echo '&lt;h1&gt;My Awesome Plugin&lt;/h1&gt;';
+        echo '&lt;p&gt;Welcome to the main page!&lt;/p&gt;';
+        echo '&lt;/div&gt;';
+    }
+    
+    public function render_settings_page() {
+        echo '&lt;div class="wrap"&gt;';
+        echo '&lt;h1&gt;Settings&lt;/h1&gt;';
+        echo '&lt;form method="post" action="options.php"&gt;';
+        // Settings fields would go here
+        echo '&lt;/form&gt;';
+        echo '&lt;/div&gt;';
+    }
+}
+?>
+                </code></pre>
+            </div>
+            
+            <h3>Frontend Class in a Namespace</h3>
+            
+            <div class="code-example">
+                <h3>Frontend Class (includes/class-frontend.php)</h3>
+                <pre><code>
+<?php
+namespace MyAwesomePlugin\Frontend;
+
+class Frontend {
+    public function __construct() {
+        // Register shortcodes
+        add_shortcode('awesome_feature', [$this, 'render_awesome_feature']);
+        
+        // Register scripts and styles
+        add_action('wp_enqueue_scripts', [$this, 'enqueue_assets']);
+    }
+    
+    public function render_awesome_feature($atts, $content = null) {
+        $atts = shortcode_atts([
+            'title' => 'Awesome Feature',
+            'color' => 'blue',
+        ], $atts);
+        
+        ob_start();
+        ?>
+        &lt;div class="awesome-feature" style="color: <?php echo esc_attr($atts['color']); ?>"&gt;
+            &lt;h3&gt;<?php echo esc_html($atts['title']); ?>&gt;&lt;/h3&gt;
+            &lt;div class="content"&gt;
+                <?php echo wp_kses_post($content); ?>
+            &lt;/div&gt;
+        &lt;/div&gt;
+        <?php
+        return ob_get_clean();
+    }
+    
+    public function enqueue_assets() {
+        wp_enqueue_style(
+            'my-awesome-plugin',
+            plugin_dir_url(__FILE__) . '../assets/css/frontend.css',
+            [],
+            '1.0.0'
+        );
+        
+        wp_enqueue_script(
+            'my-awesome-plugin',
+            plugin_dir_url(__FILE__) . '../assets/js/frontend.js',
+            ['jquery'],
+            '1.0.0',
+            true
+        );
+    }
+}
+?>
+                </code></pre>
+            </div>
+        </section>
+
+        <section id="namespace-autoloading">
+            <h2>Autoloading with Namespaces</h2>
+            
+            <p>One of the most powerful benefits of using namespaces is the ability to set up automatic class loading based on the namespace structure. This eliminates the need for numerous <code>require</code> or <code>include</code> statements.</p>
+            
+            <h3>Simple Autoloader</h3>
+            
+            <div class="code-example">
+                <h3>Basic PSR-4 Style Autoloader</h3>
+                <pre><code>
+<?php
+/**
+ * Simple PSR-4 compatible autoloader.
+ *
+ * @param string $class The fully-qualified class name.
+ * @return void
+ */
+spl_autoload_register(function ($class) {
+    // Base directory for the namespace prefix
+    $base_dir = __DIR__ . '/src/';
+    
+    // Replace namespace separators with directory separators
+    // Replace the namespace prefix with the base directory
+    $file = $base_dir . str_replace('\\', '/', $class) . '.php';
+    
+    // If the file exists, require it
+    if (file_exists($file)) {
+        require_once $file;
+    }
+});
+
+// Now you can use classes without requiring their files
+$object = new MyPlugin\Admin\Settings\Page();
+?>
+                </code></pre>
+            </div>
+            
+            <h3>Using Composer Autoloading</h3>
+            
+            <p>For more robust autoloading, Composer provides a PSR-4 compatible autoloader that's widely used in modern PHP development.</p>
+            
+            <div class="code-example">
+                <h3>Setting Up Composer Autoloading</h3>
+                <pre><code>
+// composer.json
+{
+    "name": "yourname/my-awesome-plugin",
+    "description": "An awesome WordPress plugin",
+    "type": "wordpress-plugin",
+    "require": {
+        "php": ">=7.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "MyAwesomePlugin\\": "src/"
+        }
+    }
+}
+
+// After running "composer install", you can use:
+<?php
+require_once __DIR__ . '/vendor/autoload.php';
+
+// Now all classes in the MyAwesomePlugin namespace will be autoloaded
+$plugin = new MyAwesomePlugin\Plugin();
+?>
+                </code></pre>
+            </div>
+            
+            <div class="pro-tip">
+                <h3>WordPress and Composer</h3>
+                <p>While WordPress core doesn't use Composer, many modern WordPress plugins and themes do. When distributing your plugin, you have two main options:</p>
+                <ol>
+                    <li>Include Composer's autoloader and vendor directory in your distribution package</li>
+                    <li>Use a custom autoloader specific to your plugin to avoid conflicts with other plugins using Composer</li>
+                </ol>
+                <p>For smaller plugins without many dependencies, the second approach is often simpler and more lightweight.</p>
+            </div>
+        </section>
+
+        <section id="namespace-best-practices">
+            <h2>Namespace Best Practices</h2>
+            
+            <div class="best-practices">
+                <div class="practice">
+                    <h3>Use Vendor Namespaces</h3>
+                    <p>Start your namespace with a unique vendor name (usually your company or plugin name) to avoid conflicts with other plugins or libraries.</p>
+                    <div class="code-example">
+                        <h4>Good: Using a vendor namespace</h4>
+                        <pre><code>
+// Better approach - less chance of collision
+namespace YourCompany\AwesomePlugin;
+
+// Avoid this - too generic, could conflict
+namespace Plugin;
+                        </code></pre>
+                    </div>
+                </div>
+                
+                <div class="practice">
+                    <h3>Match Namespace to Directory Structure</h3>
+                    <p>Following PSR-4 standards, your namespace structure should mirror your directory structure for easier navigation and autoloading.</p>
+                    <div class="code-example">
+                        <h4>Good: Directory structure matches namespace</h4>
+                        <pre><code>
+// File: src/MyPlugin/Admin/Settings.php
+namespace MyPlugin\Admin;
+
+class Settings {
+    // ...
+}
+
+// Directory structure:
+// src/
+// ├── MyPlugin/
+// │   ├── Admin/
+// │   │   └── Settings.php
+// │   └── Frontend/
+// └── ...
+                        </code></pre>
+                    </div>
+                </div>
+                
+                <div class="practice">
+                    <h3>Use a Single Namespace Per File</h3>
+                    <p>For clarity and maintainability, stick to one namespace per file. This also simplifies autoloading.</p>
+                    <div class="code-example">
+                        <h4>Good: One namespace per file</h4>
+                        <pre><code>
+// File: src/MyPlugin/Admin/Settings.php
+namespace MyPlugin\Admin;
+
+class Settings {
+    // ...
+}
+
+// Bad practice: Multiple namespaces in one file
+namespace MyPlugin\Admin;
+class Settings {
+    // ...
+}
+
+namespace MyPlugin\Frontend;
+class Widget {
+    // ...
+}
+                        </code></pre>
+                    </div>
+                </div>
+                
+                <div class="practice">
+                    <h3>Import Classes with Use Statements</h3>
+                    <p>For readability, import the classes you use frequently with <code>use</code> statements at the top of your file rather than using fully qualified names throughout.</p>
+                    <div class="code-example">
+                        <h4>Good: Importing with use statements</h4>
+                        <pre><code>
+namespace MyPlugin\Admin;
+
+// Import classes at the top
+use MyPlugin\Frontend\Widget;
+use MyPlugin\Utilities\Logger;
+use WP_Query;
+
+class Dashboard {
+    public function initialize() {
+        // Use imported classes directly
+        $widget = new Widget();
+        $logger = new Logger();
+        $query = new WP_Query(['post_type' => 'post']);
+        
+        // ...
+    }
+}
+                        </code></pre>
+                    </div>
+                </div>
+                
+                <div class="practice">
+                    <h3>Be Explicit with Global Functions and Classes</h3>
+                    <p>When using PHP built-in functions or WordPress functions within a namespace, either prefix them with a backslash (\) or import them using <code>use function</code> to avoid ambiguity.</p>
+                    <div class="code-example">
+                        <h4>Good: Being explicit with global functions</h4>
+                        <pre><code>
+namespace MyPlugin\Utilities;
+
+// Import global functions
+use function add_action;
+use function wp_enqueue_script;
+use function esc_html;
+
+// Alternative: use backslash prefix
+function enqueue_assets() {
+    // Using imported function
+    add_action('wp_enqueue_scripts', __NAMESPACE__ . '\\register_scripts');
+    
+    // Using backslash prefix
+    \add_filter('the_content', __NAMESPACE__ . '\\filter_content');
+}
+                        </code></pre>
+                    </div>
+                </div>
+                
+                <div class="practice">
+                    <h3>Use __NAMESPACE__ for Callbacks</h3>
+                    <p>When registering callbacks in WordPress hooks from within a namespace, use the <code>__NAMESPACE__</code> constant to build the fully qualified function name.</p>
+                    <div class="code-example">
+                        <h4>Good: Using __NAMESPACE__ for callbacks</h4>
+                        <pre><code>
+namespace MyPlugin\Frontend;
+
+// Register hooks
+function setup() {
+    // For functions in the current namespace
+    add_action('wp_enqueue_scripts', __NAMESPACE__ . '\\enqueue_scripts');
+    
+    // For class methods
+    add_action('init', [Shortcodes::class, 'register']);
+}
+
+// The callback function
+function enqueue_scripts() {
+    // Enqueue styles and scripts
+}
+
+// Register our setup function
+add_action('plugins_loaded', __NAMESPACE__ . '\\setup');
+                        </code></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="common-namespace-challenges">
+            <h2>Common Namespace Challenges</h2>
+            
+            <div class="challenges">
+                <div class="challenge">
+                    <h3>Working with Global WordPress Functions</h3>
+                    <p>One of the biggest challenges when using namespaces in WordPress is interfacing with WordPress's global functions and classes.</p>
+                    <div class="code-example">
+                        <h4>Challenge: Accessing WordPress Functions</h4>
+                        <pre><code>
+namespace MyPlugin\Admin;
+
+class Settings {
+    public function save_options() {
+        // This might not work as expected inside a namespace
+        $option_value = get_option('my_plugin_option');
+        
+        // Solution 1: Use global namespace prefix
+        $option_value = \get_option('my_plugin_option');
+        
+        // Solution 2: Import the function
+        use function get_option;
+        $option_value = get_option('my_plugin_option');
+    }
+}
+                        </code></pre>
+                    </div>
+                </div>
+                
+                <div class="challenge">
+                    <h3>Dynamic Namespace References</h3>
+                    <p>Creating dynamic class names with namespaces requires special handling.</p>
+                    <div class="code-example">
+                        <h4>Challenge: Dynamic Class Names</h4>
+                        <pre><code>
+namespace MyPlugin;
+
+class Factory {
+    public function create($type) {
+        // This won't work as expected
+        $class = 'Models\\' . $type;
+        $object = new $class(); // Tries to find MyPlugin\Models\User
+        
+        // Solution 1: Use fully qualified name
+        $class = '\\MyPlugin\\Models\\' . $type;
+        $object = new $class();
+        
+        // Solution 2: Use the namespace operator
+        $class = __NAMESPACE__ . '\\Models\\' . $type;
+        $object = new $class();
+    }
+}
+
+// Usage
+$factory = new Factory();
+$user = $factory->create('User'); // Should create MyPlugin\Models\User
+                        </code></pre>
+                    </div>
+                </div>
+                
+                <div class="challenge">
+                    <h3>Backward Compatibility with Non-Namespaced Code</h3>
+                    <p>Integrating namespaced code with older, non-namespaced code can be tricky.</p>
+                    <div class="code-example">
+                        <h4>Challenge: Integration with Legacy Code</h4>
+                        <pre><code>
+// Old plugin file (no namespace)
+function my_plugin_process_data($data) {
+    // Process data
+}
+
+// New plugin file (with namespace)
+namespace MyPlugin\Utilities;
+
+class DataProcessor {
+    public function process($data) {
+        // Call the global function from the namespaced context
+        return \my_plugin_process_data($data);
+    }
+}
+                        </code></pre>
+                    </div>
+                </div>
+                
+                <div class="challenge">
+                    <h3>Namespace Autoloading in WordPress</h3>
+                    <p>Setting up autoloading in the WordPress environment requires some special considerations.</p>
+                    <div class="code-example">
+                        <h4>Challenge: WordPress-Specific Autoloading</h4>
+                        <pre><code>
+// In your plugin's main file
+function my_plugin_autoloader($class) {
+    // Only load classes from our namespace
+    if (strpos($class, 'MyPlugin\\') !== 0) {
+        return;
+    }
+    
+    // Convert namespace to path
+    $path = str_replace('\\', '/', substr($class, 9)); // Remove 'MyPlugin\\'
+    $file = plugin_dir_path(__FILE__) . 'includes/' . $path . '.php';
+    
+    // If the file exists, load it
+    if (file_exists($file)) {
+        require_once $file;
+    }
+}
+
+// Register the autoloader
+spl_autoload_register('my_plugin_autoloader');
+                        </code></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="real-world-examples">
+            <h2>Real-World Examples in WordPress Plugins</h2>
+            
+            <h3>WooCommerce</h3>
+            
+            <p>WooCommerce, one of the most popular WordPress plugins, makes extensive use of namespaces to organize its large codebase.</p>
+            
+            <div class="code-example">
+                <h3>WooCommerce Namespace Structure Example</h3>
+                <pre><code>
+namespace Automattic\WooCommerce\Admin\Features;
+
+use Automattic\WooCommerce\Admin\Loader;
+use Automattic\WooCommerce\Admin\API\Reports\Orders\DataStore as OrdersDataStore;
+
+/**
+ * Analytics Class.
+ */
+class Analytics {
+    /**
+     * Constructor.
+     */
+    public function __construct() {
+        add_action('admin_menu', [$this, 'register_pages']);
+    }
+    
+    /**
+     * Register the admin pages.
+     */
+    public function register_pages() {
+        // Implementation...
+    }
+}
+                </code></pre>
+            </div>
+            
+            <h3>Advanced Custom Fields</h3>
+            
+            <p>The Pro version of Advanced Custom Fields uses namespaces to organize its additional functionality.</p>
+            
+            <div class="code-example">
+                <h3>ACF Pro Namespace Structure Example</h3>
+                <pre><code>
+namespace ACF\Fields;
+
+class RepeaterField extends Field {
+    /**
+     * Initialize the field.
+     */
+    public function initialize() {
+        // Field initialization...
+    }
+    
+    /**
+     * Render the field.
+     *
+     * @param array $field The field settings.
+     */
+    public function render_field($field) {
+        // Field rendering...
+    }
+}
+                </code></pre>
+            </div>
+            
+            <h3>Creating a REST API Endpoint with Namespaces</h3>
+            
+            <p>Here's a practical example of using namespaces when creating a custom REST API endpoint for your WordPress plugin:</p>
+            
+            <div class="code-example">
+                <h3>Custom REST API with Namespaces</h3>
+                <pre><code>
+<?php
+namespace MyPlugin\API;
+
+class REST_Controller {
+    /**
+     * Namespace for the API.
+     *
+     * @var string
+     */
+    protected $namespace = 'my-plugin/v1';
+    
+    /**
+     * Register routes.
+     */
+    public function register_routes() {
+        register_rest_route(
+            $this->namespace,
+            '/settings',
+            [
+                'methods' => 'GET',
+                'callback' => [$this, 'get_settings'],
+                'permission_callback' => [$this, 'permissions_check'],
+            ]
+        );
+        
+        register_rest_route(
+            $this->namespace,
+            '/settings',
+            [
+                'methods' => 'POST',
+                'callback' => [$this, 'update_settings'],
+                'permission_callback' => [$this, 'permissions_check'],
+                'args' => [
+                    'option_name' => [
+                        'required' => true,
+                        'type' => 'string',
+                    ],
+                    'option_value' => [
+                        'required' => true,
+                    ],
+                ],
+            ]
+        );
+    }
+    
+    /**
+     * Check if the user has permission.
+     *
+     * @param \WP_REST_Request $request The request object.
+     * @return bool|WP_Error
+     */
+    public function permissions_check($request) {
+        return current_user_can('manage_options');
+    }
+    
+    /**
+     * Get settings.
+     *
+     * @param \WP_REST_Request $request The request object.
+     * @return \WP_REST_Response
+     */
+    public function get_settings($request) {
+        $settings = get_option('my_plugin_settings', []);
+        
+        return rest_ensure_response($settings);
+    }
+    
+    /**
+     * Update settings.
+     *
+     * @param \WP_REST_Request $request The request object.
+     * @return \WP_REST_Response
+     */
+    public function update_settings($request) {
+        $option_name = $request->get_param('option_name');
+        $option_value = $request->get_param('option_value');
+        
+        $settings = get_option('my_plugin_settings', []);
+        $settings[$option_name] = $option_value;
+        
+        update_option('my_plugin_settings', $settings);
+        
+        return rest_ensure_response([
+            'success' => true,
+            'settings' => $settings,
+        ]);
+    }
+}
+
+// Initialize the REST API
+function initialize_rest_api() {
+    $controller = new REST_Controller();
+    $controller->register_routes();
+}
+add_action('rest_api_init', __NAMESPACE__ . '\\initialize_rest_api');
+?>
+                </code></pre>
+            </div>
+        </section>
+
+        <section id="homework">
+            <h2>Homework: Refactoring a Plugin to Use Namespaces</h2>
+            
+            <div class="assignment">
+                <h3>Assignment: Namespace Organization</h3>
+                
+                <p>For this assignment, you'll take a simple WordPress plugin without namespaces and refactor it to use a proper namespace structure and organization.</p>
+                
+                <h4>Requirements:</h4>
+                <ol>
+                    <li>Create a namespace structure for the plugin with at least three namespaces:
+                        <ul>
+                            <li>Main plugin namespace (e.g., <code>MyPlugin</code>)</li>
+                            <li>Admin namespace for admin-related code (e.g., <code>MyPlugin\Admin</code>)</li>
+                            <li>Frontend namespace for frontend-related code (e.g., <code>MyPlugin\Frontend</code>)</li>
+                        </ul>
+                    </li>
+                    <li>Implement a simple autoloader for the namespaced classes</li>
+                    <li>Update all class and function references to use the appropriate namespace</li>
+                    <li>Properly handle WordPress function calls from within namespaces</li>
+                    <li>Document your code with PHPDoc blocks that include namespace information</li>
+                </ol>
+                
+                <h4>Starting Plugin Code:</h4>
+                <pre><code>
+<?php
+/**
+ * Plugin Name: Simple Feature Plugin
+ * Description: A simple plugin with some features
+ * Version: 1.0.0
+ * Author: Your Name
+ */
+
+// Prevent direct access
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+// Main plugin class
+class Simple_Feature_Plugin {
+    private static $instance = null;
+    
+    public static function get_instance() {
+        if (null === self::$instance) {
+            self::$instance = new self();
+        }
+        return self::$instance;
+    }
+    
+    private function __construct() {
+        $this->load_dependencies();
+        
+        add_action('init', array($this, 'init'));
+        add_action('admin_menu', array($this, 'admin_menu'));
+    }
+    
+    private function load_dependencies() {
+        require_once plugin_dir_path(__FILE__) . 'admin/class-admin.php';
+        require_once plugin_dir_path(__FILE__) . 'frontend/class-frontend.php';
+        require_once plugin_dir_path(__FILE__) . 'includes/class-utility.php';
+    }
+    
+    public function init() {
+        $frontend = new Simple_Feature_Frontend();
+        $frontend->register_shortcodes();
+    }
+    
+    public function admin_menu() {
+        $admin = new Simple_Feature_Admin();
+        $admin->register_menu_pages();
+    }
+}
+
+// Admin class
+class Simple_Feature_Admin {
+    public function register_menu_pages() {
+        add_menu_page(
+            'Simple Feature',
+            'Simple Feature',
+            'manage_options',
+            'simple-feature',
+            array($this, 'render_main_page'),
+            'dashicons-star-filled'
+        );
+    }
+    
+    public function render_main_page() {
+        $utility = new Simple_Feature_Utility();
+        $version = $utility->get_version();
+        
+        echo '<div class="wrap">';
+        echo '<h1>Simple Feature Plugin</h1>';
+        echo '<p>Welcome to the Simple Feature Plugin admin page!</p>';
+        echo '<p>Plugin version: ' . $version . '</p>';
+        echo '</div>';
+    }
+}
+
+// Frontend class
+class Simple_Feature_Frontend {
+    public function register_shortcodes() {
+        add_shortcode('simple_feature', array($this, 'shortcode_callback'));
+    }
+    
+    public function shortcode_callback($atts, $content = null) {
+        $atts = shortcode_atts(array(
+            'title' => 'Simple Feature',
+        ), $atts);
+        
+        $output = '<div class="simple-feature">';
+        $output .= '<h3>' . esc_html($atts['title']) . '</h3>';
+        if ($content) {
+            $output .= '<div class="content">' . wp_kses_post($content) . '</div>';
+        }
+        $output .= '</div>';
+        
+        return $output;
+    }
+}
+
+// Utility class
+class Simple_Feature_Utility {
+    public function get_version() {
+        return '1.0.0';
+    }
+    
+    public function get_setting($key, $default = '') {
+        $settings = get_option('simple_feature_settings', array());
+        return isset($settings[$key]) ? $settings[$key] : $default;
+    }
+}
+
+// Initialize the plugin
+function simple_feature_init() {
+    return Simple_Feature_Plugin::get_instance();
+}
+
+add_action('plugins_loaded', 'simple_feature_init');
+?>
+                </code></pre>
+                
+                <h4>Bonus Challenges:</h4>
+                <ul>
+                    <li>Implement PSR-4 compatible autoloading</li>
+                    <li>Add a new namespace for API functionality with a simple REST endpoint</li>
+                    <li>Implement dependency injection using interfaces and namespaced classes</li>
+                    <li>Create a composer.json file for the plugin with appropriate autoloading configuration</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="summary">
+            <h2>Key Takeaways</h2>
+            
+            <div class="takeaways">
+                <div class="takeaway">
+                    <h3>Code Organization</h3>
+                    <p>Namespaces provide a logical way to organize code, grouping related classes, functions, and constants together.</p>
+                </div>
+                
+                <div class="takeaway">
+                    <h3>Avoiding Name Collisions</h3>
+                    <p>Namespaces help prevent naming conflicts, allowing different plugins or libraries to use the same class names without conflicts.</p>
+                </div>
+                
+                <div class="takeaway">
+                    <h3>Autoloading Compatibility</h3>
+                    <p>Proper namespace usage enables PSR-4 autoloading, reducing the need for manual file inclusion and making your code more maintainable.</p>
+                </div>
+                
+                <div class="takeaway">
+                    <h3>Modern WordPress Development</h3>
+                    <p>While WordPress core doesn't extensively use namespaces, modern plugin and theme development increasingly adopts this approach for better organization and compatibility.</p>
+                </div>
+                
+                <div class="takeaway">
+                    <h3>Global Namespace Management</h3>
+                    <p>Understanding how to reference global functions and classes from within namespaced code is crucial for effective WordPress development.</p>
+                </div>
+            </div>
+            
+            <div class="next-steps">
+                <h3>Next Steps</h3>
+                <p>Now that you understand namespaces, we'll explore traits in our next lesson. Traits provide a mechanism for code reuse in PHP's single inheritance model, complementing the organizational structure that namespaces provide.</p>
+            </div>
+        </section>
+
+        <section class="resources">
+            <h2>Additional Resources</h2>
+            
+            <ul>
+                <li><a href="https://www.php.net/manual/en/language.namespaces.php" target="_blank">PHP Manual: Namespaces</a></li>
+                <li><a href="https://phptherightway.com/#namespaces" target="_blank">PHP The Right Way: Namespaces</a></li>
+                <li><a href="https://www.php-fig.org/psr/psr-4/" target="_blank">PSR-4: Autoloader</a></li>
+                <li><a href="https://developer.wordpress.org/plugins/intro/" target="_blank">WordPress Plugin Developer Handbook</a></li>
+                <li><a href="https://getcomposer.org/doc/01-basic-usage.md#autoloading" target="_blank">Composer Autoloading</a></li>
+                <li><a href="https://carlalexander.ca/php-namespaces-wordpress/" target="_blank">PHP Namespaces in WordPress</a></li>
+            </ul>
+        </section>
+    </main>
+    
+    <footer>
+        <p>&copy; 2025 PHP WordPress Development Course</p>
+  
+    </footer>
+</body>
+</html>

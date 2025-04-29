@@ -1,0 +1,1604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Creating Reusable PHP Components</title>
+    <link rel="stylesheet" href="/styles/main.css">
+    <link rel="icon" href="/favicon.png">
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+      mermaid.initialize({ startOnLoad: true });
+    </script>
+</head>
+<body>
+    <header>
+        <h1>Creating Reusable PHP Components</h1>
+        <p><a href="index.html">← Back to Syllabus</a></p>
+    </header>
+    
+    <main>
+        <section class="introduction">
+            <h2>Understanding Reusable Components</h2>
+            <p>Think of reusable PHP components as LEGO blocks for your web applications. Just as you can build complex structures with the same LEGO pieces, reusable components let you construct sophisticated websites while writing code only once. This approach is the foundation of modern web development, especially in WordPress theme and plugin creation.</p>
+            
+            <div class="concept_illustration">
+                <h3>The DRY Principle: Don't Repeat Yourself</h3>
+                <p>Reusable components embody the DRY principle - a fundamental concept in software engineering that emphasizes reducing repetition in code.</p>
+                
+                <div class="mermaid">
+                flowchart TD
+                    A[Write Once] --> B[Use Anywhere]
+                    B --> C[Update in One Place]
+                    C --> D[Changes Propagate Everywhere]
+                    D --> E[Save Time & Reduce Errors]
+                </div>
+                
+                <p>By creating components that can be reused throughout your application, you improve:</p>
+                <ul>
+                    <li><strong>Maintainability:</strong> Fix bugs or make improvements in one place</li>
+                    <li><strong>Consistency:</strong> Ensure uniform behavior and appearance</li>
+                    <li><strong>Development speed:</strong> Build new features by assembling existing components</li>
+                    <li><strong>Code organization:</strong> Create cleaner, more modular architecture</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="component_types">
+            <h2>Types of Reusable PHP Components</h2>
+            
+            <div class="component_type">
+                <h3>Include Files</h3>
+                <p>The simplest form of reusable components in PHP is the include file - a separate PHP file that can be included in multiple pages.</p>
+                
+                <div class="code_example">
+                    <h4>Example: Header Include</h4>
+                    <pre><code>
+// File: header.php
+&lt;?php
+function display_site_header($page_title) {
+    echo '&lt;!DOCTYPE html&gt;';
+    echo '&lt;html lang="en"&gt;';
+    echo '&lt;head&gt;';
+    echo '    &lt;meta charset="UTF-8"&gt;';
+    echo '    &lt;title&gt;' . htmlspecialchars($page_title) . ' - My Website&lt;/title&gt;';
+    echo '    &lt;link rel="stylesheet" href="/css/style.css"&gt;';
+    echo '&lt;/head&gt;';
+    echo '&lt;body&gt;';
+    echo '    &lt;header&gt;';
+    echo '        &lt;nav&gt;';
+    echo '            &lt;ul&gt;';
+    echo '                &lt;li&gt;&lt;a href="index.php"&gt;Home&lt;/a&gt;&lt;/li&gt;';
+    echo '                &lt;li&gt;&lt;a href="about.php"&gt;About&lt;/a&gt;&lt;/li&gt;';
+    echo '                &lt;li&gt;&lt;a href="contact.php"&gt;Contact&lt;/a&gt;&lt;/li&gt;';
+    echo '            &lt;/ul&gt;';
+    echo '        &lt;/nav&gt;';
+    echo '    &lt;/header&gt;';
+    echo '    &lt;main&gt;';
+}
+?&gt;
+                    </code></pre>
+                    
+                    <h4>Usage in a Page</h4>
+                    <pre><code>
+&lt;?php
+// File: index.php
+require_once 'header.php';
+
+display_site_header('Home Page');
+
+// Page content goes here
+echo '&lt;h1&gt;Welcome to our website!&lt;/h1&gt;';
+echo '&lt;p&gt;This is the home page content.&lt;/p&gt;';
+
+require_once 'footer.php';
+?&gt;
+                    </code></pre>
+                </div>
+                
+                <div class="real_world_application">
+                    <h4>Real-World Application</h4>
+                    <p>In WordPress themes, the <code>get_header()</code> and <code>get_footer()</code> functions work exactly this way, loading standard components across all pages. This pattern ensures consistency while simplifying maintenance.</p>
+                </div>
+            </div>
+            
+            <div class="component_type">
+                <h3>Functions and Function Libraries</h3>
+                <p>Functions are the workhorses of reusable code. Think of them as specialized tools in your toolbox - each designed for a specific purpose but usable in many situations.</p>
+                
+                <div class="code_example">
+                    <h4>Example: Function Library for Form Validation</h4>
+                    <pre><code>
+// File: validation_functions.php
+&lt;?php
+/**
+ * Validates an email address
+ * 
+ * @param string $email The email to validate
+ * @return bool True if valid, false otherwise
+ */
+function is_valid_email($email) {
+    return filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
+}
+
+/**
+ * Validates that a string has minimum length
+ * 
+ * @param string $string The string to check
+ * @param int $min_length The minimum required length
+ * @return bool True if valid, false otherwise
+ */
+function has_min_length($string, $min_length) {
+    return strlen(trim($string)) >= $min_length;
+}
+
+/**
+ * Validates that a password meets security requirements
+ * 
+ * @param string $password The password to validate
+ * @return bool True if valid, false otherwise
+ */
+function is_secure_password($password) {
+    // At least 8 characters, containing uppercase, lowercase, and number
+    $has_min_length = strlen($password) >= 8;
+    $has_uppercase = preg_match('/[A-Z]/', $password);
+    $has_lowercase = preg_match('/[a-z]/', $password);
+    $has_number = preg_match('/[0-9]/', $password);
+    
+    return $has_min_length && $has_uppercase && $has_lowercase && $has_number;
+}
+?&gt;
+                    </code></pre>
+                    
+                    <h4>Usage in a Registration Form</h4>
+                    <pre><code>
+&lt;?php
+// File: register.php
+require_once 'validation_functions.php';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $email = $_POST['email'] ?? '';
+    $username = $_POST['username'] ?? '';
+    $password = $_POST['password'] ?? '';
+    $errors = [];
+    
+    // Validate input using our reusable functions
+    if (!is_valid_email($email)) {
+        $errors[] = 'Please enter a valid email address.';
+    }
+    
+    if (!has_min_length($username, 4)) {
+        $errors[] = 'Username must be at least 4 characters long.';
+    }
+    
+    if (!is_secure_password($password)) {
+        $errors[] = 'Password must be at least 8 characters long and contain uppercase, lowercase, and numbers.';
+    }
+    
+    // Process form if no errors
+    if (empty($errors)) {
+        // Register the user
+        // ...
+    }
+}
+?&gt;
+                    </code></pre>
+                </div>
+                
+                <div class="real_world_application">
+                    <h4>Real-World Application</h4>
+                    <p>WordPress uses extensive function libraries like <code>sanitize_text_field()</code>, <code>wp_kses()</code>, and <code>esc_url()</code> for data validation and sanitization across the entire platform. These functions ensure consistent security practices throughout WordPress.</p>
+                </div>
+            </div>
+            
+            <div class="component_type">
+                <h3>Classes and Object-Oriented Components</h3>
+                <p>Classes are the most sophisticated form of reusable components, allowing you to package related functions and data together. Think of a class as a blueprint for creating objects with specific behaviors and properties.</p>
+                
+                <div class="mermaid">
+                classdiagram
+                    class FormField {
+                        +name: string
+                        +value: string
+                        +error: string
+                        +required: boolean
+                        +render()
+                        +validate()
+                        +getValue()
+                    }
+                    
+                    class TextField {
+                        +minLength: int
+                        +maxLength: int
+                        +placeholder: string
+                        +validate()
+                        +render()
+                    }
+                    
+                    class EmailField {
+                        +validate()
+                        +render()
+                    }
+                    
+                    class PasswordField {
+                        +minLength: int
+                        +requireSpecialChars: boolean
+                        +validate()
+                        +render()
+                    }
+                    
+                    FormField <|-- TextField
+                    FormField <|-- EmailField
+                    FormField <|-- PasswordField
+                </div>
+                
+                <div class="code_example">
+                    <h4>Example: Form Field Component Class</h4>
+                    <pre><code>
+// File: form_components.php
+&lt;?php
+/**
+ * Base class for all form field components
+ */
+abstract class FormField {
+    protected $name;
+    protected $label;
+    protected $value;
+    protected $error;
+    protected $required;
+    
+    /**
+     * Constructor
+     * 
+     * @param string $name Field name
+     * @param string $label Field label
+     * @param bool $required Whether field is required
+     */
+    public function __construct($name, $label, $required = false) {
+        $this->name = $name;
+        $this->label = $label;
+        $this->required = $required;
+        $this->value = '';
+        $this->error = '';
+    }
+    
+    /**
+     * Set the field value
+     * 
+     * @param mixed $value The value to set
+     * @return self For method chaining
+     */
+    public function setValue($value) {
+        $this->value = $value;
+        return $this;
+    }
+    
+    /**
+     * Get the field value
+     * 
+     * @return mixed The field value
+     */
+    public function getValue() {
+        return $this->value;
+    }
+    
+    /**
+     * Set an error message
+     * 
+     * @param string $error The error message
+     * @return self For method chaining
+     */
+    public function setError($error) {
+        $this->error = $error;
+        return $this;
+    }
+    
+    /**
+     * Check if field has an error
+     * 
+     * @return bool True if there's an error
+     */
+    public function hasError() {
+        return !empty($this->error);
+    }
+    
+    /**
+     * Validate the field
+     * 
+     * @return bool True if valid, false otherwise
+     */
+    abstract public function validate();
+    
+    /**
+     * Render the field HTML
+     * 
+     * @return string The field HTML
+     */
+    abstract public function render();
+}
+
+/**
+ * Text input field component
+ */
+class TextField extends FormField {
+    protected $minLength;
+    protected $maxLength;
+    protected $placeholder;
+    
+    /**
+     * Constructor
+     * 
+     * @param string $name Field name
+     * @param string $label Field label
+     * @param bool $required Whether field is required
+     * @param int $minLength Minimum length (0 for no minimum)
+     * @param int $maxLength Maximum length (0 for no maximum)
+     * @param string $placeholder Placeholder text
+     */
+    public function __construct($name, $label, $required = false, $minLength = 0, $maxLength = 0, $placeholder = '') {
+        parent::__construct($name, $label, $required);
+        $this->minLength = $minLength;
+        $this->maxLength = $maxLength;
+        $this->placeholder = $placeholder;
+    }
+    
+    /**
+     * Validate the field
+     * 
+     * @return bool True if valid, false otherwise
+     */
+    public function validate() {
+        if ($this->required && $this->value === '') {
+            $this->error = "The {$this->label} field is required.";
+            return false;
+        }
+        
+        if ($this->minLength > 0 && strlen($this->value) < $this->minLength) {
+            $this->error = "The {$this->label} field must be at least {$this->minLength} characters.";
+            return false;
+        }
+        
+        if ($this->maxLength > 0 && strlen($this->value) > $this->maxLength) {
+            $this->error = "The {$this->label} field cannot exceed {$this->maxLength} characters.";
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Render the field HTML
+     * 
+     * @return string The field HTML
+     */
+    public function render() {
+        $html = '&lt;div class="form-field' . ($this->hasError() ? ' has-error' : '') . '"&gt;';
+        $html .= '&lt;label for="' . htmlspecialchars($this->name) . '"&gt;' . htmlspecialchars($this->label);
+        if ($this->required) {
+            $html .= ' &lt;span class="required"&gt;*&lt;/span&gt;';
+        }
+        $html .= '&lt;/label&gt;';
+        
+        $html .= '&lt;input type="text" id="' . htmlspecialchars($this->name) . '" name="' . htmlspecialchars($this->name) . '" value="' . htmlspecialchars($this->value) . '"';
+        
+        if (!empty($this->placeholder)) {
+            $html .= ' placeholder="' . htmlspecialchars($this->placeholder) . '"';
+        }
+        
+        if ($this->maxLength > 0) {
+            $html .= ' maxlength="' . $this->maxLength . '"';
+        }
+        
+        if ($this->required) {
+            $html .= ' required';
+        }
+        
+        $html .= '&gt;';
+        
+        if ($this->hasError()) {
+            $html .= '&lt;p class="error-message"&gt;' . htmlspecialchars($this->error) . '&lt;/p&gt;';
+        }
+        
+        $html .= '&lt;/div&gt;';
+        
+        return $html;
+    }
+}
+
+/**
+ * Email input field component
+ */
+class EmailField extends FormField {
+    /**
+     * Validate the field
+     * 
+     * @return bool True if valid, false otherwise
+     */
+    public function validate() {
+        if ($this->required && $this->value === '') {
+            $this->error = "The {$this->label} field is required.";
+            return false;
+        }
+        
+        if ($this->value !== '' && !filter_var($this->value, FILTER_VALIDATE_EMAIL)) {
+            $this->error = "Please enter a valid email address.";
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Render the field HTML
+     * 
+     * @return string The field HTML
+     */
+    public function render() {
+        $html = '&lt;div class="form-field' . ($this->hasError() ? ' has-error' : '') . '"&gt;';
+        $html .= '&lt;label for="' . htmlspecialchars($this->name) . '"&gt;' . htmlspecialchars($this->label);
+        if ($this->required) {
+            $html .= ' &lt;span class="required"&gt;*&lt;/span&gt;';
+        }
+        $html .= '&lt;/label&gt;';
+        
+        $html .= '&lt;input type="email" id="' . htmlspecialchars($this->name) . '" name="' . htmlspecialchars($this->name) . '" value="' . htmlspecialchars($this->value) . '"';
+        
+        if ($this->required) {
+            $html .= ' required';
+        }
+        
+        $html .= '&gt;';
+        
+        if ($this->hasError()) {
+            $html .= '&lt;p class="error-message"&gt;' . htmlspecialchars($this->error) . '&lt;/p&gt;';
+        }
+        
+        $html .= '&lt;/div&gt;';
+        
+        return $html;
+    }
+}
+?&gt;
+                    </code></pre>
+                    
+                    <h4>Usage in a Form</h4>
+                    <pre><code>
+&lt;?php
+// File: contact_form.php
+require_once 'form_components.php';
+
+// Create form fields
+$nameField = new TextField('name', 'Your Name', true, 2, 50);
+$emailField = new EmailField('email', 'Email Address', true);
+$messageField = new TextField('message', 'Your Message', true, 10, 1000);
+
+// Process form submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Set values from POST data
+    $nameField->setValue($_POST['name'] ?? '');
+    $emailField->setValue($_POST['email'] ?? '');
+    $messageField->setValue($_POST['message'] ?? '');
+    
+    // Validate all fields
+    $valid = $nameField->validate() && 
+             $emailField->validate() && 
+             $messageField->validate();
+    
+    if ($valid) {
+        // Process the form data
+        // ...
+        $success = true;
+    }
+}
+?&gt;
+
+&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+    &lt;meta charset="UTF-8"&gt;
+    &lt;title&gt;Contact Us&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;h1&gt;Contact Us&lt;/h1&gt;
+    
+    &lt;?php if (isset($success)): ?&gt;
+        &lt;div class="success-message"&gt;
+            Thank you for your message! We'll get back to you soon.
+        &lt;/div&gt;
+    &lt;?php else: ?&gt;
+        &lt;form method="post"&gt;
+            &lt;?php
+            echo $nameField->render();
+            echo $emailField->render();
+            echo $messageField->render();
+            ?&gt;
+            
+            &lt;button type="submit"&gt;Send Message&lt;/button&gt;
+        &lt;/form&gt;
+    &lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+                    </code></pre>
+                </div>
+                
+                <div class="real_world_application">
+                    <h4>Real-World Application</h4>
+                    <p>WordPress uses this pattern extensively in its core. For example, the <code>WP_Widget</code> class is a base component that developers extend to create custom widgets. Similarly, the <code>WP_Block</code> class serves as the foundation for Gutenberg blocks, allowing developers to create reusable content blocks with consistent behavior.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="component_patterns">
+            <h2>Common Component Design Patterns</h2>
+            
+            <div class="pattern">
+                <h3>The Template Pattern</h3>
+                <p>Imagine a restaurant menu where the layout is consistent but the content changes. The template pattern works the same way - providing a consistent structure while allowing variable content.</p>
+                
+                <div class="svg_container">
+                    <svg viewBox="0 0 800 300" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Base Template -->
+                        <rect x="50" y="50" width="700" height="200" fill="#f0f0f0" stroke="#333" stroke-width="2"/>
+                        <text x="400" y="30" text-anchor="middle" font-size="18" font-weight="bold">Template Pattern</text>
+                        
+                        <!-- Header Section -->
+                        <rect x="75" y="75" width="650" height="40" fill="#e0e0ff" stroke="#333" stroke-width="1"/>
+                        <text x="400" y="100" text-anchor="middle" font-size="14">Header Section (Consistent Across Pages)</text>
+                        
+                        <!-- Content Section -->
+                        <rect x="75" y="130" width="650" height="70" fill="#ffe0e0" stroke="#333" stroke-width="1"/>
+                        <text x="400" y="165" text-anchor="middle" font-size="14">Content Section (Variable)</text>
+                        
+                        <!-- Footer Section -->
+                        <rect x="75" y="215" width="650" height="20" fill="#e0ffe0" stroke="#333" stroke-width="1"/>
+                        <text x="400" y="230" text-anchor="middle" font-size="14">Footer Section (Consistent Across Pages)</text>
+                        
+                        <!-- Arrows -->
+                        <path d="M 400 130 L 400 115 L 410 115 L 400 105 L 390 115 L 400 115 Z" fill="#333"/>
+                        <text x="420" y="125" font-size="12">include('header.php')</text>
+                        
+                        <path d="M 400 215 L 400 200 L 410 200 L 400 190 L 390 200 L 400 200 Z" fill="#333"/>
+                        <text x="420" y="210" font-size="12">include('footer.php')</text>
+                    </svg>
+                </div>
+                
+                <div class="code_example">
+                    <h4>Example: Template Component with Content Slots</h4>
+                    <pre><code>
+// File: page_template.php
+&lt;?php
+/**
+ * Renders a complete page using template components
+ * 
+ * @param string $title The page title
+ * @param string $content The main content HTML
+ * @param array $options Additional options (sidebar, meta tags, etc.)
+ * @return string The complete page HTML
+ */
+function render_page($title, $content, $options = []) {
+    // Start output buffering to capture HTML
+    ob_start();
+    
+    // Default options
+    $defaults = [
+        'show_sidebar' => true,
+        'meta_description' => '',
+        'active_menu' => '',
+    ];
+    
+    // Merge with provided options
+    $options = array_merge($defaults, $options);
+    
+    // Include header
+    include 'templates/header.php';
+    
+    // Main content area with optional sidebar
+    if ($options['show_sidebar']) {
+        echo '&lt;div class="container with-sidebar"&gt;';
+        echo '    &lt;main class="content"&gt;';
+        echo $content;
+        echo '    &lt;/main&gt;';
+        
+        // Include sidebar
+        include 'templates/sidebar.php';
+        
+        echo '&lt;/div&gt;';
+    } else {
+        echo '&lt;div class="container full-width"&gt;';
+        echo '    &lt;main class="content"&gt;';
+        echo $content;
+        echo '    &lt;/main&gt;';
+        echo '&lt;/div&gt;';
+    }
+    
+    // Include footer
+    include 'templates/footer.php';
+    
+    // Return the captured HTML
+    return ob_get_clean();
+}
+?&gt;
+                    </code></pre>
+                    
+                    <h4>Template Components</h4>
+                    <pre><code>
+// File: templates/header.php
+&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+    &lt;meta charset="UTF-8"&gt;
+    &lt;title&gt;&lt;?php echo htmlspecialchars($title); ?&gt; - My Website&lt;/title&gt;
+    &lt;?php if (!empty($options['meta_description'])): ?&gt;
+    &lt;meta name="description" content="&lt;?php echo htmlspecialchars($options['meta_description']); ?&gt;"&gt;
+    &lt;?php endif; ?&gt;
+    &lt;link rel="stylesheet" href="/css/style.css"&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;header&gt;
+        &lt;div class="logo"&gt;My Website&lt;/div&gt;
+        &lt;nav&gt;
+            &lt;ul&gt;
+                &lt;li&lt;?php echo $options['active_menu'] === 'home' ? ' class="active"' : ''; ?&gt;&gt;
+                    &lt;a href="index.php"&gt;Home&lt;/a&gt;
+                &lt;/li&gt;
+                &lt;li&lt;?php echo $options['active_menu'] === 'about' ? ' class="active"' : ''; ?&gt;&gt;
+                    &lt;a href="about.php"&gt;About&lt;/a&gt;
+                &lt;/li&gt;
+                &lt;li&lt;?php echo $options['active_menu'] === 'services' ? ' class="active"' : ''; ?&gt;&gt;
+                    &lt;a href="services.php"&gt;Services&lt;/a&gt;
+                &lt;/li&gt;
+                &lt;li&lt;?php echo $options['active_menu'] === 'contact' ? ' class="active"' : ''; ?&gt;&gt;
+                    &lt;a href="contact.php"&gt;Contact&lt;/a&gt;
+                &lt;/li&gt;
+            &lt;/ul&gt;
+        &lt;/nav&gt;
+    &lt;/header&gt;
+
+// File: templates/sidebar.php
+&lt;aside class="sidebar"&gt;
+    &lt;div class="widget"&gt;
+        &lt;h3&gt;Recent Posts&lt;/h3&gt;
+        &lt;ul&gt;
+            &lt;li&gt;&lt;a href="#"&gt;Post Title 1&lt;/a&gt;&lt;/li&gt;
+            &lt;li&gt;&lt;a href="#"&gt;Post Title 2&lt;/a&gt;&lt;/li&gt;
+            &lt;li&gt;&lt;a href="#"&gt;Post Title 3&lt;/a&gt;&lt;/li&gt;
+        &lt;/ul&gt;
+    &lt;/div&gt;
+    &lt;div class="widget"&gt;
+        &lt;h3&gt;Categories&lt;/h3&gt;
+        &lt;ul&gt;
+            &lt;li&gt;&lt;a href="#"&gt;Category 1&lt;/a&gt;&lt;/li&gt;
+            &lt;li&gt;&lt;a href="#"&gt;Category 2&lt;/a&gt;&lt;/li&gt;
+            &lt;li&gt;&lt;a href="#"&gt;Category 3&lt;/a&gt;&lt;/li&gt;
+        &lt;/ul&gt;
+    &lt;/div&gt;
+&lt;/aside&gt;
+
+// File: templates/footer.php
+    &lt;footer&gt;
+        &lt;div class="footer-content"&gt;
+            &lt;div class="footer-col"&gt;
+                &lt;h4&gt;About Us&lt;/h4&gt;
+                &lt;p&gt;A brief description of your company or website.&lt;/p&gt;
+            &lt;/div&gt;
+            &lt;div class="footer-col"&gt;
+                &lt;h4&gt;Quick Links&lt;/h4&gt;
+                &lt;ul&gt;
+                    &lt;li&gt;&lt;a href="privacy.php"&gt;Privacy Policy&lt;/a&gt;&lt;/li&gt;
+                    &lt;li&gt;&lt;a href="terms.php"&gt;Terms of Service&lt;/a&gt;&lt;/li&gt;
+                    &lt;li&gt;&lt;a href="sitemap.php"&gt;Sitemap&lt;/a&gt;&lt;/li&gt;
+                &lt;/ul&gt;
+            &lt;/div&gt;
+            &lt;div class="footer-col"&gt;
+                &lt;h4&gt;Contact Us&lt;/h4&gt;
+                &lt;p&gt;Email: info@example.com&lt;br&gt;
+                Phone: (123) 456-7890&lt;/p&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
+        &lt;div class="copyright"&gt;
+            &lt;p&gt;&amp;copy; &lt;?php echo date('Y'); ?&gt; My Website. All rights reserved.&lt;/p&gt;
+        &lt;/div&gt;
+    &lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+                    </code></pre>
+                    
+                    <h4>Usage in a Page</h4>
+                    <pre><code>
+&lt;?php
+// File: about.php
+require_once 'page_template.php';
+
+// Prepare the content
+$content = '
+&lt;h1&gt;About Us&lt;/h1&gt;
+&lt;p&gt;Welcome to our company page! We are dedicated to providing the best service possible.&lt;/p&gt;
+&lt;p&gt;Our team of experts has years of experience in the industry.&lt;/p&gt;
+&lt;h2&gt;Our Mission&lt;/h2&gt;
+&lt;p&gt;To deliver high-quality products and services to our customers.&lt;/p&gt;
+';
+
+// Render the page with options
+echo render_page('About Us', $content, [
+    'active_menu' => 'about',
+    'meta_description' => 'Learn about our company, mission, and team.',
+]);
+?&gt;
+                    </code></pre>
+                </div>
+                
+                <div class="real_world_application">
+                    <h4>Real-World Application: WordPress Theme System</h4>
+                    <p>WordPress's theme system is built entirely on the template pattern. Functions like <code>get_header()</code>, <code>get_footer()</code>, and the template hierarchy (index.php, single.php, page.php, etc.) all work together to provide a consistent site structure while allowing for customized content based on context.</p>
+                </div>
+            </div>
+            
+            <div class="pattern">
+                <h3>The Factory Pattern</h3>
+                <p>Like a factory producing different products using the same machinery, the factory pattern creates different objects using a common interface. This is particularly useful when creating complex objects with similar structures but different behaviors.</p>
+                
+                <div class="mermaid">
+                classDiagram
+                    class ComponentFactory {
+                        +createComponent(type, config)
+                    }
+                    
+                    class Component {
+                        <<interface>>
+                        +render()
+                        +validate()
+                    }
+                    
+                    class TextComponent {
+                        +render()
+                        +validate()
+                    }
+                    
+                    class ImageComponent {
+                        +render()
+                        +validate()
+                    }
+                    
+                    class GalleryComponent {
+                        +render()
+                        +validate()
+                    }
+                    
+                    ComponentFactory ..> Component : creates
+                    Component <|.. TextComponent
+                    Component <|.. ImageComponent
+                    Component <|.. GalleryComponent
+                </div>
+                
+                <div class="code_example">
+                    <h4>Example: Component Factory</h4>
+                    <pre><code>
+// File: component_factory.php
+&lt;?php
+/**
+ * Interface for all content components
+ */
+interface Component {
+    /**
+     * Render the component
+     * 
+     * @return string HTML representation of the component
+     */
+    public function render();
+    
+    /**
+     * Validate the component data
+     * 
+     * @return bool True if valid, false otherwise
+     */
+    public function validate();
+    
+    /**
+     * Get component type
+     * 
+     * @return string Component type identifier
+     */
+    public function getType();
+}
+
+/**
+ * Text component implementation
+ */
+class TextComponent implements Component {
+    protected $content;
+    protected $heading;
+    
+    /**
+     * Constructor
+     * 
+     * @param array $config Component configuration
+     */
+    public function __construct($config) {
+        $this->content = $config['content'] ?? '';
+        $this->heading = $config['heading'] ?? '';
+    }
+    
+    /**
+     * Render the component
+     * 
+     * @return string HTML representation of the component
+     */
+    public function render() {
+        $html = '&lt;div class="component text-component"&gt;';
+        
+        if (!empty($this->heading)) {
+            $html .= '&lt;h2&gt;' . htmlspecialchars($this->heading) . '&lt;/h2&gt;';
+        }
+        
+        $html .= '&lt;div class="content"&gt;' . nl2br(htmlspecialchars($this->content)) . '&lt;/div&gt;';
+        $html .= '&lt;/div&gt;';
+        
+        return $html;
+    }
+    
+    /**
+     * Validate the component data
+     * 
+     * @return bool True if valid, false otherwise
+     */
+    public function validate() {
+        return !empty($this->content);
+    }
+    
+    /**
+     * Get component type
+     * 
+     * @return string Component type identifier
+     */
+    public function getType() {
+        return 'text';
+    }
+}
+
+/**
+ * Image component implementation
+ */
+class ImageComponent implements Component {
+    protected $src;
+    protected $alt;
+    protected $caption;
+    
+    /**
+     * Constructor
+     * 
+     * @param array $config Component configuration
+     */
+    public function __construct($config) {
+        $this->src = $config['src'] ?? '';
+        $this->alt = $config['alt'] ?? '';
+        $this->caption = $config['caption'] ?? '';
+    }
+    
+    /**
+     * Render the component
+     * 
+     * @return string HTML representation of the component
+     */
+    public function render() {
+        $html = '&lt;div class="component image-component"&gt;';
+        $html .= '&lt;figure&gt;';
+        $html .= '&lt;img src="' . htmlspecialchars($this->src) . '" alt="' . htmlspecialchars($this->alt) . '"&gt;';
+        
+        if (!empty($this->caption)) {
+            $html .= '&lt;figcaption&gt;' . htmlspecialchars($this->caption) . '&lt;/figcaption&gt;';
+        }
+        
+        $html .= '&lt;/figure&gt;';
+        $html .= '&lt;/div&gt;';
+        
+        return $html;
+    }
+    
+    /**
+     * Validate the component data
+     * 
+     * @return bool True if valid, false otherwise
+     */
+    public function validate() {
+        return !empty($this->src);
+    }
+    
+    /**
+     * Get component type
+     * 
+     * @return string Component type identifier
+     */
+    public function getType() {
+        return 'image';
+    }
+}
+
+/**
+ * Component factory class
+ */
+class ComponentFactory {
+    /**
+     * Create a component of the specified type
+     * 
+     * @param string $type Component type
+     * @param array $config Component configuration
+     * @return Component|null The created component or null if type is invalid
+     */
+    public static function createComponent($type, $config) {
+        switch ($type) {
+            case 'text':
+                return new TextComponent($config);
+                
+            case 'image':
+                return new ImageComponent($config);
+                
+            default:
+                return null;
+        }
+    }
+}
+?&gt;
+                    </code></pre>
+                    
+                    <h4>Usage in a Page Builder</h4>
+                    <pre><code>
+&lt;?php
+// File: page_builder.php
+require_once 'component_factory.php';
+
+/**
+ * Build a page from component data
+ * 
+ * @param array $components Array of component definitions
+ * @return string The composed page HTML
+ */
+function build_page($components) {
+    $html = '';
+    
+    foreach ($components as $component_data) {
+        $type = $component_data['type'] ?? '';
+        $config = $component_data['config'] ?? [];
+        
+        $component = ComponentFactory::createComponent($type, $config);
+        
+        if ($component && $component->validate()) {
+            $html .= $component->render();
+        }
+    }
+    
+    return $html;
+}
+
+// Example usage
+$page_components = [
+    [
+        'type' => 'text',
+        'config' => [
+            'heading' => 'Welcome to Our Website',
+            'content' => 'This is the introduction to our company. We provide quality services to our customers.'
+        ]
+    ],
+    [
+        'type' => 'image',
+        'config' => [
+            'src' => '/images/office.jpg',
+            'alt' => 'Our office building',
+            'caption' => 'Our headquarters in downtown'
+        ]
+    ],
+    [
+        'type' => 'text',
+        'config' => [
+            'heading' => 'Our Services',
+            'content' => 'We offer a wide range of services including web development, design, and consulting.'
+        ]
+    ]
+];
+
+// Build the page
+$page_content = build_page($page_components);
+
+// Include in a template
+require_once 'page_template.php';
+echo render_page('Home', $page_content);
+?&gt;
+                    </code></pre>
+                </div>
+                
+                <div class="real_world_application">
+                    <h4>Real-World Application: WordPress Blocks and Shortcodes</h4>
+                    <p>WordPress uses the factory pattern for both shortcodes and Gutenberg blocks. When you register a shortcode with <code>add_shortcode()</code> or a block with <code>register_block_type()</code>, you're essentially adding to a factory that creates the appropriate component when needed. This is why WordPress can render different shortcodes and blocks with consistent behavior.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="best_practices">
+            <h2>Best Practices for Reusable Components</h2>
+            
+            <div class="practice">
+                <h3>Single Responsibility Principle</h3>
+                <p>Each component should do one thing and do it well - like a specialized tool. A hammer is for driving nails, not cutting wood. Similarly, a component should have a single, clear purpose.</p>
+                
+                <div class="example">
+                    <h4>Good Example</h4>
+                    <pre><code>
+// A component with a single responsibility - formatting dates
+class DateFormatter {
+    public function formatDate($timestamp, $format = 'Y-m-d') {
+        return date($format, $timestamp);
+    }
+    
+    public function formatDateDiff($timestamp) {
+        $diff = time() - $timestamp;
+        
+        if ($diff < 60) {
+            return "Just now";
+        } elseif ($diff < 3600) {
+            return floor($diff / 60) . " minutes ago";
+        } elseif ($diff < 86400) {
+            return floor($diff / 3600) . " hours ago";
+        } else {
+            return floor($diff / 86400) . " days ago";
+        }
+    }
+}
+                    </code></pre>
+                    
+                    <h4>Bad Example</h4>
+                    <pre><code>
+// A component trying to do too many things
+class Utility {
+    public function formatDate($timestamp) {
+        return date('Y-m-d', $timestamp);
+    }
+    
+    public function validateEmail($email) {
+        return filter_var($email, FILTER_VALIDATE_EMAIL);
+    }
+    
+    public function generatePassword($length = 8) {
+        // Password generation logic
+    }
+    
+    public function uploadImage($file) {
+        // Image upload logic
+    }
+}
+                    </code></pre>
+                </div>
+            </div>
+            
+            <div class="practice">
+                <h3>Encapsulation and Configuration</h3>
+                <p>Like adjustable tools that can be configured for different tasks, components should be encapsulated and configurable.</p>
+                
+                <div class="example">
+                    <h4>Good Example</h4>
+                    <pre><code>
+// A well-encapsulated pagination component
+class Pagination {
+    private $totalItems;
+    private $itemsPerPage;
+    private $currentPage;
+    private $baseUrl;
+    
+    public function __construct($totalItems, $itemsPerPage = 10, $currentPage = 1, $baseUrl = '?page=') {
+        $this->totalItems = $totalItems;
+        $this->itemsPerPage = $itemsPerPage;
+        $this->currentPage = $currentPage;
+        $this->baseUrl = $baseUrl;
+    }
+    
+    public function getTotalPages() {
+        return ceil($this->totalItems / $this->itemsPerPage);
+    }
+    
+    public function render() {
+        $html = '&lt;div class="pagination"&gt;';
+        
+        $totalPages = $this->getTotalPages();
+        
+        // Previous button
+        if ($this->currentPage > 1) {
+            $html .= '&lt;a href="' . htmlspecialchars($this->baseUrl . ($this->currentPage - 1)) . '" class="prev"&gt;&laquo; Previous&lt;/a&gt;';
+        } else {
+            $html .= '&lt;span class="prev disabled"&gt;&laquo; Previous&lt;/span&gt;';
+        }
+        
+        // Page numbers
+        for ($i = 1; $i <= $totalPages; $i++) {
+            if ($i == $this->currentPage) {
+                $html .= '&lt;span class="current"&gt;' . $i . '&lt;/span&gt;';
+            } else {
+                $html .= '&lt;a href="' . htmlspecialchars($this->baseUrl . $i) . '"&gt;' . $i . '&lt;/a&gt;';
+            }
+        }
+        
+        // Next button
+        if ($this->currentPage < $totalPages) {
+            $html .= '&lt;a href="' . htmlspecialchars($this->baseUrl . ($this->currentPage + 1)) . '" class="next"&gt;Next &raquo;&lt;/a&gt;';
+        } else {
+            $html .= '&lt;span class="next disabled"&gt;Next &raquo;&lt;/span&gt;';
+        }
+        
+        $html .= '&lt;/div&gt;';
+        
+        return $html;
+    }
+}
+
+// Usage
+$pagination = new Pagination(100, 10, 2, '/blog/page/');
+echo $pagination->render();
+                    </code></pre>
+                </div>
+            </div>
+            
+            <div class="practice">
+                <h3>Documentation and Naming</h3>
+                <p>Well-named and documented components are like tools with clear labels and instructions. They're easier to use correctly and consistently.</p>
+                
+                <div class="example">
+                    <h4>Good Example</h4>
+                    <pre><code>
+/**
+ * Notification Component
+ * 
+ * Displays various types of notification messages with consistent styling.
+ * 
+ * @example
+ * $notification = new Notification();
+ * echo $notification->success('Your profile has been updated successfully.');
+ */
+class Notification {
+    /**
+     * Display a success message
+     * 
+     * @param string $message The message to display
+     * @param bool $dismissible Whether the notification can be dismissed
+     * @return string HTML for the notification
+     */
+    public function success($message, $dismissible = true) {
+        return $this->render($message, 'success', $dismissible);
+    }
+    
+    /**
+     * Display an error message
+     * 
+     * @param string $message The message to display
+     * @param bool $dismissible Whether the notification can be dismissed
+     * @return string HTML for the notification
+     */
+    public function error($message, $dismissible = true) {
+        return $this->render($message, 'error', $dismissible);
+    }
+    
+    /**
+     * Display a warning message
+     * 
+     * @param string $message The message to display
+     * @param bool $dismissible Whether the notification can be dismissed
+     * @return string HTML for the notification
+     */
+    public function warning($message, $dismissible = true) {
+        return $this->render($message, 'warning', $dismissible);
+    }
+    
+    /**
+     * Display an info message
+     * 
+     * @param string $message The message to display
+     * @param bool $dismissible Whether the notification can be dismissed
+     * @return string HTML for the notification
+     */
+    public function info($message, $dismissible = true) {
+        return $this->render($message, 'info', $dismissible);
+    }
+    
+    /**
+     * Render the notification
+     * 
+     * @param string $message The message to display
+     * @param string $type The notification type (success, error, warning, info)
+     * @param bool $dismissible Whether the notification can be dismissed
+     * @return string HTML for the notification
+     */
+    private function render($message, $type, $dismissible) {
+        $html = '&lt;div class="notification ' . htmlspecialchars($type) . '"&gt;';
+        $html .= '&lt;p&gt;' . htmlspecialchars($message) . '&lt;/p&gt;';
+        
+        if ($dismissible) {
+            $html .= '&lt;button class="dismiss" aria-label="Dismiss"&gt;&times;&lt;/button&gt;';
+        }
+        
+        $html .= '&lt;/div&gt;';
+        
+        return $html;
+    }
+}
+                    </code></pre>
+                </div>
+            </div>
+        </section>
+
+        <section class="wordpress_integration">
+            <h2>Integrating Components with WordPress</h2>
+            
+            <div class="integration_method">
+                <h3>Creating Reusable Template Parts</h3>
+                <p>WordPress provides several ways to create and use reusable component templates, similar to how a car manufacturer uses interchangeable parts across different models.</p>
+                
+                <div class="code_example">
+                    <h4>Example: WordPress Template Part</h4>
+                    <pre><code>
+// File: template-parts/content-card.php
+&lt;?php
+/**
+ * Template part for displaying a content card
+ *
+ * @param array $args {
+ *     Optional. Arguments to customize the card display.
+ *
+ *     @type string $title       Card title.
+ *     @type string $content     Card content.
+ *     @type string $image_url   URL to the card image.
+ *     @type string $button_text Button text.
+ *     @type string $button_url  Button URL.
+ * }
+ */
+
+// Extract variables from arguments
+$title = $args['title'] ?? '';
+$content = $args['content'] ?? '';
+$image_url = $args['image_url'] ?? '';
+$button_text = $args['button_text'] ?? 'Read More';
+$button_url = $args['button_url'] ?? '#';
+?&gt;
+
+&lt;div class="content-card"&gt;
+    &lt;?php if (!empty($image_url)): ?&gt;
+        &lt;div class="card-image"&gt;
+            &lt;img src="&lt;?php echo esc_url($image_url); ?&gt;" alt="&lt;?php echo esc_attr($title); ?&gt;"&gt;
+        &lt;/div&gt;
+    &lt;?php endif; ?&gt;
+    
+    &lt;div class="card-content"&gt;
+        &lt;?php if (!empty($title)): ?&gt;
+            &lt;h3 class="card-title"&gt;&lt;?php echo esc_html($title); ?&gt;&lt;/h3&gt;
+        &lt;?php endif; ?&gt;
+        
+        &lt;?php if (!empty($content)): ?&gt;
+            &lt;div class="card-text"&gt;&lt;?php echo wpautop(esc_html($content)); ?&gt;&lt;/div&gt;
+        &lt;?php endif; ?&gt;
+        
+        &lt;a href="&lt;?php echo esc_url($button_url); ?&gt;" class="button"&gt;&lt;?php echo esc_html($button_text); ?&gt;&lt;/a&gt;
+    &lt;/div&gt;
+&lt;/div&gt;
+                    </code></pre>
+                    
+                    <h4>Usage in a WordPress Page Template</h4>
+                    <pre><code>
+// File: page-features.php
+&lt;?php
+/**
+ * Template Name: Features Page
+ */
+
+get_header();
+?&gt;
+
+&lt;div class="container"&gt;
+    &lt;h1 class="page-title"&gt;&lt;?php the_title(); ?&gt;&lt;/h1&gt;
+    
+    &lt;div class="features-grid"&gt;
+        &lt;?php
+        // Feature 1
+        get_template_part('template-parts/content', 'card', [
+            'title' => 'Responsive Design',
+            'content' => 'Our websites work beautifully on all devices, from desktops to smartphones.',
+            'image_url' => get_template_directory_uri() . '/images/responsive.jpg',
+            'button_url' => '/services/responsive-design/'
+        ]);
+        
+        // Feature 2
+        get_template_part('template-parts/content', 'card', [
+            'title' => 'SEO Optimization',
+            'content' => 'Improve your search engine rankings with our advanced SEO techniques.',
+            'image_url' => get_template_directory_uri() . '/images/seo.jpg',
+            'button_text' => 'Learn More',
+            'button_url' => '/services/seo-optimization/'
+        ]);
+        
+        // Feature 3
+        get_template_part('template-parts/content', 'card', [
+            'title' => 'E-commerce Solutions',
+            'content' => 'Sell your products online with our secure and user-friendly e-commerce platforms.',
+            'image_url' => get_template_directory_uri() . '/images/ecommerce.jpg',
+            'button_url' => '/services/ecommerce/'
+        ]);
+        ?&gt;
+    &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;?php
+get_footer();
+?&gt;
+                    </code></pre>
+                </div>
+            </div>
+            
+            <div class="integration_method">
+                <h3>Creating Reusable Shortcodes</h3>
+                <p>Shortcodes allow you to create components that can be easily inserted into any WordPress content area, similar to how you might insert a USB drive into any computer with a USB port.</p>
+                
+                <div class="code_example">
+                    <h4>Example: Custom Alert Shortcode</h4>
+                    <pre><code>
+// File: custom-shortcodes.php (included in your theme's functions.php)
+&lt;?php
+/**
+ * Register custom shortcodes
+ */
+function register_custom_shortcodes() {
+    add_shortcode('alert', 'alert_shortcode');
+}
+add_action('init', 'register_custom_shortcodes');
+
+/**
+ * Alert box shortcode implementation
+ *
+ * @param array $atts Shortcode attributes
+ * @param string $content Shortcode content
+ * @return string HTML output
+ */
+function alert_shortcode($atts, $content = null) {
+    // Default attributes
+    $attributes = shortcode_atts([
+        'type' => 'info', // Possible values: info, success, warning, error
+        'title' => '',
+        'dismissible' => 'no',
+    ], $atts);
+    
+    // Validate alert type
+    $valid_types = ['info', 'success', 'warning', 'error'];
+    if (!in_array($attributes['type'], $valid_types)) {
+        $attributes['type'] = 'info';
+    }
+    
+    // Convert dismissible to boolean
+    $is_dismissible = $attributes['dismissible'] === 'yes';
+    
+    // Generate unique ID for dismissible alerts
+    $alert_id = '';
+    if ($is_dismissible) {
+        $alert_id = 'alert-' . uniqid();
+    }
+    
+    // Start building the HTML
+    $html = '<div class="custom-alert alert-' . esc_attr($attributes['type']) . '"';
+    
+    if ($is_dismissible) {
+        $html .= ' id="' . esc_attr($alert_id) . '"';
+    }
+    
+    $html .= '>';
+    
+    // Add title if present
+    if (!empty($attributes['title'])) {
+        $html .= '<h4 class="alert-title">' . esc_html($attributes['title']) . '</h4>';
+    }
+    
+    // Add content
+    $html .= '<div class="alert-content">' . wpautop(do_shortcode($content)) . '</div>';
+    
+    // Add dismiss button if dismissible
+    if ($is_dismissible) {
+        $html .= '<button class="alert-dismiss" aria-label="Dismiss" onclick="document.getElementById(\'' . esc_js($alert_id) . '\').style.display=\'none\';">&times;</button>';
+    }
+    
+    $html .= '</div>';
+    
+    return $html;
+}
+?&gt;
+                    </code></pre>
+                    
+                    <h4>Usage in WordPress Content</h4>
+                    <pre><code>
+// In WordPress editor
+[alert type="warning" title="Important Notice" dismissible="yes"]
+Please backup your database before updating to the latest version.
+[/alert]
+
+[alert type="success"]
+Your registration was successful! You should receive a confirmation email shortly.
+[/alert]
+                    </code></pre>
+                </div>
+            </div>
+            
+            <div class="integration_method">
+                <h3>Creating Custom WordPress Blocks</h3>
+                <p>Gutenberg blocks are the modern way to create reusable components in WordPress, operating like modular building blocks that users can arrange however they want.</p>
+                
+                <div class="code_example">
+                    <h4>WordPress Block Registration</h4>
+                    <pre><code>
+// File: blocks/testimonial/index.php
+&lt;?php
+/**
+ * Register the testimonial block
+ */
+function register_testimonial_block() {
+    register_block_type(
+        'my-theme/testimonial',
+        [
+            'editor_script' => 'testimonial-block-editor',
+            'editor_style'  => 'testimonial-block-editor',
+            'style'         => 'testimonial-block',
+            'render_callback' => 'render_testimonial_block',
+            'attributes' => [
+                'quote' => [
+                    'type' => 'string',
+                    'default' => '',
+                ],
+                'author' => [
+                    'type' => 'string',
+                    'default' => '',
+                ],
+                'role' => [
+                    'type' => 'string',
+                    'default' => '',
+                ],
+                'imageUrl' => [
+                    'type' => 'string',
+                    'default' => '',
+                ],
+                'backgroundColor' => [
+                    'type' => 'string',
+                    'default' => '#f5f5f5',
+                ],
+            ],
+        ]
+    );
+}
+add_action('init', 'register_testimonial_block');
+
+/**
+ * Render the testimonial block on the front-end
+ *
+ * @param array $attributes Block attributes
+ * @return string HTML output
+ */
+function render_testimonial_block($attributes) {
+    // Extract block attributes
+    $quote = $attributes['quote'] ?? '';
+    $author = $attributes['author'] ?? '';
+    $role = $attributes['role'] ?? '';
+    $image_url = $attributes['imageUrl'] ?? '';
+    $background_color = $attributes['backgroundColor'] ?? '#f5f5f5';
+    
+    // Build the HTML
+    $html = sprintf(
+        '&lt;div class="wp-block-my-theme-testimonial" style="background-color: %s;"&gt;',
+        esc_attr($background_color)
+    );
+    
+    $html .= '&lt;div class="testimonial-content"&gt;';
+    
+    // Quote
+    if (!empty($quote)) {
+        $html .= sprintf(
+            '&lt;blockquote class="testimonial-quote"&gt;%s&lt;/blockquote&gt;',
+            wpautop(esc_html($quote))
+        );
+    }
+    
+    // Author info
+    $html .= '&lt;div class="testimonial-author"&gt;';
+    
+    if (!empty($image_url)) {
+        $html .= sprintf(
+            '&lt;div class="author-image"&gt;&lt;img src="%s" alt="%s"&gt;&lt;/div&gt;',
+            esc_url($image_url),
+            esc_attr($author)
+        );
+    }
+    
+    $html .= '&lt;div class="author-details"&gt;';
+    
+    if (!empty($author)) {
+        $html .= sprintf(
+            '&lt;div class="author-name"&gt;%s&lt;/div&gt;',
+            esc_html($author)
+        );
+    }
+    
+    if (!empty($role)) {
+        $html .= sprintf(
+            '&lt;div class="author-role"&gt;%s&lt;/div&gt;',
+            esc_html($role)
+        );
+    }
+    
+    $html .= '&lt;/div&gt;'; // End author-details
+    $html .= '&lt;/div&gt;'; // End testimonial-author
+    $html .= '&lt;/div&gt;'; // End testimonial-content
+    $html .= '&lt;/div&gt;'; // End testimonial block
+    
+    return $html;
+}
+?&gt;
+                    </code></pre>
+                </div>
+                
+                <div class="real_world_application">
+                    <h4>Real-World WordPress Component Examples</h4>
+                    <ul>
+                        <li><strong>WooCommerce Product Cards:</strong> Reusable components for displaying products consistently across the site</li>
+                        <li><strong>Contact Form 7:</strong> A plugin that provides reusable form components through shortcodes</li>
+                        <li><strong>The Events Calendar:</strong> Uses component-based architecture to display events in different views</li>
+                        <li><strong>Yoast SEO:</strong> Implements reusable meta box components across different post types</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section class="advanced_topics">
+            <h2>Advanced Component Concepts</h2>
+            
+            <div class="advanced_topic">
+                <h3>Component Caching</h3>
+                <p>Caching components is like preparing meals in advance - it saves time when you need to serve them. This technique significantly improves performance for complex or frequently used components.</p>
+                
+                <div class="code_example">
+                    <h4>Example: Cached Navigation Component</h4>
+                    <pre><code>
+// File: cached_nav.php
+&lt;?php
+/**
+ * Renders a cached navigation menu
+ * 
+ * @param string $menu_location The menu location to render
+ * @param int $cache_time Cache lifetime in seconds (default: 1 hour)
+ * @return string The navigation HTML
+ */
+function get_cached_navigation($menu_location = 'primary', $cache_time = 3600) {
+    // Create a unique cache key
+    $cache_key = 'nav_' . $menu_location . '_' . md5(serialize(wp_get_current_user()));
+    
+    // Check if we have cached content
+    $cached_html = get_transient($cache_key);
+    
+    if ($cached_html !== false) {
+        return $cached_html;
+    }
+    
+    // If no cache or expired, generate the navigation
+    $html = '';
+    
+    // Build the navigation HTML
+    $menu_args = [
+        'theme_location' => $menu_location,
+        'container' => 'nav',
+        'container_class' => 'site-navigation',
+        'menu_class' => 'nav-menu',
+        'echo' => false,
+    ];
+    
+    $html = wp_nav_menu($menu_args);
+    
+    // Store in cache
+    set_transient($cache_key, $html, $cache_time);
+    
+    return $html;
+}
+
+/**
+ * Clear navigation cache when menus are updated
+ */
+function clear_navigation_cache() {
+    global $wpdb;
+    
+    // Delete all transients that start with 'nav_'
+    $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_nav
