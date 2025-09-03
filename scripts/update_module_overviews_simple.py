@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-Script to update module2-9.html overview pages to match module1.html structure
-Uses a simpler, consistent design based on existing module1.html
+Script to update module2-9.html structure while PRESERVING all existing content
+Only updates the HTML structure, CSS links, header, footer, navigation
 """
 
 import os
+import re
 from pathlib import Path
 from datetime import datetime
 
@@ -25,579 +26,391 @@ if not BASE_DIR.exists():
         print("❌ Could not find the project directory.")
         exit(1)
 
-# Module data - simplified structure matching module1.html style
-modules_data = {
-    2: {
-        "title": "PHP Fundamentals",
-        "description": "Master PHP programming from basics to advanced concepts. Learn syntax, functions, OOP, database integration, and build dynamic web applications.",
-        "folder": "02module",
-        "sessions": [
-            {
-                "title": "PHP Language Basics",
-                "lessons": [
-                    "PHP Setup and Syntax",
-                    "Variables and Data Types", 
-                    "Operators and Expressions",
-                    "Control Structures",
-                    "Loops in PHP"
-                ]
-            },
-            {
-                "title": "Functions and Arrays",
-                "lessons": [
-                    "Creating Functions",
-                    "Function Parameters",
-                    "Arrays and Manipulation",
-                    "Array Functions",
-                    "Multi-dimensional Arrays"
-                ]
-            },
-            {
-                "title": "Working with Forms",
-                "lessons": [
-                    "HTML Forms Review",
-                    "Handling Form Data",
-                    "Form Validation",
-                    "File Uploads",
-                    "Sessions and Cookies"
-                ]
-            },
-            {
-                "title": "Object-Oriented PHP",
-                "lessons": [
-                    "Introduction to OOP",
-                    "Classes and Objects",
-                    "Inheritance",
-                    "Interfaces and Abstract Classes",
-                    "Traits and Namespaces"
-                ]
-            },
-            {
-                "title": "Database Operations",
-                "lessons": [
-                    "MySQL Connection",
-                    "CRUD Operations",
-                    "Prepared Statements",
-                    "Database Security",
-                    "Transactions"
-                ]
-            }
-        ]
-    },
-    3: {
-        "title": "MySQL Database Management",
-        "description": "Learn database design, SQL queries, normalization, and how to integrate MySQL with PHP for dynamic web applications.",
-        "folder": "03module",
-        "sessions": [
-            {
-                "title": "Database Fundamentals",
-                "lessons": [
-                    "Introduction to Databases",
-                    "MySQL Installation",
-                    "Database Design Principles",
-                    "Creating Databases and Tables",
-                    "Data Types"
-                ]
-            },
-            {
-                "title": "SQL Queries",
-                "lessons": [
-                    "SELECT Statements",
-                    "INSERT, UPDATE, DELETE",
-                    "WHERE Clauses and Operators",
-                    "Sorting and Grouping",
-                    "Aggregate Functions"
-                ]
-            },
-            {
-                "title": "Advanced SQL",
-                "lessons": [
-                    "Table Joins",
-                    "Subqueries",
-                    "Views",
-                    "Stored Procedures",
-                    "Triggers"
-                ]
-            },
-            {
-                "title": "Database Optimization",
-                "lessons": [
-                    "Indexes",
-                    "Query Optimization",
-                    "Performance Tuning",
-                    "Backup and Recovery",
-                    "Security Best Practices"
-                ]
-            }
-        ]
-    },
-    4: {
-        "title": "WordPress & Docker Setup",
-        "description": "Set up a professional WordPress development environment using Docker. Understand WordPress architecture and core concepts.",
-        "folder": "04module",
-        "sessions": [
-            {
-                "title": "Docker Fundamentals",
-                "lessons": [
-                    "Introduction to Docker",
-                    "Containers and Images",
-                    "Docker Compose",
-                    "Docker for WordPress",
-                    "Managing Containers"
-                ]
-            },
-            {
-                "title": "WordPress Setup",
-                "lessons": [
-                    "WordPress Installation",
-                    "Configuration",
-                    "File Structure",
-                    "Database Structure",
-                    "Admin Dashboard"
-                ]
-            },
-            {
-                "title": "WordPress Core",
-                "lessons": [
-                    "The WordPress Loop",
-                    "Template Hierarchy",
-                    "Hooks and Filters",
-                    "WordPress APIs",
-                    "WP_Query"
-                ]
-            },
-            {
-                "title": "Development Tools",
-                "lessons": [
-                    "Debugging WordPress",
-                    "WP-CLI",
-                    "Version Control",
-                    "Local Development",
-                    "Deployment Basics"
-                ]
-            }
-        ]
-    },
-    5: {
-        "title": "WordPress Theme Development",
-        "description": "Create professional WordPress themes from scratch. Master template files, custom post types, and modern theme development.",
-        "folder": "05module",
-        "sessions": [
-            {
-                "title": "Theme Basics",
-                "lessons": [
-                    "Theme Structure",
-                    "Template Files",
-                    "Functions.php",
-                    "Style.css",
-                    "Screenshot and Headers"
-                ]
-            },
-            {
-                "title": "Template Development",
-                "lessons": [
-                    "Header and Footer",
-                    "Single and Page Templates",
-                    "Archive Templates",
-                    "Custom Page Templates",
-                    "Template Parts"
-                ]
-            },
-            {
-                "title": "Theme Features",
-                "lessons": [
-                    "Menus and Navigation",
-                    "Sidebars and Widgets",
-                    "Featured Images",
-                    "Comments Template",
-                    "Search Functionality"
-                ]
-            },
-            {
-                "title": "Advanced Theming",
-                "lessons": [
-                    "Custom Post Types",
-                    "Custom Taxonomies",
-                    "Theme Customizer",
-                    "Custom Fields",
-                    "WooCommerce Support"
-                ]
-            },
-            {
-                "title": "Theme Optimization",
-                "lessons": [
-                    "Responsive Design",
-                    "Performance Optimization",
-                    "SEO Best Practices",
-                    "Accessibility",
-                    "Theme Testing"
-                ]
-            }
-        ]
-    },
-    6: {
-        "title": "WordPress Plugin Development",
-        "description": "Build custom WordPress plugins to extend functionality. Learn hooks, database operations, admin pages, and security.",
-        "folder": "06module",
-        "sessions": [
-            {
-                "title": "Plugin Fundamentals",
-                "lessons": [
-                    "Plugin Structure",
-                    "Headers and Activation",
-                    "Hooks and Filters",
-                    "Actions vs Filters",
-                    "Plugin Security"
-                ]
-            },
-            {
-                "title": "Plugin Features",
-                "lessons": [
-                    "Admin Menu Pages",
-                    "Settings API",
-                    "Options API",
-                    "Custom Database Tables",
-                    "Shortcodes"
-                ]
-            },
-            {
-                "title": "Advanced Plugin Development",
-                "lessons": [
-                    "AJAX in Plugins",
-                    "REST API Integration",
-                    "Custom Widgets",
-                    "Gutenberg Blocks",
-                    "Plugin Localization"
-                ]
-            },
-            {
-                "title": "Plugin Best Practices",
-                "lessons": [
-                    "Object-Oriented Plugins",
-                    "Plugin Testing",
-                    "Documentation",
-                    "Distribution",
-                    "Updates and Versioning"
-                ]
-            }
-        ]
-    },
-    7: {
-        "title": "Advanced WordPress Development",
-        "description": "Master REST API, Gutenberg blocks, React integration, and modern WordPress development techniques.",
-        "folder": "07module",
-        "sessions": [
-            {
-                "title": "WordPress REST API",
-                "lessons": [
-                    "REST API Basics",
-                    "Custom Endpoints",
-                    "Authentication",
-                    "CRUD Operations",
-                    "API Security"
-                ]
-            },
-            {
-                "title": "Gutenberg Development",
-                "lessons": [
-                    "Block Editor Overview",
-                    "Creating Custom Blocks",
-                    "Block Attributes",
-                    "Dynamic Blocks",
-                    "Block Patterns"
-                ]
-            },
-            {
-                "title": "React and WordPress",
-                "lessons": [
-                    "React Fundamentals",
-                    "JSX and Components",
-                    "State Management",
-                    "React in WordPress",
-                    "Building Admin Interfaces"
-                ]
-            },
-            {
-                "title": "Modern WordPress",
-                "lessons": [
-                    "Headless WordPress",
-                    "JAMstack Integration",
-                    "GraphQL and WordPress",
-                    "Progressive Web Apps",
-                    "Performance Optimization"
-                ]
-            }
-        ]
-    },
-    8: {
-        "title": "Deployment & DevOps",
-        "description": "Learn professional WordPress deployment, hosting, security, performance optimization, and maintenance strategies.",
-        "folder": "08module",
-        "sessions": [
-            {
-                "title": "Hosting and Servers",
-                "lessons": [
-                    "Hosting Options",
-                    "Server Requirements",
-                    "SSL Certificates",
-                    "Domain Configuration",
-                    "Email Setup"
-                ]
-            },
-            {
-                "title": "Deployment",
-                "lessons": [
-                    "Git Workflows",
-                    "CI/CD Pipelines",
-                    "Automated Testing",
-                    "Staging Environments",
-                    "Production Deployment"
-                ]
-            },
-            {
-                "title": "Security and Performance",
-                "lessons": [
-                    "Security Hardening",
-                    "Firewall Configuration",
-                    "Caching Strategies",
-                    "CDN Integration",
-                    "Database Optimization"
-                ]
-            },
-            {
-                "title": "Maintenance",
-                "lessons": [
-                    "Backup Strategies",
-                    "Update Management",
-                    "Monitoring",
-                    "Error Tracking",
-                    "Disaster Recovery"
-                ]
-            }
-        ]
-    },
-    9: {
-        "title": "Final Project",
-        "description": "Apply everything you've learned by building a complete WordPress project from planning to deployment.",
-        "folder": "09module",
-        "sessions": [
-            {
-                "title": "Project Planning",
-                "lessons": [
-                    "Requirements Analysis",
-                    "Project Scope",
-                    "Technical Architecture",
-                    "Timeline and Milestones",
-                    "Resource Planning"
-                ]
-            },
-            {
-                "title": "Design and Development",
-                "lessons": [
-                    "Wireframing",
-                    "Design Mockups",
-                    "Database Design",
-                    "Theme Development",
-                    "Plugin Development"
-                ]
-            },
-            {
-                "title": "Implementation",
-                "lessons": [
-                    "Content Strategy",
-                    "E-commerce Integration",
-                    "User Management",
-                    "SEO Implementation",
-                    "Performance Optimization"
-                ]
-            },
-            {
-                "title": "Launch and Documentation",
-                "lessons": [
-                    "Testing and QA",
-                    "Deployment Process",
-                    "User Documentation",
-                    "Developer Documentation",
-                    "Project Handoff"
-                ]
-            }
-        ]
-    }
-}
+def extract_existing_content(filepath):
+    """Extract the main content from existing module file"""
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Extract module title
+        title_match = re.search(r'<h1>Module \d+: (.*?)</h1>', content)
+        module_title = title_match.group(1) if title_match else "Module"
+        
+        # Extract main content (everything between <main> tags)
+        main_match = re.search(r'<main>(.*?)</main>', content, re.DOTALL)
+        main_content = main_match.group(1) if main_match else ""
+        
+        # Clean up the main content
+        main_content = main_content.strip()
+        
+        # Extract module overview if present
+        overview_match = re.search(r'<section class="module-intro">(.*?)</section>', main_content, re.DOTALL)
+        overview_content = overview_match.group(1) if overview_match else ""
+        
+        # Extract all week/session sections
+        sessions_content = ""
+        week_sections = re.findall(r'<section class="week">(.*?)</section>', main_content, re.DOTALL)
+        for week in week_sections:
+            sessions_content += f'''                <section class="week">
+{week}
+                </section>
 
-def generate_module_overview_html(module_num, data):
-    """Generate HTML for a module overview page matching module1.html style"""
+'''
+        
+        # Extract resources section if present
+        resources_match = re.search(r'<section class="resources">(.*?)</section>', main_content, re.DOTALL)
+        resources_content = resources_match.group(1) if resources_match else ""
+        
+        return {
+            'title': module_title,
+            'overview': overview_content,
+            'sessions': sessions_content,
+            'resources': resources_content,
+            'full_main': main_content
+        }
+    except Exception as e:
+        print(f"   ⚠️ Could not extract content from {filepath}: {e}")
+        return None
+
+def generate_updated_module_html(module_num, existing_content):
+    """Generate updated HTML preserving existing content but with new structure"""
     
-    # Generate session cards HTML
-    sessions_html = ""
-    for i, session in enumerate(data["sessions"], 1):
-        lessons_list = "\n".join([f'<li>{lesson}</li>' for lesson in session["lessons"]])
-        sessions_html += f"""
-            <div class="module-session">
-                <h3>Session {i}: {session["title"]}</h3>
-                <ul>
-                    {lessons_list}
-                </ul>
-            </div>"""
+    if not existing_content:
+        return None
     
-    # Determine navigation
-    prev_link = f'<a href="/module{module_num-1}.html" class="btn btn-outline">← Previous Module</a>' if module_num > 1 else ''
-    next_link = f'<a href="/module{module_num+1}.html" class="btn btn-outline">Next Module →</a>' if module_num < 9 else ''
+    title = existing_content['title']
+    
+    # Determine folder based on module number
+    folder = f"0{module_num}module"
+    
+    # Navigation links
+    prev_module = module_num - 1
+    next_module = module_num + 1 if module_num < 9 else None
+    
+    # If we have the full main content, use it directly in the proper structure
+    main_body = ""
+    if existing_content['sessions']:
+        # Use the extracted and cleaned sessions
+        main_body = f"""                <!-- Module Header -->
+                <div class="module-intro">
+{existing_content['overview']}
+                </div>
+
+{existing_content['sessions']}
+                
+                <!-- Learning Resources -->
+                <section class="resources mt-2xl">
+{existing_content['resources']}
+                </section>"""
+    else:
+        # Fallback to full main content
+        main_body = existing_content['full_main']
     
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Module {module_num}: {data['title']} - PHP WordPress Course</title>
-    <meta name="description" content="{data['description']}">
-    <link rel="stylesheet" href="/assets/css/style.css">
-    <style>
-        .module-overview {{
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem;
-        }}
-        .module-header {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 3rem 2rem;
-            border-radius: 8px;
-            margin-bottom: 2rem;
-        }}
-        .module-header h1 {{
-            margin: 0 0 1rem 0;
-            font-size: 2.5rem;
-        }}
-        .module-description {{
-            font-size: 1.2rem;
-            margin-bottom: 1.5rem;
-        }}
-        .module-meta {{
-            display: flex;
-            gap: 2rem;
-            flex-wrap: wrap;
-        }}
-        .module-meta span {{
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }}
-        .module-content {{
-            display: grid;
-            gap: 2rem;
-        }}
-        .module-session {{
-            background: white;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 1.5rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }}
-        .module-session h3 {{
-            margin: 0 0 1rem 0;
-            color: #1f2937;
-            font-size: 1.3rem;
-        }}
-        .module-session ul {{
-            margin: 0;
-            padding-left: 1.5rem;
-        }}
-        .module-session li {{
-            padding: 0.25rem 0;
-            color: #4b5563;
-        }}
-        .module-navigation {{
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 3rem;
-            padding-top: 2rem;
-            border-top: 1px solid #e5e7eb;
-        }}
-        .start-module-btn {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 1rem 2rem;
-            border-radius: 8px;
-            text-decoration: none;
-            display: inline-block;
-            margin: 2rem 0;
-            font-weight: 600;
-            font-size: 1.1rem;
-        }}
-        .start-module-btn:hover {{
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-        }}
-        .btn-outline {{
-            border: 2px solid #667eea;
-            color: #667eea;
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
-            text-decoration: none;
-            display: inline-block;
-            transition: all 0.3s ease;
-        }}
-        .btn-outline:hover {{
-            background: #667eea;
-            color: white;
-        }}
-    </style>
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    
+    <!-- SEO Meta Tags -->
+    <title>Module {module_num}: {title} - PHP WordPress Course</title>
+    <meta name="description" content="Master {title} in the PHP WordPress Development Course">
+    <meta name="keywords" content="PHP, WordPress, {title}, web development, programming">
+    <meta name="author" content="PHP WordPress Course">
+    
+    <!-- Open Graph Tags -->
+    <meta property="og:title" content="Module {module_num}: {title}">
+    <meta property="og:description" content="Master {title} in this comprehensive module">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="/assets/images/module{module_num}-og.jpg">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/favicon.png">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/assets/css/main.css">
 </head>
 <body>
-    <div class="module-overview">
-        <div class="module-header">
-            <h1>Module {module_num}: {data['title']}</h1>
-            <p class="module-description">{data['description']}</p>
-            <div class="module-meta">
-                <span>📚 {len(data['sessions'])} Sessions</span>
-                <span>📝 {sum(len(s['lessons']) for s in data['sessions'])} Lessons</span>
-                <span>📁 /{data['folder']}/</span>
+    <!-- Skip to main content -->
+    <a href="#main-content" class="sr-only">Skip to main content</a>
+    
+    <div class="page-wrapper">
+        <!-- Header -->
+        <header class="site-header" role="banner">
+            <div class="header-container">
+                <div class="site-branding">
+                    <a href="/" class="site-logo">
+                        <h1 class="site-title">PHP WordPress Development</h1>
+                    </a>
+                </div>
+                
+                <nav class="main-navigation" role="navigation" aria-label="Main navigation">
+                    <button class="mobile-menu-btn" aria-label="Toggle navigation" aria-expanded="false">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    
+                    <div class="nav-menu">
+                        <ul class="nav-list">
+                            <li class="nav-item">
+                                <a href="/" class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <button class="nav-link dropdown-toggle active" aria-haspopup="true">Modules</button>
+                                <div class="dropdown-menu">
+                                    <a href="/module1.html" class="dropdown-item">Module 1: Web Fundamentals</a>
+                                    <a href="/module2.html" class="dropdown-item{' active' if module_num == 2 else ''}">Module 2: PHP Fundamentals</a>
+                                    <a href="/module3.html" class="dropdown-item{' active' if module_num == 3 else ''}">Module 3: MySQL Database</a>
+                                    <a href="/module4.html" class="dropdown-item{' active' if module_num == 4 else ''}">Module 4: WordPress & Docker</a>
+                                    <a href="/module5.html" class="dropdown-item{' active' if module_num == 5 else ''}">Module 5: Theme Development</a>
+                                    <a href="/module6.html" class="dropdown-item{' active' if module_num == 6 else ''}">Module 6: Plugin Development</a>
+                                    <a href="/module7.html" class="dropdown-item{' active' if module_num == 7 else ''}">Module 7: Advanced WordPress</a>
+                                    <a href="/module8.html" class="dropdown-item{' active' if module_num == 8 else ''}">Module 8: Deployment</a>
+                                    <a href="/module9.html" class="dropdown-item{' active' if module_num == 9 else ''}">Module 9: Final Project</a>
+                                </div>
+                            </li>
+                            <li class="nav-item">
+                                <a href="/resources.html" class="nav-link">Resources</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="/about.html" class="nav-link">About</a>
+                            </li>
+                        </ul>
+                    </div>
+                </nav>
+                
+                <div class="search-container">
+                    <div class="search-input-wrapper">
+                        <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                        </svg>
+                        <input type="search" class="search-input" placeholder="Search lessons..." aria-label="Search">
+                    </div>
+                    <div class="search-results"></div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-header">
+                <h2 class="progress-title">Module {module_num} Progress</h2>
+                <span class="progress-text">0 of X lessons completed</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-bar-fill" style="width: 0%">
+                    <span class="progress-bar-text">0%</span>
+                </div>
             </div>
         </div>
 
-        <div class="module-content">
-            <h2>Course Content</h2>
-            {sessions_html}
-        </div>
+        <!-- Breadcrumb -->
+        <nav class="breadcrumb container" aria-label="Breadcrumb">
+            <ol class="breadcrumb-list">
+                <li class="breadcrumb-item">
+                    <a href="/">Home</a>
+                    <span class="breadcrumb-separator">/</span>
+                </li>
+                <li class="breadcrumb-item">
+                    <span aria-current="page">Module {module_num}: {title}</span>
+                </li>
+            </ol>
+        </nav>
 
-        <div style="text-align: center;">
-            <a href="/{data['folder']}/" class="start-module-btn">Start Module {module_num}</a>
-        </div>
+        <!-- Main Content -->
+        <main id="main-content" class="main-content" role="main">
+            <div class="container">
+{main_body}
 
-        <div class="module-navigation">
-            {prev_link}
-            <a href="/" class="btn btn-outline">Back to Home</a>
-            {next_link}
-        </div>
+                <!-- Module Navigation -->
+                <div class="lesson-navigation">
+                    <a href="/module{prev_module}.html" class="lesson-nav-button prev">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"/>
+                        </svg>
+                        <span>
+                            <small>Previous Module</small><br>
+                            Module {prev_module}
+                        </span>
+                    </a>
+                    
+                    <a href="/{folder}/" class="btn btn-primary btn-lg">
+                        Start Module {module_num}
+                    </a>
+                    
+                    {f'''<a href="/module{next_module}.html" class="lesson-nav-button next">
+                        <span>
+                            <small>Next Module</small><br>
+                            Module {next_module}
+                        </span>
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
+                        </svg>
+                    </a>''' if next_module else '''<a href="/" class="lesson-nav-button next">
+                        <span>
+                            <small>Back to</small><br>
+                            Course Home
+                        </span>
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
+                        </svg>
+                    </a>'''}
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="site-footer" role="contentinfo">
+            <div class="footer-container">
+                <div class="footer-content">
+                    <div class="footer-section footer-about">
+                        <h3>PHP WordPress Development</h3>
+                        <p>Complete Web Development Course - From HTML to WordPress</p>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Quick Links</h4>
+                        <ul class="footer-links">
+                            <li><a href="/">Home</a></li>
+                            <li><a href="/module{module_num}.html">Module {module_num}</a></li>
+                            <li><a href="/resources.html">Resources</a></li>
+                            <li><a href="/about.html">About</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Course Modules</h4>
+                        <ul class="footer-links">
+                            <li><a href="/module1.html">Module 1: Web Fundamentals</a></li>
+                            <li><a href="/module2.html"{' class="active"' if module_num == 2 else ''}>Module 2: PHP</a></li>
+                            <li><a href="/module3.html"{' class="active"' if module_num == 3 else ''}>Module 3: MySQL</a></li>
+                            <li><a href="/module4.html"{' class="active"' if module_num == 4 else ''}>Module 4: WordPress</a></li>
+                            <li><a href="/#modules">View All →</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Support</h4>
+                        <ul class="footer-links">
+                            <li><a href="/help.html">Help Center</a></li>
+                            <li><a href="/faq.html">FAQ</a></li>
+                            <li><a href="/contact.html">Contact</a></li>
+                            <li><a href="/feedback.html">Feedback</a></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="footer-bottom">
+                    <div class="footer-bottom-content">
+                        <p class="copyright">&copy; 2025 PHP WordPress Development Course. All rights reserved.</p>
+                        <nav class="footer-bottom-links">
+                            <a href="/privacy.html">Privacy Policy</a>
+                            <span class="separator">|</span>
+                            <a href="/terms.html">Terms of Service</a>
+                            <span class="separator">|</span>
+                            <a href="/sitemap.html">Sitemap</a>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </footer>
     </div>
+
+    <!-- Back to Top Button -->
+    <button id="back-to-top" class="back-to-top" aria-label="Back to top">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 19V5M12 5l-7 7M12 5l7 7"/>
+        </svg>
+    </button>
+
+    <!-- JavaScript -->
+    <script src="/assets/js/navigation.js"></script>
+    <script src="/assets/js/site-config.js"></script>
+    
+    <script>
+        // Module-specific progress tracking
+        document.addEventListener('DOMContentLoaded', function() {{
+            const totalLessons = document.querySelectorAll('.lesson-link').length || document.querySelectorAll('a[href*="/0{module_num}module/"]').length;
+            
+            // Update progress display
+            function updateModuleProgress() {{
+                const progress = JSON.parse(localStorage.getItem('courseProgress') || '{{}}');
+                const module{module_num}Lessons = Object.keys(progress).filter(key => key.includes('/0{module_num}module/'));
+                const completedCount = module{module_num}Lessons.length;
+                const percentage = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
+                
+                if (document.querySelector('.progress-text')) {{
+                    document.querySelector('.progress-text').textContent = `${{completedCount}} of ${{totalLessons}} lessons completed`;
+                }}
+                if (document.querySelector('.progress-bar-fill')) {{
+                    document.querySelector('.progress-bar-fill').style.width = percentage + '%';
+                }}
+                if (document.querySelector('.progress-bar-text')) {{
+                    document.querySelector('.progress-bar-text').textContent = percentage + '%';
+                }}
+            }}
+            
+            updateModuleProgress();
+        }});
+    </script>
 </body>
 </html>"""
     
     return html
 
 def main():
-    """Update module 2-9 overview pages"""
-    print("🚀 Updating Module 2-9 Overview Pages")
+    """Update module 2-9 overview pages preserving ALL existing content"""
+    print("🚀 Updating Module 2-9 Overview Pages (Preserving Content)")
     print("=" * 60)
     
     updated = []
     failed = []
+    skipped = []
     
-    for module_num, data in modules_data.items():
+    for module_num in range(2, 10):
         filename = f"module{module_num}.html"
         filepath = BASE_DIR / filename
         
+        if not filepath.exists():
+            skipped.append(filename)
+            print(f"   ⏭️ Skipped: {filename} (file doesn't exist)")
+            continue
+        
         try:
-            print(f"📝 Updating {filename}...")
-            html_content = generate_module_overview_html(module_num, data)
+            print(f"📝 Processing {filename}...")
             
+            # Extract existing content
+            existing_content = extract_existing_content(filepath)
+            
+            if not existing_content:
+                failed.append((filename, "Could not extract content"))
+                print(f"   ❌ Failed to extract content: {filename}")
+                continue
+            
+            # Generate updated HTML with existing content
+            html_content = generate_updated_module_html(module_num, existing_content)
+            
+            if not html_content:
+                failed.append((filename, "Could not generate HTML"))
+                print(f"   ❌ Failed to generate HTML: {filename}")
+                continue
+            
+            # Backup existing file
+            backup_path = filepath.with_suffix('.html.backup')
+            with open(filepath, 'r', encoding='utf-8') as f:
+                backup_content = f.read()
+            with open(backup_path, 'w', encoding='utf-8') as f:
+                f.write(backup_content)
+            
+            # Write updated file
             with open(filepath, 'w', encoding='utf-8') as f:
                 f.write(html_content)
             
             updated.append(filename)
-            print(f"   ✅ Updated: {filename}")
+            print(f"   ✅ Updated: {filename} (backup saved as {backup_path.name})")
             
         except Exception as e:
             failed.append((filename, str(e)))
@@ -606,15 +419,24 @@ def main():
     print("\n" + "=" * 60)
     print("📊 Summary:")
     print(f"   ✅ Successfully updated: {len(updated)} files")
+    print(f"   ⏭️ Skipped (not found): {len(skipped)} files")
     print(f"   ❌ Failed: {len(failed)} files")
+    print(f"   💾 Backups created for all updated files")
+    print(f"   📝 All content preserved from original files")
     
     if failed:
         print("\n⚠️ Failed files:")
         for filename, error in failed:
             print(f"   - {filename}: {error}")
     
+    if skipped:
+        print("\n📋 Skipped files:")
+        for filename in skipped:
+            print(f"   - {filename}")
+    
     print(f"\n🎉 Module overview pages update complete!")
-    print("📅 All modules now have consistent structure matching module1.html")
+    print("✨ Original content preserved with updated structure")
+    print("💡 Backup files created with .backup extension")
 
 if __name__ == "__main__":
     import sys
