@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Batch update script for Module 2: PHP Fundamentals
-Updates all Module 2 HTML files with the new template structure
+Updates ALL Module 2 HTML files with the new template structure
+Includes all 122 files found in the 02module directory
 """
 
 import os
@@ -63,159 +64,348 @@ def check_if_updated(filepath):
         print(f"    ⚠️ Could not check file: {e}")
         return False
 
-# Module 2 complete structure - PHP Fundamentals
+# Complete Module 2 structure - ALL 122 files organized by topic
 module2_files = {
-    "session1": {
-        "title": "PHP Language Basics",
+    "php_basics": {
+        "title": "PHP Basics & Setup",
         "files": [
+            ("review_php_setup.html", "Review PHP Setup", "30 minutes",
+             "Review PHP installation and setup on different platforms."),
+            ("php_setup_ubuntu.html", "PHP Setup on Ubuntu", "45 minutes",
+             "Install and configure PHP on Ubuntu Linux systems."),
+            ("php_tags_basic_syntax.html", "PHP Tags and Basic Syntax", "30 minutes",
+             "Learn PHP opening and closing tags, and basic syntax rules."),
+            ("php_comments.html", "PHP Comments", "20 minutes",
+             "Master single-line and multi-line comments in PHP."),
+            ("php_output_methods.html", "PHP Output Methods", "30 minutes",
+             "Learn echo, print, and other output methods in PHP."),
             ("php_fundamentals_review.html", "PHP Fundamentals Review", "45 minutes",
-             "Review PHP basics including syntax, variables, and data types to build a strong foundation."),
-            ("control_structures_deep_dive.html", "Control Structures Deep Dive", "60 minutes",
-             "Master PHP control structures including if/else, switch, loops, and advanced flow control."),
-            ("functions_in_php.html", "Functions in PHP", "45 minutes",
-             "Learn to create and use functions, understand scope, and work with built-in PHP functions."),
-            ("arrays_and_data_manipulation.html", "Arrays and Data Manipulation", "60 minutes",
-             "Master PHP arrays, array functions, and data manipulation techniques."),
-            ("homework_php_calculator.html", "Homework: Build a PHP Calculator", "90 minutes",
-             "Apply PHP fundamentals to build a functional calculator application.")
+             "Comprehensive review of PHP fundamentals.")
         ]
     },
-    "session2": {
-        "title": "Working with Forms and Data",
+    "variables_data_types": {
+        "title": "Variables & Data Types",
         "files": [
-            ("handling_form_data.html", "Handling Form Data in PHP", "45 minutes",
-             "Learn to process form submissions, handle GET and POST data, and validate user input."),
-            ("form_validation_sanitization.html", "Form Validation and Sanitization", "60 minutes",
-             "Implement secure form validation and data sanitization to prevent security vulnerabilities."),
-            ("file_uploads.html", "File Uploads in PHP", "45 minutes",
-             "Handle file uploads safely, validate file types, and manage uploaded files."),
-            ("sessions_and_cookies.html", "Sessions and Cookies", "60 minutes",
-             "Understand PHP sessions and cookies for maintaining user state and data persistence."),
-            ("homework_contact_form.html", "Homework: Create a Contact Form", "90 minutes",
-             "Build a complete contact form with validation, sanitization, and email functionality.")
+            ("php_variables_and_data_types.html", "PHP Variables and Data Types", "45 minutes",
+             "Understanding PHP variables, data types, and type juggling."),
+            ("php_constants.html", "PHP Constants", "30 minutes",
+             "Define and use constants in PHP applications."),
+            ("php_variable_scope.html", "PHP Variable Scope", "45 minutes",
+             "Master local, global, and static variable scope in PHP."),
+            ("php_type_operators.html", "PHP Type Operators", "30 minutes",
+             "Work with type operators and type checking in PHP.")
         ]
     },
-    "session3": {
+    "operators": {
+        "title": "PHP Operators",
+        "files": [
+            ("php_arithmetic_operators.html", "PHP Arithmetic Operators", "30 minutes",
+             "Master addition, subtraction, multiplication, division, and modulus operators."),
+            ("php_assignment_operators.html", "PHP Assignment Operators", "30 minutes",
+             "Learn assignment operators including compound assignments."),
+            ("php_comparison_operators.html", "PHP Comparison Operators", "30 minutes",
+             "Use comparison operators for conditional logic."),
+            ("php_logical_operators.html", "PHP Logical Operators", "30 minutes",
+             "Implement AND, OR, NOT, and XOR logical operations."),
+            ("php_string_operators.html", "PHP String Operators", "20 minutes",
+             "Concatenate and manipulate strings with operators."),
+            ("php_array_operators.html", "PHP Array Operators", "30 minutes",
+             "Use array operators for union and comparison."),
+            ("php_operator_precedence.html", "PHP Operator Precedence", "30 minutes",
+             "Understand operator precedence and evaluation order."),
+            ("php_ternary.html", "PHP Ternary Operator", "30 minutes",
+             "Master the ternary conditional operator."),
+            ("php_null_coalescing.html", "PHP Null Coalescing Operator", "30 minutes",
+             "Use the null coalescing operator for default values.")
+        ]
+    },
+    "control_structures": {
+        "title": "Control Structures",
+        "files": [
+            ("control_structures_deep_dive.html", "Control Structures Deep Dive", "60 minutes",
+             "Comprehensive exploration of PHP control structures."),
+            ("php_if.html", "PHP If Statement", "30 minutes",
+             "Master the basic if conditional statement."),
+            ("php_if_else.html", "PHP If-Else Statement", "30 minutes",
+             "Implement if-else conditional logic."),
+            ("php_if_elseif_else.html", "PHP If-ElseIf-Else", "30 minutes",
+             "Handle multiple conditions with elseif."),
+            ("php_switch.html", "PHP Switch Statement", "30 minutes",
+             "Use switch statements for multiple conditions."),
+            ("php_control_break_continue.html", "PHP Break and Continue", "30 minutes",
+             "Control loop execution with break and continue.")
+        ]
+    },
+    "loops": {
+        "title": "Loops in PHP",
+        "files": [
+            ("php_for_loops.html", "PHP For Loops", "30 minutes",
+             "Master for loops for iterative operations."),
+            ("php_while_loops.html", "PHP While Loops", "30 minutes",
+             "Implement while loops for conditional iteration."),
+            ("php_do_while_loops.html", "PHP Do-While Loops", "30 minutes",
+             "Use do-while loops for guaranteed execution."),
+            ("php_foreach_loops_with_arrays.html", "PHP Foreach Loops", "45 minutes",
+             "Iterate through arrays with foreach loops."),
+            ("homework_php_loops.html", "Homework: PHP Loops", "60 minutes",
+             "Practice exercises for mastering PHP loops.")
+        ]
+    },
+    "functions": {
+        "title": "Functions in PHP",
+        "files": [
+            ("functions_in_php.html", "Functions in PHP", "45 minutes",
+             "Introduction to creating and using functions."),
+            ("php_function_declaration_and_calling.html", "Function Declaration and Calling", "45 minutes",
+             "Declare and call functions in PHP."),
+            ("php_function_parameters_and return_values.html", "Function Parameters and Return Values", "45 minutes",
+             "Work with function parameters and return values."),
+            ("php_default_parameter_values.html", "Default Parameter Values", "30 minutes",
+             "Set default values for function parameters."),
+            ("php_anonymoous_functions_and_closures.html", "Anonymous Functions and Closures", "45 minutes",
+             "Master anonymous functions and closures."),
+            ("php_built_in_php_functions_overview.html", "Built-in PHP Functions", "45 minutes",
+             "Overview of PHP's built-in function library."),
+            ("php_creating_reusable_php_components.html", "Creating Reusable Components", "45 minutes",
+             "Build reusable PHP components and libraries."),
+            ("php_creating_reusable_corrected.html", "Creating Reusable Components (Corrected)", "45 minutes",
+             "Updated guide for creating reusable PHP components."),
+            ("homework_php_create_library_custom_functions.html", "Homework: Create Function Library", "90 minutes",
+             "Build a library of custom PHP functions.")
+        ]
+    },
+    "arrays": {
+        "title": "Arrays and Data Manipulation",
+        "files": [
+            ("arrays_and_data_manipulation.html", "Arrays and Data Manipulation", "60 minutes",
+             "Comprehensive guide to PHP arrays."),
+            ("php_indexed_array.html", "PHP Indexed Arrays", "30 minutes",
+             "Work with numerically indexed arrays."),
+            ("php_associative_arrays.html", "PHP Associative Arrays", "30 minutes",
+             "Master key-value pair associative arrays."),
+            ("php_multidimensional_arrays.html", "PHP Multidimensional Arrays", "45 minutes",
+             "Handle complex multidimensional array structures."),
+            ("php_array_functions.html", "PHP Array Functions", "45 minutes",
+             "Use built-in array manipulation functions."),
+            ("php_array_functions_broke.html", "PHP Array Functions (Fixed)", "45 minutes",
+             "Corrected array function examples and usage."),
+            ("php_array_iteration.html", "PHP Array Iteration", "30 minutes",
+             "Iterate through arrays with various methods."),
+            ("php_array_iteration_2.html", "PHP Array Iteration Advanced", "30 minutes",
+             "Advanced array iteration techniques."),
+            ("php_array_sorting.html", "PHP Array Sorting", "30 minutes",
+             "Sort arrays with various sorting functions."),
+            ("homework_php_array_creation_manipulation.html", "Homework: Array Manipulation", "60 minutes",
+             "Practice array creation and manipulation.")
+        ]
+    },
+    "forms": {
+        "title": "Working with Forms",
+        "files": [
+            ("php_html_forms_review.html", "HTML Forms Review", "30 minutes",
+             "Review HTML form structure for PHP processing."),
+            ("handling_form_data.html", "Handling Form Data in PHP", "45 minutes",
+             "Process form submissions with PHP."),
+            ("php_get_vs_post_methods.html", "GET vs POST Methods", "30 minutes",
+             "Understand the differences between GET and POST."),
+            ("php_accessing_form_data_get_post.html", "Accessing Form Data", "45 minutes",
+             "Access and process GET and POST data."),
+            ("form_validation_sanitization.html", "Form Validation and Sanitization", "60 minutes",
+             "Validate and sanitize form input data."),
+            ("php_form_validation_techniques.html", "Form Validation Techniques", "45 minutes",
+             "Advanced form validation strategies."),
+            ("php_sanitizing_user_input.html", "Sanitizing User Input", "45 minutes",
+             "Secure user input sanitization methods."),
+            ("php_sanitizing_user_input2.html", "Advanced Input Sanitization", "45 minutes",
+             "Advanced techniques for input sanitization."),
+            ("php_implementing_user_input.html", "Implementing User Input", "45 minutes",
+             "Safely implement user input in applications."),
+            ("file_uploads.html", "File Uploads in PHP", "45 minutes",
+             "Handle file uploads securely."),
+            ("php_file_uploads.html", "PHP File Upload Implementation", "45 minutes",
+             "Complete guide to implementing file uploads."),
+            ("homework_contact_form.html", "Homework: Contact Form", "90 minutes",
+             "Build a complete contact form with validation."),
+            ("homework_php_create_contact_form_validation.html", "Homework: Form Validation", "90 minutes",
+             "Create a contact form with comprehensive validation.")
+        ]
+    },
+    "sessions_cookies": {
+        "title": "Sessions and Cookies",
+        "files": [
+            ("sessions_and_cookies.html", "Sessions and Cookies", "60 minutes",
+             "Understanding PHP sessions and cookies."),
+            ("php_working_with_sessions_cookies.html", "Working with Sessions and Cookies", "60 minutes",
+             "Implement session and cookie functionality.")
+        ]
+    },
+    "oop": {
         "title": "Object-Oriented PHP",
         "files": [
-            ("intro_to_oop.html", "Introduction to Object-Oriented Programming", "60 minutes",
-             "Understand OOP concepts including classes, objects, properties, and methods in PHP."),
-            ("classes_and_objects.html", "Classes and Objects in PHP", "60 minutes",
-             "Create PHP classes, instantiate objects, and work with constructors and destructors."),
+            ("intro_to_oop.html", "Introduction to OOP", "60 minutes",
+             "Object-oriented programming concepts in PHP."),
+            ("php_oop_concepts.html", "PHP OOP Concepts", "45 minutes",
+             "Core OOP concepts and principles."),
+            ("classes_and_objects.html", "Classes and Objects", "60 minutes",
+             "Creating and using classes and objects."),
+            ("php_creating_classes_and instantiating_objects.html", "Creating Classes", "45 minutes",
+             "Create classes and instantiate objects."),
+            ("php_constructor_and_destructor.html", "Constructors and Destructors", "45 minutes",
+             "Use constructors and destructors in classes."),
+            ("php_access_modifiers.html", "Access Modifiers", "30 minutes",
+             "Public, private, and protected access modifiers."),
+            ("php_this_keyword.html", "The $this Keyword", "30 minutes",
+             "Understanding and using the $this keyword."),
+            ("php_static_properties_and_methods.html", "Static Properties and Methods", "45 minutes",
+             "Work with static class members."),
             ("inheritance_and_polymorphism.html", "Inheritance and Polymorphism", "45 minutes",
-             "Master inheritance, method overriding, and polymorphism in PHP OOP."),
+             "Implement inheritance and polymorphism."),
+            ("php_inheritance.html", "PHP Inheritance", "45 minutes",
+             "Master class inheritance in PHP."),
+            ("php_method_overriding.html", "Method Overriding", "30 minutes",
+             "Override parent class methods."),
             ("interfaces_and_abstract_classes.html", "Interfaces and Abstract Classes", "45 minutes",
-             "Learn to use interfaces and abstract classes for better code architecture."),
-            ("homework_oop_project.html", "Homework: OOP Mini-Project", "120 minutes",
-             "Build a small project using object-oriented PHP principles.")
+             "Use interfaces and abstract classes."),
+            ("php_interfaces.html", "PHP Interfaces", "45 minutes",
+             "Define and implement interfaces."),
+            ("php_abstract_classes.html", "PHP Abstract Classes", "45 minutes",
+             "Create and extend abstract classes."),
+            ("php_traits.html", "PHP Traits", "45 minutes",
+             "Use traits for code reuse."),
+            ("php_namespaces.html", "PHP Namespaces", "45 minutes",
+             "Organize code with namespaces."),
+            ("homework_php_create_simple_class.html", "Homework: Create Simple Class", "60 minutes",
+             "Build your first PHP class."),
+            ("homework_php_extend_with_inheritance.html", "Homework: Inheritance", "60 minutes",
+             "Practice inheritance with PHP classes."),
+            ("homework_oop_project.html", "Homework: OOP Project", "120 minutes",
+             "Complete OOP project implementation.")
         ]
     },
-    "session4": {
-        "title": "Working with Databases",
+    "database": {
+        "title": "Database Operations",
         "files": [
             ("intro_to_mysql.html", "Introduction to MySQL", "45 minutes",
-             "Learn MySQL basics, database design principles, and SQL fundamentals."),
-            ("php_mysql_connection.html", "Connecting PHP to MySQL", "45 minutes",
-             "Establish database connections using MySQLi and PDO in PHP."),
+             "MySQL database fundamentals."),
+            ("php_mysql_connection.html", "PHP MySQL Connection", "45 minutes",
+             "Connect PHP to MySQL databases."),
             ("crud_operations.html", "CRUD Operations", "90 minutes",
-             "Implement Create, Read, Update, and Delete operations with PHP and MySQL."),
-            ("prepared_statements.html", "Prepared Statements and Security", "60 minutes",
-             "Use prepared statements to prevent SQL injection and secure database operations."),
-            ("homework_user_management.html", "Homework: User Management System", "120 minutes",
-             "Build a user management system with registration, login, and profile features.")
+             "Create, Read, Update, Delete operations."),
+            ("prepared_statements.html", "Prepared Statements", "60 minutes",
+             "Secure database queries with prepared statements."),
+            ("database_design.html", "Database Design", "60 minutes",
+             "Design efficient database schemas."),
+            ("homework_user_management.html", "Homework: User Management", "120 minutes",
+             "Build a user management system.")
         ]
     },
-    "session5": {
-        "title": "PHP and Web APIs",
+    "apis": {
+        "title": "APIs and Web Services",
         "files": [
-            ("working_with_json.html", "Working with JSON in PHP", "45 minutes",
-             "Parse and generate JSON data, work with JSON APIs in PHP applications."),
-            ("consuming_apis.html", "Consuming REST APIs", "60 minutes",
-             "Learn to consume external APIs using cURL and PHP's HTTP functions."),
+            ("working_with_json.html", "Working with JSON", "45 minutes",
+             "Parse and generate JSON data in PHP."),
+            ("consuming_apis.html", "Consuming APIs", "60 minutes",
+             "Consume external REST APIs."),
             ("creating_api_endpoints.html", "Creating API Endpoints", "60 minutes",
-             "Build RESTful API endpoints with PHP to serve data to applications."),
+             "Build RESTful API endpoints."),
             ("api_authentication.html", "API Authentication", "45 minutes",
-             "Implement API authentication using tokens and API keys."),
-            ("homework_weather_app.html", "Homework: Weather App with API", "90 minutes",
-             "Create a weather application that consumes external weather APIs.")
+             "Implement API authentication."),
+            ("homework_weather_app.html", "Homework: Weather App", "90 minutes",
+             "Build a weather app using APIs.")
         ]
     },
-    "session6": {
-        "title": "PHP Security Best Practices",
+    "security": {
+        "title": "PHP Security",
         "files": [
-            ("common_vulnerabilities.html", "Common PHP Security Vulnerabilities", "60 minutes",
-             "Understand common security vulnerabilities in PHP applications and how to prevent them."),
+            ("common_vulnerabilities.html", "Common Vulnerabilities", "60 minutes",
+             "Understand common PHP security issues."),
             ("input_validation_techniques.html", "Input Validation Techniques", "45 minutes",
-             "Master comprehensive input validation strategies for secure PHP applications."),
-            ("password_hashing.html", "Password Hashing and Encryption", "45 minutes",
-             "Implement secure password storage using modern hashing algorithms."),
+             "Comprehensive input validation strategies."),
+            ("password_hashing.html", "Password Hashing", "45 minutes",
+             "Secure password storage techniques."),
             ("secure_file_handling.html", "Secure File Handling", "45 minutes",
-             "Handle files securely, prevent directory traversal, and validate uploads."),
+             "Handle files securely in PHP."),
             ("homework_secure_app.html", "Homework: Secure Application", "90 minutes",
-             "Refactor an application to implement security best practices.")
+             "Implement security best practices.")
         ]
     },
-    "session7": {
-        "title": "PHP Frameworks Introduction",
+    "frameworks": {
+        "title": "PHP Frameworks",
         "files": [
-            ("mvc_architecture.html", "Understanding MVC Architecture", "60 minutes",
-             "Learn the Model-View-Controller pattern and its implementation in PHP."),
+            ("mvc_architecture.html", "MVC Architecture", "60 minutes",
+             "Model-View-Controller design pattern."),
             ("intro_to_composer.html", "Introduction to Composer", "45 minutes",
-             "Use Composer for dependency management and autoloading in PHP projects."),
-            ("laravel_basics.html", "Laravel Framework Basics", "90 minutes",
-             "Get started with Laravel, understanding routing, controllers, and views."),
-            ("symfony_overview.html", "Symfony Framework Overview", "60 minutes",
-             "Explore Symfony components and framework fundamentals."),
-            ("homework_framework_project.html", "Homework: Framework Mini-Project", "120 minutes",
-             "Build a small application using a PHP framework.")
+             "PHP dependency management with Composer."),
+            ("laravel_basics.html", "Laravel Basics", "90 minutes",
+             "Getting started with Laravel framework."),
+            ("symfony_overview.html", "Symfony Overview", "60 minutes",
+             "Introduction to Symfony framework."),
+            ("homework_framework_project.html", "Homework: Framework Project", "120 minutes",
+             "Build a project using a PHP framework.")
         ]
     },
-    "session8": {
+    "testing_debugging": {
         "title": "Testing and Debugging",
         "files": [
-            ("debugging_techniques.html", "PHP Debugging Techniques", "45 minutes",
-             "Master debugging tools and techniques for PHP development."),
-            ("error_handling.html", "Error Handling and Logging", "45 minutes",
-             "Implement proper error handling and logging strategies."),
-            ("unit_testing_basics.html", "Unit Testing with PHPUnit", "60 minutes",
-             "Write and run unit tests for PHP code using PHPUnit."),
+            ("debugging_techniques.html", "Debugging Techniques", "45 minutes",
+             "Master PHP debugging strategies."),
+            ("error_handling.html", "Error Handling", "45 minutes",
+             "Implement proper error handling."),
+            ("unit_testing_basics.html", "Unit Testing Basics", "60 minutes",
+             "Write unit tests for PHP code."),
             ("code_quality_tools.html", "Code Quality Tools", "45 minutes",
-             "Use tools like PHP CodeSniffer and PHPStan for code quality."),
-            ("homework_add_tests.html", "Homework: Add Tests to Project", "90 minutes",
-             "Add comprehensive tests to an existing PHP project.")
+             "Use tools for code quality assurance."),
+            ("homework_add_tests.html", "Homework: Add Tests", "90 minutes",
+             "Add tests to existing code.")
         ]
     },
-    "session9": {
+    "advanced": {
         "title": "Advanced PHP Topics",
         "files": [
             ("namespaces_autoloading.html", "Namespaces and Autoloading", "45 minutes",
-             "Organize code with namespaces and implement PSR-4 autoloading."),
+             "Advanced namespace and autoloading."),
             ("traits_and_generators.html", "Traits and Generators", "45 minutes",
-             "Use traits for code reuse and generators for memory-efficient iterations."),
+             "Use traits and generators effectively."),
             ("regex_in_php.html", "Regular Expressions in PHP", "60 minutes",
-             "Master regular expressions for pattern matching and text processing."),
-            ("performance_optimization.html", "PHP Performance Optimization", "60 minutes",
-             "Optimize PHP applications for better performance and scalability."),
-            ("homework_optimization.html", "Homework: Optimize an Application", "90 minutes",
-             "Apply optimization techniques to improve application performance.")
+             "Master regex pattern matching."),
+            ("performance_optimization.html", "Performance Optimization", "60 minutes",
+             "Optimize PHP application performance."),
+            ("homework_optimization.html", "Homework: Optimization", "90 minutes",
+             "Optimize application performance.")
         ]
     },
-    "session10": {
-        "title": "PHP Project",
+    "projects": {
+        "title": "PHP Projects",
         "files": [
-            ("project_planning.html", "Project Planning and Architecture", "60 minutes",
-             "Plan and architect a complete PHP application from scratch."),
-            ("database_design.html", "Database Design for Project", "60 minutes",
-             "Design an efficient database schema for the project."),
-            ("implementing_features.html", "Implementing Core Features", "120 minutes",
-             "Build the core features of the PHP application."),
-            ("testing_deployment.html", "Testing and Deployment Preparation", "60 minutes",
-             "Test the application and prepare it for deployment."),
+            ("php_planning_php_application.html", "Planning PHP Applications", "45 minutes",
+             "Plan and architect PHP applications."),
+            ("project_planning.html", "Project Planning", "60 minutes",
+             "Comprehensive project planning."),
+            ("implementing_features.html", "Implementing Features", "120 minutes",
+             "Build core application features."),
+            ("testing_deployment.html", "Testing and Deployment", "60 minutes",
+             "Test and deploy PHP applications."),
+            ("homework_php_calculator.html", "Homework: PHP Calculator", "90 minutes",
+             "Build a functional calculator."),
+            ("homework_php_grades.html", "Homework: Grade Calculator", "60 minutes",
+             "Create a grade calculation system."),
+            ("homework_php_script.html", "Homework: PHP Script", "60 minutes",
+             "Write a complete PHP script."),
+            ("project_php_dynamic_web_app_with_authentication.html", "Project: Dynamic Web App", "180 minutes",
+             "Build a dynamic web app with authentication."),
             ("final_project_blog_cms.html", "Final Project: Blog CMS", "240 minutes",
-             "Build a complete blog content management system with PHP.")
+             "Complete blog content management system.")
         ]
     }
 }
+
+def get_all_files_from_structure():
+    """Get all files from the module structure"""
+    all_files = []
+    for session_data in module2_files.values():
+        for file_info in session_data["files"]:
+            all_files.append(file_info[0])
+    return all_files
 
 def generate_html(session_key, session_data, file_index, file_info, module_num="2"):
     """Generate complete HTML for a lesson file with proper navigation"""
@@ -223,38 +413,9 @@ def generate_html(session_key, session_data, file_index, file_info, module_num="
     filename, title, duration, description = file_info
     session_title = session_data["title"]
     
-    # Get all files in session for navigation
-    all_files = session_data["files"]
-    
-    # Determine previous and next files
-    prev_file = None
-    next_file = None
-    
-    if file_index > 0:
-        prev_file = all_files[file_index - 1]
-    else:
-        # Link to previous session's last file
-        prev_sessions = list(module2_files.keys())
-        current_session_index = prev_sessions.index(session_key)
-        if current_session_index > 0:
-            prev_session = module2_files[prev_sessions[current_session_index - 1]]
-            if prev_session["files"]:
-                prev_file = prev_session["files"][-1]
-    
-    if file_index < len(all_files) - 1:
-        next_file = all_files[file_index + 1]
-    else:
-        # Link to next session's first file
-        next_sessions = list(module2_files.keys())
-        current_session_index = next_sessions.index(session_key)
-        if current_session_index < len(next_sessions) - 1:
-            next_session = module2_files[next_sessions[current_session_index + 1]]
-            if next_session["files"]:
-                next_file = next_session["files"][0]
-    
     # Generate components
-    sidebar_html = generate_sidebar(session_title, all_files, file_index, module_num)
-    nav_html = generate_navigation(prev_file, next_file, module_num)
+    sidebar_html = generate_sidebar(session_title, session_data["files"], file_index, module_num)
+    nav_html = generate_navigation_simple(title, module_num)  # Simplified navigation
     objectives = generate_objectives(title)
     content = generate_content(title, description)
     homework = generate_homework(title)
@@ -310,7 +471,7 @@ def generate_html(session_key, session_data, file_index, file_info, module_num="
                                     <svg width="20" height="20" fill="currentColor">
                                         <path d="M12 14l9-5-9-5-9 5 9 5z"/>
                                     </svg>
-                                    <span>Module {module_num}, {session_title}</span>
+                                    <span>Module {module_num}: {session_title}</span>
                                 </div>
                             </div>
                         </header>
@@ -349,6 +510,37 @@ def generate_html(session_key, session_data, file_index, file_info, module_num="
 </html>"""
     
     return html
+
+def generate_navigation_simple(title, module_num="2"):
+    """Generate simplified lesson navigation"""
+    nav_html = f"""                        <!-- Lesson Navigation -->
+                        <div class="lesson-navigation">
+                            <a href="/module{module_num}.html" class="lesson-nav-button prev">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"/>
+                                </svg>
+                                <span>
+                                    <small>Back to</small><br>
+                                    Module {module_num} Overview
+                                </span>
+                            </a>
+                            
+                            <button class="complete-lesson-btn">
+                                Mark as Complete
+                            </button>
+                            
+                            <a href="/module3.html" class="lesson-nav-button next">
+                                <span>
+                                    <small>Next Module</small><br>
+                                    Module 3: MySQL Database
+                                </span>
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
+                                </svg>
+                            </a>
+                        </div>"""
+    
+    return nav_html
 
 def generate_header(module_num="2"):
     """Generate standard header HTML with Module 2 active"""
@@ -459,73 +651,6 @@ def generate_sidebar(session_title, files, current_index, module_num="2"):
     
     return sidebar
 
-def generate_navigation(prev_file, next_file, module_num="2"):
-    """Generate lesson navigation HTML"""
-    nav_html = """                        <!-- Lesson Navigation -->
-                        <div class="lesson-navigation">"""
-    
-    if prev_file:
-        prev_filename, prev_title, _, _ = prev_file
-        nav_html += f"""
-                            <a href="/0{module_num}module/{prev_filename}" class="lesson-nav-button prev">
-                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                                    <path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"/>
-                                </svg>
-                                <span>
-                                    <small>Previous</small><br>
-                                    {prev_title}
-                                </span>
-                            </a>"""
-    else:
-        nav_html += f"""
-                            <a href="/module{module_num}.html" class="lesson-nav-button prev">
-                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                                    <path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"/>
-                                </svg>
-                                <span>
-                                    <small>Back to</small><br>
-                                    Module {module_num} Overview
-                                </span>
-                            </a>"""
-    
-    nav_html += """
-                            
-                            <button class="complete-lesson-btn">
-                                Mark as Complete
-                            </button>"""
-    
-    if next_file:
-        next_filename, next_title, _, _ = next_file
-        nav_html += f"""
-                            
-                            <a href="/0{module_num}module/{next_filename}" class="lesson-nav-button next">
-                                <span>
-                                    <small>Next Lesson</small><br>
-                                    {next_title}
-                                </span>
-                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                                    <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
-                                </svg>
-                            </a>"""
-    else:
-        next_module = int(module_num) + 1
-        nav_html += f"""
-                            
-                            <a href="/module{next_module}.html" class="lesson-nav-button next">
-                                <span>
-                                    <small>Next Module</small><br>
-                                    Module {next_module}: MySQL Database
-                                </span>
-                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                                    <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
-                                </svg>
-                            </a>"""
-    
-    nav_html += """
-                        </div>"""
-    
-    return nav_html
-
 def generate_objectives(title):
     """Generate learning objectives based on title"""
     objectives = """                        <!-- Learning Objectives -->
@@ -535,61 +660,79 @@ def generate_objectives(title):
     
     title_lower = title.lower()
     
-    # PHP-specific objectives based on title
-    if "oop" in title_lower or "object" in title_lower:
+    # PHP-specific objectives based on keywords
+    if "setup" in title_lower:
         objectives += """
-                                <li>Understand object-oriented programming principles</li>
-                                <li>Create and use classes and objects in PHP</li>
-                                <li>Implement inheritance and polymorphism</li>
-                                <li>Apply OOP best practices in PHP development</li>"""
-    elif "database" in title_lower or "mysql" in title_lower:
+                                <li>Set up PHP development environment</li>
+                                <li>Configure PHP for optimal development</li>
+                                <li>Understand PHP installation options</li>
+                                <li>Test PHP installation and configuration</li>"""
+    elif any(word in title_lower for word in ["variable", "data type", "constant"]):
         objectives += """
-                                <li>Connect PHP applications to MySQL databases</li>
-                                <li>Execute SQL queries from PHP code</li>
-                                <li>Implement CRUD operations</li>
-                                <li>Secure database operations against SQL injection</li>"""
+                                <li>Understand PHP variables and constants</li>
+                                <li>Master PHP data types</li>
+                                <li>Learn variable scope and lifetime</li>
+                                <li>Apply best practices for naming and usage</li>"""
+    elif "operator" in title_lower:
+        objectives += """
+                                <li>Master PHP operators</li>
+                                <li>Understand operator precedence</li>
+                                <li>Apply operators in practical scenarios</li>
+                                <li>Write efficient expressions</li>"""
+    elif any(word in title_lower for word in ["loop", "for", "while", "foreach"]):
+        objectives += """
+                                <li>Master PHP loop structures</li>
+                                <li>Choose appropriate loop types</li>
+                                <li>Control loop execution flow</li>
+                                <li>Optimize loop performance</li>"""
+    elif "function" in title_lower:
+        objectives += """
+                                <li>Create and use PHP functions</li>
+                                <li>Understand function parameters and returns</li>
+                                <li>Master variable scope in functions</li>
+                                <li>Build reusable code components</li>"""
+    elif "array" in title_lower:
+        objectives += """
+                                <li>Master PHP array operations</li>
+                                <li>Work with different array types</li>
+                                <li>Use array functions effectively</li>
+                                <li>Manipulate complex data structures</li>"""
     elif "form" in title_lower:
         objectives += """
-                                <li>Process form data with PHP</li>
-                                <li>Validate and sanitize user input</li>
+                                <li>Process HTML forms with PHP</li>
+                                <li>Validate and sanitize form data</li>
                                 <li>Handle file uploads securely</li>
                                 <li>Implement form security best practices</li>"""
+    elif any(word in title_lower for word in ["oop", "object", "class"]):
+        objectives += """
+                                <li>Understand OOP principles in PHP</li>
+                                <li>Create and use classes and objects</li>
+                                <li>Implement inheritance and polymorphism</li>
+                                <li>Apply OOP best practices</li>"""
+    elif any(word in title_lower for word in ["database", "mysql", "crud"]):
+        objectives += """
+                                <li>Connect PHP to databases</li>
+                                <li>Execute database queries from PHP</li>
+                                <li>Implement CRUD operations</li>
+                                <li>Secure database operations</li>"""
     elif "api" in title_lower:
         objectives += """
-                                <li>Work with JSON data in PHP</li>
-                                <li>Consume external REST APIs</li>
-                                <li>Create API endpoints with PHP</li>
-                                <li>Implement API authentication</li>"""
+                                <li>Work with APIs in PHP</li>
+                                <li>Parse and generate JSON data</li>
+                                <li>Consume external web services</li>
+                                <li>Create RESTful endpoints</li>"""
     elif "security" in title_lower:
         objectives += """
-                                <li>Identify common PHP security vulnerabilities</li>
+                                <li>Identify security vulnerabilities</li>
                                 <li>Implement secure coding practices</li>
-                                <li>Validate and sanitize all user input</li>
-                                <li>Protect against common attacks</li>"""
-    elif "session" in title_lower or "cookie" in title_lower:
-        objectives += """
-                                <li>Understand PHP sessions and cookies</li>
-                                <li>Implement user authentication</li>
-                                <li>Maintain user state across pages</li>
-                                <li>Handle session security properly</li>"""
-    elif "framework" in title_lower:
-        objectives += """
-                                <li>Understand PHP framework concepts</li>
-                                <li>Learn MVC architecture</li>
-                                <li>Use Composer for dependency management</li>
-                                <li>Build applications with modern PHP frameworks</li>"""
-    elif "test" in title_lower:
-        objectives += """
-                                <li>Write unit tests for PHP code</li>
-                                <li>Use PHPUnit testing framework</li>
-                                <li>Implement test-driven development</li>
-                                <li>Debug PHP applications effectively</li>"""
+                                <li>Protect against common attacks</li>
+                                <li>Validate and sanitize all input</li>"""
     else:
         objectives += """
-                                <li>Master PHP programming fundamentals</li>
-                                <li>Write clean, maintainable PHP code</li>
-                                <li>Apply best practices in PHP development</li>
-                                <li>Build dynamic web applications with PHP</li>"""
+                                <li>Master PHP programming concepts</li>
+                                <li>Write clean, maintainable code</li>
+                                <li>Apply best practices</li>
+                                <li>Build dynamic applications</li>"""
     
     objectives += """
                             </ul>
@@ -607,68 +750,68 @@ def generate_content(title, description):
                                     <div class="alert-icon">💡</div>
                                     <div class="alert-content">
                                         <div class="alert-title">Key Concept</div>
-                                        <div class="alert-message">PHP is the foundation of WordPress development. Mastering PHP will enable you to create powerful WordPress themes and plugins.</div>
+                                        <div class="alert-message">PHP is the foundation of WordPress. Every concept you learn here will directly apply to WordPress development.</div>
                                     </div>
                                 </div>
                             </section>
 
                             <section>
                                 <h2>Core Concepts</h2>
-                                <p>This lesson covers essential PHP concepts that you'll use throughout your WordPress development journey.</p>
+                                <p>This lesson covers essential PHP concepts for WordPress development.</p>
                                 
                                 <pre><code class="language-php">&lt;?php
 // Example PHP code
-// Specific to the lesson topic
+// Tailored to the specific lesson topic
 ?&gt;</code></pre>
                                 
                                 <div class="best_practice">
                                     <h3>Best Practices</h3>
                                     <ul>
-                                        <li>Always validate and sanitize user input</li>
-                                        <li>Use prepared statements for database queries</li>
                                         <li>Follow PSR coding standards</li>
+                                        <li>Always validate user input</li>
+                                        <li>Use prepared statements for databases</li>
                                         <li>Implement proper error handling</li>
-                                        <li>Keep security as a top priority</li>
+                                        <li>Keep security as top priority</li>
                                     </ul>
                                 </div>
                             </section>
 
                             <section>
                                 <h2>Practical Examples</h2>
-                                <p>Let's explore practical examples that demonstrate these concepts in action.</p>
+                                <p>Real-world examples to reinforce your learning.</p>
                                 
                                 <div class="example-code">
                                     <h3>Example Implementation</h3>
                                     <pre><code class="language-php">&lt;?php
-// Practical example code
-// Will be customized based on lesson content
+// Practical example
+// Specific to lesson content
 ?&gt;</code></pre>
                                 </div>
                             </section>
 
                             <section>
-                                <h2>WordPress Context</h2>
+                                <h2>WordPress Application</h2>
                                 <div class="real_world_example">
                                     <h3>How This Applies to WordPress</h3>
-                                    <p>Understanding these PHP concepts is crucial for WordPress development:</p>
+                                    <p>This PHP concept is essential for WordPress because:</p>
                                     <ul>
-                                        <li>WordPress core is built with PHP</li>
-                                        <li>Themes use PHP for dynamic content</li>
-                                        <li>Plugins extend WordPress using PHP</li>
-                                        <li>Custom functionality requires PHP knowledge</li>
+                                        <li>WordPress core uses these patterns</li>
+                                        <li>Themes require this knowledge</li>
+                                        <li>Plugins implement these concepts</li>
+                                        <li>Custom functionality depends on it</li>
                                     </ul>
                                 </div>
                             </section>
 
                             <section>
                                 <h2>Practice Exercise</h2>
-                                <p>Apply what you've learned with this hands-on exercise.</p>
+                                <p>Apply what you've learned with hands-on practice.</p>
                                 
                                 <div class="alert alert-success">
                                     <div class="alert-icon">💻</div>
                                     <div class="alert-content">
                                         <div class="alert-title">Try It Now</div>
-                                        <div class="alert-message">Set up your local PHP environment and practice these concepts with real code!</div>
+                                        <div class="alert-message">Open your PHP environment and practice these concepts!</div>
                                     </div>
                                 </div>
                             </section>"""
@@ -677,46 +820,46 @@ def generate_content(title, description):
 
 def generate_homework(title):
     """Generate homework section based on title"""
-    if "homework" in title.lower():
+    if "homework" in title.lower() or "project" in title.lower():
         return """                            <!-- Homework -->
                             <div class="homework">
-                                <h2>Project Requirements</h2>
-                                <p>Complete this project to demonstrate your understanding of the concepts covered in this session:</p>
+                                <h2>Assignment Requirements</h2>
+                                <p>Complete this project to demonstrate mastery of the concepts:</p>
                                 <ol>
-                                    <li>Set up your development environment</li>
-                                    <li>Implement the required functionality</li>
-                                    <li>Test your code thoroughly</li>
+                                    <li>Plan your implementation approach</li>
+                                    <li>Write clean, well-commented code</li>
+                                    <li>Test thoroughly with various inputs</li>
                                     <li>Follow PHP best practices</li>
-                                    <li>Document your code</li>
+                                    <li>Document your solution</li>
                                 </ol>
                                 
                                 <h3>Submission Guidelines</h3>
                                 <ul>
-                                    <li>Upload your PHP files to GitHub</li>
-                                    <li>Include a README with setup instructions</li>
-                                    <li>Ensure code is properly commented</li>
-                                    <li>Test on XAMPP/MAMP before submission</li>
+                                    <li>Upload to GitHub with README</li>
+                                    <li>Include setup instructions</li>
+                                    <li>Add code comments</li>
+                                    <li>Test before submission</li>
                                 </ul>
                                 
-                                <p><strong>Due Date:</strong> Before the next session</p>
+                                <p><strong>Due:</strong> Before next session</p>
                             </div>"""
     else:
-        return """                            <!-- Homework -->
+        return """                            <!-- Practice -->
                             <div class="homework">
-                                <h2>Practice Assignment</h2>
-                                <p>Reinforce your learning with these practice exercises:</p>
+                                <h2>Practice Exercises</h2>
+                                <p>Reinforce your learning with these exercises:</p>
                                 <ul>
-                                    <li>Review the code examples from this lesson</li>
-                                    <li>Complete the practice exercises</li>
-                                    <li>Experiment with variations of the examples</li>
-                                    <li>Research additional PHP functions related to this topic</li>
+                                    <li>Review lesson code examples</li>
+                                    <li>Complete practice problems</li>
+                                    <li>Experiment with variations</li>
+                                    <li>Research related PHP functions</li>
                                 </ul>
                                 
-                                <p><strong>Challenge:</strong> Try to implement a small project using the concepts learned in this lesson.</p>
+                                <p><strong>Challenge:</strong> Build a small project using these concepts.</p>
                             </div>"""
 
 def generate_resources(title):
-    """Generate resources section based on title"""
+    """Generate resources section"""
     return """                            <!-- Resources -->
                             <section class="resources">
                                 <h2>Additional Resources</h2>
@@ -724,8 +867,8 @@ def generate_resources(title):
                                     <li><a href="https://www.php.net/manual/en/" target="_blank">PHP Official Documentation</a></li>
                                     <li><a href="https://phptherightway.com/" target="_blank">PHP: The Right Way</a></li>
                                     <li><a href="https://www.w3schools.com/php/" target="_blank">W3Schools PHP Tutorial</a></li>
-                                    <li><a href="https://laracasts.com/topics/php" target="_blank">Laracasts PHP Series</a></li>
                                     <li><a href="https://developer.wordpress.org/apis/" target="_blank">WordPress Developer Resources</a></li>
+                                    <li><a href="https://www.phptutorial.net/" target="_blank">PHP Tutorial</a></li>
                                 </ul>
                             </section>"""
 
@@ -776,20 +919,24 @@ def generate_footer():
 def main():
     """Main function to update all Module 2 files"""
     
-    print(f"🚀 PHP WordPress Course - Module 2 Batch Update Script")
+    print(f"🚀 PHP WordPress Course - Module 2 Complete Update Script")
     print("="*60)
     print(f"📁 Working directory: {BASE_DIR}")
     print(f"✅ Directory exists: {BASE_DIR.exists()}")
     print(f"📅 Update started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
-    # Create directory if it doesn't exist
-    if not BASE_DIR.exists():
-        print(f"📁 Creating directory: {BASE_DIR}")
-        BASE_DIR.mkdir(parents=True, exist_ok=True)
-    
-    # List existing files
+    # Get all existing files in directory
     existing_files = list(BASE_DIR.glob("*.html"))
-    print(f"📊 Found {len(existing_files)} existing HTML files in directory\n")
+    existing_filenames = [f.name for f in existing_files]
+    print(f"📊 Found {len(existing_files)} existing HTML files in directory")
+    
+    # Get all files from our structure
+    structured_files = get_all_files_from_structure()
+    print(f"📋 Structure contains {len(structured_files)} defined files")
+    
+    # Find files in directory but not in structure
+    unstructured_files = [f for f in existing_filenames if f not in structured_files]
+    print(f"🔍 Found {len(unstructured_files)} files not in structure definition\n")
     
     updated_files = []
     created_files = []
@@ -797,48 +944,75 @@ def main():
     skipped_files = []
     already_updated_files = []
     
-    # Process all sessions
-    total_files = sum(len(session_data["files"]) for session_data in module2_files.values())
+    # Process structured files
     processed = 0
+    total_files = len(structured_files) + len(unstructured_files)
     
+    print("📝 Processing structured files...")
     for session_key, session_data in module2_files.items():
-        print(f"\n📁 Processing {session_data['title']}...")
+        print(f"\n📁 {session_data['title']}...")
         
         for file_index, file_info in enumerate(session_data["files"]):
             filename = file_info[0]
             filepath = BASE_DIR / filename
             processed += 1
             
-            # Check if file is in the manually updated list
+            # Check if already updated
             if filename in ALREADY_UPDATED:
                 already_updated_files.append(filename)
-                print(f"  ⏭️  Skipped (manually updated): {filename}")
+                print(f"  ⏭️  Skipped (manual): {filename}")
                 continue
             
-            # Check if file exists and has already been updated
-            if filepath.exists():
-                if check_if_updated(filepath):
-                    skipped_files.append(filename)
-                    print(f"  ⏭️  Skipped (already updated): {filename}")
-                    continue
-                
-                # File exists but needs updating
-                action = "Updated"
-                updated_files.append(filename)
-            else:
-                # File doesn't exist, will be created
-                action = "Created"
-                created_files.append(filename)
+            if filepath.exists() and check_if_updated(filepath):
+                skipped_files.append(filename)
+                print(f"  ⏭️  Skipped (updated): {filename}")
+                continue
             
             try:
-                # Generate HTML content
                 html_content = generate_html(session_key, session_data, file_index, file_info)
                 
-                # Write file
                 with open(filepath, 'w', encoding='utf-8') as f:
                     f.write(html_content)
                 
-                print(f"  ✅ {action}: {filename} [{processed}/{total_files}]")
+                if filepath.exists():
+                    updated_files.append(filename)
+                    print(f"  ✅ Updated: {filename} [{processed}/{total_files}]")
+                else:
+                    created_files.append(filename)
+                    print(f"  🆕 Created: {filename} [{processed}/{total_files}]")
+                    
+            except Exception as e:
+                failed_files.append((filename, str(e)))
+                print(f"  ❌ Failed: {filename} - {e}")
+    
+    # Process unstructured files (files in directory but not in our structure)
+    if unstructured_files:
+        print(f"\n📝 Processing {len(unstructured_files)} unstructured files...")
+        for filename in unstructured_files:
+            filepath = BASE_DIR / filename
+            processed += 1
+            
+            if check_if_updated(filepath):
+                skipped_files.append(filename)
+                print(f"  ⏭️  Skipped (updated): {filename}")
+                continue
+            
+            try:
+                # Generate generic content for unstructured files
+                title = filename.replace('.html', '').replace('_', ' ').title()
+                description = f"PHP lesson covering {title.lower()} concepts."
+                
+                # Create generic file info
+                file_info = (filename, title, "45 minutes", description)
+                session_data = {"title": "PHP Additional Topics", "files": [file_info]}
+                
+                html_content = generate_html("additional", session_data, 0, file_info)
+                
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(html_content)
+                
+                updated_files.append(filename)
+                print(f"  ✅ Updated: {filename} [{processed}/{total_files}]")
                 
             except Exception as e:
                 failed_files.append((filename, str(e)))
@@ -846,76 +1020,80 @@ def main():
     
     # Summary
     print(f"\n{'='*60}")
-    print(f"📊 Update Summary for Module 2:")
-    print(f"  ✅ Successfully updated: {len(updated_files)} files")
-    print(f"  🆕 Newly created: {len(created_files)} files")
-    print(f"  ⏭️  Already updated (auto-detected): {len(skipped_files)} files")
-    print(f"  ⏭️  Already updated (manual list): {len(already_updated_files)} files")
-    print(f"  ❌ Failed: {len(failed_files)} files")
-    print(f"  📁 Total processed: {processed}/{total_files} files")
+    print(f"📊 Module 2 Complete Update Summary:")
+    print(f"  📁 Total files in directory: {len(existing_files)}")
+    print(f"  📋 Files in structure: {len(structured_files)}")
+    print(f"  🔍 Unstructured files: {len(unstructured_files)}")
+    print(f"  ✅ Successfully updated: {len(updated_files)}")
+    print(f"  🆕 Newly created: {len(created_files)}")
+    print(f"  ⏭️  Already updated: {len(skipped_files) + len(already_updated_files)}")
+    print(f"  ❌ Failed: {len(failed_files)}")
     
     if failed_files:
         print(f"\n⚠️ Failed files:")
         for filename, error in failed_files:
             print(f"  - {filename}: {error}")
     
-    print(f"\n🎉 Module 2 batch update complete!")
-    print(f"📅 Update finished: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    if unstructured_files:
+        print(f"\n📝 Unstructured files processed:")
+        for filename in unstructured_files[:10]:  # Show first 10
+            print(f"  - {filename}")
+        if len(unstructured_files) > 10:
+            print(f"  ... and {len(unstructured_files) - 10} more")
+    
+    print(f"\n🎉 Module 2 update complete!")
+    print(f"📅 Finished: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     # Create summary file
-    summary_path = BASE_DIR.parent / f"module2_update_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+    summary_path = BASE_DIR.parent / f"module2_complete_update_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
     with open(summary_path, 'w', encoding='utf-8') as f:
-        f.write(f"""# Module 2: PHP Fundamentals - Batch Update Results
+        f.write(f"""# Module 2: PHP Fundamentals - Complete Update Results
 **Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 **Directory:** {BASE_DIR}
 
 ## Summary
-- **Total Files in Module:** {total_files}
-- **Files Processed:** {processed}
+- **Total Files in Directory:** {len(existing_files)}
+- **Files in Structure Definition:** {len(structured_files)}
+- **Unstructured Files:** {len(unstructured_files)}
 - **Successfully Updated:** {len(updated_files)}
 - **Newly Created:** {len(created_files)}
 - **Already Updated:** {len(skipped_files) + len(already_updated_files)}
 - **Failed:** {len(failed_files)}
 
-## Successfully Updated Files ({len(updated_files)})
-{chr(10).join(f"- ✅ {f}" for f in sorted(updated_files)) if updated_files else "None"}
+## Module 2 Topics Covered
+- PHP Basics & Setup ({len(module2_files.get('php_basics', {}).get('files', []))} files)
+- Variables & Data Types ({len(module2_files.get('variables_data_types', {}).get('files', []))} files)
+- Operators ({len(module2_files.get('operators', {}).get('files', []))} files)
+- Control Structures ({len(module2_files.get('control_structures', {}).get('files', []))} files)
+- Loops ({len(module2_files.get('loops', {}).get('files', []))} files)
+- Functions ({len(module2_files.get('functions', {}).get('files', []))} files)
+- Arrays ({len(module2_files.get('arrays', {}).get('files', []))} files)
+- Forms ({len(module2_files.get('forms', {}).get('files', []))} files)
+- Sessions & Cookies ({len(module2_files.get('sessions_cookies', {}).get('files', []))} files)
+- Object-Oriented PHP ({len(module2_files.get('oop', {}).get('files', []))} files)
+- Database Operations ({len(module2_files.get('database', {}).get('files', []))} files)
+- APIs & Web Services ({len(module2_files.get('apis', {}).get('files', []))} files)
+- Security ({len(module2_files.get('security', {}).get('files', []))} files)
+- Frameworks ({len(module2_files.get('frameworks', {}).get('files', []))} files)
+- Testing & Debugging ({len(module2_files.get('testing_debugging', {}).get('files', []))} files)
+- Advanced Topics ({len(module2_files.get('advanced', {}).get('files', []))} files)
+- Projects ({len(module2_files.get('projects', {}).get('files', []))} files)
 
-## Newly Created Files ({len(created_files)})
-{chr(10).join(f"- 🆕 {f}" for f in sorted(created_files)) if created_files else "None"}
+## Unstructured Files Processed
+{chr(10).join(f"- {f}" for f in sorted(unstructured_files)) if unstructured_files else "None"}
 
-## Already Updated - Auto-detected ({len(skipped_files)})
-{chr(10).join(f"- ⏭️ {f}" for f in sorted(skipped_files)) if skipped_files else "None"}
-
-## Already Updated - Manual List ({len(already_updated_files)})
-{chr(10).join(f"- ⏭️ {f}" for f in sorted(already_updated_files)) if already_updated_files else "None"}
-
-## Failed Files ({len(failed_files)})
-{chr(10).join(f"- ❌ {f[0]}: {f[1]}" for f in failed_files) if failed_files else "None"}
-
-## Module 2 Structure
-- **Sessions:** 10
-- **Topics Covered:**
-  - PHP Language Basics
-  - Working with Forms and Data
-  - Object-Oriented PHP
-  - Working with Databases
-  - PHP and Web APIs
-  - PHP Security Best Practices
-  - PHP Frameworks Introduction
-  - Testing and Debugging
-  - Advanced PHP Topics
-  - PHP Project
+## Failed Files
+{chr(10).join(f"- {f[0]}: {f[1]}" for f in failed_files) if failed_files else "None"}
 
 ## Completion Status
-- **Progress:** {((len(updated_files) + len(created_files) + len(skipped_files) + len(already_updated_files)) / total_files * 100):.1f}% complete
-- **Remaining:** {total_files - len(updated_files) - len(created_files) - len(skipped_files) - len(already_updated_files)} files
+- **Total Progress:** {((len(updated_files) + len(created_files) + len(skipped_files) + len(already_updated_files)) / total_files * 100):.1f}%
+- **Module 2 Ready:** {"✅ Yes" if len(failed_files) == 0 else "⚠️ Review failed files"}
 
 ## Next Steps
-1. Review any failed files manually
-2. Test navigation links between lessons
-3. Validate HTML structure
-4. Add specific PHP code examples to each lesson
-5. Deploy to hosting service
+1. Review any failed files
+2. Test navigation between lessons
+3. Add PHP code examples
+4. Deploy Module 2
 """)
     
     print(f"\n📝 Summary saved to: {summary_path}")
@@ -935,9 +1113,9 @@ if __name__ == "__main__":
         
         # Exit with appropriate code
         if failed:
-            sys.exit(1)  # Exit with error if any files failed
+            sys.exit(1)
         else:
-            sys.exit(0)  # Success
+            sys.exit(0)
             
     except KeyboardInterrupt:
         print("\n\n⚠️ Update interrupted by user")

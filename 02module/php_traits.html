@@ -3,1823 +3,354 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Traits in PHP: Reusing Code Horizontally</title>
-    <link rel="stylesheet" href="/styles/main.css">
-    <link rel="icon" href="/favicon.png">
-    <script type="module">
-      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-      mermaid.initialize({ startOnLoad: true });
-    </script>
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    
+    <!-- SEO Meta Tags -->
+    <title>PHP Traits - PHP WordPress Course</title>
+    <meta name="description" content="Use traits for code reuse.">
+    <meta name="keywords" content="PHP, WordPress, web development, php, traits">
+    <meta name="author" content="PHP WordPress Course">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/favicon.png">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/assets/css/main.css">
 </head>
 <body>
-    <header>
-        <h1>Traits in PHP</h1>
-        <p><a href="index.html">← Back to Syllabus</a></p>
-    </header>
+    <!-- Skip to main content -->
+    <a href="#main-content" class="sr-only">Skip to main content</a>
     
-    <main>
-        <section class="module-intro">
-            <h2>Solving the Multiple Inheritance Problem</h2>
-            <p>Welcome to our exploration of traits in PHP! In our previous lessons, we've covered classes, inheritance, abstract classes, interfaces, and namespaces. Today, we'll be diving into traits - a powerful feature introduced in PHP 5.4 that enables code reuse in a single inheritance language like PHP.</p>
-            
-            <div class="note">
-                <p><strong>Why Traits Matter:</strong> In WordPress development, traits offer a solution for reusing code across different plugins and themes without the limitations of inheritance. They're particularly valuable for implementing common functionality like logging, caching, or data sanitization that needs to be consistent across different classes.</p>
-            </div>
-        </section>
-
-        <section id="trait-basics">
-            <h2>What Are Traits?</h2>
-            
-            <p>Think of traits as code snippets or mixins that can be "injected" into classes. While inheritance allows a class to extend only one parent class, traits allow you to reuse methods in multiple classes regardless of their inheritance hierarchy.</p>
-            
-            <div class="diagram">
-                <h3>Traits vs. Inheritance</h3>
-                <div class="mermaid">
-                    classDiagram
-                      class ParentClass {
-                        +parentMethod()
-                      }
-                      class LoggableTrait {
-                        <<trait>>
-                        +log()
-                        +getLogHistory()
-                      }
-                      class CacheTrait {
-                        <<trait>>
-                        +cache()
-                        +getCached()
-                      }
-                      class ChildClass1 {
-                        +parentMethod()
-                        +log()
-                        +getLogHistory()
-                        +childMethod1()
-                      }
-                      class ChildClass2 {
-                        +parentMethod()
-                        +cache()
-                        +getCached()
-                        +log()
-                        +getLogHistory()
-                        +childMethod2()
-                      }
-                      ParentClass <|-- ChildClass1 : Inheritance
-                      ParentClass <|-- ChildClass2 : Inheritance
-                      LoggableTrait .. ChildClass1 : Uses
-                      CacheTrait .. ChildClass2 : Uses
-                      LoggableTrait .. ChildClass2 : Uses
+    <div class="page-wrapper">
+                <!-- Header -->
+        <header class="site-header" role="banner">
+            <div class="header-container">
+                <div class="site-branding">
+                    <a href="/" class="site-logo">
+                        <h1 class="site-title">PHP WordPress Development</h1>
+                    </a>
+                </div>
+                
+                <nav class="main-navigation" role="navigation" aria-label="Main navigation">
+                    <button class="mobile-menu-btn" aria-label="Toggle navigation" aria-expanded="false">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    
+                    <div class="nav-menu">
+                        <ul class="nav-list">
+                            <li class="nav-item"><a href="/" class="nav-link">Home</a></li>
+                            <li class="nav-item dropdown">
+                                <button class="nav-link dropdown-toggle active" aria-haspopup="true">Modules</button>
+                                <div class="dropdown-menu">
+                                    <a href="/module1.html" class="dropdown-item">Module 1: Web Fundamentals</a>
+                                    <a href="/module2.html" class="dropdown-item active">Module 2: PHP Fundamentals</a>
+                                    <a href="/module3.html" class="dropdown-item">Module 3: MySQL Database</a>
+                                    <a href="/module4.html" class="dropdown-item">Module 4: WordPress & Docker</a>
+                                    <a href="/module5.html" class="dropdown-item">Module 5: Theme Development</a>
+                                    <a href="/module6.html" class="dropdown-item">Module 6: Plugin Development</a>
+                                    <a href="/module7.html" class="dropdown-item">Module 7: Advanced WordPress</a>
+                                    <a href="/module8.html" class="dropdown-item">Module 8: Deployment</a>
+                                    <a href="/module9.html" class="dropdown-item">Module 9: Final Project</a>
+                                </div>
+                            </li>
+                            <li class="nav-item"><a href="/resources.html" class="nav-link">Resources</a></li>
+                            <li class="nav-item"><a href="/about.html" class="nav-link">About</a></li>
+                        </ul>
+                    </div>
+                </nav>
+                
+                <div class="search-container">
+                    <div class="search-input-wrapper">
+                        <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                        </svg>
+                        <input type="search" class="search-input" placeholder="Search lessons..." aria-label="Search">
+                    </div>
+                    <div class="search-results"></div>
                 </div>
             </div>
-            
-            <p>In this diagram, <code>ChildClass1</code> and <code>ChildClass2</code> both inherit from <code>ParentClass</code> but also use different traits. <code>ChildClass2</code> uses both the <code>CacheTrait</code> and <code>LoggableTrait</code>, demonstrating how traits allow for horizontal code reuse.</p>
-            
-            <div class="analogy">
-                <h3>The LEGO Building Blocks Analogy</h3>
-                <p>Think of traits as specialized LEGO building blocks that you can snap onto different models. While inheritance is like creating a new model by modifying an existing one (vertical reuse), traits are like having a collection of special blocks (jet engines, wheels, weapons) that you can add to any model regardless of what it's based on (horizontal reuse).</p>
-                <p>For example, you can add jet engines to a car, a spaceship, or even a medieval castle - they're independent components that add functionality wherever they're needed, without changing the underlying model type.</p>
+        </header>
+                <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-header">
+                <h2 class="progress-title">Course Progress</h2>
+                <span class="progress-text">Loading...</span>
             </div>
-        </section>
-
-        <section id="trait-syntax">
-            <h2>Trait Syntax in PHP</h2>
-            
-            <p>In PHP, traits are declared using the <code>trait</code> keyword, and classes use them with the <code>use</code> keyword.</p>
-            
-            <div class="code-example">
-                <h3>Basic Trait Declaration and Usage</h3>
-                <pre><code>
-// Define a trait
-trait Loggable {
-    // Properties in traits
-    protected $logMessages = [];
-    
-    // Methods in traits
-    public function log($message) {
-        $timestamp = date('Y-m-d H:i:s');
-        $this->logMessages[] = "[{$timestamp}] {$message}";
-    }
-    
-    public function getLogMessages() {
-        return $this->logMessages;
-    }
-    
-    public function clearLogs() {
-        $this->logMessages = [];
-        return $this;
-    }
-}
-
-// Using the trait in a class
-class User {
-    // Include the Loggable trait
-    use Loggable;
-    
-    private $username;
-    private $email;
-    
-    public function __construct($username, $email) {
-        $this->username = $username;
-        $this->email = $email;
-        
-        // Using a method from the trait
-        $this->log("User {$username} created");
-    }
-    
-    public function updateEmail($newEmail) {
-        $oldEmail = $this->email;
-        $this->email = $newEmail;
-        
-        // Using a method from the trait
-        $this->log("Email changed from {$oldEmail} to {$newEmail}");
-    }
-}
-
-// Another class using the same trait
-class Product {
-    // Include the Loggable trait
-    use Loggable;
-    
-    private $name;
-    private $price;
-    
-    public function __construct($name, $price) {
-        $this->name = $name;
-        $this->price = $price;
-        
-        // Using a method from the trait
-        $this->log("Product {$name} created with price \${$price}");
-    }
-    
-    public function updatePrice($newPrice) {
-        $oldPrice = $this->price;
-        $this->price = $newPrice;
-        
-        // Using a method from the trait
-        $this->log("Price changed from \${$oldPrice} to \${$newPrice}");
-    }
-}
-
-// Using the classes
-$user = new User('john_doe', 'john@example.com');
-$user->updateEmail('john.doe@example.com');
-
-$product = new Product('Awesome Widget', 29.99);
-$product->updatePrice(24.99);
-
-// Accessing logs from both objects
-print_r($user->getLogMessages());
-print_r($product->getLogMessages());
-                </code></pre>
+            <div class="progress-bar">
+                <div class="progress-bar-fill">
+                    <span class="progress-bar-text"></span>
+                </div>
             </div>
-            
-            <h3>Key Features of Traits</h3>
-            
-            <ul>
-                <li>Traits can contain properties, methods, and static methods</li>
-                <li>Traits cannot be instantiated on their own</li>
-                <li>A class can use multiple traits</li>
-                <li>Traits can use other traits</li>
-                <li>Methods defined in the class override methods in the trait</li>
-                <li>Methods from a parent class are overridden by methods in a trait</li>
-                <li>Trait methods can access properties and methods of the class using them</li>
-            </ul>
-        </section>
-
-        <section id="multiple-traits">
-            <h2>Using Multiple Traits</h2>
-            
-            <p>One of the most powerful aspects of traits is that a class can use multiple traits, bringing in functionality from different sources.</p>
-            
-            <div class="code-example">
-                <h3>Using Multiple Traits</h3>
-                <pre><code>
-// Another trait for caching
-trait Cacheable {
-    private $cache = [];
-    
-    public function setCache($key, $value) {
-        $this->cache[$key] = $value;
-    }
-    
-    public function getCache($key) {
-        return isset($this->cache[$key]) ? $this->cache[$key] : null;
-    }
-    
-    public function clearCache() {
-        $this->cache = [];
-        return $this;
-    }
-}
-
-// Trait for database access
-trait DatabaseAccess {
-    protected $db;
-    
-    public function connectToDatabase($credentials) {
-        // Simulate connecting to database
-        $this->db = "Connected to {$credentials['host']} as {$credentials['user']}";
-        return $this;
-    }
-    
-    public function query($sql) {
-        return "Executing query: {$sql}";
-    }
-}
-
-// Class using multiple traits
-class ApiClient {
-    // Use multiple traits
-    use Loggable, Cacheable, DatabaseAccess;
-    
-    private $apiKey;
-    
-    public function __construct($apiKey, $dbCredentials) {
-        $this->apiKey = $apiKey;
+        </div>
+                <!-- Breadcrumb -->
+        <nav class="breadcrumb container" aria-label="Breadcrumb">
+            <ol class="breadcrumb-list">
+                <li class="breadcrumb-item">
+                    <a href="/">Home</a>
+                    <span class="breadcrumb-separator">/</span>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="/module2.html">Module 2</a>
+                    <span class="breadcrumb-separator">/</span>
+                </li>
+                <li class="breadcrumb-item">
+                    <span aria-current="page">PHP Traits</span>
+                </li>
+            </ol>
+        </nav>
         
-        // Using methods from traits
-        $this->connectToDatabase($dbCredentials);
-        $this->log("API Client initialized and connected to database");
-    }
-    
-    public function fetchData($endpoint) {
-        // Check cache first (using Cacheable trait)
-        $cacheKey = "endpoint_{$endpoint}";
-        $cachedResult = $this->getCache($cacheKey);
-        
-        if ($cachedResult) {
-            $this->log("Returning cached data for {$endpoint}");
-            return $cachedResult;
-        }
-        
-        // Simulate API call
-        $this->log("Fetching fresh data from {$endpoint}");
-        $result = "Data from {$endpoint} with key {$this->apiKey}";
-        
-        // Store in cache (using Cacheable trait)
-        $this->setCache($cacheKey, $result);
-        
-        return $result;
-    }
-}
+        <!-- Main Content -->
+        <main id="main-content" class="main-content" role="main">
+            <div class="container">
+                <div class="content-with-sidebar">
+                                        <!-- Sidebar -->
+                    <aside class="sidebar">
+                        <div class="sidebar-nav">
+                            <h3 class="sidebar-title">Module 2: Object-Oriented PHP</h3>
+                            <div class="sidebar-section">
+                                <h4 class="sidebar-section-title">Lessons</h4>
+                                <a href="/02module/intro_to_oop.html" class="sidebar-link">Introduction to OOP</a>
+                                <a href="/02module/php_oop_concepts.html" class="sidebar-link">PHP OOP Concepts</a>
+                                <a href="/02module/classes_and_objects.html" class="sidebar-link">Classes and Objects</a>
+                                <a href="/02module/php_creating_classes_and instantiating_objects.html" class="sidebar-link">Creating Classes</a>
+                                <a href="/02module/php_constructor_and_destructor.html" class="sidebar-link">Constructors and Destructors</a>
+                                <a href="/02module/php_access_modifiers.html" class="sidebar-link">Access Modifiers</a>
+                                <a href="/02module/php_this_keyword.html" class="sidebar-link">The $this Keyword</a>
+                                <a href="/02module/php_static_properties_and_methods.html" class="sidebar-link">Static Properties and Methods</a>
+                                <a href="/02module/inheritance_and_polymorphism.html" class="sidebar-link">Inheritance and Polymorphism</a>
+                                <a href="/02module/php_inheritance.html" class="sidebar-link">PHP Inheritance</a>
+                                <a href="/02module/php_method_overriding.html" class="sidebar-link">Method Overriding</a>
+                                <a href="/02module/interfaces_and_abstract_classes.html" class="sidebar-link">Interfaces and Abstract Classes</a>
+                                <a href="/02module/php_interfaces.html" class="sidebar-link">PHP Interfaces</a>
+                                <a href="/02module/php_abstract_classes.html" class="sidebar-link">PHP Abstract Classes</a>
+                                <a href="/02module/php_traits.html" class="sidebar-link active">PHP Traits</a>
+                                <a href="/02module/php_namespaces.html" class="sidebar-link">PHP Namespaces</a>
+                                <a href="/02module/homework_php_create_simple_class.html" class="sidebar-link">Homework: Create Simple Class</a>
+                                <a href="/02module/homework_php_extend_with_inheritance.html" class="sidebar-link">Homework: Inheritance</a>
+                                <a href="/02module/homework_oop_project.html" class="sidebar-link">Homework: OOP Project</a>
+                            </div>
+                        </div>
+                    </aside>
+                    
+                    <!-- Main Lesson Content -->
+                    <article class="lesson-content">
+                        <header class="lesson-header">
+                            <h1>PHP Traits</h1>
+                            <div class="lesson-meta">
+                                <div class="lesson-meta-item">
+                                    <svg width="20" height="20" fill="currentColor">
+                                        <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    <span>Duration: 45 minutes</span>
+                                </div>
+                                <div class="lesson-meta-item">
+                                    <svg width="20" height="20" fill="currentColor">
+                                        <path d="M12 14l9-5-9-5-9 5 9 5z"/>
+                                    </svg>
+                                    <span>Module 2: Object-Oriented PHP</span>
+                                </div>
+                            </div>
+                        </header>
 
-// Using the class
-$client = new ApiClient('secret_key_123', [
-    'host' => 'localhost',
-    'user' => 'root',
-    'password' => 'secret'
-]);
-
-echo $client->fetchData('/users'); // Makes API call
-echo $client->fetchData('/users'); // Gets from cache
-
-// Check logs
-print_r($client->getLogMessages());
-                </code></pre>
-            </div>
-            
-            <div class="pro-tip">
-                <h3>Organizing Trait Usage</h3>
-                <p>When using multiple traits, it's a good practice to organize them in a logical way. Group related traits on the same line and separate unrelated traits on different lines for better readability:</p>
-                <pre><code>
-class ApiClient {
-    // Related traits for data handling
-    use Cacheable, Serializable;
-    
-    // Related traits for infrastructure
-    use Loggable, Configurable;
-    
-    // Related traits for authentication
-    use Authenticatable, TokenStorage;
-    
-    // Rest of the class...
-}
-                </code></pre>
-            </div>
-        </section>
-
-        <section id="trait-methods-overriding">
-            <h2>Method Precedence and Conflict Resolution</h2>
-            
-            <p>When a class uses multiple traits that contain methods with the same name, or when a trait method has the same name as a method in the class or its parent, PHP follows specific rules to resolve these conflicts.</p>
-            
-            <div class="diagram">
-                <h3>Method Precedence Order</h3>
-                <div class="mermaid">
-                    graph TD
-                        A[Method defined in the class itself] --> B[Methods from traits]
-                        B --> C[Methods from parent class]
+                                                <!-- Learning Objectives -->
+                        <div class="lesson-objectives">
+                            <h2>Learning Objectives</h2>
+                            <ul>
+                                <li>Master PHP programming concepts</li>
+                                <li>Write clean, maintainable code</li>
+                                <li>Apply best practices</li>
+                                <li>Build dynamic applications</li>
+                            </ul>
+                        </div>
                         
-                        D[Conflict between traits?] --> E[Must be explicitly resolved\nusing the 'insteadof' keyword]
+                        <!-- Lesson Body -->
+                        <div class="lesson-body">
+                                                        <section>
+                                <h2>Introduction</h2>
+                                <p class="lead">Use traits for code reuse.</p>
+                                
+                                <div class="alert alert-info">
+                                    <div class="alert-icon">💡</div>
+                                    <div class="alert-content">
+                                        <div class="alert-title">Key Concept</div>
+                                        <div class="alert-message">PHP is the foundation of WordPress. Every concept you learn here will directly apply to WordPress development.</div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Core Concepts</h2>
+                                <p>This lesson covers essential PHP concepts for WordPress development.</p>
+                                
+                                <pre><code class="language-php">&lt;?php
+// Example PHP code
+// Tailored to the specific lesson topic
+?&gt;</code></pre>
+                                
+                                <div class="best_practice">
+                                    <h3>Best Practices</h3>
+                                    <ul>
+                                        <li>Follow PSR coding standards</li>
+                                        <li>Always validate user input</li>
+                                        <li>Use prepared statements for databases</li>
+                                        <li>Implement proper error handling</li>
+                                        <li>Keep security as top priority</li>
+                                    </ul>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Practical Examples</h2>
+                                <p>Real-world examples to reinforce your learning.</p>
+                                
+                                <div class="example-code">
+                                    <h3>Example Implementation</h3>
+                                    <pre><code class="language-php">&lt;?php
+// Practical example
+// Specific to lesson content
+?&gt;</code></pre>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>WordPress Application</h2>
+                                <div class="real_world_example">
+                                    <h3>How This Applies to WordPress</h3>
+                                    <p>This PHP concept is essential for WordPress because:</p>
+                                    <ul>
+                                        <li>WordPress core uses these patterns</li>
+                                        <li>Themes require this knowledge</li>
+                                        <li>Plugins implement these concepts</li>
+                                        <li>Custom functionality depends on it</li>
+                                    </ul>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Practice Exercise</h2>
+                                <p>Apply what you've learned with hands-on practice.</p>
+                                
+                                <div class="alert alert-success">
+                                    <div class="alert-icon">💻</div>
+                                    <div class="alert-content">
+                                        <div class="alert-title">Try It Now</div>
+                                        <div class="alert-message">Open your PHP environment and practice these concepts!</div>
+                                    </div>
+                                </div>
+                            </section>
+                            
+                                                        <!-- Practice -->
+                            <div class="homework">
+                                <h2>Practice Exercises</h2>
+                                <p>Reinforce your learning with these exercises:</p>
+                                <ul>
+                                    <li>Review lesson code examples</li>
+                                    <li>Complete practice problems</li>
+                                    <li>Experiment with variations</li>
+                                    <li>Research related PHP functions</li>
+                                </ul>
+                                
+                                <p><strong>Challenge:</strong> Build a small project using these concepts.</p>
+                            </div>
+                            
+                                                        <!-- Resources -->
+                            <section class="resources">
+                                <h2>Additional Resources</h2>
+                                <ul>
+                                    <li><a href="https://www.php.net/manual/en/" target="_blank">PHP Official Documentation</a></li>
+                                    <li><a href="https://phptherightway.com/" target="_blank">PHP: The Right Way</a></li>
+                                    <li><a href="https://www.w3schools.com/php/" target="_blank">W3Schools PHP Tutorial</a></li>
+                                    <li><a href="https://developer.wordpress.org/apis/" target="_blank">WordPress Developer Resources</a></li>
+                                    <li><a href="https://www.phptutorial.net/" target="_blank">PHP Tutorial</a></li>
+                                </ul>
+                            </section>
+                        </div>
+
+                                                <!-- Lesson Navigation -->
+                        <div class="lesson-navigation">
+                            <a href="/module2.html" class="lesson-nav-button prev">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"/>
+                                </svg>
+                                <span>
+                                    <small>Back to</small><br>
+                                    Module 2 Overview
+                                </span>
+                            </a>
+                            
+                            <button class="complete-lesson-btn">
+                                Mark as Complete
+                            </button>
+                            
+                            <a href="/module3.html" class="lesson-nav-button next">
+                                <span>
+                                    <small>Next Module</small><br>
+                                    Module 3: MySQL Database
+                                </span>
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </article>
                 </div>
             </div>
-            
-            <p>The precedence order for methods is:</p>
-            <ol>
-                <li>Methods defined in the current class</li>
-                <li>Methods defined in traits</li>
-                <li>Methods defined in the parent class</li>
-            </ol>
-            
-            <div class="code-example">
-                <h3>Method Conflict Resolution</h3>
-                <pre><code>
-trait Logger {
-    public function log($message) {
-        echo "Logger: {$message}<br>";
-    }
-    
-    public function getType() {
-        return "Simple Logger";
-    }
-}
+        </main>
 
-trait FileLogger {
-    public function log($message) {
-        echo "FileLogger: Writing to file: {$message}<br>";
-    }
-    
-    public function getType() {
-        return "File Logger";
-    }
-}
-
-class App {
-    // Method conflict! Both traits have log() and getType() methods
-    use Logger, FileLogger {
-        // Resolve conflicts using 'insteadof' keyword
-        Logger::log insteadof FileLogger; // Use Logger's log method
-        FileLogger::getType insteadof Logger; // Use FileLogger's getType method
-        
-        // Rename methods using 'as' keyword to keep access to both
-        FileLogger::log as logToFile; // Rename FileLogger's log to logToFile
-        Logger::getType as getSimpleType; // Rename Logger's getType to getSimpleType
-    }
-    
-    public function doSomething() {
-        // Uses Logger's log method (due to conflict resolution above)
-        $this->log("Operation performed");
-        
-        // Uses renamed method from FileLogger
-        $this->logToFile("Operation details for file");
-        
-        // Uses FileLogger's getType method (due to conflict resolution above)
-        echo "Logger type: " . $this->getType() . "<br>";
-        
-        // Uses renamed method from Logger
-        echo "Simple type: " . $this->getSimpleType() . "<br>";
-    }
-}
-
-$app = new App();
-$app->doSomething();
-                </code></pre>
-            </div>
-            
-            <h3>Overriding Trait Methods in Classes</h3>
-            
-            <p>Class methods always override trait methods with the same name. This allows classes to customize or extend the behavior provided by traits.</p>
-            
-            <div class="code-example">
-                <h3>Overriding Trait Methods</h3>
-                <pre><code>
-trait Notifier {
-    public function sendNotification($message) {
-        echo "Sending notification: {$message}<br>";
-    }
-}
-
-class EmailNotifier {
-    use Notifier;
-    
-    // Override the trait's method
-    public function sendNotification($message) {
-        // Add custom behavior
-        $recipient = $this->getRecipientEmail();
-        
-        echo "Sending EMAIL notification to {$recipient}: {$message}<br>";
-    }
-    
-    private function getRecipientEmail() {
-        return 'admin@example.com';
-    }
-}
-
-class SMSNotifier {
-    use Notifier;
-    
-    // Override the trait's method
-    public function sendNotification($message) {
-        // Call the trait's original method
-        Notifier::sendNotification("SMS: {$message}");
-        
-        // Add additional behavior
-        echo "SMS notification sent to " . $this->getPhoneNumber() . "<br>";
-    }
-    
-    private function getPhoneNumber() {
-        return '123-456-7890';
-    }
-}
-
-// Using the classes
-$email = new EmailNotifier();
-$email->sendNotification("New user registered");
-
-$sms = new SMSNotifier();
-$sms->sendNotification("System alert");
-                </code></pre>
-            </div>
-            
-            <div class="note">
-                <h3>Accessing the Original Trait Method</h3>
-                <p>Unlike with parent class methods, there's no direct equivalent to <code>parent::method()</code> for calling the original trait method when overriding it in a class. However, you can use the trait name as shown in the <code>SMSNotifier</code> example above, or you can use method aliasing to keep access to the original method.</p>
-            </div>
-        </section>
-
-        <section id="trait-properties">
-            <h2>Properties in Traits</h2>
-            
-            <p>Traits can define properties, just like classes. However, there are some important rules regarding property compatibility that you need to understand.</p>
-            
-            <div class="code-example">
-                <h3>Trait Property Rules</h3>
-                <pre><code>
-trait WithProperties {
-    // Properties in traits
-    public $publicProp = 'Public Value';
-    protected $protectedProp = 'Protected Value';
-    private $privateProp = 'Private Value';
-    
-    // Methods to access properties
-    public function getPublic() {
-        return $this->publicProp;
-    }
-    
-    public function getProtected() {
-        return $this->protectedProp;
-    }
-    
-    public function getPrivate() {
-        return $this->privateProp;
-    }
-}
-
-class TestProperties {
-    // Properties in the class with the same name
-    public $publicProp = 'Class Public Value';
-    
-    // Use the trait
-    use WithProperties;
-    
-    public function showProperties() {
-        echo "publicProp: " . $this->publicProp . "<br>";
-        echo "protectedProp: " . $this->protectedProp . "<br>";
-        echo "From getPrivate(): " . $this->getPrivate() . "<br>";
-    }
-}
-
-$test = new TestProperties();
-$test->showProperties();
-                </code></pre>
-            </div>
-            
-            <h3>Property Compatibility Rules</h3>
-            
-            <p>When a trait defines a property with the same name as a property in the class using it, PHP enforces strict compatibility rules:</p>
-            
-            <ul>
-                <li>The property in the class and the trait must have the same visibility (public, protected, or private)</li>
-                <li>If both properties have an initial value, the class property's value takes precedence</li>
-                <li>If the properties have different visibility, PHP will raise a fatal error</li>
-            </ul>
-            
-            <div class="code-example">
-                <h3>Property Compatibility Example</h3>
-                <pre><code>
-trait WithCounter {
-    public $counter = 0;
-    
-    public function increment() {
-        $this->counter++;
-        return $this;
-    }
-}
-
-class CompatibleClass {
-    // Same visibility as trait property (both public)
-    public $counter = 100; // Initial value will be used instead of trait's 0
-    
-    use WithCounter;
-}
-
-class IncompatibleClass {
-    // Different visibility from trait property (protected vs public)
-    protected $counter = 200; // This will cause a fatal error
-    
-    use WithCounter;
-}
-
-$compatible = new CompatibleClass();
-echo $compatible->counter; // Outputs 100, not 0
-$compatible->increment();
-echo $compatible->counter; // Outputs 101
-
-// This would cause a fatal error:
-// $incompatible = new IncompatibleClass();
-                </code></pre>
-            </div>
-            
-            <div class="pro-tip">
-                <h3>Handling Property Conflicts</h3>
-                <p>To avoid property conflicts, you can:</p>
-                <ol>
-                    <li>Use unique property names in your traits</li>
-                    <li>Prefix property names with the trait name</li>
-                    <li>Prefer methods to access and modify properties instead of direct property access</li>
-                </ol>
-                <pre><code>
-// Better approach to avoid property conflicts
-trait Counter {
-    private $counterValue = 0;
-    
-    public function getValue() {
-        return $this->counterValue;
-    }
-    
-    public function increment() {
-        $this->counterValue++;
-        return $this;
-    }
-    
-    public function reset() {
-        $this->counterValue = 0;
-        return $this;
-    }
-}
-
-class MyClass {
-    // No conflict with trait property
-    private $counter = 100;
-    
-    use Counter;
-    
-    public function getCounter() {
-        return $this->counter;
-    }
-}
-                </code></pre>
-            </div>
-        </section>
-
-        <section id="trait-composition">
-            <h2>Composing Traits from Traits</h2>
-            
-            <p>Traits can use other traits, allowing you to compose more complex traits from simpler ones. This is a powerful way to build up functionality in a modular, reusable manner.</p>
-            
-            <div class="diagram">
-                <h3>Trait Composition</h3>
-                <div class="mermaid">
-                    classDiagram
-                      class TimestampTrait {
-                        <<trait>>
-                        +getCreatedAt()
-                        +getUpdatedAt()
-                      }
-                      class JsonTrait {
-                        <<trait>>
-                        +toJson()
-                        +fromJson()
-                      }
-                      class SerializableTrait {
-                        <<trait>>
-                        +serialize()
-                        +unserialize()
-                        +toJson()
-                        +fromJson()
-                        +getCreatedAt()
-                        +getUpdatedAt()
-                      }
-                      class User {
-                        +serialize()
-                        +unserialize()
-                        +toJson()
-                        +fromJson()
-                        +getCreatedAt()
-                        +getUpdatedAt()
-                      }
-                      TimestampTrait -- SerializableTrait : Uses
-                      JsonTrait -- SerializableTrait : Uses
-                      SerializableTrait -- User : Uses
-                </div>
-            </div>
-            
-            <div class="code-example">
-                <h3>Trait Composition Example</h3>
-                <pre><code>
-// Base traits
-trait Timestamp {
-    private $createdAt;
-    private $updatedAt;
-    
-    public function initTimestamps() {
-        $this->createdAt = $this->updatedAt = time();
-        return $this;
-    }
-    
-    public function updateTimestamp() {
-        $this->updatedAt = time();
-        return $this;
-    }
-    
-    public function getCreatedAt() {
-        return $this->createdAt;
-    }
-    
-    public function getUpdatedAt() {
-        return $this->updatedAt;
-    }
-}
-
-trait JsonConversion {
-    public function toJson() {
-        return json_encode(get_object_vars($this));
-    }
-    
-    public function fromJson($json) {
-        $data = json_decode($json, true);
-        
-        foreach ($data as $key => $value) {
-            if (property_exists($this, $key)) {
-                $this->$key = $value;
-            }
-        }
-        
-        return $this;
-    }
-}
-
-// Composite trait using both basic traits
-trait Serializable {
-    // Use the component traits
-    use Timestamp, JsonConversion;
-    
-    // Add additional methods
-    public function serialize() {
-        // Make sure timestamp is updated
-        $this->updateTimestamp();
-        
-        // Use the method from JsonConversion trait
-        return $this->toJson();
-    }
-    
-    public function unserialize($data) {
-        // Use the method from JsonConversion trait
-        return $this->fromJson($data);
-    }
-}
-
-// Class using the composite trait
-class User {
-    private $id;
-    private $name;
-    private $email;
-    
-    // Use the composite trait
-    use Serializable;
-    
-    public function __construct($id, $name, $email) {
-        $this->id = $id;
-        $this->name = $name;
-        $this->email = $email;
-        
-        // Initialize timestamps from the trait
-        $this->initTimestamps();
-    }
-    
-    public function updateProfile($name, $email) {
-        $this->name = $name;
-        $this->email = $email;
-        
-        // Update timestamp from the trait
-        $this->updateTimestamp();
-        return $this;
-    }
-}
-
-// Using the class
-$user = new User(1, 'John Doe', 'john@example.com');
-
-// Serializing user (uses methods from traits)
-$serialized = $user->serialize();
-echo "Serialized: " . $serialized . "<br>";
-
-// Update user
-$user->updateProfile('John Smith', 'john.smith@example.com');
-
-// Created and updated times (from Timestamp trait)
-echo "Created: " . date('Y-m-d H:i:s', $user->getCreatedAt()) . "<br>";
-echo "Updated: " . date('Y-m-d H:i:s', $user->getUpdatedAt()) . "<br>";
-
-// Create a new user from serialized data
-$newUser = new User(0, '', '');
-$newUser->unserialize($serialized);
-
-echo "Unserialized user's email: " . $newUser->email . "<br>";
-                </code></pre>
-            </div>
-            
-            <div class="pro-tip">
-                <h3>Trait Composition vs. Inheritance</h3>
-                <p>Trait composition and class inheritance serve different purposes:</p>
-                <ul>
-                    <li><strong>Inheritance</strong> is for "is-a" relationships: A Car <em>is a</em> Vehicle</li>
-                    <li><strong>Traits</strong> are for "has ability" relationships: A User <em>has the ability</em> to be serialized</li>
-                </ul>
-                <p>Use inheritance for taxonomic relationships and traits for cross-cutting concerns that apply to many different types of classes.</p>
-            </div>
-        </section>
-
-        <section id="trait-methods-visibility">
-            <h2>Changing Method Visibility</h2>
-            
-            <p>PHP allows you to change the visibility of trait methods when using them in a class. This provides flexibility in how you expose trait functionality.</p>
-            
-            <div class="code-example">
-                <h3>Changing Method Visibility</h3>
-                <pre><code>
-trait Validator {
-    public function validate($data) {
-        // Common validation logic
-        if (empty($data)) {
-            return false;
-        }
-        
-        return $this->doValidation($data);
-    }
-    
-    protected function doValidation($data) {
-        // Default validation logic
-        return true;
-    }
-}
-
-class UserValidator {
-    use Validator {
-        // Change visibility: make protected method public
-        doValidation as public;
-    }
-    
-    // Override doValidation with custom logic
-    public function doValidation($data) {
-        // Check for required fields
-        if (!isset($data['username']) || !isset($data['email'])) {
-            return false;
-        }
-        
-        // Validate email format
-        if (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
-            return false;
-        }
-        
-        return true;
-    }
-}
-
-class PostValidator {
-    use Validator {
-        // Change visibility and rename method
-        validate as private validateData;
-    }
-    
-    // New public method that uses the trait's method
-    public function isValid($post) {
-        return $this->validateData($post);
-    }
-    
-    // Override doValidation with custom logic
-    protected function doValidation($data) {
-        // Check for required fields
-        if (!isset($data['title']) || !isset($data['content'])) {
-            return false;
-        }
-        
-        // Check minimum content length
-        if (strlen($data['content']) < 100) {
-            return false;
-        }
-        
-        return true;
-    }
-}
-
-// Using the classes
-$userValidator = new UserValidator();
-$isValid = $userValidator->validate([
-    'username' => 'john_doe',
-    'email' => 'john@example.com'
-]);
-echo "User valid: " . ($isValid ? 'Yes' : 'No') . "<br>";
-
-// We can also call the now-public doValidation method directly
-$isValid = $userValidator->doValidation([
-    'username' => 'john_doe',
-    'email' => 'invalid-email'
-]);
-echo "User valid (direct): " . ($isValid ? 'Yes' : 'No') . "<br>";
-
-// Using the post validator
-$postValidator = new PostValidator();
-$isValid = $postValidator->isValid([
-    'title' => 'My Post',
-    'content' => 'This post is too short.'
-]);
-echo "Post valid: " . ($isValid ? 'Yes' : 'No') . "<br>";
-
-// This would cause an error since validate was made private
-// $postValidator->validate([...]);
-                </code></pre>
-            </div>
-            
-            <div class="pro-tip">
-                <h3>When to Change Method Visibility</h3>
-                <p>Changing method visibility is particularly useful when:</p>
-                <ul>
-                    <li>You want to use a trait designed for one purpose in a slightly different context</li>
-                    <li>You want to hide some methods of a trait to provide a cleaner public API</li>
-                    <li>You need to make protected/private methods accessible for testing</li>
-                </ul>
-            </div>
-        </section>
-
-        <section id="traits-abstract-static">
-            <h2>Advanced Trait Features</h2>
-            
-            <h3>Abstract Methods in Traits</h3>
-            
-            <p>Traits can contain abstract methods, forcing classes that use them to implement these methods. This is a powerful way to ensure classes fulfill the requirements of the trait.</p>
-            
-            <div class="code-example">
-                <h3>Abstract Methods in Traits</h3>
-                <pre><code>
-trait Configurable {
-    // Trait properties
-    protected $config = [];
-    
-    // Concrete method
-    public function setConfig($key, $value) {
-        $this->config[$key] = $value;
-        return $this;
-    }
-    
-    public function getConfig($key = null) {
-        if ($key === null) {
-            return $this->config;
-        }
-        
-        return isset($this->config[$key]) ? $this->config[$key] : null;
-    }
-    
-    // Abstract method - classes using this trait must implement this
-    abstract public function getDefaultConfig();
-    
-    // Method that uses the abstract method
-    public function initialize() {
-        // Get default config from the implementing class
-        $this->config = $this->getDefaultConfig();
-        return $this;
-    }
-}
-
-class FileManager {
-    use Configurable;
-    
-    // Implementing the required abstract method
-    public function getDefaultConfig() {
-        return [
-            'base_path' => '/var/www/uploads',
-            'allowed_extensions' => ['jpg', 'png', 'pdf'],
-            'max_file_size' => 5 * 1024 * 1024 // 5MB
-        ];
-    }
-    
-    public function uploadFile($file) {
-        // Using the trait's methods
-        $basePath = $this->getConfig('base_path');
-        $maxSize = $this->getConfig('max_file_size');
-        
-        echo "Uploading file to {$basePath} (max size: {$maxSize} bytes)<br>";
-        // Implementation...
-    }
-}
-
-// Using the class
-$manager = new FileManager();
-$manager->initialize(); // Loads default config using the implemented method
-$manager->setConfig('max_file_size', 10 * 1024 * 1024); // Override a config value
-$manager->uploadFile(['name' => 'document.pdf']);
-                </code></pre>
-            </div>
-            
-            <h3>Static Methods and Properties in Traits</h3>
-            
-            <p>Traits can contain static methods and properties, which become part of the class using the trait.</p>
-            
-            <div class="code-example">
-                <h3>Static Members in Traits</h3>
-                <pre><code>
-trait Singleton {
-    // Static property
-    private static $instance = null;
-    
-    // Private constructor to prevent direct instantiation
-    private function __construct() {
-        // Initialization
-    }
-    
-    // Static method to get the singleton instance
-    public static function getInstance() {
-        if (self::$instance === null) {
-            // Create a new instance of the class using the trait
-            self::$instance = new static();
-        }
-        
-        return self::$instance;
-    }
-}
-
-class Database {
-    use Singleton;
-    
-    private $connection = null;
-    
-    // Private constructor (enforced by Singleton trait)
-    private function __construct() {
-        echo "Database connecting...<br>";
-        $this->connection = "Connected";
-    }
-    
-    public function query($sql) {
-        echo "Executing query: {$sql}<br>";
-        return ["result1", "result2"];
-    }
-}
-
-class Config {
-    use Singleton;
-    
-    private $settings = [];
-    
-    private function __construct() {
-        echo "Loading configuration...<br>";
-        $this->settings = [
-            'app_name' => 'My App',
-            'debug' => true
-        ];
-    }
-    
-    public function get($key) {
-        return isset($this->settings[$key]) ? $this->settings[$key] : null;
-    }
-}
-
-// Using the singleton classes
-$db = Database::getInstance(); // First call creates the instance
-$db->query("SELECT * FROM users");
-
-$db2 = Database::getInstance(); // Returns the same instance
-// $db and $db2 are the same object
-
-$config = Config::getInstance(); // Different class, different singleton
-echo "App name: " . $config->get('app_name') . "<br>";
-                </code></pre>
-            </div>
-            
-            <div class="note">
-                <h3>Important Note on static in Traits</h3>
-                <p>When a trait uses <code>self::</code>, it refers to the trait itself, not the class using the trait. Use <code>static::</code> (late static binding) to refer to the class using the trait.</p>
-                <pre><code>
-trait Logger {
-    public static function className() {
-        return self::class; // Returns 'Logger'
-    }
-    
-    public static function actualClass() {
-        return static::class; // Returns the class using the trait
-    }
-}
-
-class UserService {
-    use Logger;
-}
-
-echo UserService::className(); // Outputs 'Logger'
-echo UserService::actualClass(); // Outputs 'UserService'
-                </code></pre>
-            </div>
-        </section>
-
-        <section id="traits-wordpress">
-            <h2>Traits in WordPress Development</h2>
-            
-            <p>While WordPress core doesn't extensively use traits (mostly for backward compatibility with older PHP versions), modern WordPress development, especially for plugins and themes, can benefit greatly from traits.</p>
-            
-            <h3>Common Use Cases for Traits in WordPress</h3>
-            
-            <ol>
-                <li>Shared sanitization and validation methods</li>
-                <li>Logging and debugging functionality</li>
-                <li>Data formatting and transformation</li>
-                <li>Singleton pattern implementation</li>
-                <li>REST API response formatting</li>
-                <li>Caching implementation</li>
-                <li>Settings page helpers</li>
-            </ol>
-            
-            <div class="code-example">
-                <h3>WordPress Sanitization Trait</h3>
-                <pre><code>
-trait SanitizationTrait {
-    /**
-     * Sanitize text field.
-     *
-     * @param string $value The value to sanitize.
-     * @return string
-     */
-    public function sanitizeTextField($value) {
-        return sanitize_text_field($value);
-    }
-    
-    /**
-     * Sanitize email.
-     *
-     * @param string $value The value to sanitize.
-     * @return string
-     */
-    public function sanitizeEmail($value) {
-        return sanitize_email($value);
-    }
-    
-    /**
-     * Sanitize URL.
-     *
-     * @param string $value The value to sanitize.
-     * @return string
-     */
-    public function sanitizeUrl($value) {
-        return esc_url_raw($value);
-    }
-    
-    /**
-     * Sanitize textarea.
-     *
-     * @param string $value The value to sanitize.
-     * @return string
-     */
-    public function sanitizeTextarea($value) {
-        return sanitize_textarea_field($value);
-    }
-    
-    /**
-     * Sanitize array of values using a callback.
-     *
-     * @param array $values The array to sanitize.
-     * @param callable $callback The sanitization callback.
-     * @return array
-     */
-    public function sanitizeArray($values, $callback) {
-        if (!is_array($values)) {
-            return [];
-        }
-        
-        return array_map($callback, $values);
-    }
-}
-
-// Using the trait in a settings class
-class PluginSettings {
-    use SanitizationTrait;
-    
-    public function sanitizeOptions($input) {
-        $output = [];
-        
-        if (isset($input['title'])) {
-            $output['title'] = $this->sanitizeTextField($input['title']);
-        }
-        
-        if (isset($input['email'])) {
-            $output['email'] = $this->sanitizeEmail($input['email']);
-        }
-        
-        if (isset($input['website'])) {
-            $output['website'] = $this->sanitizeUrl($input['website']);
-        }
-        
-        if (isset($input['description'])) {
-            $output['description'] = $this->sanitizeTextarea($input['description']);
-        }
-        
-        if (isset($input['tags']) && is_array($input['tags'])) {
-            $output['tags'] = $this->sanitizeArray($input['tags'], [$this, 'sanitizeTextField']);
-        }
-        
-        return $output;
-    }
-}
-
-// Using the trait in a REST API controller
-class API_Controller {
-    use SanitizationTrait;
-    
-    public function register_routes() {
-        register_rest_route('my-plugin/v1', '/settings', [
-            'methods' => 'POST',
-            'callback' => [$this, 'update_settings'],
-            'permission_callback' => [$this, 'check_permissions'],
-        ]);
-    }
-    
-    public function update_settings($request) {
-        $params = $request->get_params();
-        
-        $sanitized = [
-            'name' => $this->sanitizeTextField($params['name'] ?? ''),
-            'email' => $this->sanitizeEmail($params['email'] ?? ''),
-            'url' => $this->sanitizeUrl($params['url'] ?? ''),
-            'message' => $this->sanitizeTextarea($params['message'] ?? ''),
-        ];
-        
-        // Update settings...
-        
-        return rest_ensure_response([
-            'success' => true,
-            'data' => $sanitized,
-        ]);
-    }
-    
-    public function check_permissions() {
-        return current_user_can('manage_options');
-    }
-}
-                </code></pre>
-            </div>
-            
-            <h3>WordPress Singleton Trait</h3>
-            
-            <div class="code-example">
-                <h3>Singleton Trait for WordPress Plugins</h3>
-                <pre><code>
-trait Singleton {
-    /**
-     * Protected class constructor to prevent direct object creation.
-     */
-    protected function __construct() {}
-    
-    /**
-     * Prevent object cloning.
-     */
-    final protected function __clone() {}
-    
-    /**
-     * Prevent unserializing.
-     */
-    final protected function __wakeup() {}
-    
-    /**
-     * Return the singleton instance of this class.
-     *
-     * @return static The singleton instance.
-     */
-    final public static function get_instance() {
-        static $instance = null;
-        
-        if (null === $instance) {
-            $instance = new static();
-        }
-        
-        return $instance;
-    }
-}
-
-/**
- * Main plugin class using the singleton trait.
- */
-class My_Plugin {
-    use Singleton;
-    
-    /**
-     * Plugin initialization.
-     */
-    protected function __construct() {
-        $this->setup_hooks();
-    }
-    
-    /**
-     * Setup plugin hooks.
-     */
-    private function setup_hooks() {
-        add_action('init', [$this, 'init']);
-        add_action('admin_menu', [$this, 'admin_menu']);
-    }
-    
-    /**
-     * Initialize plugin.
-     */
-    public function init() {
-        // Register post types, taxonomies, etc.
-    }
-    
-    /**
-     * Register admin menu.
-     */
-    public function admin_menu() {
-        add_menu_page(
-            'My Plugin',
-            'My Plugin',
-            'manage_options',
-            'my-plugin',
-            [$this, 'render_admin_page'],
-            'dashicons-admin-generic'
-        );
-    }
-    
-    /**
-     * Render admin page.
-     */
-    public function render_admin_page() {
-        echo '&lt;div class="wrap"&gt;';
-        echo '&lt;h1&gt;My Plugin&lt;/h1&gt;';
-        echo '&lt;p&gt;Welcome to the admin page!&lt;/p&gt;';
-        echo '&lt;/div&gt;';
-    }
-}
-
-// Initialize the plugin
-function my_plugin_init() {
-    return My_Plugin::get_instance();
-}
-add_action('plugins_loaded', 'my_plugin_init');
-                </code></pre>
-            </div>
-            
-            <h3>WordPress REST API Response Trait</h3>
-            
-            <div class="code-example">
-                <h3>REST API Response Trait</h3>
-                <pre><code>
-trait REST_API_Response {
-    /**
-     * Send a success response.
-     *
-     * @param mixed $data Response data.
-     * @param int $status HTTP status code.
-     * @return WP_REST_Response
-     */
-    protected function send_success($data = null, $status = 200) {
-        return rest_ensure_response([
-            'success' => true,
-            'data' => $data,
-        ]);
-    }
-    
-    /**
-     * Send an error response.
-     *
-     * @param string $message Error message.
-     * @param string $code Error code.
-     * @param int $status HTTP status code.
-     * @return WP_Error
-     */
-    protected function send_error($message, $code = 'error', $status = 400) {
-        return new WP_Error(
-            $code,
-            $message,
-            ['status' => $status]
-        );
-    }
-    
-    /**
-     * Check if user has required capability.
-     *
-     * @param string $capability WordPress capability.
-     * @return bool|WP_Error
-     */
-    protected function check_permission($capability = 'manage_options') {
-        if (!current_user_can($capability)) {
-            return $this->send_error(
-                'You do not have permission to access this resource.',
-                'rest_forbidden',
-                403
-            );
-        }
-        
-        return true;
-    }
-}
-
-/**
- * Custom endpoint controller using the response trait.
- */
-class Product_Controller {
-    use REST_API_Response;
-    
-    /**
-     * Register routes.
-     */
-    public function register_routes() {
-        register_rest_route('my-plugin/v1', '/products', [
-            'methods' => 'GET',
-            'callback' => [$this, 'get_products'],
-            'permission_callback' => [$this, 'get_products_permissions_check'],
-        ]);
-        
-        register_rest_route('my-plugin/v1', '/products/(?P<id>\d+)', [
-            'methods' => 'GET',
-            'callback' => [$this, 'get_product'],
-            'permission_callback' => [$this, 'get_product_permissions_check'],
-        ]);
-    }
-    
-    /**
-     * Check permissions for getting products.
-     *
-     * @return bool|WP_Error
-     */
-    public function get_products_permissions_check() {
-        return $this->check_permission('read');
-    }
-    
-    /**
-     * Check permissions for getting a product.
-     *
-     * @return bool|WP_Error
-     */
-    public function get_product_permissions_check() {
-        return $this->check_permission('read');
-    }
-    
-    /**
-     * Get products.
-     *
-     * @param WP_REST_Request $request Request object.
-     * @return WP_REST_Response|WP_Error
-     */
-    public function get_products($request) {
-        $products = [
-            ['id' => 1, 'name' => 'Product 1', 'price' => 29.99],
-            ['id' => 2, 'name' => 'Product 2', 'price' => 39.99],
-        ];
-        
-        return $this->send_success($products);
-    }
-    
-    /**
-     * Get a product.
-     *
-     * @param WP_REST_Request $request Request object.
-     * @return WP_REST_Response|WP_Error
-     */
-    public function get_product($request) {
-        $id = $request['id'];
-        
-        // Simple example - in real code you would fetch from database
-        if ($id == 1) {
-            return $this->send_success([
-                'id' => 1,
-                'name' => 'Product 1',
-                'price' => 29.99,
-                'description' => 'This is product 1',
-            ]);
-        }
-        
-        if ($id == 2) {
-            return $this->send_success([
-                'id' => 2,
-                'name' => 'Product 2',
-                'price' => 39.99,
-                'description' => 'This is product 2',
-            ]);
-        }
-        
-        return $this->send_error(
-            'Product not found',
-            'product_not_found',
-            404
-        );
-    }
-}
-
-// Initialize the controller
-function init_product_api() {
-    $controller = new Product_Controller();
-    $controller->register_routes();
-}
-add_action('rest_api_init', 'init_product_api');
-                </code></pre>
-            </div>
-        </section>
-
-        <section id="trait-best-practices">
-            <h2>Trait Best Practices</h2>
-            
-            <div class="best-practices">
-                <div class="practice">
-                    <h3>Keep Traits Focused</h3>
-                    <p>Each trait should have a single responsibility. Create small, focused traits rather than large, multipurpose ones.</p>
-                    <div class="code-example">
-                        <h4>Good: Focused traits</h4>
-                        <pre><code>
-// Good: Focused on a single responsibility
-trait Loggable {
-    private $logs = [];
-    
-    public function log($message) {
-        $this->logs[] = "[" . date('Y-m-d H:i:s') . "] {$message}";
-    }
-    
-    public function getLogs() {
-        return $this->logs;
-    }
-}
-
-// Good: Another focused trait
-trait Cacheable {
-    private $cache = [];
-    
-    public function setCache($key, $value) {
-        $this->cache[$key] = $value;
-    }
-    
-    public function getCache($key) {
-        return isset($this->cache[$key]) ? $this->cache[$key] : null;
-    }
-}
-
-// Bad: Too many responsibilities in one trait
-trait Utilities {
-    private $logs = [];
-    private $cache = [];
-    private $config = [];
-    
-    // Logging methods...
-    // Caching methods...
-    // Configuration methods...
-    // Validation methods...
-    // File handling methods...
-    // Database methods...
-    // And more...
-}
-                        </code></pre>
+                <!-- Footer -->
+        <footer class="site-footer" role="contentinfo">
+            <div class="footer-container">
+                <div class="footer-content">
+                    <div class="footer-section footer-about">
+                        <h3>PHP WordPress Development</h3>
+                        <p>Complete Web Development Course</p>
                     </div>
-                </div>
-                
-                <div class="practice">
-                    <h3>Name Traits Descriptively</h3>
-                    <p>Use clear, descriptive names for traits that indicate their purpose. Consider suffixing with "Trait" or "able" to make their nature obvious.</p>
-                    <div class="code-example">
-                        <h4>Good: Descriptive trait names</h4>
-                        <pre><code>
-// Good: Clear, descriptive names
-trait Loggable { /* ... */ }
-trait Cacheable { /* ... */ }
-trait Serializable { /* ... */ }
-trait DatabaseAware { /* ... */ }
-trait ValidationTrait { /* ... */ }
-trait FormattingTrait { /* ... */ }
-
-// Bad: Vague or generic names
-trait Utils { /* ... */ }
-trait Helper { /* ... */ }
-trait Common { /* ... */ }
-trait Misc { /* ... */ }
-                        </code></pre>
-                    </div>
-                </div>
-                
-                <div class="practice">
-                    <h3>Document Trait Requirements</h3>
-                    <p>Use PHPDoc or abstract methods to document what a trait expects from the class using it.</p>
-                    <div class="code-example">
-                        <h4>Good: Documented trait requirements</h4>
-                        <pre><code>
-/**
- * Provides logging functionality.
- *
- * Classes using this trait should:
- * - Implement getLogFile() method
- * - Have $this->debug property defined
- */
-trait Loggable {
-    /**
-     * Log a message if debugging is enabled.
-     *
-     * @param string $message The message to log.
-     * @return void
-     */
-    public function log($message) {
-        if (!isset($this->debug) || !$this->debug) {
-            return;
-        }
-        
-        $file = $this->getLogFile();
-        file_put_contents($file, "[" . date('Y-m-d H:i:s') . "] {$message}" . PHP_EOL, FILE_APPEND);
-    }
-    
-    /**
-     * Get the log file path.
-     *
-     * @return string
-     */
-    abstract protected function getLogFile();
-}
-                        </code></pre>
-                    </div>
-                </div>
-                
-                <div class="practice">
-                    <h3>Avoid Trait Properties with Common Names</h3>
-                    <p>Use distinctive property names in traits to avoid conflicts with properties in classes using the trait.</p>
-                    <div class="code-example">
-                        <h4>Good: Distinctive property names</h4>
-                        <pre><code>
-// Good: Distinctive property names
-trait Loggable {
-    // Prefixed with trait name
-    protected $loggable_messages = [];
-    protected $loggable_enabled = true;
-    
-    public function log($message) {
-        if ($this->loggable_enabled) {
-            $this->loggable_messages[] = $message;
-        }
-    }
-}
-
-// Bad: Generic property names likely to conflict
-trait Loggable {
-    // Generic names like "messages" or "enabled" might conflict
-    protected $messages = [];
-    protected $enabled = true;
-    
-    // ...
-}
-                        </code></pre>
-                    </div>
-                </div>
-                
-                <div class="practice">
-                    <h3>Use Traits for Horizontal Code Reuse</h3>
-                    <p>Use traits for behavior that needs to be shared across unrelated classes that don't share a common parent.</p>
-                    <div class="code-example">
-                        <h4>Good: Horizontal code reuse</h4>
-                        <pre><code>
-// Trait for a capability that many classes need
-trait Jsonable {
-    public function toJson() {
-        return json_encode(get_object_vars($this));
-    }
-    
-    public function fromJson($json) {
-        $data = json_decode($json, true);
-        foreach ($data as $key => $value) {
-            if (property_exists($this, $key)) {
-                $this->$key = $value;
-            }
-        }
-        return $this;
-    }
-}
-
-// Unrelated classes that need JSON capability
-class User {
-    use Jsonable;
-    private $id;
-    private $name;
-    private $email;
-    
-    // ... Other User methods ...
-}
-
-class Product {
-    use Jsonable;
-    private $id;
-    private $name;
-    private $price;
-    
-    // ... Other Product methods ...
-}
-
-class Order {
-    use Jsonable;
-    private $id;
-    private $date;
-    private $items;
-    
-    // ... Other Order methods ...
-}
-                        </code></pre>
-                    </div>
-                </div>
-                
-                <div class="practice">
-                    <h3>Favor Composition Over Inheritance</h3>
-                    <p>Use traits as a tool for composition rather than creating deep inheritance hierarchies.</p>
-                    <div class="code-example">
-                        <h4>Good: Composition with traits</h4>
-                        <pre><code>
-// Bad: Deep inheritance hierarchy
-class Entity { /* ... */ }
-class User extends Entity { /* ... */ }
-class AdminUser extends User { /* ... */ }
-class SuperAdmin extends AdminUser { /* ... */ }
-class GuestAdmin extends AdminUser { /* ... */ }
-
-// Good: Composition with traits
-class User {
-    // Base user functionality
-}
-
-trait AdminCapabilities {
-    // Admin functionality
-}
-
-trait SuperAdminCapabilities {
-    // Super admin functionality
-}
-
-class AdminUser extends User {
-    use AdminCapabilities;
-}
-
-class SuperAdmin extends User {
-    use AdminCapabilities, SuperAdminCapabilities;
-}
-
-class GuestAdmin extends User {
-    use AdminCapabilities;
-    
-    // Override or add guest-specific limitations
-}
-                        </code></pre>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section id="homework">
-            <h2>Homework: Building Reusable Traits for WordPress</h2>
-            
-            <div class="assignment">
-                <h3>Assignment: WordPress Plugin Traits</h3>
-                
-                <p>For this assignment, you'll create a set of reusable traits for WordPress plugin development and implement them in a simple plugin.</p>
-                
-                <h4>Requirements:</h4>
-                <ol>
-                    <li>Create at least three traits:
-                        <ul>
-                            <li><code>SingletonTrait</code>: For implementing the singleton pattern</li>
-                            <li><code>AdminNoticeTrait</code>: For displaying admin notices in the WordPress admin</li>
-                            <li><code>SettingsTrait</code>: For handling plugin settings operations</li>
+                    
+                    <div class="footer-section">
+                        <h4>Quick Links</h4>
+                        <ul class="footer-links">
+                            <li><a href="/">Home</a></li>
+                            <li><a href="/module2.html">Module 2</a></li>
+                            <li><a href="/resources.html">Resources</a></li>
                         </ul>
-                    </li>
-                    <li>Each trait should:
-                        <ul>
-                            <li>Have well-defined responsibilities</li>
-                            <li>Include proper documentation (PHPDoc)</li>
-                            <li>Handle potential conflicts with other traits or classes</li>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Support</h4>
+                        <ul class="footer-links">
+                            <li><a href="/help.html">Help Center</a></li>
+                            <li><a href="/faq.html">FAQ</a></li>
+                            <li><a href="/contact.html">Contact</a></li>
                         </ul>
-                    </li>
-                    <li>Create a simple WordPress plugin that uses these traits to:
-                        <ul>
-                            <li>Display a settings page in the admin</li>
-                            <li>Save and retrieve settings</li>
-                            <li>Show admin notices for successful/failed operations</li>
-                        </ul>
-                    </li>
-                </ol>
-                
-                <h4>Starter Code:</h4>
-                <pre><code>
-<?php
-/**
- * Plugin Name: Traits Example Plugin
- * Description: Demonstrating the use of traits in WordPress plugins
- * Version: 1.0.0
- * Author: Your Name
- */
-
-// Prevent direct access
-if (!defined('ABSPATH')) {
-    exit;
-}
-
-/**
- * Singleton trait.
- *
- * Implements the singleton pattern for classes that need a single instance.
- */
-trait SingletonTrait {
-    // TODO: Implement singleton pattern
-}
-
-/**
- * Admin notice trait.
- *
- * Provides methods for displaying admin notices.
- */
-trait AdminNoticeTrait {
-    // TODO: Implement admin notice methods
-}
-
-/**
- * Settings trait.
- *
- * Provides methods for handling plugin settings.
- */
-trait SettingsTrait {
-    // TODO: Implement settings methods
-}
-
-/**
- * Main plugin class.
- */
-class Traits_Example_Plugin {
-    // TODO: Use the traits in this class
-    
-    /**
-     * Constructor.
-     */
-    private function __construct() {
-        // TODO: Initialize the plugin
-    }
-}
-
-// TODO: Initialize the plugin
-                </code></pre>
-                
-                <h4>Bonus Challenges:</h4>
-                <ul>
-                    <li>Create a <code>ValidationTrait</code> for validating form inputs</li>
-                    <li>Create a <code>TemplateTrait</code> for handling template rendering</li>
-                    <li>Implement method conflict resolution between traits</li>
-                    <li>Create a trait that uses other traits (trait composition)</li>
-                </ul>
-            </div>
-        </section>
-
-        <section class="summary">
-            <h2>Key Takeaways</h2>
-            
-            <div class="takeaways">
-                <div class="takeaway">
-                    <h3>Horizontal Code Reuse</h3>
-                    <p>Traits provide a mechanism for horizontal code reuse, allowing you to share methods and properties across unrelated classes without using inheritance.</p>
+                    </div>
                 </div>
                 
-                <div class="takeaway">
-                    <h3>Multiple Trait Usage</h3>
-                    <p>Classes can use multiple traits, and traits can use other traits, enabling powerful composition patterns that would be difficult with single inheritance alone.</p>
-                </div>
-                
-                <div class="takeaway">
-                    <h3>Conflict Resolution</h3>
-                    <p>PHP provides mechanisms for resolving conflicts between traits, methods, and properties, giving you fine-grained control over how trait functionality is incorporated into your classes.</p>
-                </div>
-                
-                <div class="takeaway">
-                    <h3>WordPress Application</h3>
-                    <p>In WordPress development, traits can help create reusable components for common plugin and theme functionality, leading to more maintainable and consistent code.</p>
-                </div>
-                
-                <div class="takeaway">
-                    <h3>Composition Over Inheritance</h3>
-                    <p>Traits encourage a composition-based approach to code reuse, which often leads to more flexible and maintainable code compared to deep inheritance hierarchies.</p>
+                <div class="footer-bottom">
+                    <div class="footer-bottom-content">
+                        <p class="copyright">&copy; 2025 PHP WordPress Development Course</p>
+                        <nav class="footer-bottom-links">
+                            <a href="/privacy.html">Privacy</a>
+                            <span class="separator">|</span>
+                            <a href="/terms.html">Terms</a>
+                        </nav>
+                    </div>
                 </div>
             </div>
-            
-            <div class="next-steps">
-                <h3>Next Steps</h3>
-                <p>Now that you understand traits, we'll bring together all the OOP concepts we've covered (classes, inheritance, abstract classes, interfaces, namespaces, and traits) in our final project. You'll see how these features can be combined to create robust, maintainable WordPress plugins and themes.</p>
-            </div>
-        </section>
+        </footer>
+    </div>
 
-        <section class="resources">
-            <h2>Additional Resources</h2>
-            
-            <ul>
-                <li><a href="https://www.php.net/manual/en/language.oop5.traits.php" target="_blank">PHP Manual: Traits</a></li>
-                <li><a href="https://phptherightway.com/#object-oriented-programming" target="_blank">PHP The Right Way: Object-Oriented Programming</a></li>
-                <li><a href="https://developer.wordpress.org/plugins/intro/" target="_blank">WordPress Plugin Developer Handbook</a></li>
-                <li><a href="https://carlalexander.ca/static-factory-method-pattern-wordpress/" target="_blank">Using Traits in WordPress Plugins</a></li>
-                <li><a href="https://en.wikipedia.org/wiki/Composition_over_inheritance" target="_blank">Composition Over Inheritance</a></li>
-                <li><a href="https://scotch.io/tutorials/understanding-php-traits" target="_blank">Understanding PHP Traits</a></li>
-            </ul>
-        </section>
-    </main>
-    
-    <footer>
-        <p>&copy; 2025 PHP WordPress Development Course</p>
-        <p><a href="module2.html">Back to Module 2 Overview</a> | <a href="index.html">Back to Syllabus</a></p>
-    </footer>
+    <!-- Back to Top -->
+    <button id="back-to-top" class="back-to-top" aria-label="Back to top">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 19V5M12 5l-7 7M12 5l7 7"/>
+        </svg>
+    </button>
+
+    <!-- JavaScript -->
+    <script src="/assets/js/navigation.js"></script>
+    <script src="/assets/js/site-config.js"></script>
 </body>
 </html>

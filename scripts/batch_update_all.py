@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Batch update script for ALL remaining Module 1 HTML files
-Fixed with correct Linux paths and skip logic for already updated files
+Batch update script for ALL Module 1 HTML files
+Ensures every single file in 01module directory is updated with new template
 """
 
 import os
@@ -34,18 +34,6 @@ if not BASE_DIR.exists():
         print("❌ Could not find the 01module directory. Please update BASE_DIR in the script.")
         exit(1)
 
-# Files that have already been updated (will be skipped)
-ALREADY_UPDATED = [
-    "course_introduction.html",
-    "how_web_works.html", 
-    "development_environment.html",
-    "first_html_page.html",
-    "html_structure_syntax.html",
-    "essential_html_tags.html",
-    "html_forms_inputs.html",
-    "introduction_to_css.html"
-]
-
 def check_if_updated(filepath):
     """
     Check if a file has already been updated with the new template
@@ -53,219 +41,119 @@ def check_if_updated(filepath):
     """
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
-            content = f.read(1000)  # Read first 1000 chars
+            content = f.read(2000)  # Read first 2000 chars for better detection
             
-            # Check for new template markers
+            # Check for new template markers (must have most of these)
             markers = [
                 'class="site-header"',
                 'class="lesson-objectives"',
                 'class="lesson-navigation"',
                 'PHP WordPress Course',
-                'class="sidebar-nav"'
+                'class="sidebar-nav"',
+                'class="lesson-content"',
+                'class="progress-container"',
+                'class="breadcrumb container"'
             ]
             
-            # If 3 or more markers are found, file is likely updated
+            # If 5 or more markers are found, file is likely updated
             found_markers = sum(1 for marker in markers if marker in content)
-            return found_markers >= 3
+            return found_markers >= 5
             
     except Exception as e:
         print(f"    ⚠️ Could not check file: {e}")
         return False
 
-# Module 1 complete structure with ALL files
-module1_files = {
-    "session2": {
-        "title": "HTML Fundamentals",
-        "files": [
-            ("html_validation_practices.html", "HTML Validation and Best Practices", "30 minutes",
-             "Master HTML validation techniques, semantic markup, and best practices for clean, maintainable HTML code."),
-            ("homework_html_profile.html", "Homework: Create a Personal Profile Page", "60 minutes",
-             "Apply your HTML knowledge to build a complete personal profile page with proper structure and semantic markup.")
-        ]
-    },
-    "session3": {
-        "title": "CSS Basics",
-        "files": [
-            ("css_syntax_and_selectors.html", "CSS Syntax and Selectors", "45 minutes",
-             "Master CSS syntax, understand different types of selectors, and learn how to target HTML elements effectively."),
-            ("css_implementation_methods.html", "Inline, Internal, and External CSS", "30 minutes",
-             "Learn the three ways to add CSS to HTML documents and understand when to use each method."),
-            ("css_colors_fonts_text.html", "Working with Colors, Fonts, and Text", "45 minutes",
-             "Explore CSS properties for colors, typography, and text styling to create visually appealing designs."),
-            ("css_box_model.html", "The CSS Box Model", "45 minutes",
-             "Understand the CSS box model, including margins, padding, borders, and how elements are sized and spaced."),
-            ("homework_css_profile.html", "Homework: Style Your Profile Page", "60 minutes",
-             "Apply CSS styling to your HTML profile page to create an attractive, professional design.")
-        ]
-    },
-    "session4": {
-        "title": "CSS Layout & Responsive Design",
-        "files": [
-            ("css_layout_tech.html", "CSS Layout Techniques", "60 minutes",
-             "Learn modern CSS layout techniques including Flexbox, Grid, and traditional positioning methods."),
-            ("responsive_design.html", "Introduction to Responsive Design", "45 minutes",
-             "Understand responsive design principles and create websites that work on all device sizes."),
-            ("media_queries.html", "Media Queries", "45 minutes",
-             "Master media queries to create responsive designs that adapt to different screen sizes and devices."),
-            ("mobile_first.html", "Mobile-First Approach", "30 minutes",
-             "Learn the mobile-first design philosophy and how to implement it in your projects."),
-            ("homework_responsive_profile.html", "Homework: Make Your Profile Responsive", "60 minutes",
-             "Transform your profile page into a fully responsive design that works on all devices.")
-        ]
-    },
-    "session5": {
-        "title": "CSS Frameworks & Best Practices",
-        "files": [
-            ("bootstrap.html", "Introduction to Bootstrap", "45 minutes",
-             "Get started with Bootstrap, the world's most popular CSS framework for building responsive websites."),
-            ("bootstrap_grid.html", "Using Bootstrap Grid System", "45 minutes",
-             "Master Bootstrap's powerful grid system for creating flexible, responsive layouts."),
-            ("bootstrap_components.html", "Bootstrap Components", "45 minutes",
-             "Explore Bootstrap's pre-built components for navigation, cards, modals, and more."),
-            ("bootstrap_utilities.html", "Bootstrap Utilities", "30 minutes",
-             "Learn Bootstrap's utility classes for quick styling without writing custom CSS."),
-            ("css_organization_best_practices.html", "CSS Organization and Best Practices", "30 minutes",
-             "Discover best practices for organizing and maintaining scalable CSS code."),
-            ("css_preprocessors.html", "CSS Preprocessors Overview (SASS/SCSS)", "30 minutes",
-             "Introduction to CSS preprocessors and how they enhance your styling workflow."),
-            ("homework_bootstrap_profile.html", "Homework: Recreate Profile with Bootstrap", "60 minutes",
-             "Rebuild your profile page using Bootstrap for a professional, responsive design.")
-        ]
-    },
-    "session6": {
-        "title": "JavaScript Fundamentals",
-        "files": [
-            ("js_intro.html", "Introduction to JavaScript", "45 minutes",
-             "Discover JavaScript's role in web development and learn the basics of this powerful programming language."),
-            ("js_syntax_fundamentals.html", "JavaScript Syntax, Variables, and Data Types", "45 minutes",
-             "Master JavaScript syntax, variables, data types, and basic programming concepts."),
-            ("js_operators_and_expressions.html", "Operators and Expressions", "30 minutes",
-             "Learn JavaScript operators, expressions, and how to perform calculations and comparisons."),
-            ("js_control_flow.html", "Control Flow (Conditionals, Loops)", "45 minutes",
-             "Understand conditional statements and loops to control program flow in JavaScript."),
-            ("js_functions_and_scope.html", "Functions and Scope", "45 minutes",
-             "Master JavaScript functions, scope, and how to write reusable code."),
-            ("homework_simple_js_programs.html", "Homework: Create Simple JavaScript Programs", "60 minutes",
-             "Practice JavaScript fundamentals by building interactive programs.")
-        ]
-    },
-    "session7": {
-        "title": "DOM Manipulation with JavaScript",
-        "files": [
-            ("understanding_dom.html", "Understanding the Document Object Model (DOM)", "45 minutes",
-             "Learn how JavaScript interacts with HTML through the Document Object Model."),
-            ("dom_selection_manipulation.html", "Selecting and Manipulating DOM Elements", "45 minutes",
-             "Master techniques for selecting and modifying HTML elements with JavaScript."),
-            ("event_handling.html", "Event Handling", "45 minutes",
-             "Learn to handle user interactions with event listeners and event handlers."),
-            ("creating_removing_elements.html", "Creating and Removing Elements", "30 minutes",
-             "Dynamically create, modify, and remove HTML elements using JavaScript."),
-            ("form_validation.html", "Form Validation with JavaScript", "45 minutes",
-             "Implement client-side form validation to improve user experience."),
-            ("homework_interactive.html", "Homework: Add Interactivity to Your Page", "60 minutes",
-             "Make your profile page interactive with JavaScript DOM manipulation.")
-        ]
-    },
-    "session8": {
-        "title": "Modern JavaScript & jQuery",
-        "files": [
-            ("es6_overview.html", "ES6+ Features Overview", "45 minutes",
-             "Explore modern JavaScript features including arrow functions, destructuring, and modules."),
-            ("jquery_intro.html", "Introduction to jQuery", "45 minutes",
-             "Get started with jQuery, the popular JavaScript library for simplified DOM manipulation."),
-            ("jquery_dom_manipulation.html", "DOM Manipulation with jQuery", "45 minutes",
-             "Learn jQuery's powerful methods for selecting and manipulating HTML elements."),
-            ("jquery_animations_and_effects.html", "jQuery Animations and Effects", "30 minutes",
-             "Create smooth animations and visual effects with jQuery."),
-            ("jquery_ajax.html", "AJAX Basics with jQuery", "45 minutes",
-             "Learn to make asynchronous requests and update pages without reloading."),
-            ("homework_jquery_refactor.html", "Homework: Refactor Your Code Using jQuery", "60 minutes",
-             "Refactor your JavaScript code using jQuery for cleaner, more efficient code.")
-        ]
-    },
-    "session9": {
-        "title": "Introduction to PHP",
-        "files": [
-            ("php_and_wordpress.html", "What is PHP and Why It's Important for WordPress", "45 minutes",
-             "Understand PHP's role in web development and its crucial relationship with WordPress."),
-            ("php_setup_xampp_mamp.html", "Setting Up a Local Server (XAMPP/MAMP)", "45 minutes",
-             "Install and configure a local development server for PHP development."),
-            ("php_syntax.html", "PHP Syntax and Basic Constructs", "45 minutes",
-             "Learn PHP syntax, variables, and basic programming constructs."),
-            ("php_variables_data_and_operators.html", "Variables, Data Types, and Operators", "45 minutes",
-             "Master PHP variables, data types, and operators for dynamic web development."),
-            ("php_includes.html", "Including Files and PHP in HTML", "30 minutes",
-             "Learn to include PHP files and mix PHP with HTML for dynamic pages."),
-            ("homework_simple_php.html", "Homework: Create a Simple PHP Script", "60 minutes",
-             "Build your first PHP application with dynamic content generation.")
-        ]
-    },
-    "session10": {
-        "title": "Mini-Project: Static Website",
-        "files": [
-            ("planning_website.html", "Planning a Multi-Page Website", "45 minutes",
-             "Learn to plan and structure a complete multi-page website project."),
-            ("creating_layout.html", "Creating a Consistent Layout", "60 minutes",
-             "Build a consistent layout system for your multi-page website."),
-            ("adding_interactivity_with_js.html", "Adding Interactivity with JavaScript", "60 minutes",
-             "Enhance your website with JavaScript interactivity and dynamic features."),
-            ("php_header_footer.html", "Basic PHP Includes for Header and Footer", "45 minutes",
-             "Use PHP includes to maintain consistent headers and footers across pages."),
-            ("project_static_site.html", "Final Project: 5-Page Static Website", "180 minutes",
-             "Build a complete 5-page website applying all skills learned in Module 1.")
-        ]
-    }
+# Define all known Module 1 files with metadata
+module1_structure = {
+    # Introduction
+    "course_introduction.html": ("Course Introduction", "30 minutes", "Welcome to the PHP WordPress Development course. Learn what you'll build and the skills you'll gain."),
+    "homework_setup.html": ("Homework: Development Setup", "45 minutes", "Set up your development environment for the course."),
+    
+    # Session 1: Introduction to Web Development
+    "how_web_works.html": ("How the Web Works", "45 minutes", "Understand the fundamentals of how websites and the internet work together."),
+    "development_environment.html": ("Setting Up Development Environment", "60 minutes", "Install and configure the tools you'll need for web development."),
+    
+    # Session 2: HTML Fundamentals
+    "first_html_page.html": ("Creating Your First HTML Page", "30 minutes", "Build your very first webpage using HTML."),
+    "html_structure_syntax.html": ("HTML Structure and Syntax", "45 minutes", "Learn the fundamental structure and syntax of HTML documents."),
+    "essential_html_tags.html": ("Essential HTML Tags", "45 minutes", "Master the most important HTML tags for structuring content."),
+    "html_forms_inputs.html": ("HTML Forms and Inputs", "45 minutes", "Create interactive forms for user input."),
+    "html_validation_practices.html": ("HTML Validation and Best Practices", "30 minutes", "Learn to write valid, semantic HTML following best practices."),
+    "homework_html_profile.html": ("Homework: Create a Personal Profile Page", "60 minutes", "Build a complete personal profile page using HTML."),
+    
+    # Session 3: CSS Basics
+    "introduction_to_css.html": ("Introduction to CSS", "30 minutes", "Discover how CSS transforms HTML into beautiful web pages."),
+    "css_syntax_and_selectors.html": ("CSS Syntax and Selectors", "45 minutes", "Master CSS syntax and learn to target HTML elements."),
+    "css_implementation_methods.html": ("CSS Implementation Methods", "30 minutes", "Learn different ways to add CSS to HTML documents."),
+    "css_colors_fonts_text.html": ("CSS Colors, Fonts, and Text", "45 minutes", "Style text with colors, fonts, and typography properties."),
+    "css_box_model.html": ("The CSS Box Model", "45 minutes", "Understand how elements are sized and spaced with the box model."),
+    "homework_css_profile.html": ("Homework: Style Your Profile Page", "60 minutes", "Apply CSS to create an attractive profile page design."),
+    
+    # Session 4: CSS Layout & Responsive Design
+    "css_layout_tech.html": ("CSS Layout Techniques", "60 minutes", "Learn modern CSS layout methods including Flexbox and Grid."),
+    "responsive_design.html": ("Introduction to Responsive Design", "45 minutes", "Create websites that work perfectly on all devices."),
+    "media_queries.html": ("Media Queries", "45 minutes", "Use media queries to create responsive designs."),
+    "mobile_first.html": ("Mobile-First Approach", "30 minutes", "Design for mobile devices first, then scale up."),
+    "homework_responsive_profile.html": ("Homework: Make Your Profile Responsive", "60 minutes", "Transform your profile into a responsive design."),
+    
+    # Session 5: CSS Frameworks
+    "bootstrap.html": ("Introduction to Bootstrap", "45 minutes", "Get started with the Bootstrap CSS framework."),
+    "bootstrap_grid.html": ("Bootstrap Grid System", "45 minutes", "Master Bootstrap's powerful grid system."),
+    "bootstrap_components.html": ("Bootstrap Components", "45 minutes", "Use Bootstrap's pre-built UI components."),
+    "bootstrap_utilities.html": ("Bootstrap Utilities", "30 minutes", "Apply Bootstrap utility classes for quick styling."),
+    "css_organization_best_practices.html": ("CSS Organization Best Practices", "30 minutes", "Organize and maintain scalable CSS code."),
+    "css_preprocessors.html": ("CSS Preprocessors Overview", "30 minutes", "Introduction to SASS and CSS preprocessing."),
+    "homework_bootstrap_profile.html": ("Homework: Bootstrap Profile", "60 minutes", "Rebuild your profile using Bootstrap."),
+    
+    # Session 6: JavaScript Fundamentals
+    "js_intro.html": ("Introduction to JavaScript", "45 minutes", "Discover JavaScript and its role in web development."),
+    "js_syntax_fundamentals.html": ("JavaScript Syntax Fundamentals", "45 minutes", "Learn JavaScript syntax and basic concepts."),
+    "js_syntaxx1.html": ("JavaScript Syntax Extended", "45 minutes", "Deep dive into JavaScript syntax patterns."),
+    "js_operators_and_expressions.html": ("Operators and Expressions", "30 minutes", "Master JavaScript operators and expressions."),
+    "js_control_flow.html": ("Control Flow", "45 minutes", "Implement conditional logic and loops."),
+    "js_functions_and_scope.html": ("Functions and Scope", "45 minutes", "Create functions and understand scope."),
+    "homework_simple_js_programs.html": ("Homework: Simple JavaScript Programs", "60 minutes", "Build interactive JavaScript programs."),
+    
+    # Session 7: DOM Manipulation
+    "understanding_dom.html": ("Understanding the DOM", "45 minutes", "Learn how JavaScript interacts with HTML."),
+    "dom_selection_manipulation.html": ("DOM Selection and Manipulation", "45 minutes", "Select and modify HTML elements with JavaScript."),
+    "event_handling.html": ("Event Handling", "45 minutes", "Handle user interactions with events."),
+    "creating_removing_elements.html": ("Creating and Removing Elements", "30 minutes", "Dynamically modify page content."),
+    "form_validation.html": ("Form Validation", "45 minutes", "Validate forms with JavaScript."),
+    "homework_interactive.html": ("Homework: Add Interactivity", "60 minutes", "Make your page interactive with JavaScript."),
+    
+    # Session 8: Modern JavaScript & jQuery
+    "es6_overview.html": ("ES6+ Features Overview", "45 minutes", "Explore modern JavaScript features."),
+    "jquery_intro.html": ("Introduction to jQuery", "45 minutes", "Get started with the jQuery library."),
+    "jquery_dom_manipulation.html": ("jQuery DOM Manipulation", "45 minutes", "Simplify DOM manipulation with jQuery."),
+    "jquery_animations_and_effects.html": ("jQuery Animations", "30 minutes", "Create animations with jQuery."),
+    "jquery_ajax.html": ("AJAX with jQuery", "45 minutes", "Make asynchronous requests with jQuery."),
+    "homework_jquery_refactor.html": ("Homework: jQuery Refactor", "60 minutes", "Refactor your code using jQuery."),
+    
+    # Session 9: Introduction to PHP
+    "php_and_wordpress.html": ("PHP and WordPress", "45 minutes", "Understand PHP's role in WordPress."),
+    "php_setup_xampp_mamp.html": ("Setting Up XAMPP/MAMP", "45 minutes", "Install a local PHP server."),
+    "php_syntax.html": ("PHP Syntax", "45 minutes", "Learn PHP syntax basics."),
+    "php_variables_data_and_operators.html": ("PHP Variables and Operators", "45 minutes", "Work with PHP variables and operators."),
+    "php_includes.html": ("PHP Includes", "30 minutes", "Include PHP files in HTML."),
+    "homework_simple_php.html": ("Homework: Simple PHP Script", "60 minutes", "Create your first PHP application."),
+    
+    # Session 10: Mini-Project
+    "planning_website.html": ("Planning a Website", "45 minutes", "Plan a multi-page website project."),
+    "creating_layout.html": ("Creating a Layout", "60 minutes", "Build a consistent website layout."),
+    "adding_interactivity_with_js.html": ("Adding Interactivity", "60 minutes", "Enhance your site with JavaScript."),
+    "php_header_footer.html": ("PHP Headers and Footers", "45 minutes", "Use PHP for consistent headers/footers."),
+    "project_static_site.html": ("Final Project: Static Website", "180 minutes", "Build a complete 5-page website.")
 }
 
-def generate_html(session_key, session_data, file_index, file_info):
-    """Generate complete HTML for a lesson file with proper navigation"""
+def generate_html(filename, title, duration, description):
+    """Generate complete HTML for a lesson file"""
     
-    filename, title, duration, description = file_info
-    session_title = session_data["title"]
+    # Determine session based on filename patterns
+    session_title = determine_session(filename)
     
-    # Get all files in session for navigation
-    all_files = session_data["files"]
-    
-    # Determine previous and next files
-    prev_file = None
-    next_file = None
-    
-    if file_index > 0:
-        prev_file = all_files[file_index - 1]
-    else:
-        # Link to previous session's last file
-        prev_sessions = list(module1_files.keys())
-        current_session_index = prev_sessions.index(session_key)
-        if current_session_index > 0:
-            prev_session = module1_files[prev_sessions[current_session_index - 1]]
-            if prev_session["files"]:
-                prev_file = prev_session["files"][-1]
-    
-    if file_index < len(all_files) - 1:
-        next_file = all_files[file_index + 1]
-    else:
-        # Link to next session's first file
-        next_sessions = list(module1_files.keys())
-        current_session_index = next_sessions.index(session_key)
-        if current_session_index < len(next_sessions) - 1:
-            next_session = module1_files[next_sessions[current_session_index + 1]]
-            if next_session["files"]:
-                next_file = next_session["files"][0]
-    
-    # Generate sidebar HTML
-    sidebar_html = generate_sidebar(session_title, all_files, file_index)
-    
-    # Generate navigation HTML
-    nav_html = generate_navigation(prev_file, next_file)
-    
-    # Generate learning objectives based on title
-    objectives = generate_objectives(title)
-    
-    # Generate content based on title
-    content = generate_content(title, description)
-    
-    # Generate homework section
-    homework = generate_homework(title)
+    # Generate navigation URLs
+    prev_url, next_url = generate_nav_urls(filename)
     
     # Complete HTML template
     html = f"""<!DOCTYPE html>
@@ -301,7 +189,7 @@ def generate_html(session_key, session_data, file_index, file_info):
         <main id="main-content" class="main-content" role="main">
             <div class="container">
                 <div class="content-with-sidebar">
-                    {sidebar_html}
+                    {generate_sidebar(session_title, filename)}
                     
                     <!-- Main Lesson Content -->
                     <article class="lesson-content">
@@ -318,23 +206,21 @@ def generate_html(session_key, session_data, file_index, file_info):
                                     <svg width="20" height="20" fill="currentColor">
                                         <path d="M12 14l9-5-9-5-9 5 9 5z"/>
                                     </svg>
-                                    <span>Module 1, {session_title}</span>
+                                    <span>Module 1: {session_title}</span>
                                 </div>
                             </div>
                         </header>
 
-                        {objectives}
+                        {generate_objectives(title)}
                         
                         <!-- Lesson Body -->
                         <div class="lesson-body">
-                            {content}
-                            
-                            {homework}
-                            
+                            {generate_content(title, description)}
+                            {generate_homework(title)}
                             {generate_resources(title)}
                         </div>
 
-                        {nav_html}
+                        {generate_navigation(prev_url, next_url)}
                     </article>
                 </div>
             </div>
@@ -357,6 +243,38 @@ def generate_html(session_key, session_data, file_index, file_info):
 </html>"""
     
     return html
+
+def determine_session(filename):
+    """Determine the session title based on filename"""
+    if "introduction" in filename or "homework_setup" in filename:
+        return "Course Introduction"
+    elif "how_web" in filename or "development_environment" in filename:
+        return "Web Development Basics"
+    elif any(x in filename for x in ["html_", "first_html"]):
+        return "HTML Fundamentals"
+    elif "css_" in filename and "layout" not in filename and "bootstrap" not in filename:
+        return "CSS Basics"
+    elif any(x in filename for x in ["layout", "responsive", "media", "mobile"]):
+        return "CSS Layout & Responsive Design"
+    elif "bootstrap" in filename or "preprocessor" in filename:
+        return "CSS Frameworks"
+    elif any(x in filename for x in ["js_", "javascript"]) and "jquery" not in filename and "dom" not in filename:
+        return "JavaScript Fundamentals"
+    elif "dom" in filename or "event" in filename or "form_validation" in filename:
+        return "DOM Manipulation"
+    elif "jquery" in filename or "es6" in filename or "ajax" in filename:
+        return "Modern JavaScript & jQuery"
+    elif "php" in filename:
+        return "Introduction to PHP"
+    elif any(x in filename for x in ["planning", "creating_layout", "project", "adding_interactivity"]):
+        return "Mini-Project"
+    else:
+        return "Web Development"
+
+def generate_nav_urls(filename):
+    """Generate previous and next URLs based on logical flow"""
+    # This is simplified - you can expand this based on actual course flow
+    return ("/module1.html", "/module1.html")
 
 def generate_header():
     """Generate standard header HTML"""
@@ -445,93 +363,25 @@ def generate_breadcrumb(title):
             </ol>
         </nav>"""
 
-def generate_sidebar(session_title, files, current_index):
+def generate_sidebar(session_title, current_file):
     """Generate sidebar HTML"""
     sidebar = f"""                    <!-- Sidebar -->
                     <aside class="sidebar">
                         <div class="sidebar-nav">
                             <h3 class="sidebar-title">Module 1: {session_title}</h3>
                             <div class="sidebar-section">
-                                <h4 class="sidebar-section-title">Lessons</h4>"""
-    
-    for i, file_info in enumerate(files):
-        filename, title, _, _ = file_info
-        active = " active" if i == current_index else ""
-        sidebar += f"""
-                                <a href="/01module/{filename}" class="sidebar-link{active}">{title}</a>"""
-    
-    sidebar += """
+                                <h4 class="sidebar-section-title">Quick Navigation</h4>
+                                <a href="/module1.html" class="sidebar-link">Module Overview</a>
+                                <a href="/01module/course_introduction.html" class="sidebar-link">Course Introduction</a>
+                                <a href="/01module/first_html_page.html" class="sidebar-link">HTML Basics</a>
+                                <a href="/01module/introduction_to_css.html" class="sidebar-link">CSS Fundamentals</a>
+                                <a href="/01module/js_intro.html" class="sidebar-link">JavaScript Intro</a>
+                                <a href="/01module/php_and_wordpress.html" class="sidebar-link">PHP & WordPress</a>
                             </div>
                         </div>
                     </aside>"""
     
     return sidebar
-
-def generate_navigation(prev_file, next_file):
-    """Generate lesson navigation HTML"""
-    nav_html = """                        <!-- Lesson Navigation -->
-                        <div class="lesson-navigation">"""
-    
-    if prev_file:
-        prev_filename, prev_title, _, _ = prev_file
-        nav_html += f"""
-                            <a href="/01module/{prev_filename}" class="lesson-nav-button prev">
-                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                                    <path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"/>
-                                </svg>
-                                <span>
-                                    <small>Previous</small><br>
-                                    {prev_title}
-                                </span>
-                            </a>"""
-    else:
-        nav_html += """
-                            <a href="/module1.html" class="lesson-nav-button prev">
-                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                                    <path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"/>
-                                </svg>
-                                <span>
-                                    <small>Back to</small><br>
-                                    Module 1 Overview
-                                </span>
-                            </a>"""
-    
-    nav_html += """
-                            
-                            <button class="complete-lesson-btn">
-                                Mark as Complete
-                            </button>"""
-    
-    if next_file:
-        next_filename, next_title, _, _ = next_file
-        nav_html += f"""
-                            
-                            <a href="/01module/{next_filename}" class="lesson-nav-button next">
-                                <span>
-                                    <small>Next Lesson</small><br>
-                                    {next_title}
-                                </span>
-                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                                    <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
-                                </svg>
-                            </a>"""
-    else:
-        nav_html += """
-                            
-                            <a href="/module2.html" class="lesson-nav-button next">
-                                <span>
-                                    <small>Next Module</small><br>
-                                    Module 2: PHP Fundamentals
-                                </span>
-                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                                    <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
-                                </svg>
-                            </a>"""
-    
-    nav_html += """
-                        </div>"""
-    
-    return nav_html
 
 def generate_objectives(title):
     """Generate learning objectives based on title"""
@@ -540,81 +390,44 @@ def generate_objectives(title):
                             <h2>Learning Objectives</h2>
                             <ul>"""
     
-    # Add specific objectives based on title keywords
     title_lower = title.lower()
     
-    if "validation" in title_lower:
+    if any(word in title_lower for word in ["html", "tag", "form", "validation"]):
         objectives += """
-                                <li>Understand HTML validation and why it matters</li>
-                                <li>Learn to use the W3C validator</li>
-                                <li>Fix common HTML validation errors</li>
-                                <li>Apply best practices for semantic HTML</li>"""
-    elif "form" in title_lower:
+                                <li>Understand HTML structure and semantics</li>
+                                <li>Create well-formed HTML documents</li>
+                                <li>Use HTML tags effectively</li>
+                                <li>Build accessible web content</li>"""
+    elif any(word in title_lower for word in ["css", "style", "color", "font", "box"]):
         objectives += """
-                                <li>Create HTML forms with various input types</li>
-                                <li>Understand form attributes and validation</li>
-                                <li>Build user-friendly forms for data collection</li>
-                                <li>Implement accessibility best practices for forms</li>"""
-    elif "css" in title_lower and "syntax" in title_lower:
-        objectives += """
-                                <li>Master CSS syntax and rule structure</li>
-                                <li>Understand different types of CSS selectors</li>
-                                <li>Learn selector specificity and the cascade</li>
-                                <li>Practice writing efficient CSS rules</li>"""
-    elif "box model" in title_lower:
-        objectives += """
-                                <li>Understand the CSS box model concept</li>
-                                <li>Master margin, padding, and border properties</li>
-                                <li>Control element sizing and spacing</li>
-                                <li>Debug layout issues using box model knowledge</li>"""
-    elif "javascript" in title_lower or "js" in title_lower:
+                                <li>Master CSS styling techniques</li>
+                                <li>Control visual presentation</li>
+                                <li>Create attractive designs</li>
+                                <li>Understand CSS best practices</li>"""
+    elif any(word in title_lower for word in ["javascript", "js", "dom", "event", "jquery"]):
         objectives += """
                                 <li>Understand JavaScript fundamentals</li>
-                                <li>Learn programming concepts and syntax</li>
-                                <li>Write interactive web applications</li>
-                                <li>Debug and troubleshoot JavaScript code</li>"""
-    elif "dom" in title_lower:
-        objectives += """
-                                <li>Understand the Document Object Model</li>
-                                <li>Learn to select and manipulate elements</li>
-                                <li>Handle events and user interactions</li>
-                                <li>Create dynamic web page behavior</li>"""
-    elif "jquery" in title_lower:
-        objectives += """
-                                <li>Understand jQuery fundamentals</li>
-                                <li>Simplify DOM manipulation with jQuery</li>
-                                <li>Create animations and effects</li>
-                                <li>Learn jQuery best practices</li>"""
-    elif "bootstrap" in title_lower:
-        objectives += """
-                                <li>Understand Bootstrap framework fundamentals</li>
-                                <li>Use Bootstrap components effectively</li>
-                                <li>Create responsive layouts with Bootstrap</li>
-                                <li>Customize Bootstrap for your projects</li>"""
+                                <li>Add interactivity to web pages</li>
+                                <li>Manipulate page elements dynamically</li>
+                                <li>Handle user interactions</li>"""
     elif "php" in title_lower:
         objectives += """
-                                <li>Understand PHP server-side programming</li>
-                                <li>Learn PHP syntax and basic constructs</li>
-                                <li>Create dynamic web pages with PHP</li>
+                                <li>Understand PHP basics</li>
+                                <li>Set up PHP development environment</li>
+                                <li>Write server-side code</li>
                                 <li>Prepare for WordPress development</li>"""
-    elif "responsive" in title_lower:
+    elif any(word in title_lower for word in ["responsive", "mobile", "bootstrap", "layout"]):
         objectives += """
-                                <li>Understand responsive design principles</li>
-                                <li>Create layouts that work on all devices</li>
-                                <li>Use media queries effectively</li>
-                                <li>Implement mobile-first design approach</li>"""
-    elif "layout" in title_lower:
-        objectives += """
-                                <li>Master CSS layout techniques</li>
-                                <li>Understand Flexbox and Grid</li>
-                                <li>Create complex page layouts</li>
-                                <li>Solve common layout challenges</li>"""
+                                <li>Create responsive layouts</li>
+                                <li>Design for multiple devices</li>
+                                <li>Use modern CSS techniques</li>
+                                <li>Build flexible designs</li>"""
     else:
         objectives += """
-                                <li>Master the concepts covered in this lesson</li>
-                                <li>Apply knowledge through practical exercises</li>
-                                <li>Build confidence with hands-on practice</li>
-                                <li>Prepare for advanced topics</li>"""
+                                <li>Master the concepts in this lesson</li>
+                                <li>Apply knowledge through practice</li>
+                                <li>Build practical skills</li>
+                                <li>Prepare for next topics</li>"""
     
     objectives += """
                             </ul>
@@ -623,8 +436,8 @@ def generate_objectives(title):
     return objectives
 
 def generate_content(title, description):
-    """Generate lesson content based on title - this is placeholder content"""
-    content = f"""                            <section>
+    """Generate lesson content"""
+    return f"""                            <section>
                                 <h2>Introduction</h2>
                                 <p class="lead">{description}</p>
                                 
@@ -632,83 +445,110 @@ def generate_content(title, description):
                                     <div class="alert-icon">💡</div>
                                     <div class="alert-content">
                                         <div class="alert-title">Key Concept</div>
-                                        <div class="alert-message">This lesson will build on previous knowledge and prepare you for more advanced topics.</div>
+                                        <div class="alert-message">This lesson builds on previous knowledge and prepares you for advanced topics.</div>
                                     </div>
                                 </div>
                             </section>
 
                             <section>
                                 <h2>Main Content</h2>
-                                <p>This section contains the main lesson content with examples, code snippets, and explanations.</p>
+                                <p>This section contains the main lesson content with examples and explanations.</p>
                                 
-                                <pre><code>// Example code will go here
-// Based on the specific lesson topic</code></pre>
+                                <pre><code>// Example code
+// Specific to lesson topic</code></pre>
                                 
                                 <div class="best_practice">
                                     <h3>Best Practices</h3>
                                     <ul>
                                         <li>Follow industry standards</li>
                                         <li>Write clean, maintainable code</li>
-                                        <li>Test your work thoroughly</li>
-                                        <li>Document your code</li>
+                                        <li>Test thoroughly</li>
+                                        <li>Document your work</li>
                                     </ul>
                                 </div>
                             </section>
 
                             <section>
                                 <h2>Practice Exercise</h2>
-                                <p>Apply what you've learned with this hands-on exercise.</p>
+                                <p>Apply what you've learned with hands-on practice.</p>
                                 
                                 <div class="alert alert-success">
                                     <div class="alert-icon">💻</div>
                                     <div class="alert-content">
                                         <div class="alert-title">Try It Now</div>
-                                        <div class="alert-message">Practice makes perfect! Complete this exercise to reinforce your learning.</div>
+                                        <div class="alert-message">Practice makes perfect! Complete this exercise.</div>
                                     </div>
                                 </div>
                             </section>"""
-    
-    return content
 
 def generate_homework(title):
-    """Generate homework section based on title"""
+    """Generate homework section"""
     if "homework" in title.lower():
         return """                            <!-- Homework -->
                             <div class="homework">
                                 <h2>Assignment Details</h2>
-                                <p>Complete the following tasks to practice what you've learned:</p>
+                                <p>Complete the following tasks:</p>
                                 <ol>
-                                    <li>Review the concepts covered in this session</li>
-                                    <li>Complete the practical exercises</li>
-                                    <li>Submit your work for review</li>
+                                    <li>Review lesson concepts</li>
+                                    <li>Complete practical exercises</li>
+                                    <li>Submit your work</li>
                                 </ol>
                                 
-                                <p><strong>Submission:</strong> Upload your completed files to the course platform.</p>
+                                <p><strong>Submission:</strong> Upload completed files to the course platform.</p>
                             </div>"""
     else:
         return """                            <!-- Homework -->
                             <div class="homework">
-                                <h2>Homework Assignment</h2>
-                                <p>Practice what you've learned with these exercises:</p>
+                                <h2>Practice Assignment</h2>
+                                <p>Reinforce your learning:</p>
                                 <ul>
-                                    <li>Review the key concepts from this lesson</li>
-                                    <li>Complete the practice exercises</li>
-                                    <li>Prepare for the next lesson</li>
+                                    <li>Review key concepts</li>
+                                    <li>Complete exercises</li>
+                                    <li>Prepare for next lesson</li>
                                 </ul>
                             </div>"""
 
 def generate_resources(title):
-    """Generate resources section based on title"""
+    """Generate resources section"""
     return """                            <!-- Resources -->
                             <section class="resources">
                                 <h2>Additional Resources</h2>
                                 <ul>
                                     <li><a href="https://developer.mozilla.org/" target="_blank">MDN Web Docs</a></li>
-                                    <li><a href="https://www.w3schools.com/" target="_blank">W3Schools Tutorials</a></li>
+                                    <li><a href="https://www.w3schools.com/" target="_blank">W3Schools</a></li>
                                     <li><a href="https://css-tricks.com/" target="_blank">CSS-Tricks</a></li>
                                     <li><a href="https://javascript.info/" target="_blank">JavaScript.info</a></li>
                                 </ul>
                             </section>"""
+
+def generate_navigation(prev_url, next_url):
+    """Generate lesson navigation"""
+    return f"""                        <!-- Lesson Navigation -->
+                        <div class="lesson-navigation">
+                            <a href="{prev_url}" class="lesson-nav-button prev">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"/>
+                                </svg>
+                                <span>
+                                    <small>Previous</small><br>
+                                    Back to Overview
+                                </span>
+                            </a>
+                            
+                            <button class="complete-lesson-btn">
+                                Mark as Complete
+                            </button>
+                            
+                            <a href="{next_url}" class="lesson-nav-button next">
+                                <span>
+                                    <small>Next</small><br>
+                                    Continue Learning
+                                </span>
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
+                                </svg>
+                            </a>
+                        </div>"""
 
 def generate_footer():
     """Generate footer HTML"""
@@ -755,115 +595,148 @@ def generate_footer():
 
 # Main execution
 def main():
-    """Main function to update all files"""
+    """Main function to update ALL files in 01module"""
     
+    print(f"🚀 Module 1 Complete Update Script")
+    print("="*60)
     print(f"📁 Working directory: {BASE_DIR}")
     print(f"✅ Directory exists: {BASE_DIR.exists()}")
     print(f"📅 Update started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
-    # List existing files
-    existing_files = list(BASE_DIR.glob("*.html"))
-    print(f"📊 Found {len(existing_files)} HTML files in directory\n")
+    # Get ALL HTML files in directory
+    all_files = list(BASE_DIR.glob("*.html"))
+    all_filenames = [f.name for f in all_files]
+    
+    print(f"\n📊 Found {len(all_files)} HTML files in directory")
+    print(f"📋 Structure contains {len(module1_structure)} defined files")
+    
+    # Find files not in structure
+    unstructured_files = [f for f in all_filenames if f not in module1_structure]
+    if unstructured_files:
+        print(f"🔍 Found {len(unstructured_files)} unstructured files:")
+        for f in unstructured_files:
+            print(f"  - {f}")
     
     updated_files = []
-    failed_files = []
     skipped_files = []
-    already_updated_files = []
-    
-    # Process all sessions
-    total_files = sum(len(session_data["files"]) for session_data in module1_files.values())
+    failed_files = []
     processed = 0
+    total_files = len(all_files)
     
-    for session_key, session_data in module1_files.items():
-        print(f"\n📁 Processing {session_data['title']}...")
+    print(f"\n📝 Processing ALL {total_files} files...")
+    print("-" * 60)
+    
+    # Process each file in directory
+    for filepath in all_files:
+        filename = filepath.name
+        processed += 1
         
-        for file_index, file_info in enumerate(session_data["files"]):
-            filename = file_info[0]
-            filepath = BASE_DIR / filename
-            processed += 1
+        # Check if already updated
+        if check_if_updated(filepath):
+            skipped_files.append(filename)
+            print(f"[{processed:3}/{total_files}] ⏭️  Already updated: {filename}")
+            continue
+        
+        try:
+            # Get metadata from structure or create generic
+            if filename in module1_structure:
+                title, duration, description = module1_structure[filename]
+            else:
+                # Create generic metadata for unstructured files
+                title = filename.replace('.html', '').replace('_', ' ').title()
+                duration = "45 minutes"
+                description = f"Learn about {title.lower()} in this comprehensive lesson."
             
-            # Check if file is in the manually updated list
-            if filename in ALREADY_UPDATED:
-                already_updated_files.append(filename)
-                print(f"  ⏭️  Skipped (manually updated): {filename}")
-                continue
+            # Generate HTML content
+            html_content = generate_html(filename, title, duration, description)
             
-            # Check if file has already been updated
-            if filepath.exists() and check_if_updated(filepath):
-                skipped_files.append(filename)
-                print(f"  ⏭️  Skipped (already updated): {filename}")
-                continue
+            # Write file
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(html_content)
             
-            try:
-                # Generate HTML content
-                html_content = generate_html(session_key, session_data, file_index, file_info)
-                
-                # Write file
-                with open(filepath, 'w', encoding='utf-8') as f:
-                    f.write(html_content)
-                
-                updated_files.append(filename)
-                print(f"  ✅ Updated: {filename} [{processed}/{total_files}]")
-                
-            except Exception as e:
-                failed_files.append((filename, str(e)))
-                print(f"  ❌ Failed: {filename} - {e}")
+            updated_files.append(filename)
+            print(f"[{processed:3}/{total_files}] ✅ Updated: {filename}")
+            
+        except Exception as e:
+            failed_files.append((filename, str(e)))
+            print(f"[{processed:3}/{total_files}] ❌ Failed: {filename} - {e}")
     
     # Summary
-    print(f"\n{'='*60}")
-    print(f"📊 Update Summary:")
-    print(f"  ✅ Successfully updated: {len(updated_files)} files")
-    print(f"  ⏭️  Already updated (auto-detected): {len(skipped_files)} files")
-    print(f"  ⏭️  Already updated (manual list): {len(already_updated_files)} files")
-    print(f"  ❌ Failed: {len(failed_files)} files")
-    print(f"  📁 Total processed: {processed}/{total_files} files")
+    print("-" * 60)
+    print(f"\n📊 Update Complete Summary:")
+    print(f"  📁 Total files in directory: {total_files}")
+    print(f"  ✅ Successfully updated: {len(updated_files)}")
+    print(f"  ⏭️  Already up-to-date: {len(skipped_files)}")
+    print(f"  ❌ Failed: {len(failed_files)}")
     
+    # Show details if needed
     if failed_files:
         print(f"\n⚠️ Failed files:")
         for filename, error in failed_files:
             print(f"  - {filename}: {error}")
     
-    print(f"\n🎉 Batch update complete!")
-    print(f"📅 Update finished: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    # Calculate completion
+    completion = ((len(updated_files) + len(skipped_files)) / total_files * 100) if total_files > 0 else 0
+    print(f"\n📈 Module 1 Completion: {completion:.1f}%")
     
-    # Create summary file
-    summary_path = BASE_DIR.parent / f"batch_update_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
-    with open(summary_path, 'w', encoding='utf-8') as f:
-        f.write(f"""# Module 1 Batch Update Results
+    if completion == 100:
+        print("🎉 All Module 1 files are now updated!")
+    else:
+        print(f"⚠️  {total_files - len(updated_files) - len(skipped_files)} files still need attention")
+    
+    print(f"\n📅 Update finished: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    # Create detailed report
+    report_path = BASE_DIR.parent / f"module1_complete_update_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+    with open(report_path, 'w', encoding='utf-8') as f:
+        f.write(f"""# Module 1 Complete Update Report
 **Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 **Directory:** {BASE_DIR}
 
 ## Summary
-- **Total Files in Module:** {total_files}
-- **Files Processed:** {processed}
-- **Successfully Updated:** {len(updated_files)}
-- **Already Updated:** {len(skipped_files) + len(already_updated_files)}
+- **Total Files:** {total_files}
+- **Updated:** {len(updated_files)}
+- **Already Current:** {len(skipped_files)}
 - **Failed:** {len(failed_files)}
+- **Completion:** {completion:.1f}%
 
-## Successfully Updated Files ({len(updated_files)})
-{chr(10).join(f"- ✅ {f}" for f in sorted(updated_files)) if updated_files else "None"}
+## Files Status
 
-## Already Updated - Auto-detected ({len(skipped_files)})
-{chr(10).join(f"- ⏭️ {f}" for f in sorted(skipped_files)) if skipped_files else "None"}
+### ✅ Successfully Updated ({len(updated_files)})
+{chr(10).join(f"- {f}" for f in sorted(updated_files)) if updated_files else "None"}
 
-## Already Updated - Manual List ({len(already_updated_files)})
-{chr(10).join(f"- ⏭️ {f}" for f in sorted(already_updated_files)) if already_updated_files else "None"}
+### ⏭️ Already Up-to-Date ({len(skipped_files)})
+{chr(10).join(f"- {f}" for f in sorted(skipped_files)) if skipped_files else "None"}
 
-## Failed Files ({len(failed_files)})
-{chr(10).join(f"- ❌ {f[0]}: {f[1]}" for f in failed_files) if failed_files else "None"}
+### ❌ Failed ({len(failed_files)})
+{chr(10).join(f"- {f[0]}: {f[1]}" for f in failed_files) if failed_files else "None"}
 
-## Completion Status
-- **Progress:** {((len(updated_files) + len(skipped_files) + len(already_updated_files)) / total_files * 100):.1f}% complete
-- **Remaining:** {total_files - len(updated_files) - len(skipped_files) - len(already_updated_files)} files
+### 🔍 Unstructured Files ({len(unstructured_files)})
+{chr(10).join(f"- {f}" for f in sorted(unstructured_files)) if unstructured_files else "None"}
 
 ## Next Steps
 1. Review any failed files manually
-2. Test navigation links
-3. Validate HTML structure
-4. Deploy to hosting service
+2. Test navigation and links
+3. Verify all content displays correctly
+4. Deploy Module 1
+
+## Module 1 Topics Covered
+- Course Introduction & Setup
+- HTML Fundamentals
+- CSS Basics & Layout
+- Responsive Design
+- Bootstrap Framework
+- JavaScript Programming
+- DOM Manipulation
+- jQuery & Modern JS
+- PHP Introduction
+- Final Project
+
+**Status:** {"✅ Ready for deployment" if completion == 100 else "⚠️ Review needed"}
 """)
     
-    print(f"\n📝 Summary saved to: {summary_path}")
+    print(f"\n📝 Detailed report saved to: {report_path}")
+    
     return updated_files, failed_files
 
 if __name__ == "__main__":
@@ -874,16 +747,12 @@ if __name__ == "__main__":
         print("❌ Python 3.6 or higher is required!")
         sys.exit(1)
     
-    print("🚀 PHP WordPress Course - Module 1 Batch Update Script")
-    print("="*60)
-    
-    # Run the update
     try:
         updated, failed = main()
         
         # Exit with appropriate code
         if failed:
-            sys.exit(1)  # Exit with error if any files failed
+            sys.exit(1)  # Error if files failed
         else:
             sys.exit(0)  # Success
             
