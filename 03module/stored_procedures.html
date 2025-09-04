@@ -1,0 +1,416 @@
+    DO
+        SELECT 
+            category_name,
+            parent_category_id
+        INTO 
+            cat_name,
+            parent_id
+        FROM categories
+        WHERE id = parent_id;
+        
+        SET path = CONCAT(cat_name, ' > ', path);
+    END WHILE;
+    
+    RETURN path;
+END$$
+
+DELIMITER ;
+
+-- ========================================
+-- AGGREGATE FUNCTION
+-- ========================================
+
+DELIMITER $$
+
+CREATE FUNCTION GetCustomerTier(customer_id INT)
+RETURNS VARCHAR(20)
+READS SQL DATA
+BEGIN
+    DECLARE total_spent DECIMAL(10,2);
+    DECLARE tier VARCHAR(20);
+    
+    SELECT SUM(total_amount)
+    INTO total_spent
+    FROM orders
+    WHERE customer_id = customer_id
+        AND status = 'completed';
+    
+    CASE
+        WHEN total_spent >= 10000 THEN SET tier = 'Platinum';
+        WHEN total_spent >= 5000 THEN SET tier = 'Gold';
+        WHEN total_spent >= 1000 THEN SET tier = 'Silver';
+        WHEN total_spent >= 100 THEN SET tier = 'Bronze';
+        ELSE SET tier = 'Basic';
+    END CASE;
+    
+    RETURN tier;
+END$$
+
+DELIMITER ;</code></pre>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Cursors and Advanced Features</h2>
+                                
+                                <canvas id="cursorCanvas" width="600" height="300"></canvas>
+                                <script>
+                                    const cCtx = document.getElementById('cursorCanvas').getContext('2d');
+                                    
+                                    // Title
+                                    cCtx.font = 'bold 16px Arial';
+                                    cCtx.fillStyle = '#1f2937';
+                                    cCtx.fillText('Cursor Processing Flow', 200, 30);
+                                    
+                                    // Flow boxes
+                                    const steps = [
+                                        { text: 'DECLARE', x: 50, y: 60, desc: 'Define cursor' },
+                                        { text: 'OPEN', x: 170, y: 60, desc: 'Execute query' },
+                                        { text: 'FETCH', x: 290, y: 60, desc: 'Get row' },
+                                        { text: 'PROCESS', x: 410, y: 60, desc: 'Use data' },
+                                        { text: 'CLOSE', x: 530, y: 60, desc: 'Release' }
+                                    ];
+                                    
+                                    steps.forEach((step, i) => {
+                                        // Box
+                                        cCtx.fillStyle = ['#dbeafe', '#dcfce7', '#fef3c7', '#fee2e2', '#e9d5ff'][i];
+                                        cCtx.fillRect(step.x - 30, step.y, 80, 60);
+                                        cCtx.strokeStyle = '#6b7280';
+                                        cCtx.strokeRect(step.x - 30, step.y, 80, 60);
+                                        
+                                        // Text
+                                        cCtx.fillStyle = '#1f2937';
+                                        cCtx.font = 'bold 11px Arial';
+                                        cCtx.fillText(step.text, step.x - 20, step.y + 25);
+                                        
+                                        cCtx.font = '9px Arial';
+                                        cCtx.fillStyle = '#6b7280';
+                                        cCtx.fillText(step.desc, step.x - 25, step.y + 45);
+                                        
+                                        // Arrow
+                                        if (i < steps.length - 1) {
+                                            cCtx.strokeStyle = '#6b7280';
+                                            cCtx.beginPath();
+                                            cCtx.moveTo(step.x + 50, step.y + 30);
+                                            cCtx.lineTo(step.x + 90, step.y + 30);
+                                            cCtx.stroke();
+                                        }
+                                    });
+                                    
+                                    // Loop back arrow for FETCH
+                                    cCtx.strokeStyle = '#ca8a04';
+                                    cCtx.setLineDash([5, 5]);
+                                    cCtx.beginPath();
+                                    cCtx.moveTo(450, 130);
+                                    cCtx.lineTo(450, 150);
+                                    cCtx.lineTo(290, 150);
+                                    cCtx.lineTo(290, 130);
+                                    cCtx.stroke();
+                                    cCtx.setLineDash([]);
+                                    
+                                    // Loop label
+                                    cCtx.fillStyle = '#ca8a04';
+                                    cCtx.font = '10px Arial';
+                                    cCtx.fillText('Loop until done', 330, 165);
+                                    
+                                    // Example box
+                                    cCtx.fillStyle = '#f3f4f6';
+                                    cCtx.fillRect(50, 190, 500, 90);
+                                    cCtx.strokeStyle = '#6b7280';
+                                    cCtx.strokeRect(50, 190, 500, 90);
+                                    
+                                    cCtx.fillStyle = '#1f2937';
+                                    cCtx.font = '10px Courier';
+                                    cCtx.fillText('DECLARE done INT DEFAULT FALSE;', 60, 210);
+                                    cCtx.fillText('DECLARE cur CURSOR FOR SELECT...;', 60, 225);
+                                    cCtx.fillText('DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;', 60, 240);
+                                    cCtx.fillText('OPEN cur; read_loop: LOOP FETCH cur INTO...; END LOOP; CLOSE cur;', 60, 255);
+                                </script>
+                                
+                                <div class="homework">
+                                    <h3>Advanced Stored Procedure Features</h3>
+                                    
+                                    <pre><code class="language-sql">-- ========================================
+-- CURSOR EXAMPLE
+-- ========================================
+
+DELIMITER $$
+
+CREATE PROCEDURE UpdateProductPrices(
+    IN increase_percent DECIMAL(5,2)
+)
+BEGIN
+    DECLARE done INT DEFAULT FALSE;
+    DECLARE v_product_id INT;
+    DECLARE v_current_price DECIMAL(10,2);
+    DECLARE v_new_price DECIMAL(10,2);
+    
+    -- Declare cursor
+    DECLARE product_cursor CURSOR FOR
+        SELECT product_id, price
+        FROM products
+        WHERE is_active = TRUE;
+    
+    -- Declare handler for end of cursor
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+    
+    -- Open cursor
+    OPEN product_cursor;
+    
+    -- Loop through results
+    read_loop: LOOP
+        FETCH product_cursor INTO v_product_id, v_current_price;
+        
+        IF done THEN
+            LEAVE read_loop;
+        END IF;
+        
+        -- Calculate new price
+        SET v_new_price = v_current_price * (1 + increase_percent / 100);
+        
+        -- Update product
+        UPDATE products
+        SET price = v_new_price,
+            last_updated = NOW()
+        WHERE product_id = v_product_id;
+        
+        -- Log change
+        INSERT INTO price_history (
+            product_id, old_price, new_price, 
+            change_date, change_reason
+        ) VALUES (
+            v_product_id, v_current_price, v_new_price,
+            NOW(), CONCAT('Price increase: ', increase_percent, '%')
+        );
+    END LOOP;
+    
+    -- Close cursor
+    CLOSE product_cursor;
+    
+    -- Return summary
+    SELECT 
+        COUNT(*) AS products_updated,
+        AVG(increase_percent) AS avg_increase
+    FROM price_history
+    WHERE change_date >= DATE_SUB(NOW(), INTERVAL 1 MINUTE);
+END$$
+
+DELIMITER ;
+
+-- ========================================
+-- DYNAMIC SQL IN PROCEDURES
+-- ========================================
+
+DELIMITER $$
+
+CREATE PROCEDURE DynamicReport(
+    IN table_name VARCHAR(64),
+    IN column_name VARCHAR(64),
+    IN filter_value VARCHAR(100)
+)
+BEGIN
+    DECLARE sql_query TEXT;
+    
+    -- Build dynamic query
+    SET sql_query = CONCAT(
+        'SELECT * FROM ',
+        table_name,
+        ' WHERE ',
+        column_name,
+        ' = ?'
+    );
+    
+    -- Prepare and execute
+    SET @sql = sql_query;
+    SET @param = filter_value;
+    
+    PREPARE stmt FROM @sql;
+    EXECUTE stmt USING @param;
+    DEALLOCATE PREPARE stmt;
+END$$
+
+DELIMITER ;
+
+-- ========================================
+-- ERROR HANDLING
+-- ========================================
+
+DELIMITER $$
+
+CREATE PROCEDURE SafeDivision(
+    IN numerator DECIMAL(10,2),
+    IN denominator DECIMAL(10,2),
+    OUT result DECIMAL(10,2),
+    OUT error_msg VARCHAR(100)
+)
+BEGIN
+    -- Declare handlers
+    DECLARE CONTINUE HANDLER FOR SQLSTATE '22012'
+    BEGIN
+        SET error_msg = 'Division by zero error';
+        SET result = NULL;
+    END;
+    
+    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION
+    BEGIN
+        GET DIAGNOSTICS CONDITION 1
+            error_msg = MESSAGE_TEXT;
+        SET result = NULL;
+    END;
+    
+    -- Attempt division
+    IF denominator = 0 THEN
+        SIGNAL SQLSTATE '22012';
+    ELSE
+        SET result = numerator / denominator;
+        SET error_msg = 'Success';
+    END IF;
+END$$
+
+DELIMITER ;
+
+-- ========================================
+-- SCHEDULED PROCEDURES (Events)
+-- ========================================
+
+-- Enable event scheduler
+SET GLOBAL event_scheduler = ON;
+
+-- Create scheduled event
+CREATE EVENT daily_cleanup
+ON SCHEDULE EVERY 1 DAY
+STARTS '2024-01-01 02:00:00'
+DO
+BEGIN
+    -- Call cleanup procedure
+    CALL CleanupOldData();
+    
+    -- Log execution
+    INSERT INTO event_log (event_name, execution_time)
+    VALUES ('daily_cleanup', NOW());
+END;
+
+-- ========================================
+-- PROCEDURE MANAGEMENT
+-- ========================================
+
+-- List all procedures
+SELECT 
+    ROUTINE_NAME,
+    ROUTINE_TYPE,
+    CREATED,
+    LAST_ALTERED,
+    DEFINER
+FROM information_schema.ROUTINES
+WHERE ROUTINE_SCHEMA = DATABASE()
+    AND ROUTINE_TYPE = 'PROCEDURE';
+
+-- Show procedure definition
+SHOW CREATE PROCEDURE ProcessOrder;
+
+-- Drop procedure
+DROP PROCEDURE IF EXISTS OldProcedure;
+
+-- Grant execute permission
+GRANT EXECUTE ON PROCEDURE mydb.ProcessOrder 
+TO 'app_user'@'localhost';</code></pre>
+                                </div>
+                            </section>
+                            
+                            <!-- Resources -->
+                            <section class="resources">
+                                <h2>Additional Resources</h2>
+                                <ul>
+                                    <li><a href="https://dev.mysql.com/doc/refman/8.0/en/stored-routines.html" target="_blank">MySQL Stored Routines</a></li>
+                                    <li><a href="https://dev.mysql.com/doc/refman/8.0/en/stored-procedures.html" target="_blank">Stored Procedures</a></li>
+                                    <li><a href="https://dev.mysql.com/doc/refman/8.0/en/stored-functions.html" target="_blank">Stored Functions</a></li>
+                                    <li><a href="https://dev.mysql.com/doc/refman/8.0/en/cursors.html" target="_blank">Cursors</a></li>
+                                </ul>
+                            </section>
+                        </div>
+
+                        <!-- Lesson Navigation -->
+                        <div class="lesson-navigation">
+                            <a href="/03module/transactions.html" class="lesson-nav-button prev">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"/>
+                                </svg>
+                                <span>
+                                    <small>Previous</small><br>
+                                    Transactions
+                                </span>
+                            </a>
+                            
+                            <button class="complete-lesson-btn">
+                                Mark as Complete
+                            </button>
+                            
+                            <a href="/03module/php_mysql_integration.html" class="lesson-nav-button next">
+                                <span>
+                                    <small>Next</small><br>
+                                    PHP MySQL Integration
+                                </span>
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="site-footer" role="contentinfo">
+            <div class="footer-container">
+                <div class="footer-content">
+                    <div class="footer-section footer-about">
+                        <h3>PHP WordPress Development</h3>
+                        <p>Complete Web Development Course</p>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Quick Links</h4>
+                        <ul class="footer-links">
+                            <li><a href="/">Home</a></li>
+                            <li><a href="/module3.html">Module 3</a></li>
+                            <li><a href="/resources.html">Resources</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Support</h4>
+                        <ul class="footer-links">
+                            <li><a href="/help.html">Help Center</a></li>
+                            <li><a href="/faq.html">FAQ</a></li>
+                            <li><a href="/contact.html">Contact</a></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="footer-bottom">
+                    <div class="footer-bottom-content">
+                        <p class="copyright">&copy; 2025 PHP WordPress Development Course</p>
+                        <nav class="footer-bottom-links">
+                            <a href="/privacy.html">Privacy</a>
+                            <span class="separator">|</span>
+                            <a href="/terms.html">Terms</a>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Back to Top -->
+    <button id="back-to-top" class="back-to-top" aria-label="Back to top">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 19V5M12 5l-7 7M12 5l7 7"/>
+        </svg>
+    </button>
+
+    <!-- JavaScript -->
+    <script src="/assets/js/navigation.js"></script>
+    <script src="/assets/js/site-config.js"></script>
+</body>
+</html>
