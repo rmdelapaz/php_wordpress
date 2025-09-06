@@ -182,42 +182,48 @@ def print_recommended_structure():
     <div class="sidebar-nav">
         <h3 class="sidebar-title">Module 1: Web Fundamentals</h3>
         <div class="sidebar-section">
-            <h4 class="sidebar-section-title">Lessons</h4>
+            <h4 class="sidebar-section-title">Module Sessions</h4>
             <ul class="sidebar-menu">
                 <li><a href="/01module/course_introduction.html" class="sidebar-link [active]">
-                    1.1 Course Introduction
+                    <span class="session-number">1</span> Course Introduction
                 </a></li>
                 <li><a href="/01module/first_html_page.html" class="sidebar-link">
-                    1.2 Your First HTML Page
+                    <span class="session-number">2</span> Your First HTML Page
                 </a></li>
                 <li><a href="/01module/introduction_to_css.html" class="sidebar-link">
-                    1.3 Introduction to CSS
+                    <span class="session-number">3</span> Introduction to CSS
                 </a></li>
                 <li><a href="/01module/js_intro.html" class="sidebar-link">
-                    1.4 JavaScript Introduction
+                    <span class="session-number">4</span> JavaScript Introduction
                 </a></li>
                 <li><a href="/01module/php_and_wordpress.html" class="sidebar-link">
-                    1.5 PHP and WordPress Overview
+                    <span class="session-number">5</span> PHP and WordPress Overview
                 </a></li>
                 <li><a href="/01module/php_header_footer.html" class="sidebar-link">
-                    1.6 PHP Headers and Footers
+                    <span class="session-number">6</span> PHP Headers and Footers
                 </a></li>
                 <li><a href="/01module/project_static_site.html" class="sidebar-link">
-                    1.7 Project: Static Website
+                    <span class="session-number">7</span> Project: Static Website
                 </a></li>
             </ul>
         </div>
         <div class="sidebar-section">
-            <h4 class="sidebar-section-title">Module Resources</h4>
+            <h4 class="sidebar-section-title">Quick Links</h4>
             <ul class="sidebar-menu">
                 <li><a href="/module1.html" class="sidebar-link">Module Overview</a></li>
-                <li><a href="/resources.html" class="sidebar-link">Additional Resources</a></li>
+                <li><a href="/02module/review_php_setup.html" class="sidebar-link next-lesson">Next: PHP Setup →</a></li>
+                <li><a href="/resources.html" class="sidebar-link">Resources</a></li>
             </ul>
         </div>
     </div>
 </aside>
 
-Note: The [active] class should be added dynamically to the current page's link.
+Key Improvements:
+- Session numbers (1-7) instead of module.lesson format (1.1-1.7)
+- Cleaner visual with session numbers in styled spans
+- "Module Sessions" header is clearer
+- "Quick Links" section with Next Module link for easy progression
+- The [active] class should be added dynamically to the current page's link.
     """)
 
 def main():

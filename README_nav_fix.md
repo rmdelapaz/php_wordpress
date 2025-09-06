@@ -67,34 +67,59 @@ The script will:
 
 ## Navigation Structure
 
-The fixed navigation will have this structure for Module 1:
+The fixed navigation will have this improved structure for Module 1:
 
 ```html
 <aside class="sidebar">
     <div class="sidebar-nav">
         <h3 class="sidebar-title">Module 1: Web Fundamentals</h3>
         <div class="sidebar-section">
-            <h4 class="sidebar-section-title">Lessons</h4>
+            <h4 class="sidebar-section-title">Module Sessions</h4>
             <ul class="sidebar-menu">
-                <li><a href="/01module/course_introduction.html" class="sidebar-link">1.1 Course Introduction</a></li>
-                <li><a href="/01module/first_html_page.html" class="sidebar-link">1.2 Your First HTML Page</a></li>
-                <li><a href="/01module/introduction_to_css.html" class="sidebar-link">1.3 Introduction to CSS</a></li>
-                <li><a href="/01module/js_intro.html" class="sidebar-link">1.4 JavaScript Introduction</a></li>
-                <li><a href="/01module/php_and_wordpress.html" class="sidebar-link">1.5 PHP and WordPress Overview</a></li>
-                <li><a href="/01module/php_header_footer.html" class="sidebar-link">1.6 PHP Headers and Footers</a></li>
-                <li><a href="/01module/project_static_site.html" class="sidebar-link">1.7 Project: Static Website</a></li>
+                <li><a href="/01module/course_introduction.html" class="sidebar-link">
+                    <span class="session-number">1</span> Course Introduction
+                </a></li>
+                <li><a href="/01module/first_html_page.html" class="sidebar-link">
+                    <span class="session-number">2</span> Your First HTML Page
+                </a></li>
+                <li><a href="/01module/introduction_to_css.html" class="sidebar-link">
+                    <span class="session-number">3</span> Introduction to CSS
+                </a></li>
+                <li><a href="/01module/js_intro.html" class="sidebar-link">
+                    <span class="session-number">4</span> JavaScript Introduction
+                </a></li>
+                <li><a href="/01module/php_and_wordpress.html" class="sidebar-link">
+                    <span class="session-number">5</span> PHP and WordPress Overview
+                </a></li>
+                <li><a href="/01module/php_header_footer.html" class="sidebar-link">
+                    <span class="session-number">6</span> PHP Headers and Footers
+                </a></li>
+                <li><a href="/01module/project_static_site.html" class="sidebar-link">
+                    <span class="session-number">7</span> Project: Static Website
+                </a></li>
             </ul>
         </div>
         <div class="sidebar-section">
-            <h4 class="sidebar-section-title">Module Resources</h4>
+            <h4 class="sidebar-section-title">Quick Links</h4>
             <ul class="sidebar-menu">
                 <li><a href="/module1.html" class="sidebar-link">Module Overview</a></li>
-                <li><a href="/resources.html" class="sidebar-link">Additional Resources</a></li>
+                <li><a href="/02module/review_php_setup.html" class="sidebar-link next-lesson">Next: PHP Setup →</a></li>
+                <li><a href="/resources.html" class="sidebar-link">Resources</a></li>
             </ul>
         </div>
     </div>
 </aside>
 ```
+
+### Key Improvements:
+
+1. **Session Numbers**: Each lesson displays just the session number (1-7) in a styled circle, making it cleaner than "1.1, 1.2" format
+2. **"Module Sessions" header**: Clearer section title since module number is already at the top
+3. **"Quick Links" section**: Renamed from "Module Resources" and includes:
+   - Module Overview
+   - **Next: PHP Setup →** - Direct link to the first lesson of Module 2 for seamless progression
+   - Resources
+4. **Enhanced CSS**: Optional `sidebar-enhanced.css` file included for better visual styling with special highlighting for the next lesson link
 
 The script automatically adds the `active` class to the current page's link.
 
