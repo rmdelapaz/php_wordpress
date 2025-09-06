@@ -5,7 +5,6 @@ This helps identify inconsistencies between module navigation implementations.
 """
 
 import os
-from pathlib import Path
 from bs4 import BeautifulSoup
 import json
 
@@ -224,8 +223,19 @@ Note: The [active] class should be added dynamically to the current page's link.
 def main():
     """Main function to compare navigation across modules."""
     
-    # Define paths
-    base_path = Path("\\\\wsl$\\Ubuntu\\home\\practicalace\\projects\\php_wordpress")
+    # Define paths - handle both Windows and WSL paths
+    if os.path.exists(r"\\wsl$\Ubuntu\home\practicalace\projects\php_wordpress\01module"):
+        # Windows path to WSL
+        base_path = r"\\wsl$\Ubuntu\home\practicalace\projects\php_wordpress"
+        print(f"Using Windows WSL path: {base_path}")
+    elif os.path.exists("/home/practicalace/projects/php_wordpress/01module"):
+        # Direct WSL/Linux path
+        base_path = "/home/practicalace/projects/php_wordpress"
+        print(f"Using Linux path: {base_path}")
+    else:
+        # Try current directory
+        base_path = os.getcwd()
+        print(f"Using current directory: {base_path}")
     
     modules = [
         ('01module', 'Module 1: Web Fundamentals'),
@@ -240,9 +250,11 @@ def main():
     # Analyze each module
     module_results = []
     for module_dir, module_name in modules:
-        module_path = base_path / module_dir
+        module_path = os.path.join(base_path, module_dir)
         print(f"\nAnalyzing {module_name}...")
-        results = analyze_module_navigation(str(module_path), module_name)
+        print(f"  Path: {module_path}")
+        print(f"  Exists: {os.path.exists(module_path)}")
+        results = analyze_module_navigation(module_path, module_name)
         module_results.append(results)
     
     # Compare results

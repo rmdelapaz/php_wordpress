@@ -6,7 +6,6 @@ functionality found in 02module and 03module files.
 
 import os
 import re
-from pathlib import Path
 from bs4 import BeautifulSoup
 import sys
 
@@ -219,11 +218,34 @@ def analyze_current_navigation(module_dir):
 def main():
     """Main function to fix navigation in all 01module files."""
     
-    # Define paths
-    base_path = Path("\\\\wsl$\\Ubuntu\\home\\practicalace\\projects\\php_wordpress")
-    module01_dir = base_path / "01module"
-    module02_dir = base_path / "02module"
-    module03_dir = base_path / "03module"
+    # Define paths - handle both Windows and WSL paths
+    if os.path.exists(r"\\wsl$\Ubuntu\home\practicalace\projects\php_wordpress\01module"):
+        # Windows path to WSL
+        base_path = r"\\wsl$\Ubuntu\home\practicalace\projects\php_wordpress"
+        print(f"Using Windows WSL path: {base_path}")
+    elif os.path.exists("/home/practicalace/projects/php_wordpress/01module"):
+        # Direct WSL/Linux path
+        base_path = "/home/practicalace/projects/php_wordpress"
+        print(f"Using Linux path: {base_path}")
+    else:
+        # Try current directory
+        base_path = os.getcwd()
+        print(f"Using current directory: {base_path}")
+        
+    module01_dir = os.path.join(base_path, "01module")
+    module02_dir = os.path.join(base_path, "02module")
+    module03_dir = os.path.join(base_path, "03module")
+    
+    print(f"\nLooking for Module 1 files in: {module01_dir}")
+    print(f"Directory exists: {os.path.exists(module01_dir)}")
+    
+    if os.path.exists(module01_dir):
+        files_in_dir = os.listdir(module01_dir)
+        print(f"Files found in directory: {len(files_in_dir)}")
+        html_files = [f for f in files_in_dir if f.endswith('.html')]
+        print(f"HTML files found: {len(html_files)}")
+        if html_files:
+            print(f"First few HTML files: {html_files[:3]}...")
     
     print("=" * 60)
     print("Module 1 Navigation Fixer")
