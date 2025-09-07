@@ -31,28 +31,21 @@
 
     // Load saved state from localStorage
     const savedState = localStorage.getItem('sidebarCollapsed');
-    if (savedState === 'true') {
+    
+    // Default to collapsed if no saved state exists
+    if (savedState === null || savedState === 'true') {
         sidebar.classList.add('collapsed');
         document.body.classList.add('sidebar-collapsed');
-        forceReflow();
+        // Only save if it was null (first time)
+        if (savedState === null) {
+            localStorage.setItem('sidebarCollapsed', 'true');
+        }
     }
 
     // Force browser to recalculate layout
     function forceReflow() {
-        // Force the browser to recalculate styles
-        const mainContent = document.querySelector('.main-content, main, #main-content');
-        if (mainContent) {
-            // Trigger reflow
-            void mainContent.offsetHeight;
-            
-            // Force repaint
-            mainContent.style.display = 'none';
-            mainContent.offsetHeight; // Trigger reflow
-            mainContent.style.display = '';
-            
-            // Dispatch resize event for any scripts that need it
-            window.dispatchEvent(new Event('resize'));
-        }
+        // Simply dispatch a resize event without manipulating display
+        window.dispatchEvent(new Event('resize'));
     }
 
     // Toggle function
@@ -162,18 +155,6 @@
             }
         }
     });
-
-    // Auto-hide sidebar on small screens initially
-    if (window.innerWidth <= 768 && savedState === null) {
-        sidebar.classList.add('collapsed');
-        document.body.classList.add('sidebar-collapsed');
-        forceReflow();
-    }
-
-    // Initial reflow to ensure proper layout
-    setTimeout(() => {
-        forceReflow();
-    }, 100);
 
     console.log('Sidebar toggle initialized. Use Ctrl/Cmd+B to toggle.');
 })();
