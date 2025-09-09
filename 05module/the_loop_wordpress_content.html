@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    
+    <!-- SEO Meta Tags -->
+    <title>Understanding The Loop in Detail - PHP WordPress Course</title>
+    <meta name="description" content="Master WordPress's Loop mechanism - the heart of content display. Learn how The Loop works, its functions, variations, and advanced techniques">
+    <meta name="keywords" content="PHP, WordPress, The Loop, WP_Query, have_posts, the_post, content display">
+    <meta name="author" content="PHP WordPress Course">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/favicon.png">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-enhanced.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-toggle.css">
+    
+    <!-- Custom styles for Loop visualization -->
+    <style>
+        .loop-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .loop-visualization {
+            background: #f8f9fa;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+            position: relative;
+        }
+
+        .loop-flow {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 2rem 0;
+            position: relative;
+        }
+
+        .loop-step {
+            background: white;
+            border: 3px solid #667eea;
+            border-radius: 50%;
+            width: 120px;
+            height: 120px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-weight: bold;
+            position: relative;
+            z-index: 2;
+            transition: all 0.3s ease;
+        }
+
+        .loop-step:hover {
+            transform: scale(1.1);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+
+        .loop-step.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .loop-arrow {
+            position: absolute;
+            top: 50%;
+            width: calc(100% - 240px);
+            height: 3px;
+            background: linear-gradient(90deg, #667eea 0%, #667eea 50%, transparent 50%);
+            background-size: 20px 3px;
+            animation: flow 1s linear infinite;
+            z-index: 1;
+        }
+
+        @keyframes flow {
+            0% { background-position: 0 0; }
+            100% { background-position: 20px 0; }
+        }
+
+        .function-card {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            transition: all 0.3s ease;
+        }
+
+        .function-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .function-signature {
+            background: #f3f4f6;
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            margin: 0.5rem 0;
+            overflow-x: auto;
+        }
+
+        .loop-example {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            position: relative;
+        }
+
+        .loop-example .line-number {
+            color: #64748b;
+            user-select: none;
+            display: inline-block;
+            width: 30px;
+            text-align: right;
+            margin-right: 1rem;
+        }
+
+        .loop-variations {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .variation-card {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .variation-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            border-color: #667eea;
+        }
+
+        .variation-card h3 {
+            color: #667eea;
+            margin-top: 0;
+        }
+
+        .global-vars {
+            background: #fef3c7;
+            border: 2px solid #fbbf24;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .global-vars h3 {
+            color: #92400e;
+            margin-top: 0;
+        }
+
+        .query-params {
+            background: #f0f9ff;
+            border: 2px solid #0ea5e9;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .param-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .param-item {
+            background: white;
+            padding: 1rem;
+            border-radius: 4px;
+            border-left: 4px solid #0ea5e9;
+        }
+
+        .param-item code {
+            display: block;
+            margin-top: 0.5rem;
+            color: #0369a1;
+        }
+
+        .loop-methods {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 2rem 0;
+        }
+
+        .method-header {
+            background: #f3f4f6;
+            padding: 1rem 1.5rem;
+            border-bottom: 2px solid #e5e7eb;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .method-header:hover {
+            background: #e5e7eb;
+        }
+
+        .method-content {
+            padding: 1.5rem;
+            display: none;
+        }
+
+        .method-content.active {
+            display: block;
+        }
+
+        .loop-flowchart {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 2rem 0;
+            text-align: center;
+        }
+
+        .flowchart-node {
+            background: #667eea;
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            margin: 1rem auto;
+            max-width: 300px;
+            position: relative;
+        }
+
+        .flowchart-decision {
+            background: #f59e0b;
+            clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+            padding: 2rem;
+            width: 200px;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 2rem auto;
+        }
+
+        .flowchart-arrow {
+            width: 2px;
+            height: 30px;
+            background: #6b7280;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .flowchart-arrow::after {
+            content: '▼';
+            position: absolute;
+            bottom: -10px;
+            left: -7px;
+            color: #6b7280;
+        }
+
+        .template-tags-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .tag-card {
+            background: #f8f9fa;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            padding: 1rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .tag-card:hover {
+            background: white;
+            border-color: #667eea;
+            transform: translateY(-2px);
+        }
+
+        .tag-card code {
+            display: block;
+            color: #667eea;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        .pagination-example {
+            background: #f3f4f6;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .pagination-demo {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .page-num {
+            padding: 0.5rem 1rem;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            text-decoration: none;
+            color: #4b5563;
+            transition: all 0.3s ease;
+        }
+
+        .page-num:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .page-num.current {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .loop-states {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .state-indicator {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1rem;
+            min-width: 150px;
+            text-align: center;
+        }
+
+        .state-indicator.active {
+            background: #dcfce7;
+            border-color: #22c55e;
+        }
+
+        .state-indicator.inactive {
+            background: #fee2e2;
+            border-color: #ef4444;
+        }
+
+        @media (max-width: 768px) {
+            .loop-flow {
+                flex-direction: column;
+                gap: 2rem;
+            }
+            
+            .loop-arrow {
+                display: none;
+            }
+            
+            .loop-step {
+                width: 100px;
+                height: 100px;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Skip to main content -->
+    <a href="#main-content" class="sr-only">Skip to main content</a>
+    
+    <div class="page-wrapper">
+        <!-- Header -->
+        <header class="site-header" role="banner">
+            <div class="header-container">
+                <div class="site-branding">
+                    <a href="/" class="site-logo">
+                        <h1 class="site-title">PHP WordPress Development</h1>
+                    </a>
+                </div>
+                
+                <nav class="main-navigation" role="navigation" aria-label="Main navigation">
+                    <button class="mobile-menu-btn" aria-label="Toggle navigation" aria-expanded="false">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    
+                    <div class="nav-menu">
+                        <ul class="nav-list">
+                            <li class="nav-item"><a href="/" class="nav-link">Home</a></li>
+                            <li class="nav-item dropdown">
+                                <button class="nav-link dropdown-toggle active" aria-haspopup="true">Modules</button>
+                                <div class="dropdown-menu">
+                                    <a href="/module1.html" class="dropdown-item">Module 1: Web Fundamentals</a>
+                                    <a href="/module2.html" class="dropdown-item">Module 2: PHP Fundamentals</a>
+                                    <a href="/module3.html" class="dropdown-item">Module 3: MySQL Database</a>
+                                    <a href="/module4.html" class="dropdown-item">Module 4: WordPress & Docker</a>
+                                    <a href="/module5.html" class="dropdown-item active">Module 5: Theme Development</a>
+                                    <a href="/module6.html" class="dropdown-item">Module 6: Plugin Development</a>
+                                    <a href="/module7.html" class="dropdown-item">Module 7: Advanced WordPress</a>
+                                    <a href="/module8.html" class="dropdown-item">Module 8: Deployment</a>
+                                    <a href="/module9.html" class="dropdown-item">Module 9: Final Project</a>
+                                </div>
+                            </li>
+                            <li class="nav-item"><a href="/resources.html" class="nav-link">Resources</a></li>
+                            <li class="nav-item"><a href="/about.html" class="nav-link">About</a></li>
+                        </ul>
+                    </div>
+                </nav>
+                
+                <div class="search-container">
+                    <div class="search-input-wrapper">
+                        <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                        </svg>
+                        <input type="search" class="search-input" placeholder="Search lessons..." aria-label="Search">
+                    </div>
+                    <div class="search-results"></div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-header">
+                <h2 class="progress-title">Course Progress</h2>
+                <span class="progress-text">Loading...</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-bar-fill">
+                    <span class="progress-bar-text"></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Breadcrumb -->
+        <nav class="breadcrumb container" aria-label="Breadcrumb">
+            <ol class="breadcrumb-list">
+                <li class="breadcrumb-item">
+                    <a href="/">Home</a>
+                    <span class="breadcrumb-separator">/</span>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="/module5.html">Module 5</a>
+                    <span class="breadcrumb-separator">/</span>
+                </li>
+                <li class="breadcrumb-item">
+                    <span aria-current="page">Understanding The Loop</span>
+                </li>
+            </ol>
+        </nav>
+        
+        <!-- Main Content -->
+        <main id="main-content" class="main-content" role="main">
+            <div class="container">
+                <div class="content-with-sidebar">
+                    <!-- Sidebar -->
+                    <aside class="sidebar">
+                        <div class="sidebar-nav">
+                            <h3 class="sidebar-title">Module 5: Theme Development</h3>
+                            <div class="sidebar-section">
+                                <h4 class="sidebar-section-title">Session 3: The Loop & Content Display</h4>
+                                <ul class="sidebar-menu">
+                                    <li class="active"><a class="sidebar-link active" href="/05module/the_loop_wordpress_content.html">Understanding The Loop</a></li>
+                                    <li><a class="sidebar-link" href="/05module/template_tags_functions.html">Template Tags & Functions</a></li>
+                                    <li><a class="sidebar-link" href="/05module/custom_queries_wp_query.html">Custom Queries with WP_Query</a></li>
+                                    <li><a class="sidebar-link" href="/05module/pagination_navigation.html">Pagination & Navigation</a></li>
+                                    <li><a class="sidebar-link" href="/05module/homework_blog_listing.html">Homework: Blog Listing</a></li>
+                                </ul>
+                            </div>
+                            <div class="sidebar-section">
+                                <h4 class="sidebar-section-title">Quick Links</h4>
+                                <ul class="sidebar-menu">
+                                    <li><a class="sidebar-link" href="/module5.html">Module Overview</a></li>
+                                    <li><a class="sidebar-link" href="/05module/homework_expand_theme.html">← Previous: Session 2 HW</a></li>
+                                    <li><a class="sidebar-link next-session" href="/05module/working_with_functions.html">Next: Session 4 →</a></li>
+                                    <li><a class="sidebar-link" href="/">← Course Home</a></li>
+                                    <li><a class="sidebar-link" href="/resources.html">Resources</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </aside>
+                    
+                    <!-- Main Lesson Content -->
+                    <article class="lesson-content">
+                        <div class="loop-header">
+                            <h1>🔄 Understanding The Loop in Detail</h1>
+                            <p class="lead">The heartbeat of WordPress content display</p>
+                            <p>Master the fundamental mechanism that powers every WordPress site</p>
+                        </div>
+
+                        <!-- Learning Objectives -->
+                        <div class="lesson-objectives">
+                            <h2>Learning Objectives</h2>
+                            <ul>
+                                <li>Understand how The Loop works internally</li>
+                                <li>Master Loop functions: have_posts(), the_post(), rewind_posts()</li>
+                                <li>Learn about global variables: $post, $wp_query</li>
+                                <li>Implement different Loop variations</li>
+                                <li>Handle multiple Loops on a single page</li>
+                                <li>Debug and troubleshoot Loop issues</li>
+                                <li>Optimize Loop performance</li>
+                            </ul>
+                        </div>
+                        
+                        <!-- Lesson Body -->
+                        <div class="lesson-body">
+                            <!-- Introduction -->
+                            <section>
+                                <h2>What is The Loop?</h2>
+                                <p class="lead">The Loop is WordPress's mechanism for displaying posts. It's called "The Loop" because it loops through each post in the query results and displays it according to your template.</p>
+                                
+                                <div class="alert alert-info">
+                                    <div class="alert-icon">💡</div>
+                                    <div class="alert-content">
+                                        <div class="alert-title">The Loop Analogy</div>
+                                        <div class="alert-message">Think of The Loop as a conveyor belt in a factory. Posts come down the belt one by one, and at each station (template tag), something is done with that post - its title is displayed, its content is formatted, its metadata is shown, etc.</div>
+                                    </div>
+                                </div>
+
+                                <div class="loop-visualization">
+                                    <h3>The Loop Process</h3>
+                                    <div class="loop-flow">
+                                        <div class="loop-step" id="step1">
+                                            <span>Query Database</span>
+                                            <small>Get posts</small>
+                                        </div>
+                                        <div class="loop-arrow"></div>
+                                        <div class="loop-step" id="step2">
+                                            <span>have_posts()</span>
+                                            <small>Check if posts exist</small>
+                                        </div>
+                                        <div class="loop-step" id="step3">
+                                            <span>the_post()</span>
+                                            <small>Setup post data</small>
+                                        </div>
+                                        <div class="loop-step" id="step4">
+                                            <span>Display Content</span>
+                                            <small>Output HTML</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <script>
+                                    // Animate loop steps
+                                    let currentStep = 1;
+                                    setInterval(() => {
+                                        document.querySelectorAll('.loop-step').forEach(step => {
+                                            step.classList.remove('active');
+                                        });
+                                        document.getElementById(`step${currentStep}`).classList.add('active');
+                                        currentStep = currentStep >= 4 ? 1 : currentStep + 1;
+                                    }, 2000);
+                                </script>
+                            </section>
+
+                            <!-- Basic Loop Structure -->
+                            <section>
+                                <h2>The Basic Loop Structure</h2>
+                                <p>Every WordPress Loop follows this fundamental pattern:</p>
+
+                                <div class="loop-example">
+                                    <pre><code><span class="line-number">1</span>&lt;?php if ( have_posts() ) : ?&gt;
+<span class="line-number">2</span>    &lt;?php while ( have_posts() ) : the_post(); ?&gt;
+<span class="line-number">3</span>        
+<span class="line-number">4</span>        &lt;!-- Display post content here --&gt;
+<span class="line-number">5</span>        &lt;h2&gt;&lt;?php the_title(); ?&gt;&lt;/h2&gt;
+<span class="line-number">6</span>        &lt;?php the_content(); ?&gt;
+<span class="line-number">7</span>        
+<span class="line-number">8</span>    &lt;?php endwhile; ?&gt;
+<span class="line-number">9</span>&lt;?php else : ?&gt;
+<span class="line-number">10</span>    
+<span class="line-number">11</span>    &lt;!-- No posts found --&gt;
+<span class="line-number">12</span>    &lt;p&gt;Sorry, no posts found.&lt;/p&gt;
+<span class="line-number">13</span>    
+<span class="line-number">14</span>&lt;?php endif; ?&gt;</code></pre>
+                                </div>
+
+                                <h3>Breaking Down Each Component</h3>
+                                
+                                <div class="function-card">
+                                    <h4>have_posts()</h4>
+                                    <div class="function-signature">
+                                        bool have_posts()
+                                    </div>
+                                    <p>Checks whether there are any posts in the current query. Returns true if posts exist, false otherwise.</p>
+                                    <ul>
+                                        <li>Checks the global <code>$wp_query</code> object</li>
+                                        <li>Returns true if current post index < post count</li>
+                                        <li>Automatically handles pagination</li>
+                                    </ul>
+                                </div>
+
+                                <div class="function-card">
+                                    <h4>the_post()</h4>
+                                    <div class="function-signature">
+                                        void the_post()
+                                    </div>
+                                    <p>Sets up the current post and advances the Loop counter. This populates the global <code>$post</code> object.</p>
+                                    <ul>
+                                        <li>Increments the post counter</li>
+                                        <li>Sets up global post data</li>
+                                        <li>Fires the <code>loop_start</code> action (first iteration)</li>
+                                        <li>Makes template tags available</li>
+                                    </ul>
+                                </div>
+                            </section>
+
+                            <!-- How The Loop Works Internally -->
+                            <section>
+                                <h2>How The Loop Works Internally</h2>
+                                
+                                <div class="loop-flowchart">
+                                    <div class="flowchart-node">WordPress loads template file</div>
+                                    <div class="flowchart-arrow"></div>
+                                    <div class="flowchart-node">Query database based on URL</div>
+                                    <div class="flowchart-arrow"></div>
+                                    <div class="flowchart-node">Populate $wp_query object</div>
+                                    <div class="flowchart-arrow"></div>
+                                    <div class="flowchart-decision">have_posts()?</div>
+                                    <div class="flowchart-arrow"></div>
+                                    <div class="flowchart-node">the_post() sets up $post</div>
+                                    <div class="flowchart-arrow"></div>
+                                    <div class="flowchart-node">Template tags output content</div>
+                                    <div class="flowchart-arrow"></div>
+                                    <div class="flowchart-node">Repeat until no more posts</div>
+                                </div>
+
+                                <h3>The Global Variables</h3>
+                                <div class="global-vars">
+                                    <h3>🌍 Important Global Variables in The Loop</h3>
+                                    <ul>
+                                        <li><strong>$wp_query</strong> - The main query object containing all posts</li>
+                                        <li><strong>$post</strong> - The current post object in the Loop</li>
+                                        <li><strong>$posts</strong> - Array of post objects from the query</li>
+                                        <li><strong>$wp_the_query</strong> - Backup of the main query</li>
+                                        <li><strong>$paged</strong> - Current page number for pagination</li>
+                                    </ul>
+                                    
+                                    <pre><code class="language-php">// Accessing global variables
+global $post, $wp_query;
+
+// Current post ID
+echo $post->ID;
+
+// Total number of posts
+echo $wp_query->found_posts;
+
+// Current post index
+echo $wp_query->current_post;
+
+// Is this the main query?
+if ( $wp_query->is_main_query() ) {
+    // Main query logic
+}</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Loop Variations -->
+                            <section>
+                                <h2>Common Loop Variations</h2>
+                                
+                                <div class="loop-variations">
+                                    <div class="variation-card">
+                                        <h3>Standard Loop</h3>
+                                        <p>The most common Loop pattern using alternative syntax:</p>
+                                        <pre><code class="language-php">&lt;?php if ( have_posts() ) : ?&gt;
+    &lt;?php while ( have_posts() ) : the_post(); ?&gt;
+        &lt;!-- content --&gt;
+    &lt;?php endwhile; ?&gt;
+&lt;?php endif; ?&gt;</code></pre>
+                                    </div>
+
+                                    <div class="variation-card">
+                                        <h3>Loop with Counter</h3>
+                                        <p>Track post position for special styling:</p>
+                                        <pre><code class="language-php">&lt;?php 
+$counter = 0;
+if ( have_posts() ) :
+    while ( have_posts() ) : the_post();
+        $counter++;
+        $class = ($counter == 1) ? 'first-post' : '';
+        ?&gt;
+        &lt;article class="&lt;?php echo $class; ?&gt;"&gt;
+            &lt;!-- content --&gt;
+        &lt;/article&gt;
+    &lt;?php endwhile;
+endif; ?&gt;</code></pre>
+                                    </div>
+
+                                    <div class="variation-card">
+                                        <h3>Loop with Columns</h3>
+                                        <p>Create multi-column layouts:</p>
+                                        <pre><code class="language-php">&lt;?php 
+$column = 1;
+if ( have_posts() ) : ?&gt;
+    &lt;div class="row"&gt;
+    &lt;?php while ( have_posts() ) : the_post(); ?&gt;
+        &lt;div class="col-md-4"&gt;
+            &lt;!-- content --&gt;
+        &lt;/div&gt;
+        &lt;?php 
+        if ( $column % 3 == 0 ) {
+            echo '&lt;/div&gt;&lt;div class="row"&gt;';
+        }
+        $column++;
+        ?&gt;
+    &lt;?php endwhile; ?&gt;
+    &lt;/div&gt;
+&lt;?php endif; ?&gt;</code></pre>
+                                    </div>
+
+                                    <div class="variation-card">
+                                        <h3>Foreach Loop Style</h3>
+                                        <p>Using PHP's foreach with posts array:</p>
+                                        <pre><code class="language-php">&lt;?php
+global $wp_query;
+if ( have_posts() ) :
+    foreach ( $wp_query->posts as $post ) :
+        setup_postdata( $post ); ?&gt;
+        &lt;!-- content --&gt;
+    &lt;?php endforeach;
+    wp_reset_postdata();
+endif; ?&gt;</code></pre>
+                                    </div>
+
+                                    <div class="variation-card">
+                                        <h3>Do-While Loop</h3>
+                                        <p>Alternative syntax for single execution guarantee:</p>
+                                        <pre><code class="language-php">&lt;?php 
+if ( have_posts() ) :
+    do { 
+        the_post(); ?&gt;
+        &lt;!-- content --&gt;
+    &lt;?php } while ( have_posts() );
+endif; ?&gt;</code></pre>
+                                    </div>
+
+                                    <div class="variation-card">
+                                        <h3>First/Last Post Detection</h3>
+                                        <p>Apply special treatment to first/last posts:</p>
+                                        <pre><code class="language-php">&lt;?php 
+if ( have_posts() ) :
+    while ( have_posts() ) : the_post();
+        $is_first = ( $wp_query->current_post == 0 );
+        $is_last = ( $wp_query->current_post + 1 == $wp_query->post_count );
+        
+        if ( $is_first ) {
+            // Special first post treatment
+        } elseif ( $is_last ) {
+            // Special last post treatment
+        }
+    endwhile;
+endif; ?&gt;</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Template Tags in The Loop -->
+                            <section>
+                                <h2>Template Tags Available in The Loop</h2>
+                                <p>Once <code>the_post()</code> is called, these template tags become available:</p>
+
+                                <div class="template-tags-grid">
+                                    <div class="tag-card">
+                                        <strong>Title</strong>
+                                        <code>the_title()</code>
+                                        <code>get_the_title()</code>
+                                    </div>
+                                    <div class="tag-card">
+                                        <strong>Content</strong>
+                                        <code>the_content()</code>
+                                        <code>get_the_content()</code>
+                                    </div>
+                                    <div class="tag-card">
+                                        <strong>Excerpt</strong>
+                                        <code>the_excerpt()</code>
+                                        <code>get_the_excerpt()</code>
+                                    </div>
+                                    <div class="tag-card">
+                                        <strong>Link</strong>
+                                        <code>the_permalink()</code>
+                                        <code>get_permalink()</code>
+                                    </div>
+                                    <div class="tag-card">
+                                        <strong>Date</strong>
+                                        <code>the_date()</code>
+                                        <code>get_the_date()</code>
+                                    </div>
+                                    <div class="tag-card">
+                                        <strong>Author</strong>
+                                        <code>the_author()</code>
+                                        <code>get_the_author()</code>
+                                    </div>
+                                    <div class="tag-card">
+                                        <strong>Categories</strong>
+                                        <code>the_category()</code>
+                                        <code>get_the_category()</code>
+                                    </div>
+                                    <div class="tag-card">
+                                        <strong>Tags</strong>
+                                        <code>the_tags()</code>
+                                        <code>get_the_tags()</code>
+                                    </div>
+                                    <div class="tag-card">
+                                        <strong>ID</strong>
+                                        <code>the_ID()</code>
+                                        <code>get_the_ID()</code>
+                                    </div>
+                                    <div class="tag-card">
+                                        <strong>Thumbnail</strong>
+                                        <code>the_post_thumbnail()</code>
+                                        <code>get_the_post_thumbnail()</code>
+                                    </div>
+                                    <div class="tag-card">
+                                        <strong>Custom Fields</strong>
+                                        <code>the_meta()</code>
+                                        <code>get_post_meta()</code>
+                                    </div>
+                                    <div class="tag-card">
+                                        <strong>Post Class</strong>
+                                        <code>post_class()</code>
+                                        <code>get_post_class()</code>
+                                    </div>
+                                </div>
+
+                                <div class="alert alert-warning">
+                                    <div class="alert-icon">⚠️</div>
+                                    <div class="alert-content">
+                                        <div class="alert-title">Important Note</div>
+                                        <div class="alert-message">Template tags that start with "the_" echo output directly, while those starting with "get_" return values for use in PHP.</div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Multiple Loops -->
+                            <section>
+                                <h2>Working with Multiple Loops</h2>
+                                <p>Sometimes you need multiple Loops on the same page. Here's how to handle them properly:</p>
+
+                                <h3>Method 1: Using rewind_posts()</h3>
+                                <pre><code class="language-php">&lt;?php
+// First Loop - Display titles only
+if ( have_posts() ) :
+    echo '&lt;ul class="post-titles"&gt;';
+    while ( have_posts() ) : the_post(); ?&gt;
+        &lt;li&gt;&lt;a href="&lt;?php the_permalink(); ?&gt;"&gt;&lt;?php the_title(); ?&gt;&lt;/a&gt;&lt;/li&gt;
+    &lt;?php endwhile;
+    echo '&lt;/ul&gt;';
+endif;
+
+// Reset the Loop
+rewind_posts();
+
+// Second Loop - Display full content
+if ( have_posts() ) :
+    while ( have_posts() ) : the_post(); ?&gt;
+        &lt;article&gt;
+            &lt;h2&gt;&lt;?php the_title(); ?&gt;&lt;/h2&gt;
+            &lt;?php the_content(); ?&gt;
+        &lt;/article&gt;
+    &lt;?php endwhile;
+endif; ?&gt;</code></pre>
+
+                                <h3>Method 2: Using WP_Query for Secondary Loops</h3>
+                                <pre><code class="language-php">&lt;?php
+// Main Loop
+if ( have_posts() ) :
+    while ( have_posts() ) : the_post();
+        // Main content
+    endwhile;
+endif;
+
+// Secondary Loop - Featured Posts
+$featured = new WP_Query( array(
+    'posts_per_page' => 3,
+    'meta_key' => 'featured',
+    'meta_value' => 'yes'
+) );
+
+if ( $featured->have_posts() ) :
+    while ( $featured->have_posts() ) : $featured->the_post();
+        // Featured posts content
+    endwhile;
+    wp_reset_postdata(); // Important!
+endif; ?&gt;</code></pre>
+
+                                <h3>Method 3: Using get_posts()</h3>
+                                <pre><code class="language-php">&lt;?php
+// Main Loop continues normally
+if ( have_posts() ) :
+    while ( have_posts() ) : the_post();
+        // Main content
+    endwhile;
+endif;
+
+// Get recent posts without affecting main Loop
+$recent_posts = get_posts( array(
+    'numberposts' => 5,
+    'post_status' => 'publish'
+) );
+
+foreach ( $recent_posts as $post ) :
+    setup_postdata( $post ); ?&gt;
+    &lt;h3&gt;&lt;?php the_title(); ?&gt;&lt;/h3&gt;
+&lt;?php endforeach;
+wp_reset_postdata(); ?&gt;</code></pre>
+                            </section>
+
+                            <!-- Loop States and Conditionals -->
+                            <section>
+                                <h2>Loop States and Conditional Tags</h2>
+                                <p>WordPress provides conditional tags to check the current state of The Loop:</p>
+
+                                <div class="loop-states">
+                                    <div class="state-indicator active">
+                                        <strong>in_the_loop()</strong>
+                                        <p>True when inside The Loop</p>
+                                    </div>
+                                    <div class="state-indicator active">
+                                        <strong>is_main_query()</strong>
+                                        <p>True for main query</p>
+                                    </div>
+                                    <div class="state-indicator inactive">
+                                        <strong>is_singular()</strong>
+                                        <p>True for single post/page</p>
+                                    </div>
+                                    <div class="state-indicator active">
+                                        <strong>have_posts()</strong>
+                                        <p>True if posts exist</p>
+                                    </div>
+                                </div>
+
+                                <h3>Using Conditional Tags in The Loop</h3>
+                                <pre><code class="language-php">&lt;?php
+if ( have_posts() ) :
+    while ( have_posts() ) : the_post();
+        
+        // Check if we're in the main Loop
+        if ( is_main_query() && in_the_loop() ) {
+            // This is the main Loop
+        }
+        
+        // Check post type
+        if ( get_post_type() === 'post' ) {
+            // Regular blog post
+        } elseif ( get_post_type() === 'page' ) {
+            // Static page
+        }
+        
+        // Check for sticky posts
+        if ( is_sticky() ) {
+            // This is a sticky post
+        }
+        
+        // Check if has thumbnail
+        if ( has_post_thumbnail() ) {
+            the_post_thumbnail();
+        }
+        
+    endwhile;
+endif; ?&gt;</code></pre>
+                            </section>
+
+                            <!-- Advanced Loop Techniques -->
+                            <section>
+                                <h2>Advanced Loop Techniques</h2>
+
+                                <h3>1. Excluding Posts from The Loop</h3>
+                                <pre><code class="language-php">&lt;?php
+// Skip certain posts in The Loop
+if ( have_posts() ) :
+    while ( have_posts() ) : the_post();
+        
+        // Skip posts from a specific category
+        if ( in_category( 'exclude-me' ) ) {
+            continue;
+        }
+        
+        // Skip posts by specific author
+        if ( get_the_author_meta( 'ID' ) == 5 ) {
+            continue;
+        }
+        
+        // Display the post
+        get_template_part( 'template-parts/content' );
+        
+    endwhile;
+endif; ?&gt;</code></pre>
+
+                                <h3>2. Modifying The Main Query</h3>
+                                <pre><code class="language-php">// In functions.php
+function modify_main_query( $query ) {
+    if ( ! is_admin() && $query->is_main_query() ) {
+        
+        // Modify homepage query
+        if ( is_home() ) {
+            $query->set( 'posts_per_page', 5 );
+            $query->set( 'orderby', 'title' );
+            $query->set( 'order', 'ASC' );
+        }
+        
+        // Exclude category from blog
+        if ( is_home() ) {
+            $query->set( 'cat', '-5' ); // Exclude category ID 5
+        }
+    }
+}
+add_action( 'pre_get_posts', 'modify_main_query' );</code></pre>
+
+                                <h3>3. Loop with AJAX Loading</h3>
+                                <pre><code class="language-php">// Initial Loop with load more button
+&lt;div id="posts-container"&gt;
+    &lt;?php 
+    if ( have_posts() ) :
+        while ( have_posts() ) : the_post(); ?&gt;
+            &lt;article class="post-item"&gt;
+                &lt;h2&gt;&lt;?php the_title(); ?&gt;&lt;/h2&gt;
+                &lt;?php the_excerpt(); ?&gt;
+            &lt;/article&gt;
+        &lt;?php endwhile; ?&gt;
+    &lt;?php endif; ?&gt;
+&lt;/div&gt;
+
+&lt;button id="load-more" data-page="2"&gt;Load More&lt;/button&gt;
+
+&lt;script&gt;
+jQuery('#load-more').on('click', function() {
+    var page = jQuery(this).data('page');
+    jQuery.ajax({
+        url: ajaxurl,
+        type: 'POST',
+        data: {
+            action: 'load_more_posts',
+            page: page
+        },
+        success: function(response) {
+            jQuery('#posts-container').append(response);
+            jQuery('#load-more').data('page', page + 1);
+        }
+    });
+});
+&lt;/script&gt;</code></pre>
+
+                                <h3>4. Custom Loop Order</h3>
+                                <pre><code class="language-php">&lt;?php
+// Create custom ordered array
+$custom_order = array( 45, 23, 67, 12, 89 ); // Post IDs in desired order
+
+// Query posts
+$args = array(
+    'post__in' => $custom_order,
+    'orderby' => 'post__in', // Maintain array order
+    'posts_per_page' => -1
+);
+
+$custom_query = new WP_Query( $args );
+
+if ( $custom_query->have_posts() ) :
+    while ( $custom_query->have_posts() ) : $custom_query->the_post();
+        // Display posts in custom order
+    endwhile;
+    wp_reset_postdata();
+endif; ?&gt;</code></pre>
+                            </section>
+
+                            <!-- Loop Performance -->
+                            <section>
+                                <h2>Loop Performance Optimization</h2>
+                                
+                                <div class="alert alert-success">
+                                    <div class="alert-icon">⚡</div>
+                                    <div class="alert-content">
+                                        <div class="alert-title">Performance Best Practices</div>
+                                        <div class="alert-message">
+                                            <ul>
+                                                <li><strong>Limit queries:</strong> Use 'posts_per_page' to limit results</li>
+                                                <li><strong>Select only needed fields:</strong> Use 'fields' => 'ids' when you only need IDs</li>
+                                                <li><strong>Cache results:</strong> Use transients for expensive queries</li>
+                                                <li><strong>Avoid nested Loops:</strong> They multiply database queries</li>
+                                                <li><strong>Use pagination:</strong> Don't load all posts at once</li>
+                                                <li><strong>Reset postdata:</strong> Always use wp_reset_postdata() after custom queries</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <h3>Optimized Loop Example</h3>
+                                <pre><code class="language-php">&lt;?php
+// Cache the query results
+$cache_key = 'featured_posts_' . get_current_blog_id();
+$featured_posts = get_transient( $cache_key );
+
+if ( false === $featured_posts ) {
+    // Query not cached, run it
+    $args = array(
+        'posts_per_page' => 5,
+        'meta_key' => 'featured',
+        'meta_value' => 'yes',
+        'fields' => 'ids', // Get only IDs first
+        'no_found_rows' => true, // Skip pagination count
+        'update_post_meta_cache' => false, // Skip meta cache if not needed
+        'update_post_term_cache' => false, // Skip term cache if not needed
+    );
+    
+    $featured_posts = get_posts( $args );
+    
+    // Cache for 12 hours
+    set_transient( $cache_key, $featured_posts, 12 * HOUR_IN_SECONDS );
+}
+
+// Now loop through the cached IDs
+foreach ( $featured_posts as $post_id ) :
+    $post = get_post( $post_id );
+    setup_postdata( $post ); ?&gt;
+    
+    &lt;article&gt;
+        &lt;h2&gt;&lt;?php the_title(); ?&gt;&lt;/h2&gt;
+    &lt;/article&gt;
+    
+&lt;?php endforeach;
+wp_reset_postdata(); ?&gt;</code></pre>
+                            </section>
+
+                            <!-- Debugging The Loop -->
+                            <section>
+                                <h2>Debugging The Loop</h2>
+                                
+                                <h3>Common Loop Issues and Solutions</h3>
+                                
+                                <div class="alert alert-warning">
+                                    <div class="alert-icon">🐛</div>
+                                    <div class="alert-content">
+                                        <div class="alert-title">Issue: Loop Shows Wrong Content</div>
+                                        <div class="alert-message">
+                                            <strong>Cause:</strong> Forgot to reset postdata after custom query<br>
+                                            <strong>Solution:</strong> Always use <code>wp_reset_postdata()</code> after custom loops
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="alert alert-warning">
+                                    <div class="alert-icon">🐛</div>
+                                    <div class="alert-content">
+                                        <div class="alert-title">Issue: Template Tags Not Working</div>
+                                        <div class="alert-message">
+                                            <strong>Cause:</strong> Using template tags outside The Loop<br>
+                                            <strong>Solution:</strong> Ensure <code>the_post()</code> is called before using template tags
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <h3>Debug Helper Functions</h3>
+                                <pre><code class="language-php">// Debug function to inspect Loop state
+function debug_loop_state() {
+    global $wp_query, $post;
+    
+    echo '&lt;pre style="background: #f0f0f0; padding: 10px;"&gt;';
+    echo 'Current Post ID: ' . ( $post ? $post->ID : 'None' ) . "\n";
+    echo 'Post Count: ' . $wp_query->post_count . "\n";
+    echo 'Found Posts: ' . $wp_query->found_posts . "\n";
+    echo 'Current Post Index: ' . $wp_query->current_post . "\n";
+    echo 'Is Main Query: ' . ( $wp_query->is_main_query() ? 'Yes' : 'No' ) . "\n";
+    echo 'In The Loop: ' . ( in_the_loop() ? 'Yes' : 'No' ) . "\n";
+    echo 'Have Posts: ' . ( have_posts() ? 'Yes' : 'No' ) . "\n";
+    echo '&lt;/pre&gt;';
+}
+
+// Use in your template
+if ( have_posts() ) :
+    while ( have_posts() ) : the_post();
+        debug_loop_state(); // Check Loop state
+        // Your content
+    endwhile;
+endif;</code></pre>
+
+                                <h3>Query Monitor</h3>
+                                <pre><code class="language-php">// Log queries for debugging
+function log_loop_queries() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        return;
+    }
+    
+    global $wp_query;
+    error_log( 'Loop Query: ' . print_r( $wp_query->request, true ) );
+    error_log( 'Query Vars: ' . print_r( $wp_query->query_vars, true ) );
+}
+add_action( 'loop_start', 'log_loop_queries' );</code></pre>
+                            </section>
+
+                            <!-- Practice Exercise -->
+                            <section>
+                                <h2>Practice Exercise</h2>
+                                <div class="alert alert-success">
+                                    <div class="alert-icon">💻</div>
+                                    <div class="alert-content">
+                                        <div class="alert-title">Loop Mastery Challenge</div>
+                                        <div class="alert-message">
+                                            <p>Create a complex page template that demonstrates Loop mastery:</p>
+                                            <ol>
+                                                <li>Display the 3 most recent sticky posts at the top</li>
+                                                <li>Show regular posts below (excluding the sticky ones already shown)</li>
+                                                <li>Add a sidebar with the 5 most commented posts</li>
+                                                <li>Include post numbering (1, 2, 3...)</li>
+                                                <li>Apply special styling to the first post</li>
+                                                <li>Create a 3-column layout that wraps properly</li>
+                                                <li>Add "Load More" AJAX functionality</li>
+                                                <li>Display different content for different post formats</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Resources -->
+                            <section class="resources">
+                                <h2>Additional Resources</h2>
+                                <ul>
+                                    <li><a href="https://developer.wordpress.org/themes/basics/the-loop/" target="_blank">The Loop - WordPress Developer Resources</a></li>
+                                    <li><a href="https://codex.wordpress.org/The_Loop_in_Action" target="_blank">The Loop in Action - WordPress Codex</a></li>
+                                    <li><a href="https://developer.wordpress.org/reference/classes/wp_query/" target="_blank">WP_Query Class Reference</a></li>
+                                    <li><a href="https://www.billerickson.net/code/wp_query-arguments/" target="_blank">WP_Query Arguments - Bill Erickson</a></li>
+                                    <li><a href="https://digwp.com/2011/05/loops/" target="_blank">4 Ways to Loop with WordPress - Digging Into WordPress</a></li>
+                                </ul>
+                            </section>
+                        </div>
+
+                        <!-- Lesson Navigation -->
+                        <div class="lesson-navigation">
+                            <a href="/05module/homework_expand_theme.html" class="lesson-nav-button prev">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"/>
+                                </svg>
+                                <span>
+                                    <small>Previous</small><br>
+                                    Session 2 Homework
+                                </span>
+                            </a>
+                            
+                            <button class="complete-lesson-btn">
+                                Mark as Complete
+                            </button>
+                            
+                            <a href="/05module/template_tags_functions.html" class="lesson-nav-button next">
+                                <span>
+                                    <small>Next</small><br>
+                                    Template Tags & Functions
+                                </span>
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="site-footer" role="contentinfo">
+            <div class="footer-container">
+                <div class="footer-content">
+                    <div class="footer-section footer-about">
+                        <h3>PHP WordPress Development</h3>
+                        <p>Complete Web Development Course</p>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Quick Links</h4>
+                        <ul class="footer-links">
+                            <li><a href="/">Home</a></li>
+                            <li><a href="/module5.html">Module 5</a></li>
+                            <li><a href="/resources.html">Resources</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Support</h4>
+                        <ul class="footer-links">
+                            <li><a href="/about.html">About</a></li>
+                            <li><a href="/contact.html">Contact</a></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="footer-bottom">
+                    <p>&copy; 2024 PHP WordPress Course. All rights reserved.</p>
+                    <p>This course material is for educational purposes only.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="/assets/js/prism.js"></script>
+    <script src="/assets/js/main.js"></script>
+    <script src="/assets/js/sidebar-toggle.js"></script>
+    <script src="/assets/js/progress-tracker.js"></script>
+    <script src="/assets/js/search.js"></script>
+    <script src="/assets/js/theme-toggle.js"></script>
+</body>
+</html>

@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    
+    <!-- SEO Meta Tags -->
+    <title>WordPress Template Hierarchy in Depth - PHP WordPress Course</title>
+    <meta name="description" content="Master the WordPress Template Hierarchy - understand how WordPress decides which template file to use for different types of content">
+    <meta name="keywords" content="PHP, WordPress, template hierarchy, theme development, template files, conditional tags">
+    <meta name="author" content="PHP WordPress Course">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/favicon.png">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-enhanced.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-toggle.css">
+    
+    <!-- Custom styles for template hierarchy visualization -->
+    <style>
+        .hierarchy-diagram {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 2rem;
+            border-radius: 12px;
+            margin: 2rem 0;
+            overflow-x: auto;
+        }
+
+        .hierarchy-tree {
+            background: white;
+            border-radius: 8px;
+            padding: 2rem;
+            min-width: 800px;
+        }
+
+        .template-flow {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 1rem 0;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            position: relative;
+        }
+
+        .template-flow::after {
+            content: '→';
+            position: absolute;
+            right: 50%;
+            font-size: 2rem;
+            color: #667eea;
+        }
+
+        .template-box {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 0.5rem;
+            min-width: 150px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .template-box:hover {
+            transform: translateY(-5px);
+            border-color: #667eea;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+
+        .template-box.primary {
+            background: #dbeafe;
+            border-color: #3b82f6;
+        }
+
+        .template-box.fallback {
+            background: #fef3c7;
+            border-color: #f59e0b;
+        }
+
+        .template-box.ultimate {
+            background: #fee2e2;
+            border-color: #ef4444;
+        }
+
+        .template-decision {
+            background: #f0f9ff;
+            border: 2px solid #0ea5e9;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .decision-path {
+            display: flex;
+            align-items: center;
+            margin: 1rem 0;
+        }
+
+        .decision-node {
+            background: white;
+            border: 2px solid #0ea5e9;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 1rem;
+        }
+
+        .hierarchy-interactive {
+            background: #1e293b;
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 2rem 0;
+            color: #e2e8f0;
+        }
+
+        .hierarchy-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .hierarchy-button {
+            background: #334155;
+            color: white;
+            border: 2px solid #475569;
+            padding: 0.75rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .hierarchy-button:hover {
+            background: #475569;
+            border-color: #64748b;
+        }
+
+        .hierarchy-button.active {
+            background: #667eea;
+            border-color: #818cf8;
+        }
+
+        .hierarchy-result {
+            background: #0f172a;
+            padding: 1.5rem;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .hierarchy-result .step {
+            margin: 0.5rem 0;
+            padding-left: 1rem;
+        }
+
+        .hierarchy-result .found {
+            color: #4ade80;
+            font-weight: bold;
+        }
+
+        .hierarchy-result .checking {
+            color: #fbbf24;
+        }
+
+        .hierarchy-result .not-found {
+            color: #94a3b8;
+            text-decoration: line-through;
+        }
+
+        .template-priority {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 2rem 0;
+        }
+
+        .priority-header {
+            background: #f3f4f6;
+            padding: 1rem;
+            font-weight: bold;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .priority-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .priority-item {
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            transition: background 0.3s ease;
+        }
+
+        .priority-item:hover {
+            background: #f9fafb;
+        }
+
+        .priority-number {
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 1rem;
+        }
+
+        .conditional-tag {
+            display: inline-block;
+            background: #e0f2fe;
+            color: #075985;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            margin: 0.25rem;
+        }
+
+        .hierarchy-canvas {
+            width: 100%;
+            height: 500px;
+            margin: 2rem 0;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+        }
+
+        .template-example {
+            background: #f8fafc;
+            border-left: 4px solid #667eea;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .template-example h4 {
+            color: #667eea;
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Skip to main content -->
+    <a href="#main-content" class="sr-only">Skip to main content</a>
+    
+    <div class="page-wrapper">
+        <!-- Header -->
+        <header class="site-header" role="banner">
+            <div class="header-container">
+                <div class="site-branding">
+                    <a href="/" class="site-logo">
+                        <h1 class="site-title">PHP WordPress Development</h1>
+                    </a>
+                </div>
+                
+                <nav class="main-navigation" role="navigation" aria-label="Main navigation">
+                    <button class="mobile-menu-btn" aria-label="Toggle navigation" aria-expanded="false">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    
+                    <div class="nav-menu">
+                        <ul class="nav-list">
+                            <li class="nav-item"><a href="/" class="nav-link">Home</a></li>
+                            <li class="nav-item dropdown">
+                                <button class="nav-link dropdown-toggle active" aria-haspopup="true">Modules</button>
+                                <div class="dropdown-menu">
+                                    <a href="/module1.html" class="dropdown-item">Module 1: Web Fundamentals</a>
+                                    <a href="/module2.html" class="dropdown-item">Module 2: PHP Fundamentals</a>
+                                    <a href="/module3.html" class="dropdown-item">Module 3: MySQL Database</a>
+                                    <a href="/module4.html" class="dropdown-item">Module 4: WordPress & Docker</a>
+                                    <a href="/module5.html" class="dropdown-item active">Module 5: Theme Development</a>
+                                    <a href="/module6.html" class="dropdown-item">Module 6: Plugin Development</a>
+                                    <a href="/module7.html" class="dropdown-item">Module 7: Advanced WordPress</a>
+                                    <a href="/module8.html" class="dropdown-item">Module 8: Deployment</a>
+                                    <a href="/module9.html" class="dropdown-item">Module 9: Final Project</a>
+                                </div>
+                            </li>
+                            <li class="nav-item"><a href="/resources.html" class="nav-link">Resources</a></li>
+                            <li class="nav-item"><a href="/about.html" class="nav-link">About</a></li>
+                        </ul>
+                    </div>
+                </nav>
+                
+                <div class="search-container">
+                    <div class="search-input-wrapper">
+                        <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                        </svg>
+                        <input type="search" class="search-input" placeholder="Search lessons..." aria-label="Search">
+                    </div>
+                    <div class="search-results"></div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-header">
+                <h2 class="progress-title">Course Progress</h2>
+                <span class="progress-text">Loading...</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-bar-fill">
+                    <span class="progress-bar-text"></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Breadcrumb -->
+        <nav class="breadcrumb container" aria-label="Breadcrumb">
+            <ol class="breadcrumb-list">
+                <li class="breadcrumb-item">
+                    <a href="/">Home</a>
+                    <span class="breadcrumb-separator">/</span>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="/module5.html">Module 5</a>
+                    <span class="breadcrumb-separator">/</span>
+                </li>
+                <li class="breadcrumb-item">
+                    <span aria-current="page">WordPress Template Hierarchy</span>
+                </li>
+            </ol>
+        </nav>
+        
+        <!-- Main Content -->
+        <main id="main-content" class="main-content" role="main">
+            <div class="container">
+                <div class="content-with-sidebar">
+                    <!-- Sidebar -->
+                    <aside class="sidebar">
+                        <div class="sidebar-nav">
+                            <h3 class="sidebar-title">Module 5: Theme Development</h3>
+                            <div class="sidebar-section">
+                                <h4 class="sidebar-section-title">Session 2: Template Hierarchy</h4>
+                                <ul class="sidebar-menu">
+                                    <li class="active"><a class="sidebar-link active" href="/05module/wordpress_template_hierarchy.html">Template Hierarchy in Depth</a></li>
+                                    <li><a class="sidebar-link" href="/05module/main_template_files.html">Main Template Files</a></li>
+                                    <li><a class="sidebar-link" href="/05module/template_parts_includes.html">Template Parts & Includes</a></li>
+                                    <li><a class="sidebar-link" href="/05module/get_template_part.html">get_template_part() Function</a></li>
+                                    <li><a class="sidebar-link" href="/05module/homework_expand_theme.html">Homework: Expand Theme</a></li>
+                                </ul>
+                            </div>
+                            <div class="sidebar-section">
+                                <h4 class="sidebar-section-title">Quick Links</h4>
+                                <ul class="sidebar-menu">
+                                    <li><a class="sidebar-link" href="/module5.html">Module Overview</a></li>
+                                    <li><a class="sidebar-link" href="/05module/homework_minimal_wordpress_theme.html">← Previous Session</a></li>
+                                    <li><a class="sidebar-link next-session" href="/05module/the_loop_wordpress_content.html">Next: Session 3 →</a></li>
+                                    <li><a class="sidebar-link" href="/">← Course Home</a></li>
+                                    <li><a class="sidebar-link" href="/resources.html">Resources</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </aside>
+                    
+                    <!-- Main Lesson Content -->
+                    <article class="lesson-content">
+                        <header class="lesson-header">
+                            <h1>WordPress Template Hierarchy in Depth</h1>
+                            <div class="lesson-meta">
+                                <div class="lesson-meta-item">
+                                    <svg width="20" height="20" fill="currentColor">
+                                        <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    <span>Duration: 60 minutes</span>
+                                </div>
+                                <div class="lesson-meta-item">
+                                    <svg width="20" height="20" fill="currentColor">
+                                        <path d="M12 14l9-5-9-5-9 5 9 5z"/>
+                                    </svg>
+                                    <span>Module 5: Session 2</span>
+                                </div>
+                            </div>
+                        </header>
+
+                        <!-- Learning Objectives -->
+                        <div class="lesson-objectives">
+                            <h2>Learning Objectives</h2>
+                            <ul>
+                                <li>Master the WordPress Template Hierarchy decision tree</li>
+                                <li>Understand how WordPress selects templates for different content</li>
+                                <li>Learn the priority order of template files</li>
+                                <li>Use conditional tags to control template logic</li>
+                                <li>Create specialized templates for specific content types</li>
+                                <li>Debug template loading issues effectively</li>
+                            </ul>
+                        </div>
+                        
+                        <!-- Lesson Body -->
+                        <div class="lesson-body">
+                            <section>
+                                <h2>Introduction</h2>
+                                <p class="lead">The WordPress Template Hierarchy is like a detailed roadmap that WordPress follows to decide which template file to use. Think of it as a sophisticated decision tree - WordPress starts at the top with the most specific template and works its way down to more general ones until it finds a file that exists.</p>
+                                
+                                <div class="alert alert-info">
+                                    <div class="alert-icon">🗺️</div>
+                                    <div class="alert-content">
+                                        <div class="alert-title">The Golden Rule</div>
+                                        <div class="alert-message">WordPress always uses the MOST SPECIFIC template file available. If that doesn't exist, it falls back to the next most specific, and so on, until it reaches index.php - the ultimate fallback.</div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Understanding the Hierarchy</h2>
+                                <p>The template hierarchy is WordPress's way of being flexible yet predictable. It's like having multiple backup plans:</p>
+                                
+                                <canvas id="hierarchyCanvas" class="hierarchy-canvas"></canvas>
+                                <script>
+                                    const canvas = document.getElementById('hierarchyCanvas');
+                                    const ctx = canvas.getContext('2d');
+                                    canvas.width = canvas.offsetWidth;
+                                    canvas.height = 500;
+                                    
+                                    // Animation variables
+                                    let currentPath = 0;
+                                    let animationStep = 0;
+                                    const paths = [
+                                        { type: 'Single Post', templates: ['single-{post-type}-{slug}.php', 'single-{post-type}.php', 'single.php', 'singular.php', 'index.php'] },
+                                        { type: 'Page', templates: ['page-{slug}.php', 'page-{id}.php', 'page.php', 'singular.php', 'index.php'] },
+                                        { type: 'Category', templates: ['category-{slug}.php', 'category-{id}.php', 'category.php', 'archive.php', 'index.php'] },
+                                        { type: 'Home Page', templates: ['front-page.php', 'home.php', 'index.php'] }
+                                    ];
+                                    
+                                    function drawHierarchy() {
+                                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                                        
+                                        // Title
+                                        ctx.fillStyle = '#1f2937';
+                                        ctx.font = 'bold 20px Arial';
+                                        ctx.textAlign = 'center';
+                                        ctx.fillText('Template Hierarchy Decision Path', canvas.width / 2, 30);
+                                        
+                                        // Current path type
+                                        ctx.fillStyle = '#667eea';
+                                        ctx.font = 'bold 16px Arial';
+                                        ctx.fillText('Requesting: ' + paths[currentPath].type, canvas.width / 2, 60);
+                                        
+                                        // Draw the hierarchy path
+                                        const startY = 100;
+                                        const boxHeight = 40;
+                                        const boxWidth = 250;
+                                        const spacing = 60;
+                                        
+                                        paths[currentPath].templates.forEach((template, index) => {
+                                            const x = canvas.width / 2 - boxWidth / 2;
+                                            const y = startY + (index * spacing);
+                                            
+                                            // Draw connection line
+                                            if (index > 0) {
+                                                ctx.strokeStyle = '#e5e7eb';
+                                                ctx.lineWidth = 2;
+                                                ctx.beginPath();
+                                                ctx.moveTo(canvas.width / 2, y - spacing + boxHeight);
+                                                ctx.lineTo(canvas.width / 2, y);
+                                                ctx.stroke();
+                                                
+                                                // Arrow
+                                                ctx.beginPath();
+                                                ctx.moveTo(canvas.width / 2 - 5, y - 5);
+                                                ctx.lineTo(canvas.width / 2, y);
+                                                ctx.lineTo(canvas.width / 2 + 5, y - 5);
+                                                ctx.stroke();
+                                            }
+                                            
+                                            // Determine box style based on animation
+                                            let fillColor = '#f3f4f6';
+                                            let borderColor = '#e5e7eb';
+                                            let textColor = '#6b7280';
+                                            
+                                            if (index < animationStep) {
+                                                // Already checked
+                                                fillColor = '#fee2e2';
+                                                borderColor = '#ef4444';
+                                                textColor = '#991b1b';
+                                            } else if (index === animationStep) {
+                                                // Currently checking
+                                                fillColor = '#fef3c7';
+                                                borderColor = '#f59e0b';
+                                                textColor = '#92400e';
+                                            } else if (index === paths[currentPath].templates.length - 1) {
+                                                // Will definitely exist (index.php)
+                                                fillColor = '#dcfce7';
+                                                borderColor = '#22c55e';
+                                                textColor = '#166534';
+                                            }
+                                            
+                                            // Draw box
+                                            ctx.fillStyle = fillColor;
+                                            ctx.fillRect(x, y, boxWidth, boxHeight);
+                                            ctx.strokeStyle = borderColor;
+                                            ctx.lineWidth = 2;
+                                            ctx.strokeRect(x, y, boxWidth, boxHeight);
+                                            
+                                            // Draw text
+                                            ctx.fillStyle = textColor;
+                                            ctx.font = '14px Courier New';
+                                            ctx.textAlign = 'center';
+                                            ctx.fillText(template, canvas.width / 2, y + 25);
+                                            
+                                            // Status indicator
+                                            if (index < animationStep) {
+                                                ctx.fillStyle = '#ef4444';
+                                                ctx.font = '12px Arial';
+                                                ctx.textAlign = 'left';
+                                                ctx.fillText('✗ Not Found', x + boxWidth + 10, y + 25);
+                                            } else if (index === animationStep && animationStep < paths[currentPath].templates.length - 1) {
+                                                ctx.fillStyle = '#f59e0b';
+                                                ctx.font = '12px Arial';
+                                                ctx.textAlign = 'left';
+                                                ctx.fillText('? Checking...', x + boxWidth + 10, y + 25);
+                                            } else if (index === paths[currentPath].templates.length - 1) {
+                                                ctx.fillStyle = '#22c55e';
+                                                ctx.font = '12px Arial';
+                                                ctx.textAlign = 'left';
+                                                ctx.fillText('✓ Always Exists', x + boxWidth + 10, y + 25);
+                                            }
+                                        });
+                                        
+                                        // Animate
+                                        animationStep++;
+                                        if (animationStep > paths[currentPath].templates.length) {
+                                            animationStep = 0;
+                                            currentPath = (currentPath + 1) % paths.length;
+                                        }
+                                    }
+                                    
+                                    setInterval(drawHierarchy, 1000);
+                                    drawHierarchy();
+                                </script>
+
+                                <div class="hierarchy-diagram">
+                                    <div class="hierarchy-tree">
+                                        <h3>Complete Template Hierarchy Map</h3>
+                                        <p>WordPress checks for templates in this specific order:</p>
+                                        
+                                        <div class="template-flow">
+                                            <div class="template-box primary">
+                                                Most Specific Template<br>
+                                                <small>(e.g., page-about.php)</small>
+                                            </div>
+                                            <div class="template-box fallback">
+                                                General Template<br>
+                                                <small>(e.g., page.php)</small>
+                                            </div>
+                                            <div class="template-box ultimate">
+                                                Ultimate Fallback<br>
+                                                <small>(index.php)</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Homepage Display Hierarchy</h2>
+                                <p>The homepage has its own special hierarchy depending on your Settings → Reading configuration:</p>
+                                
+                                <div class="template-priority">
+                                    <div class="priority-header">Homepage Template Priority</div>
+                                    <ol class="priority-list">
+                                        <li class="priority-item">
+                                            <span class="priority-number">1</span>
+                                            <div>
+                                                <strong>front-page.php</strong><br>
+                                                <small>Always used for the front page if it exists, regardless of settings</small>
+                                            </div>
+                                        </li>
+                                        <li class="priority-item">
+                                            <span class="priority-number">2</span>
+                                            <div>
+                                                <strong>home.php</strong><br>
+                                                <small>Blog posts index, whether on homepage or separate page</small>
+                                            </div>
+                                        </li>
+                                        <li class="priority-item">
+                                            <span class="priority-number">3</span>
+                                            <div>
+                                                <strong>index.php</strong><br>
+                                                <small>The ultimate fallback for everything</small>
+                                            </div>
+                                        </li>
+                                    </ol>
+                                </div>
+
+                                <div class="template-example">
+                                    <h4>Real World Example</h4>
+                                    <p>If your site is set to show "Your latest posts" on the homepage:</p>
+                                    <ul>
+                                        <li>WordPress first looks for <code>front-page.php</code></li>
+                                        <li>If not found, it looks for <code>home.php</code></li>
+                                        <li>If neither exists, it uses <code>index.php</code></li>
+                                    </ul>
+                                    <p>If set to show "A static page":</p>
+                                    <ul>
+                                        <li>Homepage uses: <code>front-page.php</code> → custom page template → <code>page.php</code> → <code>index.php</code></li>
+                                        <li>Posts page uses: <code>home.php</code> → <code>index.php</code></li>
+                                    </ul>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Single Post Type Hierarchy</h2>
+                                <p>When displaying a single post, page, or custom post type, WordPress follows this hierarchy:</p>
+                                
+                                <div class="hierarchy-interactive">
+                                    <h3>Interactive Template Selector</h3>
+                                    <p>Click a content type to see its template hierarchy:</p>
+                                    
+                                    <div class="hierarchy-selector">
+                                        <button class="hierarchy-button" onclick="showHierarchy('post')">Blog Post</button>
+                                        <button class="hierarchy-button" onclick="showHierarchy('page')">Page</button>
+                                        <button class="hierarchy-button" onclick="showHierarchy('product')">Custom Post Type</button>
+                                        <button class="hierarchy-button" onclick="showHierarchy('attachment')">Attachment</button>
+                                    </div>
+                                    
+                                    <div class="hierarchy-result" id="hierarchyResult">
+                                        <p>Select a content type above to see its template hierarchy...</p>
+                                    </div>
+                                </div>
+
+                                <script>
+                                    function showHierarchy(type) {
+                                        const result = document.getElementById('hierarchyResult');
+                                        const buttons = document.querySelectorAll('.hierarchy-button');
+                                        
+                                        // Update active button
+                                        buttons.forEach(btn => btn.classList.remove('active'));
+                                        event.target.classList.add('active');
+                                        
+                                        let templates = [];
+                                        
+                                        switch(type) {
+                                            case 'post':
+                                                templates = [
+                                                    { file: 'single-post-{slug}.php', desc: 'Specific post by slug', example: 'single-post-hello-world.php' },
+                                                    { file: 'single-post.php', desc: 'All blog posts' },
+                                                    { file: 'single.php', desc: 'All single posts of any type' },
+                                                    { file: 'singular.php', desc: 'All singular items (posts & pages)' },
+                                                    { file: 'index.php', desc: 'Ultimate fallback', found: true }
+                                                ];
+                                                break;
+                                            case 'page':
+                                                templates = [
+                                                    { file: 'custom-template.php', desc: 'Custom page template (if selected)' },
+                                                    { file: 'page-{slug}.php', desc: 'Specific page by slug', example: 'page-about.php' },
+                                                    { file: 'page-{id}.php', desc: 'Specific page by ID', example: 'page-42.php' },
+                                                    { file: 'page.php', desc: 'All pages' },
+                                                    { file: 'singular.php', desc: 'All singular items' },
+                                                    { file: 'index.php', desc: 'Ultimate fallback', found: true }
+                                                ];
+                                                break;
+                                            case 'product':
+                                                templates = [
+                                                    { file: 'single-product-{slug}.php', desc: 'Specific product', example: 'single-product-widget.php' },
+                                                    { file: 'single-product.php', desc: 'All products' },
+                                                    { file: 'single.php', desc: 'All single posts' },
+                                                    { file: 'singular.php', desc: 'All singular items' },
+                                                    { file: 'index.php', desc: 'Ultimate fallback', found: true }
+                                                ];
+                                                break;
+                                            case 'attachment':
+                                                templates = [
+                                                    { file: '{mimetype}-{subtype}.php', desc: 'Specific MIME type', example: 'image-jpeg.php' },
+                                                    { file: '{subtype}.php', desc: 'MIME subtype', example: 'jpeg.php' },
+                                                    { file: '{mimetype}.php', desc: 'MIME type', example: 'image.php' },
+                                                    { file: 'attachment.php', desc: 'All attachments' },
+                                                    { file: 'single-attachment.php', desc: 'Single attachment' },
+                                                    { file: 'single.php', desc: 'All single posts' },
+                                                    { file: 'index.php', desc: 'Ultimate fallback', found: true }
+                                                ];
+                                                break;
+                                        }
+                                        
+                                        let html = '<p><strong>WordPress checks in this order:</strong></p>';
+                                        templates.forEach((template, index) => {
+                                            const stepNum = index + 1;
+                                            const statusClass = template.found ? 'found' : (index === 0 ? 'checking' : 'not-found');
+                                            html += `<div class="step ${statusClass}">`;
+                                            html += `${stepNum}. ${template.file}`;
+                                            if (template.desc) html += ` - ${template.desc}`;
+                                            if (template.example) html += `<br>   <small>Example: ${template.example}</small>`;
+                                            html += '</div>';
+                                        });
+                                        
+                                        result.innerHTML = html;
+                                    }
+                                </script>
+                            </section>
+
+                            <section>
+                                <h2>Archive Page Hierarchy</h2>
+                                <p>Archive pages (categories, tags, dates, authors) have their own hierarchy:</p>
+                                
+                                <div class="template-priority">
+                                    <div class="priority-header">Category Archive Hierarchy</div>
+                                    <ol class="priority-list">
+                                        <li class="priority-item">
+                                            <span class="priority-number">1</span>
+                                            <div>
+                                                <strong>category-{slug}.php</strong><br>
+                                                <small>Specific category by slug (e.g., category-news.php)</small>
+                                            </div>
+                                        </li>
+                                        <li class="priority-item">
+                                            <span class="priority-number">2</span>
+                                            <div>
+                                                <strong>category-{id}.php</strong><br>
+                                                <small>Specific category by ID (e.g., category-5.php)</small>
+                                            </div>
+                                        </li>
+                                        <li class="priority-item">
+                                            <span class="priority-number">3</span>
+                                            <div>
+                                                <strong>category.php</strong><br>
+                                                <small>All category archives</small>
+                                            </div>
+                                        </li>
+                                        <li class="priority-item">
+                                            <span class="priority-number">4</span>
+                                            <div>
+                                                <strong>archive.php</strong><br>
+                                                <small>All archive pages</small>
+                                            </div>
+                                        </li>
+                                        <li class="priority-item">
+                                            <span class="priority-number">5</span>
+                                            <div>
+                                                <strong>index.php</strong><br>
+                                                <small>Ultimate fallback</small>
+                                            </div>
+                                        </li>
+                                    </ol>
+                                </div>
+
+                                <pre><code class="language-php">&lt;?php
+// Example: Creating a specific category template
+// File: category-tutorials.php
+
+get_header(); ?&gt;
+
+&lt;div class="tutorials-archive"&gt;
+    &lt;header class="archive-header"&gt;
+        &lt;h1 class="archive-title"&gt;
+            &lt;?php single_cat_title( 'Tutorials: ' ); ?&gt;
+        &lt;/h1&gt;
+        &lt;div class="archive-description"&gt;
+            &lt;?php echo category_description(); ?&gt;
+        &lt;/div&gt;
+    &lt;/header&gt;
+    
+    &lt;div class="tutorial-grid"&gt;
+        &lt;?php
+        if ( have_posts() ) :
+            while ( have_posts() ) : the_post();
+                // Custom layout for tutorials
+                get_template_part( 'template-parts/content', 'tutorial' );
+            endwhile;
+            
+            the_posts_pagination();
+        else :
+            get_template_part( 'template-parts/content', 'none' );
+        endif;
+        ?&gt;
+    &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;?php
+get_sidebar( 'tutorials' );
+get_footer();</code></pre>
+                            </section>
+
+                            <section>
+                                <h2>Conditional Tags</h2>
+                                <p>WordPress provides conditional tags to check what type of page is being displayed. These are essential for controlling template logic:</p>
+                                
+                                <div class="template-decision">
+                                    <h3>Common Conditional Tags</h3>
+                                    
+                                    <div class="decision-path">
+                                        <span class="decision-node">?</span>
+                                        <div>
+                                            <span class="conditional-tag">is_home()</span>
+                                            <p>Blog posts index page</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="decision-path">
+                                        <span class="decision-node">?</span>
+                                        <div>
+                                            <span class="conditional-tag">is_front_page()</span>
+                                            <p>Site front page (static or posts)</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="decision-path">
+                                        <span class="decision-node">?</span>
+                                        <div>
+                                            <span class="conditional-tag">is_single()</span>
+                                            <p>Any single post (of any post type)</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="decision-path">
+                                        <span class="decision-node">?</span>
+                                        <div>
+                                            <span class="conditional-tag">is_page()</span>
+                                            <p>Any single page</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="decision-path">
+                                        <span class="decision-node">?</span>
+                                        <div>
+                                            <span class="conditional-tag">is_category()</span>
+                                            <p>Category archive page</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="decision-path">
+                                        <span class="decision-node">?</span>
+                                        <div>
+                                            <span class="conditional-tag">is_archive()</span>
+                                            <p>Any archive page</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <pre><code class="language-php">&lt;?php
+// Using conditional tags in templates
+
+// Check multiple conditions
+if ( is_front_page() && is_home() ) {
+    // Default homepage (showing latest posts)
+} elseif ( is_front_page() ) {
+    // Static homepage
+} elseif ( is_home() ) {
+    // Blog page (when not front page)
+}
+
+// Check for specific pages
+if ( is_page( 'about' ) ) {
+    // Page with slug "about"
+} elseif ( is_page( 42 ) ) {
+    // Page with ID 42
+} elseif ( is_page( array( 'about', 'team', 'contact' ) ) ) {
+    // Any of these pages
+}
+
+// Check post types
+if ( is_singular( 'product' ) ) {
+    // Single product post type
+} elseif ( is_post_type_archive( 'product' ) ) {
+    // Product archive page
+}
+
+// Combine conditions
+if ( is_single() && ! is_attachment() ) {
+    // Single post but not attachment
+}
+
+if ( is_archive() && ! is_category() && ! is_tag() ) {
+    // Archive but not category or tag
+}</code></pre>
+                            </section>
+
+                            <section>
+                                <h2>Custom Page Templates</h2>
+                                <p>You can create custom templates for specific pages that override the normal hierarchy:</p>
+                                
+                                <pre><code class="language-php">&lt;?php
+/**
+ * Template Name: Full Width Layout
+ * Template Post Type: page, post
+ *
+ * @package My_Theme
+ */
+
+get_header(); ?&gt;
+
+&lt;div class="full-width-container"&gt;
+    &lt;?php
+    while ( have_posts() ) :
+        the_post();
+        ?&gt;
+        &lt;article id="post-&lt;?php the_ID(); ?&gt;" &lt;?php post_class( 'full-width' ); ?&gt;&gt;
+            &lt;header class="entry-header"&gt;
+                &lt;?php the_title( '&lt;h1 class="entry-title"&gt;', '&lt;/h1&gt;' ); ?&gt;
+            &lt;/header&gt;
+            
+            &lt;div class="entry-content"&gt;
+                &lt;?php
+                the_content();
+                
+                wp_link_pages( array(
+                    'before' =&gt; '&lt;div class="page-links"&gt;' . __( 'Pages:', 'my-theme' ),
+                    'after'  =&gt; '&lt;/div&gt;',
+                ) );
+                ?&gt;
+            &lt;/div&gt;
+        &lt;/article&gt;
+        &lt;?php
+    endwhile;
+    ?&gt;
+&lt;/div&gt;
+
+&lt;?php get_footer(); ?&gt;</code></pre>
+
+                                <div class="alert alert-success">
+                                    <div class="alert-icon">💡</div>
+                                    <div class="alert-content">
+                                        <div class="alert-title">Pro Tip</div>
+                                        <div class="alert-message">Custom page templates appear in the Page Attributes meta box when editing a page. They take priority over all other templates in the hierarchy!</div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Debugging Template Loading</h2>
+                                <p>When templates aren't loading as expected, use these debugging techniques:</p>
+                                
+                                <pre><code class="language-php">&lt;?php
+// Add to functions.php for debugging
+
+// Show which template is being used
+add_action( 'wp_head', 'show_template_file' );
+function show_template_file() {
+    if ( current_user_can( 'manage_options' ) ) {
+        global $template;
+        echo '&lt;!-- Template: ' . basename( $template ) . ' --&gt;';
+    }
+}
+
+// Display all conditional tags
+add_action( 'wp_footer', 'debug_conditional_tags' );
+function debug_conditional_tags() {
+    if ( ! WP_DEBUG ) return;
+    ?&gt;
+    &lt;div style="background: #f0f0f0; padding: 20px; margin: 20px;"&gt;
+        &lt;h3&gt;Active Conditional Tags:&lt;/h3&gt;
+        &lt;ul&gt;
+            &lt;li&gt;is_home(): &lt;?php var_dump( is_home() ); ?&gt;&lt;/li&gt;
+            &lt;li&gt;is_front_page(): &lt;?php var_dump( is_front_page() ); ?&gt;&lt;/li&gt;
+            &lt;li&gt;is_single(): &lt;?php var_dump( is_single() ); ?&gt;&lt;/li&gt;
+            &lt;li&gt;is_page(): &lt;?php var_dump( is_page() ); ?&gt;&lt;/li&gt;
+            &lt;li&gt;is_archive(): &lt;?php var_dump( is_archive() ); ?&gt;&lt;/li&gt;
+            &lt;li&gt;is_category(): &lt;?php var_dump( is_category() ); ?&gt;&lt;/li&gt;
+            &lt;li&gt;is_tag(): &lt;?php var_dump( is_tag() ); ?&gt;&lt;/li&gt;
+            &lt;li&gt;is_author(): &lt;?php var_dump( is_author() ); ?&gt;&lt;/li&gt;
+            &lt;li&gt;is_search(): &lt;?php var_dump( is_search() ); ?&gt;&lt;/li&gt;
+            &lt;li&gt;is_404(): &lt;?php var_dump( is_404() ); ?&gt;&lt;/li&gt;
+        &lt;/ul&gt;
+    &lt;/div&gt;
+    &lt;?php
+}
+
+// Use Query Monitor plugin for detailed template info
+// Or use this simple function
+function get_current_template() {
+    global $template;
+    return basename( $template );
+}</code></pre>
+                            </section>
+
+                            <section>
+                                <h2>Special Cases in the Hierarchy</h2>
+                                
+                                <div class="template-example">
+                                    <h4>404 Error Pages</h4>
+                                    <p>WordPress uses this simple hierarchy:</p>
+                                    <ol>
+                                        <li><code>404.php</code></li>
+                                        <li><code>index.php</code></li>
+                                    </ol>
+                                </div>
+
+                                <div class="template-example">
+                                    <h4>Search Results</h4>
+                                    <p>Search results follow this path:</p>
+                                    <ol>
+                                        <li><code>search.php</code></li>
+                                        <li><code>index.php</code></li>
+                                    </ol>
+                                </div>
+
+                                <div class="template-example">
+                                    <h4>Author Archives</h4>
+                                    <p>Author pages check for:</p>
+                                    <ol>
+                                        <li><code>author-{nicename}.php</code> (e.g., author-john.php)</li>
+                                        <li><code>author-{id}.php</code> (e.g., author-3.php)</li>
+                                        <li><code>author.php</code></li>
+                                        <li><code>archive.php</code></li>
+                                        <li><code>index.php</code></li>
+                                    </ol>
+                                </div>
+                            </section>
+
+                            <div class="best_practice">
+                                <h3>Template Hierarchy Best Practices</h3>
+                                <ul>
+                                    <li><strong>Start General:</strong> Build index.php first, then add specific templates as needed</li>
+                                    <li><strong>Use Meaningful Names:</strong> Name template files clearly (e.g., page-contact.php not page-2.php)</li>
+                                    <li><strong>Avoid Over-Specificity:</strong> Don't create too many specific templates - use conditional logic instead</li>
+                                    <li><strong>Document Templates:</strong> Add comments explaining what each template is for</li>
+                                    <li><strong>Test Thoroughly:</strong> Check that the right template loads for each type of content</li>
+                                    <li><strong>Use Template Parts:</strong> Keep templates DRY by using get_template_part()</li>
+                                    <li><strong>Consider Child Themes:</strong> Child themes inherit parent templates but can override them</li>
+                                </ul>
+                            </div>
+
+                            <!-- Practice Exercise -->
+                            <section>
+                                <h2>Practice Exercise</h2>
+                                <p>Let's practice working with the template hierarchy:</p>
+                                
+                                <div class="alert alert-success">
+                                    <div class="alert-icon">💻</div>
+                                    <div class="alert-content">
+                                        <div class="alert-title">Template Hierarchy Challenge</div>
+                                        <div class="alert-message">
+                                            <ol>
+                                                <li>Create a custom template for your "About" page (page-about.php)</li>
+                                                <li>Create a category template for "News" category (category-news.php)</li>
+                                                <li>Add debugging code to show which template is being used</li>
+                                                <li>Test with different URLs and verify correct templates load</li>
+                                                <li>Create a custom 404.php page with helpful content</li>
+                                                <li>Use conditional tags to modify content in index.php</li>
+                                                <li>Create a search.php template with custom results layout</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                            
+                            <!-- Homework Preview -->
+                            <div class="homework">
+                                <h2>Homework Preview</h2>
+                                <p>In this session's homework, you'll expand your minimal theme with multiple template files:</p>
+                                <ul>
+                                    <li>Create header.php, footer.php, and sidebar.php</li>
+                                    <li>Add single.php for blog posts</li>
+                                    <li>Create page.php for static pages</li>
+                                    <li>Build archive.php for archive pages</li>
+                                    <li>Implement proper template hierarchy</li>
+                                    <li>Use conditional tags appropriately</li>
+                                    <li>Test with various content types</li>
+                                </ul>
+                            </div>
+                            
+                            <!-- Resources -->
+                            <section class="resources">
+                                <h2>Additional Resources</h2>
+                                <ul>
+                                    <li><a href="https://developer.wordpress.org/themes/basics/template-hierarchy/" target="_blank">WordPress Template Hierarchy Reference</a></li>
+                                    <li><a href="https://wphierarchy.com/" target="_blank">Interactive Template Hierarchy Diagram</a></li>
+                                    <li><a href="https://developer.wordpress.org/themes/basics/conditional-tags/" target="_blank">Conditional Tags Documentation</a></li>
+                                    <li><a href="https://codex.wordpress.org/Template_Hierarchy" target="_blank">Template Hierarchy Codex</a></li>
+                                    <li><a href="https://www.smashingmagazine.com/2016/10/wordpress-template-hierarchy/" target="_blank">Smashing Magazine: Complete Guide to Template Hierarchy</a></li>
+                                </ul>
+                            </section>
+                        </div>
+
+                        <!-- Lesson Navigation -->
+                        <div class="lesson-navigation">
+                            <a href="/05module/homework_minimal_wordpress_theme.html" class="lesson-nav-button prev">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"/>
+                                </svg>
+                                <span>
+                                    <small>Previous</small><br>
+                                    Homework: Minimal Theme
+                                </span>
+                            </a>
+                            
+                            <button class="complete-lesson-btn">
+                                Mark as Complete
+                            </button>
+                            
+                            <a href="/05module/main_template_files.html" class="lesson-nav-button next">
+                                <span>
+                                    <small>Next</small><br>
+                                    Main Template Files
+                                </span>
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="site-footer" role="contentinfo">
+            <div class="footer-container">
+                <div class="footer-content">
+                    <div class="footer-section footer-about">
+                        <h3>PHP WordPress Development</h3>
+                        <p>Complete Web Development Course</p>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Quick Links</h4>
+                        <ul class="footer-links">
+                            <li><a href="/">Home</a></li>
+                            <li><a href="/module5.html">Module 5</a></li>
+                            <li><a href="/resources.html">Resources</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Support</h4>
+                        <ul class="footer-links">
+                            <li><a href="/help.html">Help Center</a></li>
+                            <li><a href="/faq.html">FAQ</a></li>
+                            <li><a href="/contact.html">Contact</a></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="footer-bottom">
+                    <div class="footer-bottom-content">
+                        <p class="copyright">© 2025 PHP WordPress Development Course</p>
+                        <nav class="footer-bottom-links">
+                            <a href="/privacy.html">Privacy</a>
+                            <span class="separator">|</span>
+                            <a href="/terms.html">Terms</a>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Back to Top -->
+    <button id="back-to-top" class="back-to-top" aria-label="Back to top">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 19V5M12 5l-7 7M12 5l7 7"/>
+        </svg>
+    </button>
+
+    <!-- JavaScript -->
+    <script src="/assets/js/navigation.js"></script>
+    <script src="/assets/js/site-config.js"></script>
+    <script src="/assets/js/sidebar-toggle.js"></script>
+    
+    <!-- Universal Mermaid Fix -->
+    <script src="/assets/js/mermaid-universal-fix.js"></script>
+</body>
+</html>
