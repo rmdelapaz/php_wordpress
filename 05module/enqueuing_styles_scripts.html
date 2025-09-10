@@ -1,0 +1,1485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    
+    <!-- SEO Meta Tags -->
+    <title>Enqueuing Styles & Scripts - WordPress Theme Development - PHP WordPress Course</title>
+    <meta name="description" content="Learn the proper way to add CSS and JavaScript to WordPress themes using wp_enqueue_style and wp_enqueue_script functions.">
+    <meta name="keywords" content="PHP, WordPress, enqueue, styles, scripts, CSS, JavaScript, wp_enqueue_style, wp_enqueue_script">
+    <meta name="author" content="PHP WordPress Course">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/favicon.png">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-enhanced.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-toggle.css">
+    
+    <!-- Custom styles for enqueuing lesson -->
+    <style>
+        .enqueue-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .enqueue-process {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 2px solid #0ea5e9;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .enqueue-process h3 {
+            color: #0369a1;
+            margin-top: 0;
+        }
+
+        .process-flow {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .process-step {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 2px solid #0ea5e9;
+            flex: 1;
+            min-width: 150px;
+            text-align: center;
+        }
+
+        .process-arrow {
+            color: #0ea5e9;
+            font-size: 2rem;
+        }
+
+        .code-example {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+        }
+
+        .code-example h4 {
+            color: #a5b4fc;
+            margin-top: 0;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 0.5rem;
+        }
+
+        .method-card {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            transition: all 0.3s ease;
+        }
+
+        .method-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            border-color: #667eea;
+        }
+
+        .method-card h3 {
+            color: #667eea;
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .method-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            font-size: 1.2rem;
+        }
+
+        .parameters-table {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 2rem 0;
+        }
+
+        .parameters-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .parameters-table th {
+            background: #f3f4f6;
+            padding: 1rem;
+            text-align: left;
+            font-weight: bold;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .parameters-table td {
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .parameters-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .parameters-table code {
+            background: #f3f4f6;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.9rem;
+            color: #667eea;
+        }
+
+        .dependency-diagram {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .dependency-diagram h3 {
+            color: #667eea;
+            margin-top: 0;
+        }
+
+        .dependency-tree {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .dependency-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .dependency-level {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .dependency-arrow {
+            color: #667eea;
+            font-size: 1.2rem;
+        }
+
+        .dependency-box {
+            background: #f3f4f6;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .best-practice {
+            background: #f0f9ff;
+            border-left: 4px solid #0ea5e9;
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .best-practice h4 {
+            color: #0369a1;
+            margin-top: 0;
+        }
+
+        .warning-box {
+            background: #fef3c7;
+            border: 2px solid #fbbf24;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .warning-box::before {
+            content: "⚠️ Warning: ";
+            font-weight: bold;
+            color: #92400e;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+
+        .do-section, .dont-section {
+            padding: 1.5rem;
+            border-radius: 8px;
+        }
+
+        .do-section {
+            background: #f0fdf4;
+            border: 2px solid #22c55e;
+        }
+
+        .do-section h4 {
+            color: #166534;
+            margin-top: 0;
+        }
+
+        .dont-section {
+            background: #fef2f2;
+            border: 2px solid #ef4444;
+        }
+
+        .dont-section h4 {
+            color: #991b1b;
+            margin-top: 0;
+        }
+
+        .hooks-reference {
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .hooks-reference h3 {
+            color: #667eea;
+            margin-top: 0;
+        }
+
+        .hook-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .hook-item {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 4px;
+            border-left: 3px solid #667eea;
+        }
+
+        .hook-item code {
+            display: block;
+            color: #667eea;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .conditional-loading {
+            background: #f8f9fa;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .conditional-loading h3 {
+            color: #667eea;
+            margin-top: 0;
+        }
+
+        .cdn-section {
+            background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
+            border: 2px solid #fbbf24;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .cdn-section h3 {
+            color: #92400e;
+            margin-top: 0;
+        }
+
+        .priority-table {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 1.5rem 0;
+        }
+
+        .priority-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .priority-table th {
+            background: #667eea;
+            color: white;
+            padding: 1rem;
+            text-align: left;
+        }
+
+        .priority-table td {
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .priority-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        .localization-example {
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .localization-example h3 {
+            color: #667eea;
+            margin-top: 0;
+        }
+
+        @media (max-width: 768px) {
+            .comparison-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .process-flow {
+                flex-direction: column;
+            }
+            
+            .process-arrow {
+                transform: rotate(90deg);
+            }
+            
+            .hook-list {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Skip to main content -->
+    <a href="#main-content" class="sr-only">Skip to main content</a>
+    
+    <div class="page-wrapper">
+        <!-- Header -->
+        <header class="site-header" role="banner">
+            <div class="header-container">
+                <div class="site-branding">
+                    <a href="/" class="site-logo">
+                        <h1 class="site-title">PHP WordPress Development</h1>
+                    </a>
+                </div>
+                
+                <nav class="main-navigation" role="navigation" aria-label="Main navigation">
+                    <button class="mobile-menu-btn" aria-label="Toggle navigation" aria-expanded="false">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    
+                    <div class="nav-menu">
+                        <ul class="nav-list">
+                            <li class="nav-item"><a href="/" class="nav-link">Home</a></li>
+                            <li class="nav-item dropdown">
+                                <button class="nav-link dropdown-toggle active" aria-haspopup="true">Modules</button>
+                                <div class="dropdown-menu">
+                                    <a href="/module1.html" class="dropdown-item">Module 1: Web Fundamentals</a>
+                                    <a href="/module2.html" class="dropdown-item">Module 2: PHP Fundamentals</a>
+                                    <a href="/module3.html" class="dropdown-item">Module 3: MySQL Database</a>
+                                    <a href="/module4.html" class="dropdown-item">Module 4: WordPress & Docker</a>
+                                    <a href="/module5.html" class="dropdown-item active">Module 5: Theme Development</a>
+                                    <a href="/module6.html" class="dropdown-item">Module 6: Plugin Development</a>
+                                    <a href="/module7.html" class="dropdown-item">Module 7: Advanced WordPress</a>
+                                    <a href="/module8.html" class="dropdown-item">Module 8: Deployment</a>
+                                    <a href="/module9.html" class="dropdown-item">Module 9: Final Project</a>
+                                </div>
+                            </li>
+                            <li class="nav-item"><a href="/resources.html" class="nav-link">Resources</a></li>
+                            <li class="nav-item"><a href="/about.html" class="nav-link">About</a></li>
+                        </ul>
+                    </div>
+                </nav>
+                
+                <div class="search-container">
+                    <div class="search-input-wrapper">
+                        <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                        </svg>
+                        <input type="search" class="search-input" placeholder="Search lessons..." aria-label="Search">
+                    </div>
+                    <div class="search-results"></div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-header">
+                <h2 class="progress-title">Course Progress</h2>
+                <span class="progress-text">Loading...</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-bar-fill">
+                    <span class="progress-bar-text"></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Breadcrumb -->
+        <nav class="breadcrumb container" aria-label="Breadcrumb">
+            <ol class="breadcrumb-list">
+                <li class="breadcrumb-item">
+                    <a href="/">Home</a>
+                    <span class="breadcrumb-separator">/</span>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="/module5.html">Module 5</a>
+                    <span class="breadcrumb-separator">/</span>
+                </li>
+                <li class="breadcrumb-item">
+                    <span aria-current="page">Enqueuing Styles & Scripts</span>
+                </li>
+            </ol>
+        </nav>
+        
+        <!-- Main Content -->
+        <main id="main-content" class="main-content" role="main">
+            <div class="container">
+                <div class="content-with-sidebar">
+                    <!-- Sidebar -->
+                    <aside class="sidebar">
+                        <div class="sidebar-nav">
+                            <h3 class="sidebar-title">Module 5: Theme Development</h3>
+                            <div class="sidebar-section">
+                                <h4 class="sidebar-section-title">Session 4: Functions and Features</h4>
+                                <ul class="sidebar-menu">
+                                    <li><a class="sidebar-link" href="/05module/understanding_functions_php.html">Understanding functions.php</a></li>
+                                    <li><a class="sidebar-link" href="/05module/theme_support_features.html">Theme Support & Features</a></li>
+                                    <li class="active"><a class="sidebar-link active" href="/05module/enqueuing_styles_scripts.html">Enqueuing Styles & Scripts</a></li>
+                                    <li><a class="sidebar-link" href="/05module/navigation_menus.html">Navigation Menus</a></li>
+                                    <li><a class="sidebar-link" href="/05module/widget_areas_sidebars.html">Widget Areas & Sidebars</a></li>
+                                    <li><a class="sidebar-link" href="/05module/custom_functions_helpers.html">Custom Functions & Helpers</a></li>
+                                    <li><a class="sidebar-link" href="/05module/homework_complete_functions.html">Homework: Complete Functions File</a></li>
+                                </ul>
+                            </div>
+                            <div class="sidebar-section">
+                                <h4 class="sidebar-section-title">Quick Links</h4>
+                                <ul class="sidebar-menu">
+                                    <li><a class="sidebar-link" href="/module5.html">Module Overview</a></li>
+                                    <li><a class="sidebar-link" href="/05module/theme_support_features.html">← Previous Lesson</a></li>
+                                    <li><a class="sidebar-link next-session" href="/05module/navigation_menus.html">Next Lesson →</a></li>
+                                    <li><a class="sidebar-link" href="/">← Course Home</a></li>
+                                    <li><a class="sidebar-link" href="/resources.html">Resources</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </aside>
+                    
+                    <!-- Main Lesson Content -->
+                    <article class="lesson-content">
+                        <div class="enqueue-header">
+                            <h1>📦 Enqueuing Styles & Scripts</h1>
+                            <p class="lead">The WordPress way to add CSS and JavaScript</p>
+                            <p>Master proper asset management in WordPress themes</p>
+                        </div>
+
+                        <!-- Learning Objectives -->
+                        <div class="lesson-objectives">
+                            <h2>Learning Objectives</h2>
+                            <ul>
+                                <li>Understand why enqueuing is important</li>
+                                <li>Master wp_enqueue_style() and wp_enqueue_script()</li>
+                                <li>Manage script and style dependencies</li>
+                                <li>Learn proper versioning and caching strategies</li>
+                                <li>Implement conditional loading</li>
+                                <li>Work with external CDN resources</li>
+                                <li>Localize scripts for AJAX</li>
+                                <li>Dequeue and deregister assets</li>
+                                <li>Optimize loading performance</li>
+                            </ul>
+                        </div>
+                        
+                        <!-- Lesson Body -->
+                        <div class="lesson-body">
+                            <!-- Introduction -->
+                            <section>
+                                <h2>Why Enqueue?</h2>
+                                <p class="lead">WordPress uses an enqueuing system to manage CSS and JavaScript files. This prevents conflicts, manages dependencies, and ensures scripts load in the correct order.</p>
+                                
+                                <div class="alert alert-info">
+                                    <div class="alert-icon">💡</div>
+                                    <div class="alert-content">
+                                        <div class="alert-title">Key Concept</div>
+                                        <div class="alert-message">Never hardcode script or style tags in your theme templates. Always use the WordPress enqueue system to maintain compatibility and prevent conflicts.</div>
+                                    </div>
+                                </div>
+
+                                <div class="enqueue-process">
+                                    <h3>The Enqueue Process</h3>
+                                    <div class="process-flow">
+                                        <div class="process-step">
+                                            <strong>1. Register</strong>
+                                            <p>Define the asset</p>
+                                        </div>
+                                        <span class="process-arrow">→</span>
+                                        <div class="process-step">
+                                            <strong>2. Enqueue</strong>
+                                            <p>Add to queue</p>
+                                        </div>
+                                        <span class="process-arrow">→</span>
+                                        <div class="process-step">
+                                            <strong>3. Dependencies</strong>
+                                            <p>Check requirements</p>
+                                        </div>
+                                        <span class="process-arrow">→</span>
+                                        <div class="process-step">
+                                            <strong>4. Output</strong>
+                                            <p>Print in HTML</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Basic Enqueuing -->
+                            <section>
+                                <h2>Basic Enqueuing</h2>
+                                
+                                <div class="method-card">
+                                    <h3><span class="method-icon">🎨</span> Enqueuing Styles</h3>
+                                    
+                                    <div class="code-example">
+                                        <h4>Basic Style Enqueue</h4>
+                                        <pre><code class="language-php">&lt;?php
+function mytheme_enqueue_styles() {
+    // Main theme stylesheet (style.css)
+    wp_enqueue_style( 
+        'mytheme-style',                    // Handle
+        get_stylesheet_uri(),               // Source
+        array(),                            // Dependencies
+        '1.0.0',                           // Version
+        'all'                              // Media
+    );
+    
+    // Additional stylesheet
+    wp_enqueue_style( 
+        'mytheme-custom',
+        get_template_directory_uri() . '/assets/css/custom.css',
+        array('mytheme-style'),            // Depends on main style
+        filemtime(get_template_directory() . '/assets/css/custom.css'), // Auto version
+        'all'
+    );
+    
+    // Conditional stylesheet for print
+    wp_enqueue_style( 
+        'mytheme-print',
+        get_template_directory_uri() . '/assets/css/print.css',
+        array(),
+        '1.0.0',
+        'print'                            // Only for print media
+    );
+}
+add_action( 'wp_enqueue_scripts', 'mytheme_enqueue_styles' );</code></pre>
+                                    </div>
+                                </div>
+
+                                <div class="method-card">
+                                    <h3><span class="method-icon">⚡</span> Enqueuing Scripts</h3>
+                                    
+                                    <div class="code-example">
+                                        <h4>Basic Script Enqueue</h4>
+                                        <pre><code class="language-php">&lt;?php
+function mytheme_enqueue_scripts() {
+    // Deregister WordPress jQuery and use custom version (not recommended)
+    // wp_deregister_script( 'jquery' );
+    
+    // Main theme script
+    wp_enqueue_script( 
+        'mytheme-main',                    // Handle
+        get_template_directory_uri() . '/assets/js/main.js', // Source
+        array('jquery'),                   // Dependencies
+        '1.0.0',                           // Version
+        true                               // In footer
+    );
+    
+    // Vendor script
+    wp_enqueue_script( 
+        'mytheme-vendor',
+        get_template_directory_uri() . '/assets/js/vendor.min.js',
+        array(),                           // No dependencies
+        '1.0.0',
+        true
+    );
+    
+    // Custom script with multiple dependencies
+    wp_enqueue_script( 
+        'mytheme-custom',
+        get_template_directory_uri() . '/assets/js/custom.js',
+        array('jquery', 'mytheme-vendor', 'mytheme-main'),
+        filemtime(get_template_directory() . '/assets/js/custom.js'),
+        true
+    );
+}
+add_action( 'wp_enqueue_scripts', 'mytheme_enqueue_scripts' );</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Parameters Reference -->
+                            <section>
+                                <h2>Function Parameters</h2>
+                                
+                                <div class="parameters-table">
+                                    <h3>wp_enqueue_style() Parameters</h3>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Parameter</th>
+                                                <th>Type</th>
+                                                <th>Required</th>
+                                                <th>Description</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><code>$handle</code></td>
+                                                <td>string</td>
+                                                <td>Yes</td>
+                                                <td>Unique name for the stylesheet</td>
+                                            </tr>
+                                            <tr>
+                                                <td><code>$src</code></td>
+                                                <td>string</td>
+                                                <td>No</td>
+                                                <td>Full URL or path to stylesheet</td>
+                                            </tr>
+                                            <tr>
+                                                <td><code>$deps</code></td>
+                                                <td>array</td>
+                                                <td>No</td>
+                                                <td>Array of handles this stylesheet depends on</td>
+                                            </tr>
+                                            <tr>
+                                                <td><code>$ver</code></td>
+                                                <td>string|bool</td>
+                                                <td>No</td>
+                                                <td>Version number (false for no version)</td>
+                                            </tr>
+                                            <tr>
+                                                <td><code>$media</code></td>
+                                                <td>string</td>
+                                                <td>No</td>
+                                                <td>Media type ('all', 'screen', 'print', etc.)</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div class="parameters-table">
+                                    <h3>wp_enqueue_script() Parameters</h3>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Parameter</th>
+                                                <th>Type</th>
+                                                <th>Required</th>
+                                                <th>Description</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><code>$handle</code></td>
+                                                <td>string</td>
+                                                <td>Yes</td>
+                                                <td>Unique name for the script</td>
+                                            </tr>
+                                            <tr>
+                                                <td><code>$src</code></td>
+                                                <td>string</td>
+                                                <td>No</td>
+                                                <td>Full URL or path to script</td>
+                                            </tr>
+                                            <tr>
+                                                <td><code>$deps</code></td>
+                                                <td>array</td>
+                                                <td>No</td>
+                                                <td>Array of handles this script depends on</td>
+                                            </tr>
+                                            <tr>
+                                                <td><code>$ver</code></td>
+                                                <td>string|bool</td>
+                                                <td>No</td>
+                                                <td>Version number (false for no version)</td>
+                                            </tr>
+                                            <tr>
+                                                <td><code>$in_footer</code></td>
+                                                <td>bool</td>
+                                                <td>No</td>
+                                                <td>Load in footer (true) or header (false)</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+
+                            <!-- Dependencies -->
+                            <section>
+                                <h2>Managing Dependencies</h2>
+                                
+                                <div class="dependency-diagram">
+                                    <h3>Dependency Chain Example</h3>
+                                    <div class="dependency-tree">
+                                        <div class="dependency-item">
+                                            <div class="dependency-level">
+                                                <div class="dependency-box">jQuery (Core)</div>
+                                            </div>
+                                        </div>
+                                        <div class="dependency-item">
+                                            <div class="dependency-level">
+                                                <span class="dependency-arrow">↓</span>
+                                                <div class="dependency-box">Bootstrap JS</div>
+                                                <span>(depends on jQuery)</span>
+                                            </div>
+                                        </div>
+                                        <div class="dependency-item">
+                                            <div class="dependency-level">
+                                                <span class="dependency-arrow">↓</span>
+                                                <div class="dependency-box">Theme Main JS</div>
+                                                <span>(depends on Bootstrap)</span>
+                                            </div>
+                                        </div>
+                                        <div class="dependency-item">
+                                            <div class="dependency-level">
+                                                <span class="dependency-arrow">↓</span>
+                                                <div class="dependency-box">Custom JS</div>
+                                                <span>(depends on Main JS)</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="code-example">
+                                    <h4>Complex Dependencies Example</h4>
+                                    <pre><code class="language-php">&lt;?php
+function mytheme_scripts_with_deps() {
+    // Register scripts first (optional but recommended for complex deps)
+    wp_register_script(
+        'bootstrap-js',
+        get_template_directory_uri() . '/assets/js/bootstrap.min.js',
+        array('jquery'),
+        '5.0.0',
+        true
+    );
+    
+    wp_register_script(
+        'slick-slider',
+        get_template_directory_uri() . '/assets/js/slick.min.js',
+        array('jquery'),
+        '1.8.1',
+        true
+    );
+    
+    wp_register_script(
+        'lightbox',
+        get_template_directory_uri() . '/assets/js/lightbox.min.js',
+        array('jquery'),
+        '2.11.3',
+        true
+    );
+    
+    // Main script depends on all libraries
+    wp_enqueue_script(
+        'mytheme-main',
+        get_template_directory_uri() . '/assets/js/main.js',
+        array('jquery', 'bootstrap-js', 'slick-slider', 'lightbox'),
+        '1.0.0',
+        true
+    );
+    
+    // Styles with dependencies
+    wp_enqueue_style(
+        'bootstrap-css',
+        get_template_directory_uri() . '/assets/css/bootstrap.min.css',
+        array(),
+        '5.0.0'
+    );
+    
+    wp_enqueue_style(
+        'mytheme-style',
+        get_stylesheet_uri(),
+        array('bootstrap-css'), // Depends on Bootstrap CSS
+        '1.0.0'
+    );
+}
+add_action( 'wp_enqueue_scripts', 'mytheme_scripts_with_deps' );</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Conditional Loading -->
+                            <section>
+                                <div class="conditional-loading">
+                                    <h3>Conditional Asset Loading</h3>
+                                    <p>Load assets only where needed to improve performance.</p>
+                                    
+                                    <div class="code-example">
+                                        <h4>Conditional Enqueuing Examples</h4>
+                                        <pre><code class="language-php">&lt;?php
+function mytheme_conditional_scripts() {
+    // Load only on front page
+    if ( is_front_page() ) {
+        wp_enqueue_script(
+            'mytheme-hero-slider',
+            get_template_directory_uri() . '/assets/js/hero-slider.js',
+            array('jquery'),
+            '1.0.0',
+            true
+        );
+    }
+    
+    // Load only on single posts
+    if ( is_single() ) {
+        wp_enqueue_script(
+            'mytheme-comments',
+            get_template_directory_uri() . '/assets/js/comments.js',
+            array('jquery'),
+            '1.0.0',
+            true
+        );
+    }
+    
+    // Load only on pages with specific template
+    if ( is_page_template('template-contact.php') ) {
+        wp_enqueue_script(
+            'google-maps',
+            'https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY',
+            array(),
+            null,
+            true
+        );
+        
+        wp_enqueue_script(
+            'mytheme-contact',
+            get_template_directory_uri() . '/assets/js/contact.js',
+            array('jquery', 'google-maps'),
+            '1.0.0',
+            true
+        );
+    }
+    
+    // Load only if WooCommerce is active and on shop pages
+    if ( class_exists('WooCommerce') && is_shop() ) {
+        wp_enqueue_script(
+            'mytheme-shop',
+            get_template_directory_uri() . '/assets/js/shop.js',
+            array('jquery'),
+            '1.0.0',
+            true
+        );
+    }
+    
+    // Load only for logged-in users
+    if ( is_user_logged_in() ) {
+        wp_enqueue_script(
+            'mytheme-user-dashboard',
+            get_template_directory_uri() . '/assets/js/dashboard.js',
+            array('jquery'),
+            '1.0.0',
+            true
+        );
+    }
+    
+    // Load different styles for different post types
+    if ( is_singular('portfolio') ) {
+        wp_enqueue_style(
+            'mytheme-portfolio',
+            get_template_directory_uri() . '/assets/css/portfolio.css',
+            array(),
+            '1.0.0'
+        );
+    }
+}
+add_action( 'wp_enqueue_scripts', 'mytheme_conditional_scripts' );</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Script Localization -->
+                            <section>
+                                <div class="localization-example">
+                                    <h3>Script Localization (AJAX)</h3>
+                                    <p>Pass PHP data to JavaScript using wp_localize_script().</p>
+                                    
+                                    <div class="code-example">
+                                        <h4>Localizing Scripts for AJAX</h4>
+                                        <pre><code class="language-php">&lt;?php
+function mytheme_enqueue_ajax_script() {
+    // Enqueue the script
+    wp_enqueue_script(
+        'mytheme-ajax',
+        get_template_directory_uri() . '/assets/js/ajax.js',
+        array('jquery'),
+        '1.0.0',
+        true
+    );
+    
+    // Localize the script with data
+    wp_localize_script(
+        'mytheme-ajax',                    // Script handle
+        'mytheme_ajax_object',              // Object name in JS
+        array(
+            'ajax_url'  => admin_url('admin-ajax.php'),
+            'nonce'     => wp_create_nonce('mytheme_ajax_nonce'),
+            'site_url'  => home_url(),
+            'theme_url' => get_template_directory_uri(),
+            'is_mobile' => wp_is_mobile(),
+            'is_logged_in' => is_user_logged_in(),
+            'current_user_id' => get_current_user_id(),
+            'strings'   => array(
+                'loading'   => __('Loading...', 'mytheme'),
+                'error'     => __('An error occurred', 'mytheme'),
+                'success'   => __('Success!', 'mytheme'),
+                'confirm'   => __('Are you sure?', 'mytheme'),
+            ),
+            'settings'  => array(
+                'animation_speed' => 300,
+                'posts_per_page'  => get_option('posts_per_page'),
+                'date_format'     => get_option('date_format'),
+            )
+        )
+    );
+}
+add_action( 'wp_enqueue_scripts', 'mytheme_enqueue_ajax_script' );
+
+// JavaScript usage:
+// console.log(mytheme_ajax_object.ajax_url);
+// console.log(mytheme_ajax_object.strings.loading);</code></pre>
+                                    </div>
+
+                                    <div class="code-example">
+                                        <h4>JavaScript AJAX Implementation</h4>
+                                        <pre><code class="language-javascript">// ajax.js
+jQuery(document).ready(function($) {
+    $('#load-more-btn').on('click', function() {
+        var button = $(this);
+        
+        $.ajax({
+            url: mytheme_ajax_object.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'load_more_posts',
+                nonce: mytheme_ajax_object.nonce,
+                page: button.data('page')
+            },
+            beforeSend: function() {
+                button.text(mytheme_ajax_object.strings.loading);
+            },
+            success: function(response) {
+                if (response.success) {
+                    $('#posts-container').append(response.data.html);
+                    button.data('page', response.data.next_page);
+                } else {
+                    alert(mytheme_ajax_object.strings.error);
+                }
+            },
+            error: function() {
+                alert(mytheme_ajax_object.strings.error);
+            },
+            complete: function() {
+                button.text('Load More');
+            }
+        });
+    });
+});</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- CDN Resources -->
+                            <section>
+                                <div class="cdn-section">
+                                    <h3>Working with CDN Resources</h3>
+                                    <p>How to properly enqueue external libraries from CDNs.</p>
+                                    
+                                    <div class="code-example">
+                                        <h4>CDN Enqueuing with Fallback</h4>
+                                        <pre><code class="language-php">&lt;?php
+function mytheme_enqueue_cdn_scripts() {
+    // Google Fonts
+    wp_enqueue_style(
+        'google-fonts',
+        'https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap',
+        array(),
+        null
+    );
+    
+    // Font Awesome from CDN
+    wp_enqueue_style(
+        'font-awesome',
+        'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css',
+        array(),
+        '6.0.0'
+    );
+    
+    // jQuery from CDN with local fallback
+    wp_deregister_script('jquery');
+    wp_register_script(
+        'jquery',
+        'https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js',
+        array(),
+        '3.6.0',
+        true
+    );
+    wp_enqueue_script('jquery');
+    
+    // Add fallback for jQuery
+    wp_add_inline_script(
+        'jquery',
+        'window.jQuery || document.write(\'<script src="' . 
+        get_template_directory_uri() . 
+        '/assets/js/jquery.min.js"><\/script>\')',
+        'after'
+    );
+    
+    // Bootstrap from CDN
+    wp_enqueue_style(
+        'bootstrap-cdn',
+        'https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/css/bootstrap.min.css',
+        array(),
+        '5.0.0'
+    );
+    
+    wp_enqueue_script(
+        'bootstrap-cdn-js',
+        'https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/js/bootstrap.bundle.min.js',
+        array(),
+        '5.0.0',
+        true
+    );
+    
+    // Add integrity and crossorigin attributes
+    add_filter('script_loader_tag', 'add_script_attributes', 10, 2);
+    add_filter('style_loader_tag', 'add_style_attributes', 10, 2);
+}
+add_action('wp_enqueue_scripts', 'mytheme_enqueue_cdn_scripts');
+
+// Add integrity check to CDN resources
+function add_script_attributes($tag, $handle) {
+    if ('bootstrap-cdn-js' === $handle) {
+        $tag = str_replace(
+            ' src',
+            ' integrity="sha384-..." crossorigin="anonymous" src',
+            $tag
+        );
+    }
+    return $tag;
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Inline Styles and Scripts -->
+                            <section>
+                                <h2>Inline Styles and Scripts</h2>
+                                
+                                <div class="code-example">
+                                    <h4>Adding Inline CSS and JS</h4>
+                                    <pre><code class="language-php">&lt;?php
+function mytheme_inline_styles_scripts() {
+    // Add inline CSS
+    $custom_css = "
+        .site-header {
+            background-color: " . get_theme_mod('header_color', '#ffffff') . ";
+        }
+        .site-footer {
+            background-color: " . get_theme_mod('footer_color', '#333333') . ";
+        }
+    ";
+    wp_add_inline_style('mytheme-style', $custom_css);
+    
+    // Add inline JavaScript before a script
+    $inline_script_before = "
+        var mytheme_config = {
+            slider_speed: " . get_theme_mod('slider_speed', 5000) . ",
+            enable_animations: " . (get_theme_mod('enable_animations', true) ? 'true' : 'false') . "
+        };
+    ";
+    wp_add_inline_script('mytheme-main', $inline_script_before, 'before');
+    
+    // Add inline JavaScript after a script
+    $inline_script_after = "
+        jQuery(document).ready(function($) {
+            console.log('Theme initialized');
+        });
+    ";
+    wp_add_inline_script('mytheme-main', $inline_script_after, 'after');
+}
+add_action('wp_enqueue_scripts', 'mytheme_inline_styles_scripts');</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Dequeuing Scripts -->
+                            <section>
+                                <h2>Dequeuing and Deregistering</h2>
+                                
+                                <div class="code-example">
+                                    <h4>Removing Unwanted Scripts/Styles</h4>
+                                    <pre><code class="language-php">&lt;?php
+function mytheme_dequeue_scripts() {
+    // Remove plugin styles
+    wp_dequeue_style('plugin-ugly-style');
+    wp_deregister_style('plugin-ugly-style');
+    
+    // Remove emoji scripts
+    remove_action('wp_head', 'print_emoji_detection_script', 7);
+    remove_action('wp_print_styles', 'print_emoji_styles');
+    
+    // Remove Gutenberg block styles if not using blocks
+    if (!is_singular() || !has_blocks()) {
+        wp_dequeue_style('wp-block-library');
+        wp_dequeue_style('wp-block-library-theme');
+    }
+    
+    // Remove jQuery Migrate
+    add_action('wp_default_scripts', function($scripts) {
+        if (!is_admin() && isset($scripts->registered['jquery'])) {
+            $script = $scripts->registered['jquery'];
+            if ($script->deps) {
+                $script->deps = array_diff($script->deps, array('jquery-migrate'));
+            }
+        }
+    });
+    
+    // Remove Contact Form 7 styles/scripts except on contact page
+    if (!is_page('contact')) {
+        wp_dequeue_script('contact-form-7');
+        wp_dequeue_style('contact-form-7');
+    }
+}
+add_action('wp_enqueue_scripts', 'mytheme_dequeue_scripts', 100);</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Admin Enqueuing -->
+                            <section>
+                                <h2>Admin Area Enqueuing</h2>
+                                
+                                <div class="code-example">
+                                    <h4>Enqueuing in WordPress Admin</h4>
+                                    <pre><code class="language-php">&lt;?php
+// Admin styles and scripts
+function mytheme_admin_scripts($hook) {
+    // Load only on specific admin pages
+    if ('toplevel_page_mytheme-settings' !== $hook) {
+        return;
+    }
+    
+    // Admin CSS
+    wp_enqueue_style(
+        'mytheme-admin-style',
+        get_template_directory_uri() . '/assets/css/admin.css',
+        array(),
+        '1.0.0'
+    );
+    
+    // Admin JavaScript
+    wp_enqueue_script(
+        'mytheme-admin-script',
+        get_template_directory_uri() . '/assets/js/admin.js',
+        array('jquery', 'wp-color-picker'),
+        '1.0.0',
+        true
+    );
+    
+    // WordPress Media Library
+    if ('post.php' === $hook || 'post-new.php' === $hook) {
+        wp_enqueue_media();
+    }
+    
+    // Color picker
+    wp_enqueue_style('wp-color-picker');
+    wp_enqueue_script('wp-color-picker');
+}
+add_action('admin_enqueue_scripts', 'mytheme_admin_scripts');
+
+// Login page styles
+function mytheme_login_styles() {
+    wp_enqueue_style(
+        'mytheme-login',
+        get_template_directory_uri() . '/assets/css/login.css',
+        array(),
+        '1.0.0'
+    );
+}
+add_action('login_enqueue_scripts', 'mytheme_login_styles');</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Performance Best Practices -->
+                            <section>
+                                <h2>Performance Optimization</h2>
+                                
+                                <div class="best-practice">
+                                    <h4>Asset Loading Best Practices</h4>
+                                    <ul>
+                                        <li><strong>Load scripts in footer:</strong> Use true for $in_footer parameter</li>
+                                        <li><strong>Minimize HTTP requests:</strong> Combine files when possible</li>
+                                        <li><strong>Use minified versions:</strong> .min.css and .min.js in production</li>
+                                        <li><strong>Leverage browser caching:</strong> Use proper versioning</li>
+                                        <li><strong>Load conditionally:</strong> Only load assets where needed</li>
+                                        <li><strong>Defer non-critical CSS:</strong> Load above-fold CSS first</li>
+                                        <li><strong>Use async/defer attributes:</strong> For non-blocking scripts</li>
+                                        <li><strong>Optimize images:</strong> Use appropriate formats and sizes</li>
+                                    </ul>
+                                </div>
+
+                                <div class="code-example">
+                                    <h4>Performance Optimizations</h4>
+                                    <pre><code class="language-php">&lt;?php
+// Add async/defer attributes to scripts
+function add_async_defer_attributes($tag, $handle) {
+    // Async scripts
+    $async_scripts = array('google-analytics', 'facebook-pixel');
+    if (in_array($handle, $async_scripts)) {
+        return str_replace(' src', ' async src', $tag);
+    }
+    
+    // Defer scripts
+    $defer_scripts = array('mytheme-main', 'mytheme-custom');
+    if (in_array($handle, $defer_scripts)) {
+        return str_replace(' src', ' defer src', $tag);
+    }
+    
+    return $tag;
+}
+add_filter('script_loader_tag', 'add_async_defer_attributes', 10, 2);
+
+// Preload critical resources
+function add_preload_links() {
+    echo '&lt;link rel="preload" href="' . get_template_directory_uri() . '/assets/fonts/custom-font.woff2" as="font" type="font/woff2" crossorigin&gt;';
+    echo '&lt;link rel="preload" href="' . get_template_directory_uri() . '/assets/css/critical.css" as="style"&gt;';
+    echo '&lt;link rel="preconnect" href="https://fonts.googleapis.com"&gt;';
+    echo '&lt;link rel="dns-prefetch" href="//cdn.example.com"&gt;';
+}
+add_action('wp_head', 'add_preload_links', 1);
+
+// Remove version strings for security
+function remove_version_strings($src) {
+    if (strpos($src, 'ver=')) {
+        $src = remove_query_arg('ver', $src);
+    }
+    return $src;
+}
+add_filter('style_loader_src', 'remove_version_strings', 9999);
+add_filter('script_loader_src', 'remove_version_strings', 9999);</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Common Mistakes -->
+                            <section>
+                                <h2>Do's and Don'ts</h2>
+                                
+                                <div class="comparison-grid">
+                                    <div class="do-section">
+                                        <h4>✅ DO's</h4>
+                                        <ul>
+                                            <li>Use wp_enqueue_script/style functions</li>
+                                            <li>Specify dependencies correctly</li>
+                                            <li>Use get_template_directory_uri()</li>
+                                            <li>Version your assets properly</li>
+                                            <li>Load scripts in footer when possible</li>
+                                            <li>Use wp_localize_script for data</li>
+                                            <li>Check if function exists before using</li>
+                                            <li>Use conditional loading</li>
+                                            <li>Register before enqueuing complex deps</li>
+                                        </ul>
+                                    </div>
+                                    
+                                    <div class="dont-section">
+                                        <h4>❌ DON'Ts</h4>
+                                        <ul>
+                                            <li>Don't hardcode script/link tags</li>
+                                            <li>Don't echo scripts directly</li>
+                                            <li>Don't use relative paths</li>
+                                            <li>Don't forget dependencies</li>
+                                            <li>Don't load everything everywhere</li>
+                                            <li>Don't modify core WordPress files</li>
+                                            <li>Don't use wrong action hooks</li>
+                                            <li>Don't load duplicate libraries</li>
+                                            <li>Don't ignore browser compatibility</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Available Hooks -->
+                            <section>
+                                <div class="hooks-reference">
+                                    <h3>Enqueue Hooks Reference</h3>
+                                    <div class="hook-list">
+                                        <div class="hook-item">
+                                            <code>wp_enqueue_scripts</code>
+                                            <p>Front-end scripts and styles</p>
+                                        </div>
+                                        <div class="hook-item">
+                                            <code>admin_enqueue_scripts</code>
+                                            <p>Admin area scripts and styles</p>
+                                        </div>
+                                        <div class="hook-item">
+                                            <code>login_enqueue_scripts</code>
+                                            <p>Login page scripts and styles</p>
+                                        </div>
+                                        <div class="hook-item">
+                                            <code>wp_print_scripts</code>
+                                            <p>Print scripts (use sparingly)</p>
+                                        </div>
+                                        <div class="hook-item">
+                                            <code>wp_print_styles</code>
+                                            <p>Print styles (use sparingly)</p>
+                                        </div>
+                                        <div class="hook-item">
+                                            <code>customize_controls_enqueue_scripts</code>
+                                            <p>Customizer controls</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Practice Exercise -->
+                            <section>
+                                <h2>Practice Exercise</h2>
+                                <div class="alert alert-success">
+                                    <div class="alert-icon">💻</div>
+                                    <div class="alert-content">
+                                        <div class="alert-title">Complete Enqueue Setup</div>
+                                        <div class="alert-message">
+                                            <p>Create a comprehensive enqueue function that includes:</p>
+                                            <ol>
+                                                <li>Main theme stylesheet with proper versioning</li>
+                                                <li>Google Fonts integration</li>
+                                                <li>Bootstrap CSS and JS from CDN</li>
+                                                <li>jQuery (using WordPress core version)</li>
+                                                <li>Custom theme JavaScript with dependencies</li>
+                                                <li>Conditional script for contact page only</li>
+                                                <li>AJAX script with localization</li>
+                                                <li>Inline CSS for theme customizer options</li>
+                                                <li>Admin area custom styles</li>
+                                                <li>Performance optimizations (async/defer)</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Resources -->
+                            <section class="resources">
+                                <h2>Additional Resources</h2>
+                                <ul>
+                                    <li><a href="https://developer.wordpress.org/reference/functions/wp_enqueue_script/" target="_blank">wp_enqueue_script() Documentation</a></li>
+                                    <li><a href="https://developer.wordpress.org/reference/functions/wp_enqueue_style/" target="_blank">wp_enqueue_style() Documentation</a></li>
+                                    <li><a href="https://developer.wordpress.org/themes/basics/including-css-javascript/" target="_blank">Including CSS & JavaScript</a></li>
+                                    <li><a href="https://developer.wordpress.org/reference/functions/wp_localize_script/" target="_blank">wp_localize_script() Reference</a></li>
+                                    <li><a href="https://developer.wordpress.org/themes/advanced-topics/javascript-best-practices/" target="_blank">JavaScript Best Practices</a></li>
+                                    <li><a href="https://www.w3.org/TR/resource-hints/" target="_blank">Resource Hints Specification</a></li>
+                                </ul>
+                            </section>
+                        </div>
+
+                        <!-- Lesson Navigation -->
+                        <div class="lesson-navigation">
+                            <a href="/05module/theme_support_features.html" class="lesson-nav-button prev">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"/>
+                                </svg>
+                                <span>
+                                    <small>Previous</small><br>
+                                    Theme Support & Features
+                                </span>
+                            </a>
+                            
+                            <button class="complete-lesson-btn">
+                                Mark as Complete
+                            </button>
+                            
+                            <a href="/05module/navigation_menus.html" class="lesson-nav-button next">
+                                <span>
+                                    <small>Next</small><br>
+                                    Navigation Menus
+                                </span>
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="site-footer" role="contentinfo">
+            <div class="footer-container">
+                <div class="footer-content">
+                    <div class="footer-section footer-about">
+                        <h3>PHP WordPress Development</h3>
+                        <p>Complete Web Development Course</p>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Quick Links</h4>
+                        <ul class="footer-links">
+                            <li><a href="/">Home</a></li>
+                            <li><a href="/module5.html">Module 5</a></li>
+                            <li><a href="/resources.html">Resources</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Support</h4>
+                        <ul class="footer-links">
+                            <li><a href="/about.html">About</a></li>
+                            <li><a href="/contact.html">Contact</a></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="footer-bottom">
+                    <p>&copy; 2024 PHP WordPress Course. All rights reserved.</p>
+                    <p>This course material is for educational purposes only.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="/assets/js/prism.js"></script>
+    <script src="/assets/js/main.js"></script>
+    <script src="/assets/js/sidebar-toggle.js"></script>
+    <script src="/assets/js/progress-tracker.js"></script>
+    <script src="/assets/js/search.js"></script>
+    <script src="/assets/js/theme-toggle.js"></script>
+</body>
+</html>
