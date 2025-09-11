@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    
+    <!-- SEO Meta Tags -->
+    <title>Creating Custom Hooks - WordPress Hooks System - PHP WordPress Course</title>
+    <meta name="description" content="Learn how to create your own custom hooks in WordPress plugins. Make your plugins extensible by allowing other developers to hook into your code.">
+    <meta name="keywords" content="PHP, WordPress, custom hooks, do_action, apply_filters, plugin extensibility, hook creation">
+    <meta name="author" content="PHP WordPress Course">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/favicon.png">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-enhanced.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-toggle.css">
+    
+    <!-- Custom styles for custom hooks lesson -->
+    <style>
+        .custom-hooks-header {
+            background: linear-gradient(135deg, #ec4899 0%, #be185d 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .custom-hook-concept {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .custom-hook-concept h3 {
+            color: #ec4899;
+            margin-top: 0;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 1rem;
+        }
+
+        .hook-creation-flow {
+            background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%);
+            border: 2px solid #ec4899;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .flow-step {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            position: relative;
+            padding-left: 4rem;
+        }
+
+        .flow-step-number {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 40px;
+            background: #ec4899;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .code-example {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+        }
+
+        .code-example h4 {
+            color: #a5b4fc;
+            margin-top: 0;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 0.5rem;
+        }
+
+        .implementation-box {
+            background: #f9fafb;
+            border: 2px solid #d1d5db;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .implementation-box h4 {
+            color: #374151;
+            margin-top: 0;
+        }
+
+        .extensibility-diagram {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 2rem 0;
+            text-align: center;
+        }
+
+        .plugin-box {
+            display: inline-block;
+            background: #f3f4f6;
+            border: 2px solid #9ca3af;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 0.5rem;
+            min-width: 150px;
+        }
+
+        .plugin-box.main {
+            background: #fce7f3;
+            border-color: #ec4899;
+        }
+
+        .arrow {
+            display: inline-block;
+            margin: 0 1rem;
+            color: #6b7280;
+            font-size: 1.5rem;
+        }
+
+        .best-practice {
+            background: #f0f9ff;
+            border-left: 4px solid #0ea5e9;
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .best-practice h4 {
+            color: #0369a1;
+            margin-top: 0;
+        }
+
+        .warning-box {
+            background: #fef3c7;
+            border: 2px solid #fbbf24;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .warning-box::before {
+            content: "⚠️ Warning: ";
+            font-weight: bold;
+            color: #92400e;
+        }
+
+        .tip-box {
+            background: #f0fdf4;
+            border: 2px solid #86efac;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .tip-box::before {
+            content: "💡 Tip: ";
+            font-weight: bold;
+            color: #166534;
+        }
+
+        .naming-convention {
+            background: #faf5ff;
+            border: 2px solid #e9d5ff;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .naming-convention h4 {
+            color: #7c3aed;
+            margin-top: 0;
+        }
+
+        .comparison-table {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 2rem 0;
+        }
+
+        .comparison-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .comparison-table th {
+            background: #f3f4f6;
+            padding: 1rem;
+            text-align: left;
+            font-weight: bold;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .comparison-table td {
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        @media (max-width: 768px) {
+            .flow-step {
+                padding-left: 3rem;
+            }
+            
+            .flow-step-number {
+                width: 30px;
+                height: 30px;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Skip to main content -->
+    <a href="#main-content" class="sr-only">Skip to main content</a>
+    
+    <div class="page-wrapper">
+        <!-- Header -->
+        <header class="site-header" role="banner">
+            <div class="header-container">
+                <div class="site-branding">
+                    <a href="/" class="site-logo">
+                        <h1 class="site-title">PHP WordPress Development</h1>
+                    </a>
+                </div>
+                
+                <nav class="main-navigation" role="navigation" aria-label="Main navigation">
+                    <button class="mobile-menu-btn" aria-label="Toggle navigation" aria-expanded="false">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    
+                    <div class="nav-menu">
+                        <ul class="nav-list">
+                            <li class="nav-item"><a href="/" class="nav-link">Home</a></li>
+                            <li class="nav-item dropdown">
+                                <button class="nav-link dropdown-toggle active" aria-haspopup="true">Modules</button>
+                                <div class="dropdown-menu">
+                                    <a href="/module1.html" class="dropdown-item">Module 1: Web Fundamentals</a>
+                                    <a href="/module2.html" class="dropdown-item">Module 2: PHP Fundamentals</a>
+                                    <a href="/module3.html" class="dropdown-item">Module 3: MySQL Database</a>
+                                    <a href="/module4.html" class="dropdown-item">Module 4: WordPress & Docker</a>
+                                    <a href="/module5.html" class="dropdown-item">Module 5: Theme Development</a>
+                                    <a href="/module6.html" class="dropdown-item active">Module 6: Plugin Development</a>
+                                    <a href="/module7.html" class="dropdown-item">Module 7: Advanced WordPress</a>
+                                    <a href="/module8.html" class="dropdown-item">Module 8: Deployment</a>
+                                    <a href="/module9.html" class="dropdown-item">Module 9: Final Project</a>
+                                </div>
+                            </li>
+                            <li class="nav-item"><a href="/resources.html" class="nav-link">Resources</a></li>
+                            <li class="nav-item"><a href="/about.html" class="nav-link">About</a></li>
+                        </ul>
+                    </div>
+                </nav>
+                
+                <div class="search-container">
+                    <div class="search-input-wrapper">
+                        <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                        </svg>
+                        <input type="search" class="search-input" placeholder="Search lessons..." aria-label="Search">
+                    </div>
+                    <div class="search-results"></div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-header">
+                <h2 class="progress-title">Course Progress</h2>
+                <span class="progress-text">Loading...</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-bar-fill">
+                    <span class="progress-bar-text"></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Breadcrumb -->
+        <nav class="breadcrumb container" aria-label="Breadcrumb">
+            <ol class="breadcrumb-list">
+                <li class="breadcrumb-item">
+                    <a href="/">Home</a>
+                    <span class="breadcrumb-separator">/</span>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="/module6.html">Module 6</a>
+                    <span class="breadcrumb-separator">/</span>
+                </li>
+                <li class="breadcrumb-item">
+                    <span aria-current="page">Creating Custom Hooks</span>
+                </li>
+            </ol>
+        </nav>
+        
+        <!-- Main Content -->
+        <main id="main-content" class="main-content" role="main">
+            <div class="container">
+                <div class="content-with-sidebar">
+                    <!-- Sidebar -->
+                    <aside class="sidebar">
+                        <div class="sidebar-nav">
+                            <h3 class="sidebar-title">Module 6: Plugin Development</h3>
+                            <div class="sidebar-section">
+                                <h4 class="sidebar-section-title">Session 2: WordPress Hooks System</h4>
+                                <ul class="sidebar-menu">
+                                    <li><a class="sidebar-link" href="/06module/action_hooks_vs_filter_hooks.html">Action Hooks vs Filter Hooks</a></li>
+                                    <li><a class="sidebar-link" href="/06module/understanding_hook_priorities.html">Understanding Hook Priorities</a></li>
+                                    <li><a class="sidebar-link" href="/06module/common_wordpress_hooks.html">Common WordPress Hooks</a></li>
+                                    <li class="active"><a class="sidebar-link active" href="/06module/creating_custom_hooks.html">Creating Custom Hooks</a></li>
+                                    <li><a class="sidebar-link" href="/06module/removing_hooks.html">Removing Hooks</a></li>
+                                    <li><a class="sidebar-link" href="/06module/homework_plugin_with_hooks.html">Homework: Build Plugin with Hooks</a></li>
+                                </ul>
+                            </div>
+                            <div class="sidebar-section">
+                                <h4 class="sidebar-section-title">Quick Links</h4>
+                                <ul class="sidebar-menu">
+                                    <li><a class="sidebar-link" href="/module6.html">Module Overview</a></li>
+                                    <li><a class="sidebar-link" href="/06module/common_wordpress_hooks.html">← Previous Lesson</a></li>
+                                    <li><a class="sidebar-link next-session" href="/06module/removing_hooks.html">Next Lesson →</a></li>
+                                    <li><a class="sidebar-link" href="/">← Course Home</a></li>
+                                    <li><a class="sidebar-link" href="/resources.html">Resources</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </aside>
+                    
+                    <!-- Main Lesson Content -->
+                    <article class="lesson-content">
+                        <div class="custom-hooks-header">
+                            <h1>🔧 Creating Custom Hooks</h1>
+                            <p class="lead">Make your plugins extensible with custom hooks</p>
+                            <p>Learn how to create hooks that other developers can use</p>
+                        </div>
+
+                        <!-- Learning Objectives -->
+                        <div class="lesson-objectives">
+                            <h2>Learning Objectives</h2>
+                            <ul>
+                                <li>Understand why custom hooks are important</li>
+                                <li>Create custom action hooks with do_action()</li>
+                                <li>Create custom filter hooks with apply_filters()</li>
+                                <li>Design extensible plugin architecture</li>
+                                <li>Document custom hooks properly</li>
+                                <li>Pass multiple parameters to hooks</li>
+                                <li>Follow naming conventions</li>
+                                <li>Test custom hooks effectively</li>
+                            </ul>
+                        </div>
+                        
+                        <!-- Lesson Body -->
+                        <div class="lesson-body">
+                            <!-- Introduction -->
+                            <section>
+                                <h2>Why Create Custom Hooks?</h2>
+                                <p class="lead">Custom hooks make your plugins extensible, allowing other developers to modify or extend your plugin's functionality without changing its core code.</p>
+                                
+                                <div class="custom-hook-concept">
+                                    <h3>Benefits of Custom Hooks</h3>
+                                    <ul>
+                                        <li><strong>Extensibility:</strong> Other plugins can modify your plugin's behavior</li>
+                                        <li><strong>Maintainability:</strong> Core code remains untouched during customization</li>
+                                        <li><strong>Compatibility:</strong> Updates don't break customizations</li>
+                                        <li><strong>Community:</strong> Developers can create add-ons for your plugin</li>
+                                        <li><strong>Flexibility:</strong> Users can customize without editing files</li>
+                                    </ul>
+                                </div>
+
+                                <div class="extensibility-diagram">
+                                    <h3>Plugin Extensibility Flow</h3>
+                                    <div>
+                                        <div class="plugin-box main">Your Plugin</div>
+                                        <span class="arrow">→</span>
+                                        <div class="plugin-box">Custom Hooks</div>
+                                        <span class="arrow">→</span>
+                                        <div class="plugin-box">Other Plugins</div>
+                                    </div>
+                                    <p>Custom hooks allow other plugins to interact with yours</p>
+                                </div>
+                            </section>
+
+                            <!-- Creating Action Hooks -->
+                            <section>
+                                <h2>Creating Custom Action Hooks</h2>
+                                <p>Use <code>do_action()</code> to create points where other code can execute.</p>
+                                
+                                <div class="code-example">
+                                    <h4>Basic Custom Action Hook</h4>
+                                    <pre><code class="language-php">&lt;?php
+// In your plugin code, create a hook point
+function my_plugin_process_data() {
+    // Before processing
+    do_action( 'my_plugin_before_process' );
+    
+    // Your plugin's core functionality
+    $data = get_option( 'my_plugin_data' );
+    $processed = process_data( $data );
+    
+    // After processing - pass data to hooks
+    do_action( 'my_plugin_after_process', $processed );
+    
+    return $processed;
+}
+
+// Other developers can now hook into these points:
+add_action( 'my_plugin_before_process', 'custom_before_process' );
+
+function custom_before_process() {
+    // Custom code runs before your plugin processes data
+    error_log( 'About to process data' );
+}
+
+add_action( 'my_plugin_after_process', 'custom_after_process' );
+
+function custom_after_process( $processed_data ) {
+    // Custom code runs after processing
+    // Can access the processed data
+    wp_mail( 'admin@example.com', 'Data Processed', print_r( $processed_data, true ) );
+}</code></pre>
+                                </div>
+
+                                <div class="code-example">
+                                    <h4>Action Hooks with Multiple Parameters</h4>
+                                    <pre><code class="language-php">&lt;?php
+class My_Plugin_Form {
+    
+    public function save_form( $form_id, $form_data ) {
+        // Validate form
+        $is_valid = $this->validate( $form_data );
+        
+        // Fire hook before saving
+        do_action( 
+            'my_plugin_before_save_form', 
+            $form_id,           // Parameter 1
+            $form_data,         // Parameter 2
+            $is_valid           // Parameter 3
+        );
+        
+        if ( $is_valid ) {
+            // Save to database
+            $result = $this->save_to_db( $form_id, $form_data );
+            
+            // Fire hook after saving
+            do_action(
+                'my_plugin_after_save_form',
+                $form_id,
+                $form_data,
+                $result
+            );
+            
+            return $result;
+        }
+        
+        // Fire hook for invalid form
+        do_action( 'my_plugin_form_validation_failed', $form_id, $form_data );
+        
+        return false;
+    }
+}
+
+// Developers can hook with multiple parameters
+add_action( 'my_plugin_after_save_form', 'log_form_submission', 10, 3 );
+
+function log_form_submission( $form_id, $form_data, $result ) {
+    if ( $result ) {
+        $log_entry = sprintf(
+            'Form %d submitted successfully at %s',
+            $form_id,
+            current_time( 'mysql' )
+        );
+        error_log( $log_entry );
+    }
+}</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Creating Filter Hooks -->
+                            <section>
+                                <h2>Creating Custom Filter Hooks</h2>
+                                <p>Use <code>apply_filters()</code> to create points where data can be modified.</p>
+                                
+                                <div class="code-example">
+                                    <h4>Basic Custom Filter Hook</h4>
+                                    <pre><code class="language-php">&lt;?php
+// In your plugin, create filterable data points
+function my_plugin_get_settings() {
+    $default_settings = array(
+        'enable_feature' => true,
+        'items_per_page' => 10,
+        'theme' => 'default'
+    );
+    
+    // Allow other plugins to modify default settings
+    $settings = apply_filters( 'my_plugin_default_settings', $default_settings );
+    
+    return $settings;
+}
+
+// Other developers can modify your data:
+add_filter( 'my_plugin_default_settings', 'customize_plugin_settings' );
+
+function customize_plugin_settings( $settings ) {
+    // Modify the settings
+    $settings['items_per_page'] = 20;
+    $settings['theme'] = 'dark';
+    
+    // Must return the modified value
+    return $settings;
+}</code></pre>
+                                </div>
+
+                                <div class="code-example">
+                                    <h4>Complex Filter Examples</h4>
+                                    <pre><code class="language-php">&lt;?php
+class My_Plugin_Display {
+    
+    public function render_item( $item ) {
+        // Get template
+        $template = $this->get_template( $item->type );
+        
+        // Allow filtering of template
+        $template = apply_filters(
+            'my_plugin_item_template',
+            $template,
+            $item->type,
+            $item
+        );
+        
+        // Process template variables
+        $variables = array(
+            'title' => $item->title,
+            'content' => $item->content,
+            'date' => $item->date
+        );
+        
+        // Allow filtering of variables
+        $variables = apply_filters(
+            'my_plugin_template_variables',
+            $variables,
+            $item,
+            $template
+        );
+        
+        // Render HTML
+        $html = $this->render_template( $template, $variables );
+        
+        // Allow final filtering of HTML
+        $html = apply_filters(
+            'my_plugin_item_html',
+            $html,
+            $item,
+            $template,
+            $variables
+        );
+        
+        return $html;
+    }
+    
+    public function get_allowed_types() {
+        $types = array( 'post', 'page', 'product' );
+        
+        // Allow adding custom types
+        $types = apply_filters( 'my_plugin_allowed_types', $types );
+        
+        return $types;
+    }
+}
+
+// Developers can modify at multiple points
+add_filter( 'my_plugin_template_variables', 'add_custom_variables', 10, 3 );
+
+function add_custom_variables( $variables, $item, $template ) {
+    // Add custom variables
+    $variables['author'] = get_the_author_meta( 'display_name', $item->author_id );
+    $variables['category'] = get_the_category( $item->ID );
+    
+    return $variables;
+}
+
+add_filter( 'my_plugin_allowed_types', 'add_custom_post_type' );
+
+function add_custom_post_type( $types ) {
+    $types[] = 'portfolio';
+    $types[] = 'testimonial';
+    return $types;
+}</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Hook Creation Flow -->
+                            <section>
+                                <h2>Hook Creation Process</h2>
+                                
+                                <div class="hook-creation-flow">
+                                    <h3>Steps to Create Effective Custom Hooks</h3>
+                                    
+                                    <div class="flow-step">
+                                        <span class="flow-step-number">1</span>
+                                        <h4>Identify Extension Points</h4>
+                                        <p>Find places where customization would be useful</p>
+                                    </div>
+                                    
+                                    <div class="flow-step">
+                                        <span class="flow-step-number">2</span>
+                                        <h4>Choose Hook Type</h4>
+                                        <p>Action for events, Filter for modifying data</p>
+                                    </div>
+                                    
+                                    <div class="flow-step">
+                                        <span class="flow-step-number">3</span>
+                                        <h4>Name Your Hook</h4>
+                                        <p>Use clear, prefixed naming convention</p>
+                                    </div>
+                                    
+                                    <div class="flow-step">
+                                        <span class="flow-step-number">4</span>
+                                        <h4>Add Parameters</h4>
+                                        <p>Pass useful data to hook callbacks</p>
+                                    </div>
+                                    
+                                    <div class="flow-step">
+                                        <span class="flow-step-number">5</span>
+                                        <h4>Document</h4>
+                                        <p>Explain when hook fires and what it does</p>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Naming Conventions -->
+                            <section>
+                                <h2>Hook Naming Conventions</h2>
+                                
+                                <div class="naming-convention">
+                                    <h4>Best Practices for Hook Names</h4>
+                                    <ul>
+                                        <li><strong>Use plugin prefix:</strong> <code>my_plugin_hook_name</code></li>
+                                        <li><strong>Be descriptive:</strong> <code>my_plugin_before_render_gallery</code></li>
+                                        <li><strong>Use underscores:</strong> Not hyphens or camelCase</li>
+                                        <li><strong>Indicate timing:</strong> before_, after_, pre_, post_</li>
+                                        <li><strong>Group related hooks:</strong> Same prefix for related functionality</li>
+                                    </ul>
+                                </div>
+
+                                <div class="comparison-table">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Good Names ✅</th>
+                                                <th>Bad Names ❌</th>
+                                                <th>Why?</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>my_plugin_before_save</td>
+                                                <td>before_save</td>
+                                                <td>No prefix - conflicts possible</td>
+                                            </tr>
+                                            <tr>
+                                                <td>my_plugin_filter_content</td>
+                                                <td>myPlugin-filterContent</td>
+                                                <td>Wrong separator style</td>
+                                            </tr>
+                                            <tr>
+                                                <td>my_plugin_after_init</td>
+                                                <td>mp_ai</td>
+                                                <td>Too abbreviated</td>
+                                            </tr>
+                                            <tr>
+                                                <td>my_plugin_modify_query</td>
+                                                <td>MYPLUGIN_MODIFY</td>
+                                                <td>All caps inappropriate</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+
+                            <!-- Real-World Example -->
+                            <section>
+                                <h2>Real-World Plugin Example</h2>
+                                
+                                <div class="code-example">
+                                    <h4>Complete Extensible Plugin Class</h4>
+                                    <pre><code class="language-php">&lt;?php
+/**
+ * Extensible Contact Form Plugin
+ */
+class Extensible_Contact_Form {
+    
+    private $fields = array();
+    private $settings = array();
+    
+    public function __construct() {
+        $this->init();
+    }
+    
+    private function init() {
+        // Fire action when plugin initializes
+        do_action( 'ecf_init', $this );
+        
+        // Load settings with filter
+        $default_settings = array(
+            'recipient' => get_option( 'admin_email' ),
+            'subject' => 'Contact Form Submission',
+            'success_message' => 'Thank you for contacting us!'
+        );
+        
+        $this->settings = apply_filters( 'ecf_default_settings', $default_settings );
+        
+        // Set up default fields with filter
+        $this->setup_fields();
+    }
+    
+    private function setup_fields() {
+        $default_fields = array(
+            'name' => array(
+                'type' => 'text',
+                'label' => 'Name',
+                'required' => true
+            ),
+            'email' => array(
+                'type' => 'email',
+                'label' => 'Email',
+                'required' => true
+            ),
+            'message' => array(
+                'type' => 'textarea',
+                'label' => 'Message',
+                'required' => true
+            )
+        );
+        
+        // Allow modifying fields
+        $this->fields = apply_filters( 'ecf_form_fields', $default_fields );
+    }
+    
+    public function render_form() {
+        // Before form render
+        do_action( 'ecf_before_form_render', $this->fields );
+        
+        $form_html = '<form method="post" class="ecf-form">';
+        
+        // Allow filtering form attributes
+        $form_attributes = apply_filters( 'ecf_form_attributes', array(
+            'class' => 'ecf-form',
+            'id' => 'contact-form'
+        ) );
+        
+        foreach ( $this->fields as $field_name => $field ) {
+            // Allow modifying individual fields
+            $field = apply_filters( 'ecf_render_field', $field, $field_name );
+            
+            $form_html .= $this->render_field( $field_name, $field );
+        }
+        
+        // Add submit button with filter
+        $submit_text = apply_filters( 'ecf_submit_button_text', 'Send Message' );
+        $form_html .= '<button type="submit">' . esc_html( $submit_text ) . '</button>';
+        
+        $form_html .= '</form>';
+        
+        // Filter final form HTML
+        $form_html = apply_filters( 'ecf_form_html', $form_html, $this->fields );
+        
+        // After form render
+        do_action( 'ecf_after_form_render', $form_html );
+        
+        return $form_html;
+    }
+    
+    public function process_submission( $data ) {
+        // Before validation
+        do_action( 'ecf_before_validation', $data );
+        
+        // Validate with filter
+        $is_valid = apply_filters( 'ecf_validate_submission', true, $data );
+        
+        if ( ! $is_valid ) {
+            do_action( 'ecf_validation_failed', $data );
+            return false;
+        }
+        
+        // Before sending
+        do_action( 'ecf_before_send_email', $data );
+        
+        // Prepare email
+        $email_data = apply_filters( 'ecf_email_data', array(
+            'to' => $this->settings['recipient'],
+            'subject' => $this->settings['subject'],
+            'message' => $this->format_message( $data ),
+            'headers' => array()
+        ), $data );
+        
+        // Send email
+        $sent = wp_mail(
+            $email_data['to'],
+            $email_data['subject'],
+            $email_data['message'],
+            $email_data['headers']
+        );
+        
+        if ( $sent ) {
+            // After successful send
+            do_action( 'ecf_email_sent', $data, $email_data );
+        } else {
+            // On send failure
+            do_action( 'ecf_email_failed', $data, $email_data );
+        }
+        
+        return $sent;
+    }
+    
+    private function format_message( $data ) {
+        $message = '';
+        
+        foreach ( $data as $field => $value ) {
+            $message .= ucfirst( $field ) . ': ' . $value . "\n";
+        }
+        
+        // Allow filtering the message format
+        return apply_filters( 'ecf_format_message', $message, $data );
+    }
+}
+
+// Example of extending the plugin
+add_filter( 'ecf_form_fields', 'add_phone_field' );
+
+function add_phone_field( $fields ) {
+    $fields['phone'] = array(
+        'type' => 'tel',
+        'label' => 'Phone Number',
+        'required' => false
+    );
+    return $fields;
+}
+
+add_action( 'ecf_email_sent', 'log_form_submission', 10, 2 );
+
+function log_form_submission( $data, $email_data ) {
+    // Log successful submissions
+    error_log( 'Form submitted: ' . print_r( $data, true ) );
+}</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Documentation -->
+                            <section>
+                                <h2>Documenting Your Hooks</h2>
+                                
+                                <div class="code-example">
+                                    <h4>Proper Hook Documentation</h4>
+                                    <pre><code class="language-php">&lt;?php
+/**
+ * Fires before the widget content is rendered.
+ *
+ * @since 1.0.0
+ *
+ * @param array  $instance The widget instance settings.
+ * @param string $widget_id The widget ID.
+ * @param array  $args The widget arguments.
+ */
+do_action( 'my_plugin_before_widget_render', $instance, $widget_id, $args );
+
+/**
+ * Filters the widget output HTML.
+ *
+ * @since 1.0.0
+ *
+ * @param string $html The widget HTML output.
+ * @param array  $instance The widget instance settings.
+ * @param string $widget_id The widget ID.
+ * 
+ * @return string Modified widget HTML.
+ */
+$html = apply_filters( 'my_plugin_widget_html', $html, $instance, $widget_id );</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Testing Custom Hooks -->
+                            <section>
+                                <h2>Testing Your Custom Hooks</h2>
+                                
+                                <div class="code-example">
+                                    <h4>Hook Testing Example</h4>
+                                    <pre><code class="language-php">&lt;?php
+// Test file for your custom hooks
+class Test_My_Plugin_Hooks {
+    
+    public function run_tests() {
+        // Test action hook
+        add_action( 'my_plugin_test_action', array( $this, 'test_action_callback' ), 10, 2 );
+        
+        // Fire the action
+        do_action( 'my_plugin_test_action', 'param1', 'param2' );
+        
+        // Test filter hook
+        add_filter( 'my_plugin_test_filter', array( $this, 'test_filter_callback' ) );
+        
+        // Apply the filter
+        $original = 'original value';
+        $filtered = apply_filters( 'my_plugin_test_filter', $original );
+        
+        // Verify filter worked
+        if ( $filtered !== $original ) {
+            echo 'Filter test passed!';
+        }
+    }
+    
+    public function test_action_callback( $param1, $param2 ) {
+        echo "Action fired with: $param1, $param2";
+    }
+    
+    public function test_filter_callback( $value ) {
+        return $value . ' - modified';
+    }
+}</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Best Practices -->
+                            <section>
+                                <div class="best-practice">
+                                    <h4>Custom Hook Best Practices</h4>
+                                    <ul>
+                                        <li><strong>Always prefix:</strong> Use your plugin slug as prefix</li>
+                                        <li><strong>Be consistent:</strong> Use same naming pattern throughout</li>
+                                        <li><strong>Document thoroughly:</strong> Explain when hooks fire and parameters</li>
+                                        <li><strong>Pass useful data:</strong> Include relevant context in parameters</li>
+                                        <li><strong>Check for existence:</strong> Use did_action() and has_filter()</li>
+                                        <li><strong>Version your hooks:</strong> Document when hooks were added</li>
+                                        <li><strong>Provide examples:</strong> Show how to use your hooks</li>
+                                        <li><strong>Consider performance:</strong> Don't create too many hooks</li>
+                                    </ul>
+                                </div>
+
+                                <div class="warning-box">
+                                    Don't change hook parameters in minor versions - it breaks backward compatibility!
+                                </div>
+
+                                <div class="tip-box">
+                                    Create a developer documentation page listing all your custom hooks with examples.
+                                </div>
+                            </section>
+
+                            <!-- Practice Exercise -->
+                            <section>
+                                <h2>Practice Exercise</h2>
+                                <div class="alert alert-success">
+                                    <div class="alert-icon">💻</div>
+                                    <div class="alert-content">
+                                        <div class="alert-title">Build an Extensible Plugin</div>
+                                        <div class="alert-message">
+                                            <p>Create a simple plugin with custom hooks:</p>
+                                            <ol>
+                                                <li>Create a plugin that displays a custom message</li>
+                                                <li>Add action hook before displaying the message</li>
+                                                <li>Add filter hook to modify the message content</li>
+                                                <li>Add action hook after displaying the message</li>
+                                                <li>Create filter for message styling/CSS classes</li>
+                                                <li>Document all your hooks properly</li>
+                                                <li>Create a separate "extension" plugin that uses your hooks</li>
+                                                <li>Test that your hooks work correctly</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Resources -->
+                            <section class="resources">
+                                <h2>Additional Resources</h2>
+                                <ul>
+                                    <li><a href="https://developer.wordpress.org/plugins/hooks/custom-hooks/" target="_blank">Creating Custom Hooks</a></li>
+                                    <li><a href="https://developer.wordpress.org/reference/functions/do_action/" target="_blank">do_action() Documentation</a></li>
+                                    <li><a href="https://developer.wordpress.org/reference/functions/apply_filters/" target="_blank">apply_filters() Documentation</a></li>
+                                    <li><a href="https://developer.wordpress.org/plugins/hooks/advanced-topics/" target="_blank">Advanced Hook Topics</a></li>
+                                    <li><a href="https://make.wordpress.org/core/handbook/best-practices/inline-documentation-standards/php/#4-hooks-actions-and-filters" target="_blank">Hook Documentation Standards</a></li>
+                                    <li><a href="https://carlalexander.ca/designing-extensible-php-wordpress-plugin/" target="_blank">Designing Extensible Plugins</a></li>
+                                </ul>
+                            </section>
+                        </div>
+
+                        <!-- Lesson Navigation -->
+                        <div class="lesson-navigation">
+                            <a href="/06module/common_wordpress_hooks.html" class="lesson-nav-button prev">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"/>
+                                </svg>
+                                <span>
+                                    <small>Previous</small><br>
+                                    Common WordPress Hooks
+                                </span>
+                            </a>
+                            
+                            <button class="complete-lesson-btn">
+                                Mark as Complete
+                            </button>
+                            
+                            <a href="/06module/removing_hooks.html" class="lesson-nav-button next">
+                                <span>
+                                    <small>Next</small><br>
+                                    Removing Hooks
+                                </span>
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="site-footer" role="contentinfo">
+            <div class="footer-container">
+                <div class="footer-content">
+                    <div class="footer-section footer-about">
+                        <h3>PHP WordPress Development</h3>
+                        <p>Complete Web Development Course</p>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Quick Links</h4>
+                        <ul class="footer-links">
+                            <li><a href="/">Home</a></li>
+                            <li><a href="/module6.html">Module 6</a></li>
+                            <li><a href="/resources.html">Resources</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Support</h4>
+                        <ul class="footer-links">
+                            <li><a href="/about.html">About</a></li>
+                            <li><a href="/contact.html">Contact</a></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="footer-bottom">
+                    <p>&copy; 2024 PHP WordPress Course. All rights reserved.</p>
+                    <p>This course material is for educational purposes only.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="/assets/js/prism.js"></script>
+    <script src="/assets/js/main.js"></script>
+    <script src="/assets/js/sidebar-toggle.js"></script>
+    <script src="/assets/js/progress-tracker.js"></script>
+    <script src="/assets/js/search.js"></script>
+    <script src="/assets/js/theme-toggle.js"></script>
+</body>
+</html>

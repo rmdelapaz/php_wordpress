@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    
+    <!-- SEO Meta Tags -->
+    <title>Understanding Hook Priorities - WordPress Hooks System - PHP WordPress Course</title>
+    <meta name="description" content="Master WordPress hook priorities and execution order. Learn how to control when your hooks run and manage conflicts between plugins.">
+    <meta name="keywords" content="PHP, WordPress, hook priorities, execution order, add_action priority, add_filter priority">
+    <meta name="author" content="PHP WordPress Course">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/favicon.png">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-enhanced.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-toggle.css">
+    
+    <!-- Custom styles for priorities lesson -->
+    <style>
+        .priorities-header {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .priority-concept {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .priority-concept h3 {
+            color: #f59e0b;
+            margin-top: 0;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 1rem;
+        }
+
+        .execution-timeline {
+            background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
+            border: 2px solid #f59e0b;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .timeline-item {
+            display: flex;
+            align-items: center;
+            margin: 1.5rem 0;
+            position: relative;
+        }
+
+        .timeline-item::before {
+            content: "";
+            position: absolute;
+            left: 30px;
+            top: 50px;
+            height: calc(100% + 30px);
+            width: 2px;
+            background: #d97706;
+        }
+
+        .timeline-item:last-child::before {
+            display: none;
+        }
+
+        .priority-number {
+            width: 60px;
+            height: 60px;
+            background: #f59e0b;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.5rem;
+            margin-right: 1.5rem;
+            flex-shrink: 0;
+            z-index: 1;
+        }
+
+        .timeline-content {
+            flex: 1;
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .timeline-content h4 {
+            margin-top: 0;
+            color: #374151;
+        }
+
+        .code-example {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+        }
+
+        .code-example h4 {
+            color: #a5b4fc;
+            margin-top: 0;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 0.5rem;
+        }
+
+        .priority-table {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 2rem 0;
+        }
+
+        .priority-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .priority-table th {
+            background: #f3f4f6;
+            padding: 1rem;
+            text-align: left;
+            font-weight: bold;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .priority-table td {
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .priority-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: bold;
+        }
+
+        .priority-early {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .priority-default {
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+
+        .priority-late {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .visualization-box {
+            background: #f9fafb;
+            border: 2px solid #d1d5db;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            text-align: center;
+        }
+
+        .priority-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(90deg, #10b981 0%, #f59e0b 50%, #ef4444 100%);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            color: white;
+            font-weight: bold;
+        }
+
+        .conflict-example {
+            background: #fef2f2;
+            border: 2px solid #ef4444;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .conflict-example h4 {
+            color: #991b1b;
+            margin-top: 0;
+        }
+
+        .best-practice {
+            background: #f0f9ff;
+            border-left: 4px solid #0ea5e9;
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .best-practice h4 {
+            color: #0369a1;
+            margin-top: 0;
+        }
+
+        .warning-box {
+            background: #fef3c7;
+            border: 2px solid #fbbf24;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .warning-box::before {
+            content: "⚠️ Warning: ";
+            font-weight: bold;
+            color: #92400e;
+        }
+
+        .tip-box {
+            background: #f0fdf4;
+            border: 2px solid #86efac;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .tip-box::before {
+            content: "💡 Tip: ";
+            font-weight: bold;
+            color: #166534;
+        }
+
+        @media (max-width: 768px) {
+            .timeline-item {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .timeline-item::before {
+                display: none;
+            }
+            
+            .priority-number {
+                margin: 0 auto 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Skip to main content -->
+    <a href="#main-content" class="sr-only">Skip to main content</a>
+    
+    <div class="page-wrapper">
+        <!-- Header -->
+        <header class="site-header" role="banner">
+            <div class="header-container">
+                <div class="site-branding">
+                    <a href="/" class="site-logo">
+                        <h1 class="site-title">PHP WordPress Development</h1>
+                    </a>
+                </div>
+                
+                <nav class="main-navigation" role="navigation" aria-label="Main navigation">
+                    <button class="mobile-menu-btn" aria-label="Toggle navigation" aria-expanded="false">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    
+                    <div class="nav-menu">
+                        <ul class="nav-list">
+                            <li class="nav-item"><a href="/" class="nav-link">Home</a></li>
+                            <li class="nav-item dropdown">
+                                <button class="nav-link dropdown-toggle active" aria-haspopup="true">Modules</button>
+                                <div class="dropdown-menu">
+                                    <a href="/module1.html" class="dropdown-item">Module 1: Web Fundamentals</a>
+                                    <a href="/module2.html" class="dropdown-item">Module 2: PHP Fundamentals</a>
+                                    <a href="/module3.html" class="dropdown-item">Module 3: MySQL Database</a>
+                                    <a href="/module4.html" class="dropdown-item">Module 4: WordPress & Docker</a>
+                                    <a href="/module5.html" class="dropdown-item">Module 5: Theme Development</a>
+                                    <a href="/module6.html" class="dropdown-item active">Module 6: Plugin Development</a>
+                                    <a href="/module7.html" class="dropdown-item">Module 7: Advanced WordPress</a>
+                                    <a href="/module8.html" class="dropdown-item">Module 8: Deployment</a>
+                                    <a href="/module9.html" class="dropdown-item">Module 9: Final Project</a>
+                                </div>
+                            </li>
+                            <li class="nav-item"><a href="/resources.html" class="nav-link">Resources</a></li>
+                            <li class="nav-item"><a href="/about.html" class="nav-link">About</a></li>
+                        </ul>
+                    </div>
+                </nav>
+                
+                <div class="search-container">
+                    <div class="search-input-wrapper">
+                        <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                        </svg>
+                        <input type="search" class="search-input" placeholder="Search lessons..." aria-label="Search">
+                    </div>
+                    <div class="search-results"></div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-header">
+                <h2 class="progress-title">Course Progress</h2>
+                <span class="progress-text">Loading...</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-bar-fill">
+                    <span class="progress-bar-text"></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Breadcrumb -->
+        <nav class="breadcrumb container" aria-label="Breadcrumb">
+            <ol class="breadcrumb-list">
+                <li class="breadcrumb-item">
+                    <a href="/">Home</a>
+                    <span class="breadcrumb-separator">/</span>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="/module6.html">Module 6</a>
+                    <span class="breadcrumb-separator">/</span>
+                </li>
+                <li class="breadcrumb-item">
+                    <span aria-current="page">Understanding Hook Priorities</span>
+                </li>
+            </ol>
+        </nav>
+        
+        <!-- Main Content -->
+        <main id="main-content" class="main-content" role="main">
+            <div class="container">
+                <div class="content-with-sidebar">
+                    <!-- Sidebar -->
+                    <aside class="sidebar">
+                        <div class="sidebar-nav">
+                            <h3 class="sidebar-title">Module 6: Plugin Development</h3>
+                            <div class="sidebar-section">
+                                <h4 class="sidebar-section-title">Session 2: WordPress Hooks System</h4>
+                                <ul class="sidebar-menu">
+                                    <li><a class="sidebar-link" href="/06module/action_hooks_vs_filter_hooks.html">Action Hooks vs Filter Hooks</a></li>
+                                    <li class="active"><a class="sidebar-link active" href="/06module/understanding_hook_priorities.html">Understanding Hook Priorities</a></li>
+                                    <li><a class="sidebar-link" href="/06module/common_wordpress_hooks.html">Common WordPress Hooks</a></li>
+                                    <li><a class="sidebar-link" href="/06module/creating_custom_hooks.html">Creating Custom Hooks</a></li>
+                                    <li><a class="sidebar-link" href="/06module/removing_hooks.html">Removing Hooks</a></li>
+                                    <li><a class="sidebar-link" href="/06module/homework_plugin_with_hooks.html">Homework: Build Plugin with Hooks</a></li>
+                                </ul>
+                            </div>
+                            <div class="sidebar-section">
+                                <h4 class="sidebar-section-title">Quick Links</h4>
+                                <ul class="sidebar-menu">
+                                    <li><a class="sidebar-link" href="/module6.html">Module Overview</a></li>
+                                    <li><a class="sidebar-link" href="/06module/action_hooks_vs_filter_hooks.html">← Previous Lesson</a></li>
+                                    <li><a class="sidebar-link next-session" href="/06module/common_wordpress_hooks.html">Next Lesson →</a></li>
+                                    <li><a class="sidebar-link" href="/">← Course Home</a></li>
+                                    <li><a class="sidebar-link" href="/resources.html">Resources</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </aside>
+                    
+                    <!-- Main Lesson Content -->
+                    <article class="lesson-content">
+                        <div class="priorities-header">
+                            <h1>🎯 Understanding Hook Priorities</h1>
+                            <p class="lead">Control the execution order of your hooks</p>
+                            <p>Master priority levels to ensure your code runs at the right time</p>
+                        </div>
+
+                        <!-- Learning Objectives -->
+                        <div class="lesson-objectives">
+                            <h2>Learning Objectives</h2>
+                            <ul>
+                                <li>Understand how WordPress hook priorities work</li>
+                                <li>Learn the default priority system</li>
+                                <li>Control execution order with priority values</li>
+                                <li>Resolve conflicts between plugins</li>
+                                <li>Debug priority-related issues</li>
+                                <li>Choose appropriate priority levels</li>
+                                <li>Understand accepted arguments parameter</li>
+                                <li>Master advanced priority techniques</li>
+                            </ul>
+                        </div>
+                        
+                        <!-- Lesson Body -->
+                        <div class="lesson-body">
+                            <!-- Introduction -->
+                            <section>
+                                <h2>What Are Hook Priorities?</h2>
+                                <p class="lead">Hook priorities determine the order in which functions attached to the same hook are executed. Lower numbers run first, higher numbers run later.</p>
+                                
+                                <div class="priority-concept">
+                                    <h3>The Priority System</h3>
+                                    <p>When multiple functions are hooked to the same action or filter, WordPress uses the priority parameter to determine their execution order:</p>
+                                    <ul>
+                                        <li><strong>Lower priority numbers (1, 5, 9)</strong> = Execute earlier</li>
+                                        <li><strong>Default priority (10)</strong> = Standard execution</li>
+                                        <li><strong>Higher priority numbers (11, 20, 100)</strong> = Execute later</li>
+                                    </ul>
+                                </div>
+
+                                <div class="visualization-box">
+                                    <h3>Priority Scale</h3>
+                                    <div class="priority-bar">
+                                        <span>1 (Early)</span>
+                                        <span>10 (Default)</span>
+                                        <span>100+ (Late)</span>
+                                    </div>
+                                    <p>Functions execute from left to right based on priority</p>
+                                </div>
+                            </section>
+
+                            <!-- Basic Syntax -->
+                            <section>
+                                <h2>Hook Priority Syntax</h2>
+                                
+                                <div class="code-example">
+                                    <h4>Basic Priority Usage</h4>
+                                    <pre><code class="language-php">&lt;?php
+// Syntax for add_action and add_filter
+add_action( 'hook_name', 'callback_function', $priority, $accepted_args );
+add_filter( 'hook_name', 'callback_function', $priority, $accepted_args );
+
+// Default values
+// $priority = 10 (if not specified)
+// $accepted_args = 1 (if not specified)
+
+// Example: Using default priority (10)
+add_action( 'init', 'my_function' );
+// Same as:
+add_action( 'init', 'my_function', 10 );
+
+// Example: Early execution (priority 5)
+add_action( 'init', 'my_early_function', 5 );
+
+// Example: Late execution (priority 20)
+add_action( 'init', 'my_late_function', 20 );
+
+// Example: Very late execution (priority 999)
+add_action( 'init', 'my_cleanup_function', 999 );</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Execution Order Example -->
+                            <section>
+                                <h2>Execution Order Demonstration</h2>
+                                
+                                <div class="code-example">
+                                    <h4>Multiple Functions on Same Hook</h4>
+                                    <pre><code class="language-php">&lt;?php
+// Three functions hooked to 'init' with different priorities
+add_action( 'init', 'function_priority_20', 20 );
+add_action( 'init', 'function_priority_5', 5 );
+add_action( 'init', 'function_priority_10', 10 );
+add_action( 'init', 'function_priority_10_second', 10 );
+add_action( 'init', 'function_priority_1', 1 );
+
+function function_priority_1() {
+    error_log( '1. Running at priority 1' );
+}
+
+function function_priority_5() {
+    error_log( '2. Running at priority 5' );
+}
+
+function function_priority_10() {
+    error_log( '3. Running at priority 10 (first)' );
+}
+
+function function_priority_10_second() {
+    error_log( '4. Running at priority 10 (second)' );
+}
+
+function function_priority_20() {
+    error_log( '5. Running at priority 20' );
+}
+
+// Execution order:
+// 1. function_priority_1 (priority 1)
+// 2. function_priority_5 (priority 5)
+// 3. function_priority_10 (priority 10 - first added)
+// 4. function_priority_10_second (priority 10 - second added)
+// 5. function_priority_20 (priority 20)</code></pre>
+                                </div>
+
+                                <div class="tip-box">
+                                    When multiple functions have the same priority, they execute in the order they were added.
+                                </div>
+                            </section>
+
+                            <!-- Timeline Visualization -->
+                            <section>
+                                <h2>Priority Timeline</h2>
+                                
+                                <div class="execution-timeline">
+                                    <h3>Typical Hook Execution Flow</h3>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="priority-number">1</div>
+                                        <div class="timeline-content">
+                                            <h4>Very Early (Priority 1-5)</h4>
+                                            <p>Core WordPress functions, critical plugin initialization</p>
+                                            <span class="priority-badge priority-early">Early</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="priority-number">5</div>
+                                        <div class="timeline-content">
+                                            <h4>Early (Priority 5-9)</h4>
+                                            <p>Plugin setup, register post types, taxonomies</p>
+                                            <span class="priority-badge priority-early">Early</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="priority-number">10</div>
+                                        <div class="timeline-content">
+                                            <h4>Default (Priority 10)</h4>
+                                            <p>Most plugin and theme functions</p>
+                                            <span class="priority-badge priority-default">Default</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="priority-number">20</div>
+                                        <div class="timeline-content">
+                                            <h4>Late (Priority 11-50)</h4>
+                                            <p>Override default behavior, cleanup functions</p>
+                                            <span class="priority-badge priority-late">Late</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="priority-number">99</div>
+                                        <div class="timeline-content">
+                                            <h4>Very Late (Priority 50+)</h4>
+                                            <p>Final modifications, ensure last execution</p>
+                                            <span class="priority-badge priority-late">Very Late</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Common Priority Patterns -->
+                            <section>
+                                <h2>Common Priority Patterns</h2>
+                                
+                                <div class="priority-table">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Use Case</th>
+                                                <th>Recommended Priority</th>
+                                                <th>Reason</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>Register post types</td>
+                                                <td>0-5</td>
+                                                <td>Should happen very early</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Enqueue scripts/styles</td>
+                                                <td>10 (default)</td>
+                                                <td>Standard loading order</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Modify query vars</td>
+                                                <td>5-9</td>
+                                                <td>Before main query runs</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Content filters</td>
+                                                <td>10-20</td>
+                                                <td>After default processing</td>
+                                            </tr>
+                                            <tr>
+                                                <td>SEO modifications</td>
+                                                <td>15-20</td>
+                                                <td>Override other plugins</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Cleanup/logging</td>
+                                                <td>999</td>
+                                                <td>Ensure it runs last</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Override theme functions</td>
+                                                <td>20-30</td>
+                                                <td>After theme loads</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Critical security checks</td>
+                                                <td>1-5</td>
+                                                <td>Before anything else</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+
+                            <!-- Real World Examples -->
+                            <section>
+                                <h2>Real-World Priority Examples</h2>
+                                
+                                <div class="code-example">
+                                    <h4>Example 1: Ensuring Your Filter Runs Last</h4>
+                                    <pre><code class="language-php">&lt;?php
+// Problem: Other plugins are modifying the title after your filter
+// Solution: Use a very high priority to run last
+
+// This might not work if other plugins use priority > 10
+add_filter( 'the_title', 'my_title_modifier', 10 );
+
+// This ensures your filter runs after most others
+add_filter( 'the_title', 'my_title_modifier', 999 );
+
+function my_title_modifier( $title ) {
+    // This will override changes made by filters with lower priority
+    if ( is_single() ) {
+        $title = '⭐ ' . $title . ' ⭐';
+    }
+    return $title;
+}</code></pre>
+                                </div>
+
+                                <div class="code-example">
+                                    <h4>Example 2: Modifying WooCommerce Price Display</h4>
+                                    <pre><code class="language-php">&lt;?php
+// WooCommerce uses priority 10 for its price filters
+// To modify after WooCommerce, use priority > 10
+
+// This runs BEFORE WooCommerce's formatting
+add_filter( 'woocommerce_get_price_html', 'early_price_modifier', 5, 2 );
+
+function early_price_modifier( $price, $product ) {
+    // Modifications here might be overridden by WooCommerce
+    return $price;
+}
+
+// This runs AFTER WooCommerce's formatting
+add_filter( 'woocommerce_get_price_html', 'late_price_modifier', 20, 2 );
+
+function late_price_modifier( $price, $product ) {
+    // Modifications here will override WooCommerce's formatting
+    if ( $product->is_on_sale() ) {
+        $price = '<span class="flash-sale">' . $price . '</span>';
+    }
+    return $price;
+}</code></pre>
+                                </div>
+
+                                <div class="code-example">
+                                    <h4>Example 3: Controlling Script Loading Order</h4>
+                                    <pre><code class="language-php">&lt;?php
+// Load jQuery plugins after jQuery itself
+add_action( 'wp_enqueue_scripts', 'enqueue_jquery', 5 );
+add_action( 'wp_enqueue_scripts', 'enqueue_jquery_plugins', 15 );
+add_action( 'wp_enqueue_scripts', 'enqueue_custom_scripts', 20 );
+
+function enqueue_jquery() {
+    // Ensure jQuery is loaded first
+    wp_enqueue_script( 'jquery' );
+}
+
+function enqueue_jquery_plugins() {
+    // Load jQuery plugins after jQuery
+    wp_enqueue_script( 
+        'jquery-plugin', 
+        plugin_dir_url( __FILE__ ) . 'js/jquery-plugin.js',
+        array( 'jquery' ),
+        '1.0.0',
+        true
+    );
+}
+
+function enqueue_custom_scripts() {
+    // Load custom scripts last
+    wp_enqueue_script(
+        'custom-script',
+        plugin_dir_url( __FILE__ ) . 'js/custom.js',
+        array( 'jquery', 'jquery-plugin' ),
+        '1.0.0',
+        true
+    );
+}</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Conflict Resolution -->
+                            <section>
+                                <h2>Resolving Priority Conflicts</h2>
+                                
+                                <div class="conflict-example">
+                                    <h4>Common Conflict Scenario</h4>
+                                    <p>Two plugins modifying the same content with the same priority:</p>
+                                    
+                                    <pre><code class="language-php">&lt;?php
+// Plugin A
+add_filter( 'the_content', 'plugin_a_content', 10 );
+
+function plugin_a_content( $content ) {
+    return $content . '&lt;p&gt;Added by Plugin A&lt;/p&gt;';
+}
+
+// Plugin B  
+add_filter( 'the_content', 'plugin_b_content', 10 );
+
+function plugin_b_content( $content ) {
+    return '&lt;p&gt;Added by Plugin B&lt;/p&gt;' . $content;
+}
+
+// Result depends on which plugin loads first!
+// Solution: Use different priorities
+
+// Better approach:
+add_filter( 'the_content', 'plugin_a_content', 15 ); // Runs second
+add_filter( 'the_content', 'plugin_b_content', 5 );  // Runs first</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Accepted Arguments -->
+                            <section>
+                                <h2>The Accepted Arguments Parameter</h2>
+                                
+                                <div class="code-example">
+                                    <h4>Understanding Accepted Arguments</h4>
+                                    <pre><code class="language-php">&lt;?php
+// The fourth parameter specifies how many arguments to accept
+add_action( 'hook_name', 'callback', $priority, $accepted_args );
+
+// Example: Hook that passes 3 arguments
+do_action( 'save_post', $post_ID, $post, $update );
+
+// If you only need the first argument (default)
+add_action( 'save_post', 'my_save_function_1', 10, 1 );
+
+function my_save_function_1( $post_ID ) {
+    // Only receives $post_ID
+}
+
+// If you need two arguments
+add_action( 'save_post', 'my_save_function_2', 10, 2 );
+
+function my_save_function_2( $post_ID, $post ) {
+    // Receives $post_ID and $post
+}
+
+// If you need all three arguments
+add_action( 'save_post', 'my_save_function_3', 10, 3 );
+
+function my_save_function_3( $post_ID, $post, $update ) {
+    // Receives all three arguments
+    if ( $update ) {
+        // This is an update, not a new post
+    }
+}</code></pre>
+                                </div>
+
+                                <div class="warning-box">
+                                    If you don't specify the correct number of accepted arguments, you won't receive all the data the hook provides.
+                                </div>
+                            </section>
+
+                            <!-- Debugging Priorities -->
+                            <section>
+                                <h2>Debugging Hook Priorities</h2>
+                                
+                                <div class="code-example">
+                                    <h4>View All Hooks and Their Priorities</h4>
+                                    <pre><code class="language-php">&lt;?php
+// Function to display all callbacks for a specific hook
+function debug_hook_priorities( $hook_name ) {
+    global $wp_filter;
+    
+    if ( ! isset( $wp_filter[$hook_name] ) ) {
+        echo "No callbacks registered for hook: $hook_name";
+        return;
+    }
+    
+    $hook = $wp_filter[$hook_name];
+    
+    echo "&lt;h3&gt;Callbacks for hook: $hook_name&lt;/h3&gt;";
+    echo "&lt;pre&gt;";
+    
+    // Sort by priority
+    ksort( $hook->callbacks );
+    
+    foreach ( $hook->callbacks as $priority => $callbacks ) {
+        echo "\nPriority $priority:\n";
+        foreach ( $callbacks as $callback ) {
+            $name = 'unknown';
+            
+            if ( is_string( $callback['function'] ) ) {
+                $name = $callback['function'];
+            } elseif ( is_array( $callback['function'] ) ) {
+                if ( is_object( $callback['function'][0] ) ) {
+                    $name = get_class( $callback['function'][0] ) . '::' . $callback['function'][1];
+                } else {
+                    $name = $callback['function'][0] . '::' . $callback['function'][1];
+                }
+            }
+            
+            echo "  - $name (accepts {$callback['accepted_args']} args)\n";
+        }
+    }
+    
+    echo "&lt;/pre&gt;";
+}
+
+// Usage
+add_action( 'wp_footer', function() {
+    if ( current_user_can( 'manage_options' ) ) {
+        debug_hook_priorities( 'the_content' );
+    }
+}, 9999 );</code></pre>
+                                </div>
+
+                                <div class="code-example">
+                                    <h4>Check Current Execution Priority</h4>
+                                    <pre><code class="language-php">&lt;?php
+// Get the current priority during execution
+function check_current_priority() {
+    $current_filter = current_filter();
+    $current_priority = has_filter( $current_filter, __FUNCTION__ );
+    
+    error_log( "Running in hook: $current_filter at priority: $current_priority" );
+}
+
+add_action( 'init', 'check_current_priority', 15 );</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Best Practices -->
+                            <section>
+                                <div class="best-practice">
+                                    <h4>Priority Best Practices</h4>
+                                    <ul>
+                                        <li><strong>Use default (10) when possible:</strong> Only change when necessary</li>
+                                        <li><strong>Document your priorities:</strong> Comment why you chose specific values</li>
+                                        <li><strong>Leave gaps:</strong> Use 5, 10, 15, 20 instead of 9, 10, 11</li>
+                                        <li><strong>Test with other plugins:</strong> Check for conflicts</li>
+                                        <li><strong>Be consistent:</strong> Use same priorities for similar functions</li>
+                                        <li><strong>Avoid extreme values:</strong> Don't use 999999 or -999999</li>
+                                        <li><strong>Check hook documentation:</strong> Some hooks have recommended priorities</li>
+                                        <li><strong>Consider performance:</strong> Many high-priority hooks can slow down</li>
+                                    </ul>
+                                </div>
+
+                                <div class="tip-box">
+                                    Use priority 9 or 11 when you want to run just before or after default priority hooks without going to extremes.
+                                </div>
+                            </section>
+
+                            <!-- Practice Exercise -->
+                            <section>
+                                <h2>Practice Exercise</h2>
+                                <div class="alert alert-success">
+                                    <div class="alert-icon">💻</div>
+                                    <div class="alert-content">
+                                        <div class="alert-title">Priority Challenge</div>
+                                        <div class="alert-message">
+                                            <p>Create a plugin that demonstrates priority control:</p>
+                                            <ol>
+                                                <li>Hook three functions to 'the_content' with priorities 5, 10, and 15</li>
+                                                <li>Each function should add a numbered paragraph showing when it ran</li>
+                                                <li>Create a function that lists all callbacks on 'init' hook</li>
+                                                <li>Override another plugin's filter using high priority</li>
+                                                <li>Use accepted_args to get multiple parameters from 'save_post'</li>
+                                                <li>Create a debugging function to show execution order</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Resources -->
+                            <section class="resources">
+                                <h2>Additional Resources</h2>
+                                <ul>
+                                    <li><a href="https://developer.wordpress.org/plugins/hooks/advanced-topics/" target="_blank">Advanced Hook Topics</a></li>
+                                    <li><a href="https://developer.wordpress.org/reference/functions/add_action/" target="_blank">add_action() Documentation</a></li>
+                                    <li><a href="https://developer.wordpress.org/reference/functions/add_filter/" target="_blank">add_filter() Documentation</a></li>
+                                    <li><a href="https://make.wordpress.org/core/handbook/best-practices/coding-standards/php/#hook-priorities" target="_blank">Hook Priority Standards</a></li>
+                                    <li><a href="https://www.wp-hasty.com/tools/wordpress-hooks-finder/" target="_blank">WordPress Hooks Finder</a></li>
+                                    <li><a href="https://wordpress.stackexchange.com/questions/tagged/priority" target="_blank">Priority Questions on Stack Exchange</a></li>
+                                    <li><a href="https://hookr.io/" target="_blank">WordPress Hook Reference</a></li>
+                                </ul>
+                            </section>
+                        </div>
+
+                        <!-- Lesson Navigation -->
+                        <div class="lesson-navigation">
+                            <a href="/06module/action_hooks_vs_filter_hooks.html" class="lesson-nav-button prev">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"/>
+                                </svg>
+                                <span>
+                                    <small>Previous</small><br>
+                                    Action Hooks vs Filter Hooks
+                                </span>
+                            </a>
+                            
+                            <button class="complete-lesson-btn">
+                                Mark as Complete
+                            </button>
+                            
+                            <a href="/06module/common_wordpress_hooks.html" class="lesson-nav-button next">
+                                <span>
+                                    <small>Next</small><br>
+                                    Common WordPress Hooks
+                                </span>
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="site-footer" role="contentinfo">
+            <div class="footer-container">
+                <div class="footer-content">
+                    <div class="footer-section footer-about">
+                        <h3>PHP WordPress Development</h3>
+                        <p>Complete Web Development Course</p>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Quick Links</h4>
+                        <ul class="footer-links">
+                            <li><a href="/">Home</a></li>
+                            <li><a href="/module6.html">Module 6</a></li>
+                            <li><a href="/resources.html">Resources</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Support</h4>
+                        <ul class="footer-links">
+                            <li><a href="/about.html">About</a></li>
+                            <li><a href="/contact.html">Contact</a></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="footer-bottom">
+                    <p>&copy; 2024 PHP WordPress Course. All rights reserved.</p>
+                    <p>This course material is for educational purposes only.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="/assets/js/prism.js"></script>
+    <script src="/assets/js/main.js"></script>
+    <script src="/assets/js/sidebar-toggle.js"></script>
+    <script src="/assets/js/progress-tracker.js"></script>
+    <script src="/assets/js/search.js"></script>
+    <script src="/assets/js/theme-toggle.js"></script>
+</body>
+</html>

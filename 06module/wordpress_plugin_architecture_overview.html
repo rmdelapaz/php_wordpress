@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    
+    <!-- SEO Meta Tags -->
+    <title>WordPress Plugin Architecture Overview - Plugin Development - PHP WordPress Course</title>
+    <meta name="description" content="Understand WordPress plugin architecture and how plugins extend WordPress functionality. Learn the plugin system, hooks, filters, and extension points.">
+    <meta name="keywords" content="PHP, WordPress, plugin architecture, hooks, filters, actions, plugin development">
+    <meta name="author" content="PHP WordPress Course">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/favicon.png">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-enhanced.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-toggle.css">
+    
+    <!-- Custom styles for plugin architecture lesson -->
+    <style>
+        .architecture-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .architecture-concept {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .architecture-concept h3 {
+            color: #667eea;
+            margin-top: 0;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 1rem;
+        }
+
+        .architecture-diagram {
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+            text-align: center;
+        }
+
+        .diagram-box {
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem auto;
+            max-width: 500px;
+            position: relative;
+        }
+
+        .diagram-box::after {
+            content: "↓";
+            position: absolute;
+            bottom: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 24px;
+            color: #667eea;
+        }
+
+        .diagram-box:last-child::after {
+            display: none;
+        }
+
+        .hook-types {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .hook-card {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hook-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+        }
+
+        .hook-card h4 {
+            color: #1f2937;
+            margin-top: 0;
+        }
+
+        .code-example {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+        }
+
+        .code-example h4 {
+            color: #a5b4fc;
+            margin-top: 0;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 0.5rem;
+        }
+
+        .plugin-lifecycle {
+            background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
+            border: 2px solid #f59e0b;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .lifecycle-steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .lifecycle-step {
+            background: white;
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .step-number {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background: #f59e0b;
+            color: white;
+            border-radius: 50%;
+            line-height: 30px;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .best-practice {
+            background: #f0f9ff;
+            border-left: 4px solid #0ea5e9;
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .best-practice h4 {
+            color: #0369a1;
+            margin-top: 0;
+        }
+
+        .warning-box {
+            background: #fef3c7;
+            border: 2px solid #fbbf24;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .warning-box::before {
+            content: "⚠️ Warning: ";
+            font-weight: bold;
+            color: #92400e;
+        }
+
+        .tip-box {
+            background: #f0fdf4;
+            border: 2px solid #86efac;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .tip-box::before {
+            content: "💡 Tip: ";
+            font-weight: bold;
+            color: #166534;
+        }
+
+        .comparison-table {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 2rem 0;
+        }
+
+        .comparison-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .comparison-table th {
+            background: #f3f4f6;
+            padding: 1rem;
+            text-align: left;
+            font-weight: bold;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .comparison-table td {
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        @media (max-width: 768px) {
+            .hook-types,
+            .lifecycle-steps {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Skip to main content -->
+    <a href="#main-content" class="sr-only">Skip to main content</a>
+    
+    <div class="page-wrapper">
+        <!-- Header -->
+        <header class="site-header" role="banner">
+            <div class="header-container">
+                <div class="site-branding">
+                    <a href="/" class="site-logo">
+                        <h1 class="site-title">PHP WordPress Development</h1>
+                    </a>
+                </div>
+                
+                <nav class="main-navigation" role="navigation" aria-label="Main navigation">
+                    <button class="mobile-menu-btn" aria-label="Toggle navigation" aria-expanded="false">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    
+                    <div class="nav-menu">
+                        <ul class="nav-list">
+                            <li class="nav-item"><a href="/" class="nav-link">Home</a></li>
+                            <li class="nav-item dropdown">
+                                <button class="nav-link dropdown-toggle active" aria-haspopup="true">Modules</button>
+                                <div class="dropdown-menu">
+                                    <a href="/module1.html" class="dropdown-item">Module 1: Web Fundamentals</a>
+                                    <a href="/module2.html" class="dropdown-item">Module 2: PHP Fundamentals</a>
+                                    <a href="/module3.html" class="dropdown-item">Module 3: MySQL Database</a>
+                                    <a href="/module4.html" class="dropdown-item">Module 4: WordPress & Docker</a>
+                                    <a href="/module5.html" class="dropdown-item">Module 5: Theme Development</a>
+                                    <a href="/module6.html" class="dropdown-item active">Module 6: Plugin Development</a>
+                                    <a href="/module7.html" class="dropdown-item">Module 7: Advanced WordPress</a>
+                                    <a href="/module8.html" class="dropdown-item">Module 8: Deployment</a>
+                                    <a href="/module9.html" class="dropdown-item">Module 9: Final Project</a>
+                                </div>
+                            </li>
+                            <li class="nav-item"><a href="/resources.html" class="nav-link">Resources</a></li>
+                            <li class="nav-item"><a href="/about.html" class="nav-link">About</a></li>
+                        </ul>
+                    </div>
+                </nav>
+                
+                <div class="search-container">
+                    <div class="search-input-wrapper">
+                        <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                        </svg>
+                        <input type="search" class="search-input" placeholder="Search lessons..." aria-label="Search">
+                    </div>
+                    <div class="search-results"></div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-header">
+                <h2 class="progress-title">Course Progress</h2>
+                <span class="progress-text">Loading...</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-bar-fill">
+                    <span class="progress-bar-text"></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Breadcrumb -->
+        <nav class="breadcrumb container" aria-label="Breadcrumb">
+            <ol class="breadcrumb-list">
+                <li class="breadcrumb-item">
+                    <a href="/">Home</a>
+                    <span class="breadcrumb-separator">/</span>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="/module6.html">Module 6</a>
+                    <span class="breadcrumb-separator">/</span>
+                </li>
+                <li class="breadcrumb-item">
+                    <span aria-current="page">WordPress Plugin Architecture Overview</span>
+                </li>
+            </ol>
+        </nav>
+        
+        <!-- Main Content -->
+        <main id="main-content" class="main-content" role="main">
+            <div class="container">
+                <div class="content-with-sidebar">
+                    <!-- Sidebar -->
+                    <aside class="sidebar">
+                        <div class="sidebar-nav">
+                            <h3 class="sidebar-title">Module 6: Plugin Development</h3>
+                            <div class="sidebar-section">
+                                <h4 class="sidebar-section-title">Session 1: Plugin Development Introduction</h4>
+                                <ul class="sidebar-menu">
+                                    <li class="active"><a class="sidebar-link active" href="/06module/wordpress_plugin_architecture_overview.html">WordPress Plugin Architecture Overview</a></li>
+                                    <li><a class="sidebar-link" href="/06module/types_wordpress_plugins.html">Types of WordPress Plugins</a></li>
+                                    <li><a class="sidebar-link" href="/06module/plugin_requirements_standards.html">Plugin Requirements and Standards</a></li>
+                                    <li><a class="sidebar-link" href="/06module/creating_basic_plugin_structure.html">Creating a Basic Plugin Structure</a></li>
+                                    <li><a class="sidebar-link" href="/06module/required_files_headers.html">Required Files and Headers</a></li>
+                                    <li><a class="sidebar-link" href="/06module/plugin_metadata.html">Plugin Metadata</a></li>
+                                    <li><a class="sidebar-link" href="/06module/activation_deactivation_hooks.html">Activation and Deactivation Hooks</a></li>
+                                    <li><a class="sidebar-link" href="/06module/plugin_file_organization.html">Plugin File Organization</a></li>
+                                    <li><a class="sidebar-link" href="/06module/homework_create_basic_plugin.html">Homework: Create a Basic WordPress Plugin</a></li>
+                                </ul>
+                            </div>
+                            <div class="sidebar-section">
+                                <h4 class="sidebar-section-title">Quick Links</h4>
+                                <ul class="sidebar-menu">
+                                    <li><a class="sidebar-link" href="/module6.html">Module Overview</a></li>
+                                    <li><a class="sidebar-link" href="/module5.html">← Previous Module</a></li>
+                                    <li><a class="sidebar-link next-session" href="/06module/types_wordpress_plugins.html">Next Lesson →</a></li>
+                                    <li><a class="sidebar-link" href="/">← Course Home</a></li>
+                                    <li><a class="sidebar-link" href="/resources.html">Resources</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </aside>
+                    
+                    <!-- Main Lesson Content -->
+                    <article class="lesson-content">
+                        <div class="architecture-header">
+                            <h1>🏗️ WordPress Plugin Architecture Overview</h1>
+                            <p class="lead">Understanding how plugins extend WordPress</p>
+                            <p>Master the foundation of WordPress plugin development</p>
+                        </div>
+
+                        <!-- Learning Objectives -->
+                        <div class="lesson-objectives">
+                            <h2>Learning Objectives</h2>
+                            <ul>
+                                <li>Understand WordPress plugin architecture</li>
+                                <li>Learn how plugins interact with WordPress core</li>
+                                <li>Master the hook system (actions and filters)</li>
+                                <li>Understand plugin loading order</li>
+                                <li>Learn about plugin APIs and extension points</li>
+                                <li>Understand plugin isolation and conflicts</li>
+                                <li>Learn security considerations</li>
+                                <li>Understand performance implications</li>
+                            </ul>
+                        </div>
+                        
+                        <!-- Lesson Body -->
+                        <div class="lesson-body">
+                            <!-- Introduction -->
+                            <section>
+                                <h2>What is a WordPress Plugin?</h2>
+                                <p class="lead">A WordPress plugin is a piece of software that extends or adds functionality to WordPress without modifying the core code.</p>
+                                
+                                <div class="architecture-concept">
+                                    <h3>Plugin Characteristics</h3>
+                                    <ul>
+                                        <li><strong>Modular:</strong> Self-contained functionality</li>
+                                        <li><strong>Extensible:</strong> Can be extended by other plugins</li>
+                                        <li><strong>Portable:</strong> Works across WordPress installations</li>
+                                        <li><strong>Upgradeable:</strong> Can be updated without affecting core</li>
+                                        <li><strong>Deactivatable:</strong> Can be turned on/off without data loss</li>
+                                        <li><strong>Customizable:</strong> Often includes settings and options</li>
+                                    </ul>
+                                </div>
+                            </section>
+
+                            <!-- Plugin Architecture -->
+                            <section>
+                                <h2>WordPress Plugin Architecture</h2>
+                                
+                                <div class="architecture-diagram">
+                                    <h3>Plugin System Flow</h3>
+                                    
+                                    <div class="diagram-box">
+                                        <strong>WordPress Core</strong>
+                                        <p>Loads and initializes the system</p>
+                                    </div>
+                                    
+                                    <div class="diagram-box">
+                                        <strong>Active Plugins Loaded</strong>
+                                        <p>WordPress loads all active plugins</p>
+                                    </div>
+                                    
+                                    <div class="diagram-box">
+                                        <strong>Hooks Registered</strong>
+                                        <p>Plugins register actions and filters</p>
+                                    </div>
+                                    
+                                    <div class="diagram-box">
+                                        <strong>WordPress Execution</strong>
+                                        <p>Core runs and triggers hooks</p>
+                                    </div>
+                                    
+                                    <div class="diagram-box">
+                                        <strong>Plugin Code Executes</strong>
+                                        <p>Hooked functions run at appropriate times</p>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Hook System -->
+                            <section>
+                                <h2>The WordPress Hook System</h2>
+                                <p>The hook system is the foundation of WordPress plugin architecture. It allows plugins to "hook into" WordPress at specific points during execution.</p>
+                                
+                                <div class="hook-types">
+                                    <div class="hook-card">
+                                        <h4>🎯 Actions</h4>
+                                        <p>Actions allow you to add or change WordPress functionality.</p>
+                                        <ul>
+                                            <li>Execute functions at specific points</li>
+                                            <li>Don't return values</li>
+                                            <li>Used for doing something</li>
+                                            <li>Example: sending email, saving data</li>
+                                        </ul>
+                                        <code>add_action('hook_name', 'function_name');</code>
+                                    </div>
+                                    
+                                    <div class="hook-card">
+                                        <h4>🔄 Filters</h4>
+                                        <p>Filters allow you to modify data before it's used.</p>
+                                        <ul>
+                                            <li>Modify and return values</li>
+                                            <li>Must return a value</li>
+                                            <li>Used for changing something</li>
+                                            <li>Example: modifying content, changing titles</li>
+                                        </ul>
+                                        <code>add_filter('hook_name', 'function_name');</code>
+                                    </div>
+                                </div>
+
+                                <div class="code-example">
+                                    <h4>Action Hook Example</h4>
+                                    <pre><code class="language-php">&lt;?php
+// Hook into WordPress initialization
+add_action('init', 'my_plugin_init');
+
+function my_plugin_init() {
+    // This code runs when WordPress initializes
+    register_post_type('product', array(
+        'public' => true,
+        'label' => 'Products'
+    ));
+}
+
+// Hook with priority and arguments
+add_action('save_post', 'my_save_post_function', 10, 2);
+
+function my_save_post_function($post_id, $post) {
+    // This runs when a post is saved
+    // Do something with the post data
+}</code></pre>
+                                </div>
+
+                                <div class="code-example">
+                                    <h4>Filter Hook Example</h4>
+                                    <pre><code class="language-php">&lt;?php
+// Modify the content before display
+add_filter('the_content', 'my_content_filter');
+
+function my_content_filter($content) {
+    // Add something to the content
+    $content .= '&lt;p&gt;Thanks for reading!&lt;/p&gt;';
+    return $content; // Must return the modified value
+}
+
+// Filter with priority and multiple arguments
+add_filter('the_title', 'my_title_filter', 10, 2);
+
+function my_title_filter($title, $id) {
+    if (is_single()) {
+        $title = '📖 ' . $title;
+    }
+    return $title;
+}</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Plugin Loading Process -->
+                            <section>
+                                <h2>Plugin Loading Process</h2>
+                                
+                                <div class="plugin-lifecycle">
+                                    <h3>How WordPress Loads Plugins</h3>
+                                    
+                                    <div class="lifecycle-steps">
+                                        <div class="lifecycle-step">
+                                            <div class="step-number">1</div>
+                                            <h4>WordPress Starts</h4>
+                                            <p>Core files loaded</p>
+                                        </div>
+                                        
+                                        <div class="lifecycle-step">
+                                            <div class="step-number">2</div>
+                                            <h4>Must-Use Plugins</h4>
+                                            <p>mu-plugins loaded</p>
+                                        </div>
+                                        
+                                        <div class="lifecycle-step">
+                                            <div class="step-number">3</div>
+                                            <h4>Network Plugins</h4>
+                                            <p>If multisite</p>
+                                        </div>
+                                        
+                                        <div class="lifecycle-step">
+                                            <div class="step-number">4</div>
+                                            <h4>Active Plugins</h4>
+                                            <p>Regular plugins</p>
+                                        </div>
+                                        
+                                        <div class="lifecycle-step">
+                                            <div class="step-number">5</div>
+                                            <h4>pluggable.php</h4>
+                                            <p>Pluggable functions</p>
+                                        </div>
+                                        
+                                        <div class="lifecycle-step">
+                                            <div class="step-number">6</div>
+                                            <h4>Theme Functions</h4>
+                                            <p>functions.php</p>
+                                        </div>
+                                        
+                                        <div class="lifecycle-step">
+                                            <div class="step-number">7</div>
+                                            <h4>Init Hook</h4>
+                                            <p>Initialization</p>
+                                        </div>
+                                        
+                                        <div class="lifecycle-step">
+                                            <div class="step-number">8</div>
+                                            <h4>Page Loads</h4>
+                                            <p>Content displayed</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="code-example">
+                                    <h4>Plugin Loading Order Example</h4>
+                                    <pre><code class="language-php">&lt;?php
+// These hooks fire in order during WordPress loading
+
+// Very early - when plugin file is included
+register_activation_hook(__FILE__, 'my_plugin_activate');
+register_deactivation_hook(__FILE__, 'my_plugin_deactivate');
+
+// After all plugins are loaded
+add_action('plugins_loaded', 'my_plugins_loaded');
+
+// After pluggable functions
+add_action('after_setup_theme', 'my_after_theme_setup');
+
+// WordPress fully loaded but before headers sent
+add_action('init', 'my_init_function');
+
+// Admin area initialized
+add_action('admin_init', 'my_admin_init');
+
+// Before page content is sent
+add_action('wp', 'my_wp_function');
+
+// In the HTML head section
+add_action('wp_head', 'my_head_function');
+
+// Footer of the page
+add_action('wp_footer', 'my_footer_function');</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Plugin APIs -->
+                            <section>
+                                <h2>WordPress Plugin APIs</h2>
+                                <p>WordPress provides numerous APIs that plugins can use to extend functionality:</p>
+                                
+                                <div class="architecture-concept">
+                                    <h3>Core Plugin APIs</h3>
+                                    
+                                    <h4>1. Options API</h4>
+                                    <pre><code class="language-php">// Store and retrieve plugin settings
+add_option('my_plugin_option', 'default_value');
+$value = get_option('my_plugin_option');
+update_option('my_plugin_option', 'new_value');
+delete_option('my_plugin_option');</code></pre>
+                                    
+                                    <h4>2. Database API</h4>
+                                    <pre><code class="language-php">global $wpdb;
+// Create custom tables
+$wpdb->query("CREATE TABLE {$wpdb->prefix}my_table ...");
+// Query data
+$results = $wpdb->get_results("SELECT * FROM {$wpdb->prefix}my_table");</code></pre>
+                                    
+                                    <h4>3. HTTP API</h4>
+                                    <pre><code class="language-php">// Make external requests
+$response = wp_remote_get('https://api.example.com/data');
+$body = wp_remote_retrieve_body($response);</code></pre>
+                                    
+                                    <h4>4. File System API</h4>
+                                    <pre><code class="language-php">// Work with files
+WP_Filesystem();
+global $wp_filesystem;
+$wp_filesystem->put_contents($file, $contents);</code></pre>
+                                    
+                                    <h4>5. Settings API</h4>
+                                    <pre><code class="language-php">// Create settings pages
+register_setting('my_options_group', 'my_option_name');
+add_settings_section('my_section', 'Section Title', 'callback', 'page');
+add_settings_field('my_field', 'Field Title', 'callback', 'page', 'section');</code></pre>
+                                    
+                                    <h4>6. Transients API</h4>
+                                    <pre><code class="language-php">// Temporary data storage with expiration
+set_transient('my_transient', $value, 3600); // 1 hour
+$value = get_transient('my_transient');
+delete_transient('my_transient');</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Plugin vs Theme -->
+                            <section>
+                                <h2>Plugins vs Themes</h2>
+                                
+                                <div class="comparison-table">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Aspect</th>
+                                                <th>Plugin</th>
+                                                <th>Theme</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><strong>Purpose</strong></td>
+                                                <td>Add functionality</td>
+                                                <td>Control presentation</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Activation</strong></td>
+                                                <td>Multiple can be active</td>
+                                                <td>Only one active</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Location</strong></td>
+                                                <td>/wp-content/plugins/</td>
+                                                <td>/wp-content/themes/</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Required Files</strong></td>
+                                                <td>Main plugin file</td>
+                                                <td>style.css, index.php</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Switching</strong></td>
+                                                <td>Data persists</td>
+                                                <td>May lose settings</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Updates</strong></td>
+                                                <td>Independent</td>
+                                                <td>May need child theme</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Scope</strong></td>
+                                                <td>Site-wide or network</td>
+                                                <td>Site-specific</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+
+                            <!-- Plugin Execution Context -->
+                            <section>
+                                <h2>Plugin Execution Context</h2>
+                                
+                                <div class="code-example">
+                                    <h4>Understanding Execution Context</h4>
+                                    <pre><code class="language-php">&lt;?php
+/**
+ * Plugins run in different contexts
+ */
+
+// Check if in admin area
+if (is_admin()) {
+    // Admin-only functionality
+    add_action('admin_menu', 'add_admin_pages');
+    add_action('admin_enqueue_scripts', 'enqueue_admin_scripts');
+} else {
+    // Frontend-only functionality
+    add_action('wp_enqueue_scripts', 'enqueue_frontend_scripts');
+}
+
+// Check if doing AJAX
+if (wp_doing_ajax()) {
+    // AJAX handlers
+    add_action('wp_ajax_my_action', 'handle_ajax');
+    add_action('wp_ajax_nopriv_my_action', 'handle_ajax_nopriv');
+}
+
+// Check if in Customizer
+if (is_customize_preview()) {
+    // Customizer-specific code
+    add_action('customize_register', 'register_customizer_settings');
+}
+
+// Check if doing cron
+if (wp_doing_cron()) {
+    // Scheduled tasks
+    add_action('my_scheduled_event', 'do_scheduled_task');
+}
+
+// Check if REST API request
+if (defined('REST_REQUEST') && REST_REQUEST) {
+    // REST API specific code
+    add_action('rest_api_init', 'register_rest_routes');
+}</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Security Considerations -->
+                            <section>
+                                <h2>Security in Plugin Architecture</h2>
+                                
+                                <div class="architecture-concept">
+                                    <h3>Security Best Practices</h3>
+                                    
+                                    <div class="code-example">
+                                        <h4>Nonce Verification</h4>
+                                        <pre><code class="language-php">// Create nonce
+$nonce = wp_create_nonce('my_action_nonce');
+
+// Verify nonce
+if (!wp_verify_nonce($_POST['_wpnonce'], 'my_action_nonce')) {
+    die('Security check failed');
+}</code></pre>
+                                    </div>
+                                    
+                                    <div class="code-example">
+                                        <h4>Capability Checks</h4>
+                                        <pre><code class="language-php">// Check user permissions
+if (!current_user_can('manage_options')) {
+    wp_die('You do not have permission to access this page.');
+}</code></pre>
+                                    </div>
+                                    
+                                    <div class="code-example">
+                                        <h4>Data Sanitization</h4>
+                                        <pre><code class="language-php">// Sanitize input
+$title = sanitize_text_field($_POST['title']);
+$content = wp_kses_post($_POST['content']);
+$email = sanitize_email($_POST['email']);
+
+// Escape output
+echo esc_html($title);
+echo esc_url($url);
+echo esc_attr($attribute);</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Performance Considerations -->
+                            <section>
+                                <h2>Performance Considerations</h2>
+                                
+                                <div class="best-practice">
+                                    <h4>Performance Best Practices</h4>
+                                    <ul>
+                                        <li><strong>Load conditionally:</strong> Only load code when needed</li>
+                                        <li><strong>Use caching:</strong> Cache expensive operations</li>
+                                        <li><strong>Minimize database queries:</strong> Use efficient queries</li>
+                                        <li><strong>Enqueue properly:</strong> Load scripts/styles correctly</li>
+                                        <li><strong>Avoid globals:</strong> Use dependency injection</li>
+                                        <li><strong>Lazy load:</strong> Load resources on demand</li>
+                                        <li><strong>Use transients:</strong> Cache API calls and calculations</li>
+                                        <li><strong>Optimize autoloading:</strong> Use efficient class loading</li>
+                                    </ul>
+                                </div>
+
+                                <div class="code-example">
+                                    <h4>Performance Optimization Example</h4>
+                                    <pre><code class="language-php">&lt;?php
+// Bad: Loading on every page
+add_action('init', 'load_my_plugin_everything');
+
+// Good: Load conditionally
+add_action('init', 'load_my_plugin_conditionally');
+
+function load_my_plugin_conditionally() {
+    // Only load on specific pages
+    if (is_page('contact')) {
+        require_once plugin_dir_path(__FILE__) . 'contact-form.php';
+    }
+    
+    // Only load in admin
+    if (is_admin()) {
+        require_once plugin_dir_path(__FILE__) . 'admin/admin.php';
+    }
+    
+    // Cache expensive operation
+    $data = get_transient('my_plugin_data');
+    if (false === $data) {
+        $data = expensive_operation();
+        set_transient('my_plugin_data', $data, HOUR_IN_SECONDS);
+    }
+}</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Common Pitfalls -->
+                            <section>
+                                <h2>Common Architecture Pitfalls</h2>
+                                
+                                <div class="warning-box">
+                                    Avoid these common mistakes that can break your plugin or cause conflicts
+                                </div>
+                                
+                                <div class="architecture-concept">
+                                    <h3>Pitfalls to Avoid</h3>
+                                    <ol>
+                                        <li><strong>Direct file access:</strong> Always check if WordPress is loaded</li>
+                                        <li><strong>Hardcoded paths:</strong> Use WordPress functions for paths</li>
+                                        <li><strong>Global namespace pollution:</strong> Prefix everything</li>
+                                        <li><strong>Direct database queries:</strong> Use $wpdb properly</li>
+                                        <li><strong>Loading order assumptions:</strong> Don't assume plugin order</li>
+                                        <li><strong>Missing dependency checks:</strong> Check if required plugins exist</li>
+                                        <li><strong>Improper hook usage:</strong> Wrong priority or wrong hook</li>
+                                        <li><strong>Not checking context:</strong> Admin vs frontend vs AJAX</li>
+                                    </ol>
+                                </div>
+                            </section>
+
+                            <!-- Practice Exercise -->
+                            <section>
+                                <h2>Practice Exercise</h2>
+                                <div class="alert alert-success">
+                                    <div class="alert-icon">💻</div>
+                                    <div class="alert-content">
+                                        <div class="alert-title">Understanding Plugin Architecture</div>
+                                        <div class="alert-message">
+                                            <p>Create a simple plugin that demonstrates the architecture:</p>
+                                            <ol>
+                                                <li>Create a plugin that logs WordPress hooks as they fire</li>
+                                                <li>Add an action that runs on 'init'</li>
+                                                <li>Add a filter that modifies 'the_content'</li>
+                                                <li>Create an admin notice using 'admin_notices' action</li>
+                                                <li>Use proper security checks</li>
+                                                <li>Store data using Options API</li>
+                                                <li>Display execution context information</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Summary -->
+                            <section>
+                                <h2>Summary</h2>
+                                <div class="architecture-concept">
+                                    <h3>Key Takeaways</h3>
+                                    <ul>
+                                        <li>Plugins extend WordPress through the hook system</li>
+                                        <li>Actions and filters are the foundation of plugin development</li>
+                                        <li>WordPress loads plugins in a specific order</li>
+                                        <li>Multiple APIs are available for different functionality</li>
+                                        <li>Security and performance must be considered from the start</li>
+                                        <li>Plugins should be modular and conflict-free</li>
+                                        <li>Understanding execution context is crucial</li>
+                                        <li>Following WordPress standards ensures compatibility</li>
+                                    </ul>
+                                </div>
+                            </section>
+
+                            <!-- Resources -->
+                            <section class="resources">
+                                <h2>Additional Resources</h2>
+                                <ul>
+                                    <li><a href="https://developer.wordpress.org/plugins/" target="_blank">WordPress Plugin Developer Handbook</a></li>
+                                    <li><a href="https://codex.wordpress.org/Plugin_API" target="_blank">Plugin API Documentation</a></li>
+                                    <li><a href="https://developer.wordpress.org/plugins/hooks/" target="_blank">Hooks Documentation</a></li>
+                                    <li><a href="https://developer.wordpress.org/reference/hooks/" target="_blank">Hook Reference</a></li>
+                                    <li><a href="https://developer.wordpress.org/apis/" target="_blank">WordPress APIs</a></li>
+                                    <li><a href="https://www.wordpress.org/plugins/developers/" target="_blank">Plugin Developer Resources</a></li>
+                                    <li><a href="https://github.com/WordPress/WordPress" target="_blank">WordPress Core Source Code</a></li>
+                                    <li><a href="https://make.wordpress.org/plugins/" target="_blank">Make WordPress Plugins</a></li>
+                                </ul>
+                            </section>
+                        </div>
+
+                        <!-- Lesson Navigation -->
+                        <div class="lesson-navigation">
+                            <a href="/module5.html" class="lesson-nav-button prev">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"/>
+                                </svg>
+                                <span>
+                                    <small>Previous Module</small><br>
+                                    Module 5: Theme Development
+                                </span>
+                            </a>
+                            
+                            <button class="complete-lesson-btn">
+                                Mark as Complete
+                            </button>
+                            
+                            <a href="/06module/types_wordpress_plugins.html" class="lesson-nav-button next">
+                                <span>
+                                    <small>Next</small><br>
+                                    Types of WordPress Plugins
+                                </span>
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="site-footer" role="contentinfo">
+            <div class="footer-container">
+                <div class="footer-content">
+                    <div class="footer-section footer-about">
+                        <h3>PHP WordPress Development</h3>
+                        <p>Complete Web Development Course</p>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Quick Links</h4>
+                        <ul class="footer-links">
+                            <li><a href="/">Home</a></li>
+                            <li><a href="/module6.html">Module 6</a></li>
+                            <li><a href="/resources.html">Resources</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Support</h4>
+                        <ul class="footer-links">
+                            <li><a href="/about.html">About</a></li>
+                            <li><a href="/contact.html">Contact</a></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="footer-bottom">
+                    <p>&copy; 2024 PHP WordPress Course. All rights reserved.</p>
+                    <p>This course material is for educational purposes only.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="/assets/js/prism.js"></script>
+    <script src="/assets/js/main.js"></script>
+    <script src="/assets/js/sidebar-toggle.js"></script>
+    <script src="/assets/js/progress-tracker.js"></script>
+    <script src="/assets/js/search.js"></script>
+    <script src="/assets/js/theme-toggle.js"></script>
+</body>
+</html>
