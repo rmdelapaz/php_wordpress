@@ -1,0 +1,1558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    
+    <!-- SEO Meta Tags -->
+    <title>Theme Security Best Practices - WordPress Theme Development - PHP WordPress Course</title>
+    <meta name="description" content="Learn essential security practices for WordPress theme development. Master data validation, sanitization, escaping, nonce implementation, and protection against common vulnerabilities.">
+    <meta name="keywords" content="PHP, WordPress, security, theme security, XSS, CSRF, SQL injection, data validation, sanitization, escaping">
+    <meta name="author" content="PHP WordPress Course">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/favicon.png">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-enhanced.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-toggle.css">
+    
+    <!-- Custom styles for security lesson -->
+    <style>
+        .security-header {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .security-concept {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .security-concept h3 {
+            color: #ef4444;
+            margin-top: 0;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 1rem;
+        }
+
+        .code-example {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+        }
+
+        .code-example h4 {
+            color: #a5b4fc;
+            margin-top: 0;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 0.5rem;
+        }
+
+        .vulnerability-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .vulnerability-card {
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+            border: 2px solid #ef4444;
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+
+        .vulnerability-card h4 {
+            color: #991b1b;
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .vulnerability-card .severity {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: white;
+        }
+
+        .severity.critical {
+            background: #991b1b;
+        }
+
+        .severity.high {
+            background: #dc2626;
+        }
+
+        .severity.medium {
+            background: #f59e0b;
+        }
+
+        .severity.low {
+            background: #3b82f6;
+        }
+
+        .security-functions-table {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 2rem 0;
+        }
+
+        .security-functions-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .security-functions-table th {
+            background: #f3f4f6;
+            padding: 1rem;
+            text-align: left;
+            font-weight: bold;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .security-functions-table td {
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .security-functions-table code {
+            background: #f3f4f6;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.875rem;
+            color: #ef4444;
+        }
+
+        .checklist-section {
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            border: 2px solid #22c55e;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .checklist-section h3 {
+            color: #166534;
+            margin-top: 0;
+        }
+
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+
+        .checklist li {
+            padding: 0.75rem 0;
+            padding-left: 2rem;
+            position: relative;
+            border-bottom: 1px solid #bbf7d0;
+        }
+
+        .checklist li:last-child {
+            border-bottom: none;
+        }
+
+        .checklist li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #22c55e;
+            font-weight: bold;
+            font-size: 1.25rem;
+        }
+
+        .security-tools {
+            background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+            border: 2px solid #0ea5e9;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .security-tools h3 {
+            color: #0369a1;
+            margin-top: 0;
+        }
+
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .tool-item {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid #0ea5e9;
+        }
+
+        .tool-item h4 {
+            color: #0369a1;
+            margin-top: 0;
+            font-size: 1rem;
+        }
+
+        .best-practice {
+            background: #f0f9ff;
+            border-left: 4px solid #0ea5e9;
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .best-practice h4 {
+            color: #0369a1;
+            margin-top: 0;
+        }
+
+        .warning-box {
+            background: #fef3c7;
+            border: 2px solid #fbbf24;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .warning-box::before {
+            content: "⚠️ Warning: ";
+            font-weight: bold;
+            color: #92400e;
+        }
+
+        .danger-box {
+            background: #fee2e2;
+            border: 2px solid #ef4444;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .danger-box::before {
+            content: "🚨 Danger: ";
+            font-weight: bold;
+            color: #991b1b;
+        }
+
+        .tip-box {
+            background: #f0fdf4;
+            border: 2px solid #86efac;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .tip-box::before {
+            content: "💡 Tip: ";
+            font-weight: bold;
+            color: #166534;
+        }
+
+        @media (max-width: 768px) {
+            .vulnerability-grid,
+            .tools-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Skip to main content -->
+    <a href="#main-content" class="sr-only">Skip to main content</a>
+    
+    <div class="page-wrapper">
+        <!-- Header -->
+        <header class="site-header" role="banner">
+            <div class="header-container">
+                <div class="site-branding">
+                    <a href="/" class="site-logo">
+                        <h1 class="site-title">PHP WordPress Development</h1>
+                    </a>
+                </div>
+                
+                <nav class="main-navigation" role="navigation" aria-label="Main navigation">
+                    <button class="mobile-menu-btn" aria-label="Toggle navigation" aria-expanded="false">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    
+                    <div class="nav-menu">
+                        <ul class="nav-list">
+                            <li class="nav-item"><a href="/" class="nav-link">Home</a></li>
+                            <li class="nav-item dropdown">
+                                <button class="nav-link dropdown-toggle active" aria-haspopup="true">Modules</button>
+                                <div class="dropdown-menu">
+                                    <a href="/module1.html" class="dropdown-item">Module 1: Web Fundamentals</a>
+                                    <a href="/module2.html" class="dropdown-item">Module 2: PHP Fundamentals</a>
+                                    <a href="/module3.html" class="dropdown-item">Module 3: MySQL Database</a>
+                                    <a href="/module4.html" class="dropdown-item">Module 4: WordPress & Docker</a>
+                                    <a href="/module5.html" class="dropdown-item active">Module 5: Theme Development</a>
+                                    <a href="/module6.html" class="dropdown-item">Module 6: Plugin Development</a>
+                                    <a href="/module7.html" class="dropdown-item">Module 7: Advanced WordPress</a>
+                                    <a href="/module8.html" class="dropdown-item">Module 8: Deployment</a>
+                                    <a href="/module9.html" class="dropdown-item">Module 9: Final Project</a>
+                                </div>
+                            </li>
+                            <li class="nav-item"><a href="/resources.html" class="nav-link">Resources</a></li>
+                            <li class="nav-item"><a href="/about.html" class="nav-link">About</a></li>
+                        </ul>
+                    </div>
+                </nav>
+                
+                <div class="search-container">
+                    <div class="search-input-wrapper">
+                        <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                        </svg>
+                        <input type="search" class="search-input" placeholder="Search lessons..." aria-label="Search">
+                    </div>
+                    <div class="search-results"></div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-header">
+                <h2 class="progress-title">Course Progress</h2>
+                <span class="progress-text">Loading...</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-bar-fill">
+                    <span class="progress-bar-text"></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Breadcrumb -->
+        <nav class="breadcrumb container" aria-label="Breadcrumb">
+            <ol class="breadcrumb-list">
+                <li class="breadcrumb-item">
+                    <a href="/">Home</a>
+                    <span class="breadcrumb-separator">/</span>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="/module5.html">Module 5</a>
+                    <span class="breadcrumb-separator">/</span>
+                </li>
+                <li class="breadcrumb-item">
+                    <span aria-current="page">Theme Security Best Practices</span>
+                </li>
+            </ol>
+        </nav>
+        
+        <!-- Main Content -->
+        <main id="main-content" class="main-content" role="main">
+            <div class="container">
+                <div class="content-with-sidebar">
+                    <!-- Sidebar -->
+                    <aside class="sidebar">
+                        <div class="sidebar-nav">
+                            <h3 class="sidebar-title">Module 5: Theme Development</h3>
+                            <div class="sidebar-section">
+                                <h4 class="sidebar-section-title">Session 9: Advanced Theme Features</h4>
+                                <ul class="sidebar-menu">
+                                    <li><a class="sidebar-link" href="/05module/theme_i18n.html">Theme Internationalization (i18n)</a></li>
+                                    <li><a class="sidebar-link" href="/05module/translation_ready_themes.html">Translation-ready Themes</a></li>
+                                    <li><a class="sidebar-link" href="/05module/accessibility_considerations.html">Accessibility Considerations</a></li>
+                                    <li><a class="sidebar-link" href="/05module/seo_best_practices.html">SEO Best Practices in Themes</a></li>
+                                    <li><a class="sidebar-link" href="/05module/schema_markup.html">Schema Markup</a></li>
+                                    <li class="active"><a class="sidebar-link active" href="/05module/theme_security.html">Theme Security Best Practices</a></li>
+                                    <li><a class="sidebar-link" href="/05module/theme_performance.html">Theme Performance Optimization</a></li>
+                                    <li><a class="sidebar-link" href="/05module/homework_advanced_features.html">Homework: Advanced Features</a></li>
+                                </ul>
+                            </div>
+                            <div class="sidebar-section">
+                                <h4 class="sidebar-section-title">Quick Links</h4>
+                                <ul class="sidebar-menu">
+                                    <li><a class="sidebar-link" href="/module5.html">Module Overview</a></li>
+                                    <li><a class="sidebar-link" href="/05module/schema_markup.html">← Previous Lesson</a></li>
+                                    <li><a class="sidebar-link next-session" href="/05module/theme_performance.html">Next Lesson →</a></li>
+                                    <li><a class="sidebar-link" href="/">← Course Home</a></li>
+                                    <li><a class="sidebar-link" href="/resources.html">Resources</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </aside>
+                    
+                    <!-- Main Lesson Content -->
+                    <article class="lesson-content">
+                        <div class="security-header">
+                            <h1>🔒 Theme Security Best Practices</h1>
+                            <p class="lead">Protect your WordPress themes from vulnerabilities</p>
+                            <p>Master validation, sanitization, escaping, and defense against attacks</p>
+                        </div>
+
+                        <!-- Learning Objectives -->
+                        <div class="lesson-objectives">
+                            <h2>Learning Objectives</h2>
+                            <ul>
+                                <li>Understand common WordPress security vulnerabilities</li>
+                                <li>Master data validation and sanitization</li>
+                                <li>Implement proper output escaping</li>
+                                <li>Use WordPress nonces for CSRF protection</li>
+                                <li>Prevent SQL injection attacks</li>
+                                <li>Secure file uploads and includes</li>
+                                <li>Implement proper user capability checks</li>
+                                <li>Follow security coding standards</li>
+                            </ul>
+                        </div>
+                        
+                        <!-- Lesson Body -->
+                        <div class="lesson-body">
+                            <!-- Introduction -->
+                            <section>
+                                <h2>Understanding WordPress Security</h2>
+                                <p class="lead">Security is not optional in WordPress theme development. A single vulnerability can compromise an entire website and its users' data.</p>
+                                
+                                <div class="security-concept">
+                                    <h3>The Security Mindset</h3>
+                                    <ul>
+                                        <li><strong>Never trust user input:</strong> Always validate and sanitize</li>
+                                        <li><strong>Escape late, escape often:</strong> Escape output right before display</li>
+                                        <li><strong>Principle of least privilege:</strong> Check capabilities before actions</li>
+                                        <li><strong>Defense in depth:</strong> Multiple layers of security</li>
+                                        <li><strong>Keep it simple:</strong> Complex code is harder to secure</li>
+                                    </ul>
+                                </div>
+
+                                <div class="alert alert-info">
+                                    <div class="alert-icon">💡</div>
+                                    <div class="alert-content">
+                                        <div class="alert-title">Key Principle</div>
+                                        <div class="alert-message">The golden rule of WordPress security: "Validate input, sanitize data, escape output, and verify nonces."</div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Common Vulnerabilities -->
+                            <section>
+                                <h2>Common WordPress Vulnerabilities</h2>
+                                
+                                <div class="vulnerability-grid">
+                                    <div class="vulnerability-card">
+                                        <h4>Cross-Site Scripting (XSS) <span class="severity critical">CRITICAL</span></h4>
+                                        <p>Malicious scripts injected into web pages</p>
+                                        <ul>
+                                            <li>Stored XSS in database</li>
+                                            <li>Reflected XSS in URLs</li>
+                                            <li>DOM-based XSS</li>
+                                        </ul>
+                                        <strong>Prevention:</strong> Escape all output
+                                    </div>
+
+                                    <div class="vulnerability-card">
+                                        <h4>SQL Injection <span class="severity critical">CRITICAL</span></h4>
+                                        <p>Malicious SQL queries executed on database</p>
+                                        <ul>
+                                            <li>Direct query manipulation</li>
+                                            <li>Second-order injection</li>
+                                            <li>Blind SQL injection</li>
+                                        </ul>
+                                        <strong>Prevention:</strong> Use prepared statements
+                                    </div>
+
+                                    <div class="vulnerability-card">
+                                        <h4>CSRF Attacks <span class="severity high">HIGH</span></h4>
+                                        <p>Forged requests from authenticated users</p>
+                                        <ul>
+                                            <li>State-changing operations</li>
+                                            <li>Admin actions</li>
+                                            <li>Form submissions</li>
+                                        </ul>
+                                        <strong>Prevention:</strong> Use WordPress nonces
+                                    </div>
+
+                                    <div class="vulnerability-card">
+                                        <h4>File Inclusion <span class="severity high">HIGH</span></h4>
+                                        <p>Unauthorized file access or execution</p>
+                                        <ul>
+                                            <li>Local file inclusion</li>
+                                            <li>Remote file inclusion</li>
+                                            <li>Directory traversal</li>
+                                        </ul>
+                                        <strong>Prevention:</strong> Validate file paths
+                                    </div>
+
+                                    <div class="vulnerability-card">
+                                        <h4>Privilege Escalation <span class="severity medium">MEDIUM</span></h4>
+                                        <p>Unauthorized access to admin functions</p>
+                                        <ul>
+                                            <li>Missing capability checks</li>
+                                            <li>Insecure direct references</li>
+                                            <li>Broken access control</li>
+                                        </ul>
+                                        <strong>Prevention:</strong> Check user capabilities
+                                    </div>
+
+                                    <div class="vulnerability-card">
+                                        <h4>Information Disclosure <span class="severity low">LOW</span></h4>
+                                        <p>Exposure of sensitive information</p>
+                                        <ul>
+                                            <li>Error messages</li>
+                                            <li>Debug information</li>
+                                            <li>Version numbers</li>
+                                        </ul>
+                                        <strong>Prevention:</strong> Disable debug in production
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Data Validation -->
+                            <section>
+                                <h2>Data Validation and Sanitization</h2>
+                                
+                                <div class="code-example">
+                                    <h4>Input Validation Functions</h4>
+                                    <pre><code class="language-php">&lt;?php
+/**
+ * Validate and sanitize different types of input
+ */
+
+// Text input validation
+$text = isset( $_POST['text_field'] ) ? sanitize_text_field( $_POST['text_field'] ) : '';
+
+// Email validation
+$email = isset( $_POST['email'] ) ? sanitize_email( $_POST['email'] ) : '';
+if ( ! is_email( $email ) ) {
+    wp_die( 'Invalid email address' );
+}
+
+// URL validation
+$url = isset( $_POST['url'] ) ? esc_url_raw( $_POST['url'] ) : '';
+if ( ! filter_var( $url, FILTER_VALIDATE_URL ) ) {
+    wp_die( 'Invalid URL' );
+}
+
+// Textarea with HTML
+$content = isset( $_POST['content'] ) ? wp_kses_post( $_POST['content'] ) : '';
+
+// Number validation
+$number = isset( $_POST['number'] ) ? absint( $_POST['number'] ) : 0;
+if ( $number < 1 || $number > 100 ) {
+    wp_die( 'Number must be between 1 and 100' );
+}
+
+// Array validation
+$options = isset( $_POST['options'] ) && is_array( $_POST['options'] ) 
+    ? array_map( 'sanitize_text_field', $_POST['options'] ) 
+    : array();
+
+// Boolean validation
+$checkbox = isset( $_POST['checkbox'] ) && $_POST['checkbox'] === '1';
+
+// Select dropdown validation
+$allowed_values = array( 'option1', 'option2', 'option3' );
+$selected = isset( $_POST['select'] ) && in_array( $_POST['select'], $allowed_values, true ) 
+    ? $_POST['select'] 
+    : 'option1';
+
+// File name validation
+$filename = isset( $_POST['filename'] ) ? sanitize_file_name( $_POST['filename'] ) : '';
+
+// SQL data validation
+$title = isset( $_POST['title'] ) ? sanitize_title( $_POST['title'] ) : '';
+
+// Key validation (alphanumeric + underscore/dash)
+$key = isset( $_POST['key'] ) ? sanitize_key( $_POST['key'] ) : '';
+
+// Custom validation function
+function validate_color_hex( $color ) {
+    $color = sanitize_hex_color( $color );
+    if ( empty( $color ) ) {
+        return '#000000'; // Default color
+    }
+    return $color;
+}
+
+// Date validation
+function validate_date( $date, $format = 'Y-m-d' ) {
+    $d = DateTime::createFromFormat( $format, $date );
+    return $d && $d->format( $format ) === $date ? $date : false;
+}
+
+// Phone number validation
+function validate_phone( $phone ) {
+    $phone = preg_replace( '/[^0-9+()-]/', '', $phone );
+    if ( strlen( $phone ) < 10 ) {
+        return false;
+    }
+    return $phone;
+}</code></pre>
+                                </div>
+
+                                <div class="security-functions-table">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Function</th>
+                                                <th>Purpose</th>
+                                                <th>Use Case</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><code>sanitize_text_field()</code></td>
+                                                <td>Strips tags, removes line breaks</td>
+                                                <td>Single line text inputs</td>
+                                            </tr>
+                                            <tr>
+                                                <td><code>sanitize_textarea_field()</code></td>
+                                                <td>Preserves line breaks</td>
+                                                <td>Multi-line text inputs</td>
+                                            </tr>
+                                            <tr>
+                                                <td><code>sanitize_email()</code></td>
+                                                <td>Strips illegal email characters</td>
+                                                <td>Email addresses</td>
+                                            </tr>
+                                            <tr>
+                                                <td><code>sanitize_url()</code></td>
+                                                <td>Cleans URL for database</td>
+                                                <td>URLs for storage</td>
+                                            </tr>
+                                            <tr>
+                                                <td><code>sanitize_file_name()</code></td>
+                                                <td>Removes special characters</td>
+                                                <td>File names</td>
+                                            </tr>
+                                            <tr>
+                                                <td><code>sanitize_html_class()</code></td>
+                                                <td>Sanitizes HTML class names</td>
+                                                <td>CSS classes</td>
+                                            </tr>
+                                            <tr>
+                                                <td><code>sanitize_key()</code></td>
+                                                <td>Lowercase alphanumeric</td>
+                                                <td>Database keys</td>
+                                            </tr>
+                                            <tr>
+                                                <td><code>sanitize_title()</code></td>
+                                                <td>Sanitizes for URLs</td>
+                                                <td>Post slugs</td>
+                                            </tr>
+                                            <tr>
+                                                <td><code>wp_kses_post()</code></td>
+                                                <td>Allows safe HTML</td>
+                                                <td>Post content</td>
+                                            </tr>
+                                            <tr>
+                                                <td><code>wp_kses()</code></td>
+                                                <td>Custom allowed HTML</td>
+                                                <td>Custom HTML filtering</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+
+                            <!-- Output Escaping -->
+                            <section>
+                                <h2>Output Escaping</h2>
+                                
+                                <div class="code-example">
+                                    <h4>Escaping Functions</h4>
+                                    <pre><code class="language-php">&lt;?php
+/**
+ * Always escape output before displaying
+ */
+
+// HTML escaping
+?&gt;
+&lt;h1&gt;&lt;?php echo esc_html( $title ); ?&gt;&lt;/h1&gt;
+&lt;p&gt;&lt;?php echo esc_html( $description ); ?&gt;&lt;/p&gt;
+
+&lt;!-- Attribute escaping --&gt;
+&lt;input type="text" value="&lt;?php echo esc_attr( $value ); ?&gt;" 
+       class="&lt;?php echo esc_attr( $class ); ?&gt;"
+       data-id="&lt;?php echo esc_attr( $id ); ?&gt;"&gt;
+
+&lt;!-- URL escaping --&gt;
+&lt;a href="&lt;?php echo esc_url( $link ); ?&gt;"&gt;Link&lt;/a&gt;
+&lt;img src="&lt;?php echo esc_url( $image_url ); ?&gt;" alt="&lt;?php echo esc_attr( $alt ); ?&gt;"&gt;
+
+&lt;!-- JavaScript escaping --&gt;
+&lt;script&gt;
+var data = &lt;?php echo wp_json_encode( $data ); ?&gt;;
+var message = '&lt;?php echo esc_js( $message ); ?&gt;';
+&lt;/script&gt;
+
+&lt;!-- Textarea escaping --&gt;
+&lt;textarea&gt;&lt;?php echo esc_textarea( $content ); ?&gt;&lt;/textarea&gt;
+
+&lt;?php
+// Translation with escaping
+echo esc_html__( 'Hello World', 'textdomain' );
+echo esc_attr__( 'Title attribute', 'textdomain' );
+echo esc_html_e( 'Echo translated', 'textdomain' );
+
+// Escaping with allowed HTML
+$allowed_html = array(
+    'a' => array(
+        'href' => array(),
+        'title' => array(),
+        'target' => array(),
+    ),
+    'br' => array(),
+    'em' => array(),
+    'strong' => array(),
+    'p' => array(
+        'class' => array(),
+    ),
+);
+echo wp_kses( $html_content, $allowed_html );
+
+// Complex escaping example
+function display_user_content( $content ) {
+    // Allow only specific HTML tags
+    $allowed_tags = array(
+        'p' => array(),
+        'br' => array(),
+        'strong' => array(),
+        'em' => array(),
+        'a' => array(
+            'href' => array(),
+            'title' => array(),
+        ),
+        'ul' => array(),
+        'ol' => array(),
+        'li' => array(),
+        'blockquote' => array(
+            'cite' => array(),
+        ),
+    );
+    
+    // Sanitize and escape
+    $content = wp_kses( $content, $allowed_tags );
+    
+    // Auto-paragraph
+    $content = wpautop( $content );
+    
+    // Convert URLs to links
+    $content = make_clickable( $content );
+    
+    return $content;
+}
+
+// Conditional escaping
+function output_link( $url, $text, $new_window = false ) {
+    if ( ! empty( $url ) ) {
+        $target = $new_window ? ' target="_blank" rel="noopener noreferrer"' : '';
+        printf(
+            '&lt;a href="%s"%s&gt;%s&lt;/a&gt;',
+            esc_url( $url ),
+            $target,
+            esc_html( $text )
+        );
+    }
+}</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Nonce Implementation -->
+                            <section>
+                                <h2>WordPress Nonces (CSRF Protection)</h2>
+                                
+                                <div class="code-example">
+                                    <h4>Implementing Nonces</h4>
+                                    <pre><code class="language-php">&lt;?php
+/**
+ * Form with nonce field
+ */
+?&gt;
+&lt;form method="post" action=""&gt;
+    &lt;?php wp_nonce_field( 'my_form_action', 'my_form_nonce' ); ?&gt;
+    &lt;input type="text" name="user_input" /&gt;
+    &lt;input type="submit" value="Submit" /&gt;
+&lt;/form&gt;
+
+&lt;?php
+/**
+ * Verify nonce on form submission
+ */
+if ( isset( $_POST['my_form_nonce'] ) ) {
+    if ( ! wp_verify_nonce( $_POST['my_form_nonce'], 'my_form_action' ) ) {
+        wp_die( 'Security check failed' );
+    }
+    
+    // Process form data
+    $user_input = sanitize_text_field( $_POST['user_input'] );
+    // ... handle the data
+}
+
+/**
+ * AJAX with nonce
+ */
+// In PHP - localize script
+wp_localize_script( 'my-script', 'my_ajax', array(
+    'ajax_url' => admin_url( 'admin-ajax.php' ),
+    'nonce' => wp_create_nonce( 'my_ajax_nonce' ),
+) );
+
+// AJAX handler
+add_action( 'wp_ajax_my_action', 'handle_ajax_request' );
+add_action( 'wp_ajax_nopriv_my_action', 'handle_ajax_request' );
+
+function handle_ajax_request() {
+    // Verify nonce
+    if ( ! check_ajax_referer( 'my_ajax_nonce', 'nonce', false ) ) {
+        wp_die( 'Security check failed' );
+    }
+    
+    // Process AJAX request
+    $data = sanitize_text_field( $_POST['data'] );
+    
+    wp_send_json_success( array(
+        'message' => 'Data processed successfully',
+        'data' => $data
+    ) );
+}
+
+/**
+ * URL with nonce
+ */
+$delete_url = wp_nonce_url( 
+    admin_url( 'admin.php?action=delete&id=' . $id ),
+    'delete_item_' . $id
+);
+
+// Verify URL nonce
+if ( isset( $_GET['action'] ) && $_GET['action'] === 'delete' ) {
+    $id = absint( $_GET['id'] );
+    
+    if ( ! wp_verify_nonce( $_GET['_wpnonce'], 'delete_item_' . $id ) ) {
+        wp_die( 'Security check failed' );
+    }
+    
+    // Delete item
+    delete_item( $id );
+}
+
+/**
+ * Custom nonce implementation
+ */
+class My_Theme_Security {
+    
+    /**
+     * Generate form with nonce
+     */
+    public static function form_open( $action = '', $method = 'post' ) {
+        $output = '&lt;form action="' . esc_url( $action ) . '" method="' . esc_attr( $method ) . '"&gt;';
+        $output .= wp_nonce_field( 'theme_form_' . $action, 'theme_nonce', true, false );
+        return $output;
+    }
+    
+    /**
+     * Verify form submission
+     */
+    public static function verify_form( $action ) {
+        if ( ! isset( $_POST['theme_nonce'] ) ) {
+            return false;
+        }
+        
+        return wp_verify_nonce( $_POST['theme_nonce'], 'theme_form_' . $action );
+    }
+}</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- SQL Injection Prevention -->
+                            <section>
+                                <h2>Preventing SQL Injection</h2>
+                                
+                                <div class="code-example">
+                                    <h4>Safe Database Queries</h4>
+                                    <pre><code class="language-php">&lt;?php
+/**
+ * NEVER do this - vulnerable to SQL injection
+ */
+// BAD - Direct query without escaping
+$results = $wpdb->get_results( 
+    "SELECT * FROM {$wpdb->posts} WHERE post_title = '{$_POST['title']}'"
+);
+
+/**
+ * ALWAYS use prepared statements
+ */
+global $wpdb;
+
+// GOOD - Using prepare()
+$title = $_POST['title'];
+$results = $wpdb->get_results(
+    $wpdb->prepare(
+        "SELECT * FROM {$wpdb->posts} WHERE post_title = %s",
+        $title
+    )
+);
+
+// Multiple placeholders
+$results = $wpdb->get_results(
+    $wpdb->prepare(
+        "SELECT * FROM {$wpdb->posts} 
+         WHERE post_title = %s 
+         AND post_status = %s 
+         AND ID > %d",
+        $title,
+        'publish',
+        100
+    )
+);
+
+// Insert with prepare
+$wpdb->insert(
+    $wpdb->prefix . 'my_table',
+    array(
+        'column1' => $value1,  // %s
+        'column2' => $value2,  // %d
+    ),
+    array( '%s', '%d' )  // Format types
+);
+
+// Update with prepare
+$wpdb->update(
+    $wpdb->prefix . 'my_table',
+    array( 'column1' => $new_value ),  // Data
+    array( 'ID' => $id ),              // Where
+    array( '%s' ),                     // Data format
+    array( '%d' )                      // Where format
+);
+
+// Safe LIKE queries
+$search = '%' . $wpdb->esc_like( $_POST['search'] ) . '%';
+$results = $wpdb->get_results(
+    $wpdb->prepare(
+        "SELECT * FROM {$wpdb->posts} WHERE post_title LIKE %s",
+        $search
+    )
+);
+
+// IN clause with multiple values
+$ids = array( 1, 2, 3, 4, 5 );
+$placeholders = array_fill( 0, count( $ids ), '%d' );
+$format = implode( ', ', $placeholders );
+
+$results = $wpdb->get_results(
+    $wpdb->prepare(
+        "SELECT * FROM {$wpdb->posts} WHERE ID IN ($format)",
+        ...$ids
+    )
+);
+
+/**
+ * Using WP_Query (automatically safe)
+ */
+$args = array(
+    'post_type' => 'post',
+    'meta_key' => 'custom_field',
+    'meta_value' => $_POST['value'],  // Automatically escaped
+    'posts_per_page' => 10,
+);
+$query = new WP_Query( $args );
+
+/**
+ * Custom safe query function
+ */
+function get_posts_by_meta( $meta_key, $meta_value ) {
+    global $wpdb;
+    
+    // Validate input
+    $meta_key = sanitize_key( $meta_key );
+    $meta_value = sanitize_text_field( $meta_value );
+    
+    // Prepare query
+    $query = $wpdb->prepare(
+        "SELECT p.* 
+         FROM {$wpdb->posts} p
+         INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+         WHERE pm.meta_key = %s 
+         AND pm.meta_value = %s
+         AND p.post_status = 'publish'",
+        $meta_key,
+        $meta_value
+    );
+    
+    return $wpdb->get_results( $query );
+}</code></pre>
+                                </div>
+
+                                <div class="danger-box">
+                                    Never concatenate user input directly into SQL queries. Always use $wpdb->prepare() or WordPress query functions.
+                                </div>
+                            </section>
+
+                            <!-- File Security -->
+                            <section>
+                                <h2>File Upload and Include Security</h2>
+                                
+                                <div class="code-example">
+                                    <h4>Secure File Handling</h4>
+                                    <pre><code class="language-php">&lt;?php
+/**
+ * Secure file uploads
+ */
+function handle_file_upload() {
+    // Check nonce
+    if ( ! wp_verify_nonce( $_POST['upload_nonce'], 'file_upload' ) ) {
+        wp_die( 'Security check failed' );
+    }
+    
+    // Check capabilities
+    if ( ! current_user_can( 'upload_files' ) ) {
+        wp_die( 'You do not have permission to upload files' );
+    }
+    
+    // Allowed file types
+    $allowed_types = array( 'jpg', 'jpeg', 'png', 'gif', 'pdf' );
+    
+    // Handle upload
+    if ( ! function_exists( 'wp_handle_upload' ) ) {
+        require_once( ABSPATH . 'wp-admin/includes/file.php' );
+    }
+    
+    $uploadedfile = $_FILES['file'];
+    $upload_overrides = array(
+        'test_form' => false,
+        'mimes' => array(
+            'jpg|jpeg|jpe' => 'image/jpeg',
+            'gif' => 'image/gif',
+            'png' => 'image/png',
+            'pdf' => 'application/pdf',
+        )
+    );
+    
+    $movefile = wp_handle_upload( $uploadedfile, $upload_overrides );
+    
+    if ( $movefile && ! isset( $movefile['error'] ) ) {
+        // File uploaded successfully
+        return $movefile;
+    } else {
+        wp_die( $movefile['error'] );
+    }
+}
+
+/**
+ * Secure file includes
+ */
+// NEVER do this
+include( $_GET['file'] ); // Vulnerable to LFI/RFI
+
+// Safe file include
+function safe_include_template( $template ) {
+    // Whitelist allowed templates
+    $allowed_templates = array(
+        'header',
+        'footer',
+        'sidebar',
+        'content'
+    );
+    
+    // Validate template name
+    if ( ! in_array( $template, $allowed_templates, true ) ) {
+        return false;
+    }
+    
+    // Build safe path
+    $file = get_template_directory() . '/partials/' . $template . '.php';
+    
+    // Check file exists and is readable
+    if ( file_exists( $file ) && is_readable( $file ) ) {
+        include( $file );
+        return true;
+    }
+    
+    return false;
+}
+
+/**
+ * Prevent direct file access
+ */
+// Add to top of PHP files
+if ( ! defined( 'ABSPATH' ) ) {
+    exit; // Exit if accessed directly
+}
+
+/**
+ * Secure file download
+ */
+function secure_file_download( $file_id ) {
+    // Verify nonce
+    if ( ! wp_verify_nonce( $_GET['download_nonce'], 'download_' . $file_id ) ) {
+        wp_die( 'Invalid download link' );
+    }
+    
+    // Check permissions
+    if ( ! current_user_can( 'read' ) ) {
+        wp_die( 'You do not have permission to download this file' );
+    }
+    
+    // Get file path from database
+    $file_path = get_post_meta( $file_id, 'file_path', true );
+    
+    // Validate file path
+    $upload_dir = wp_upload_dir();
+    $base_dir = $upload_dir['basedir'];
+    
+    // Ensure file is within uploads directory
+    $real_path = realpath( $base_dir . '/' . $file_path );
+    if ( strpos( $real_path, $base_dir ) !== 0 ) {
+        wp_die( 'Invalid file path' );
+    }
+    
+    // Check file exists
+    if ( ! file_exists( $real_path ) ) {
+        wp_die( 'File not found' );
+    }
+    
+    // Serve file
+    header( 'Content-Type: application/octet-stream' );
+    header( 'Content-Disposition: attachment; filename="' . basename( $real_path ) . '"' );
+    header( 'Content-Length: ' . filesize( $real_path ) );
+    readfile( $real_path );
+    exit;
+}</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Capability Checks -->
+                            <section>
+                                <h2>User Capability Checks</h2>
+                                
+                                <div class="code-example">
+                                    <h4>Proper Permission Verification</h4>
+                                    <pre><code class="language-php">&lt;?php
+/**
+ * Always check user capabilities before sensitive operations
+ */
+
+// Check if user can edit posts
+if ( current_user_can( 'edit_posts' ) ) {
+    // Show edit button
+    echo '&lt;a href="' . esc_url( $edit_link ) . '"&gt;Edit&lt;/a&gt;';
+}
+
+// Check specific post permission
+if ( current_user_can( 'edit_post', $post_id ) ) {
+    // User can edit this specific post
+}
+
+// Admin-only functionality
+if ( current_user_can( 'manage_options' ) ) {
+    // Show admin settings
+}
+
+// Check multiple capabilities
+if ( current_user_can( 'publish_posts' ) && current_user_can( 'upload_files' ) ) {
+    // Show advanced editor
+}
+
+/**
+ * Custom capability checks
+ */
+function my_theme_admin_page() {
+    // Check capability
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_die( __( 'You do not have sufficient permissions to access this page.' ) );
+    }
+    
+    // Display admin page
+}
+
+/**
+ * AJAX capability check
+ */
+add_action( 'wp_ajax_delete_item', 'ajax_delete_item' );
+function ajax_delete_item() {
+    // Check nonce
+    check_ajax_referer( 'delete_nonce', 'nonce' );
+    
+    // Check capability
+    if ( ! current_user_can( 'delete_posts' ) ) {
+        wp_send_json_error( 'Insufficient permissions' );
+    }
+    
+    $post_id = absint( $_POST['post_id'] );
+    
+    // Check specific post capability
+    if ( ! current_user_can( 'delete_post', $post_id ) ) {
+        wp_send_json_error( 'Cannot delete this post' );
+    }
+    
+    // Delete post
+    wp_delete_post( $post_id );
+    wp_send_json_success();
+}
+
+/**
+ * Role-based content
+ */
+function display_premium_content() {
+    // Check if user has specific role
+    $user = wp_get_current_user();
+    
+    if ( in_array( 'premium_member', (array) $user->roles ) ) {
+        // Show premium content
+        get_template_part( 'template-parts/premium', 'content' );
+    } else {
+        // Show upgrade message
+        get_template_part( 'template-parts/upgrade', 'message' );
+    }
+}
+
+/**
+ * Custom capability system
+ */
+class Theme_Capabilities {
+    
+    public static function init() {
+        add_action( 'init', array( __CLASS__, 'add_capabilities' ) );
+    }
+    
+    public static function add_capabilities() {
+        $role = get_role( 'editor' );
+        
+        // Add custom capability
+        $role->add_cap( 'edit_theme_options' );
+    }
+    
+    public static function check( $capability ) {
+        return current_user_can( $capability );
+    }
+}</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Security Headers -->
+                            <section>
+                                <h2>Security Headers and Configuration</h2>
+                                
+                                <div class="code-example">
+                                    <h4>Implementing Security Headers</h4>
+                                    <pre><code class="language-php">&lt;?php
+/**
+ * Add security headers
+ */
+function add_security_headers() {
+    // X-Frame-Options: Prevent clickjacking
+    header( 'X-Frame-Options: SAMEORIGIN' );
+    
+    // X-Content-Type-Options: Prevent MIME sniffing
+    header( 'X-Content-Type-Options: nosniff' );
+    
+    // X-XSS-Protection: Enable XSS filter
+    header( 'X-XSS-Protection: 1; mode=block' );
+    
+    // Referrer-Policy
+    header( 'Referrer-Policy: strict-origin-when-cross-origin' );
+    
+    // Content-Security-Policy
+    $csp = "default-src 'self'; ";
+    $csp .= "script-src 'self' 'unsafe-inline' https://ajax.googleapis.com; ";
+    $csp .= "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; ";
+    $csp .= "font-src 'self' https://fonts.gstatic.com; ";
+    $csp .= "img-src 'self' data: https:; ";
+    header( 'Content-Security-Policy: ' . $csp );
+}
+add_action( 'send_headers', 'add_security_headers' );
+
+/**
+ * Remove WordPress version
+ */
+remove_action( 'wp_head', 'wp_generator' );
+add_filter( 'the_generator', '__return_empty_string' );
+
+/**
+ * Disable XML-RPC
+ */
+add_filter( 'xmlrpc_enabled', '__return_false' );
+
+/**
+ * Disable file editing in admin
+ */
+define( 'DISALLOW_FILE_EDIT', true );
+
+/**
+ * Hide login errors
+ */
+function hide_login_errors() {
+    return 'Login failed. Please check your credentials.';
+}
+add_filter( 'login_errors', 'hide_login_errors' );
+
+/**
+ * Limit login attempts
+ */
+class Login_Security {
+    private $failed_login_limit = 5;
+    private $lockout_duration = 900; // 15 minutes
+    
+    public function __construct() {
+        add_action( 'wp_login_failed', array( $this, 'login_failed' ) );
+        add_filter( 'authenticate', array( $this, 'check_attempted_login' ), 30, 3 );
+    }
+    
+    public function login_failed( $username ) {
+        $ip = $_SERVER['REMOTE_ADDR'];
+        $attempts = get_transient( 'login_attempts_' . $ip );
+        
+        if ( $attempts ) {
+            $attempts++;
+        } else {
+            $attempts = 1;
+        }
+        
+        set_transient( 'login_attempts_' . $ip, $attempts, $this->lockout_duration );
+    }
+    
+    public function check_attempted_login( $user, $username, $password ) {
+        $ip = $_SERVER['REMOTE_ADDR'];
+        $attempts = get_transient( 'login_attempts_' . $ip );
+        
+        if ( $attempts >= $this->failed_login_limit ) {
+            return new WP_Error( 'too_many_attempts', 
+                'Too many failed login attempts. Please try again later.' );
+        }
+        
+        return $user;
+    }
+}
+new Login_Security();</code></pre>
+                                </div>
+                            </section>
+
+                            <!-- Security Checklist -->
+                            <section>
+                                <div class="checklist-section">
+                                    <h3>WordPress Theme Security Checklist</h3>
+                                    
+                                    <ul class="checklist">
+                                        <li>Validate all user input</li>
+                                        <li>Sanitize data before saving to database</li>
+                                        <li>Escape all output</li>
+                                        <li>Use nonces for forms and AJAX</li>
+                                        <li>Use prepared statements for database queries</li>
+                                        <li>Check user capabilities before actions</li>
+                                        <li>Validate file uploads and types</li>
+                                        <li>Prevent direct file access</li>
+                                        <li>Implement security headers</li>
+                                        <li>Remove WordPress version numbers</li>
+                                        <li>Disable XML-RPC if not needed</li>
+                                        <li>Disable file editing in admin</li>
+                                        <li>Use HTTPS everywhere</li>
+                                        <li>Keep WordPress and plugins updated</li>
+                                        <li>Use strong passwords</li>
+                                        <li>Limit login attempts</li>
+                                        <li>Regular security audits</li>
+                                        <li>Backup regularly</li>
+                                        <li>Monitor for suspicious activity</li>
+                                        <li>Follow WordPress coding standards</li>
+                                    </ul>
+                                </div>
+                            </section>
+
+                            <!-- Security Tools -->
+                            <section>
+                                <div class="security-tools">
+                                    <h3>Security Testing Tools</h3>
+                                    
+                                    <div class="tools-grid">
+                                        <div class="tool-item">
+                                            <h4>WPScan</h4>
+                                            <p>WordPress vulnerability scanner</p>
+                                        </div>
+                                        
+                                        <div class="tool-item">
+                                            <h4>Sucuri SiteCheck</h4>
+                                            <p>Free website security scanner</p>
+                                        </div>
+                                        
+                                        <div class="tool-item">
+                                            <h4>Theme Check Plugin</h4>
+                                            <p>WordPress theme testing tool</p>
+                                        </div>
+                                        
+                                        <div class="tool-item">
+                                            <h4>Query Monitor</h4>
+                                            <p>Developer tools panel</p>
+                                        </div>
+                                        
+                                        <div class="tool-item">
+                                            <h4>OWASP ZAP</h4>
+                                            <p>Web application security scanner</p>
+                                        </div>
+                                        
+                                        <div class="tool-item">
+                                            <h4>Wordfence</h4>
+                                            <p>WordPress security plugin</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Best Practices -->
+                            <section>
+                                <h2>Best Practices</h2>
+                                
+                                <div class="best-practice">
+                                    <h4>Security Development Best Practices</h4>
+                                    <ul>
+                                        <li><strong>Principle of least privilege:</strong> Give minimum necessary permissions</li>
+                                        <li><strong>Defense in depth:</strong> Multiple layers of security</li>
+                                        <li><strong>Fail securely:</strong> Handle errors without exposing information</li>
+                                        <li><strong>Don't trust user input:</strong> Always validate and sanitize</li>
+                                        <li><strong>Keep it simple:</strong> Complex code is harder to secure</li>
+                                        <li><strong>Regular updates:</strong> Keep everything up to date</li>
+                                        <li><strong>Code reviews:</strong> Have others review security-critical code</li>
+                                        <li><strong>Security testing:</strong> Regular penetration testing</li>
+                                        <li><strong>Monitoring:</strong> Log and monitor suspicious activity</li>
+                                        <li><strong>Documentation:</strong> Document security measures</li>
+                                    </ul>
+                                </div>
+
+                                <div class="warning-box">
+                                    Never store sensitive information like API keys, passwords, or credentials in theme files. Use wp-config.php or environment variables instead.
+                                </div>
+
+                                <div class="tip-box">
+                                    Use the WordPress VIP coding standards for enterprise-level security practices. They provide stricter security guidelines than standard WordPress themes.
+                                </div>
+                            </section>
+
+                            <!-- Practice Exercise -->
+                            <section>
+                                <h2>Practice Exercise</h2>
+                                <div class="alert alert-success">
+                                    <div class="alert-icon">💻</div>
+                                    <div class="alert-content">
+                                        <div class="alert-title">Secure Your Theme</div>
+                                        <div class="alert-message">
+                                            <p>Implement comprehensive security in your theme:</p>
+                                            <ol>
+                                                <li>Audit all user input points</li>
+                                                <li>Add validation to all forms</li>
+                                                <li>Implement sanitization for data storage</li>
+                                                <li>Add escaping to all output</li>
+                                                <li>Implement nonces for all forms</li>
+                                                <li>Add capability checks</li>
+                                                <li>Secure all database queries</li>
+                                                <li>Add security headers</li>
+                                                <li>Test with security scanner</li>
+                                                <li>Fix all security issues found</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Resources -->
+                            <section class="resources">
+                                <h2>Additional Resources</h2>
+                                <ul>
+                                    <li><a href="https://developer.wordpress.org/themes/theme-security/" target="_blank">WordPress Theme Security Handbook</a></li>
+                                    <li><a href="https://www.wordfence.com/learn/" target="_blank">Wordfence Learning Center</a></li>
+                                    <li><a href="https://owasp.org/www-project-top-ten/" target="_blank">OWASP Top 10</a></li>
+                                    <li><a href="https://sucuri.net/guides/wordpress-security/" target="_blank">Sucuri WordPress Security Guide</a></li>
+                                    <li><a href="https://www.wpscan.org/" target="_blank">WPScan Vulnerability Database</a></li>
+                                    <li><a href="https://codex.wordpress.org/Data_Validation" target="_blank">WordPress Data Validation</a></li>
+                                    <li><a href="https://vip.wordpress.com/documentation/vip-go/code-review-blockers-warnings-notices/" target="_blank">WordPress VIP Coding Standards</a></li>
+                                    <li><a href="https://www.php.net/manual/en/security.php" target="_blank">PHP Security Manual</a></li>
+                                </ul>
+                            </section>
+                        </div>
+
+                        <!-- Lesson Navigation -->
+                        <div class="lesson-navigation">
+                            <a href="/05module/schema_markup.html" class="lesson-nav-button prev">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"/>
+                                </svg>
+                                <span>
+                                    <small>Previous</small><br>
+                                    Schema Markup
+                                </span>
+                            </a>
+                            
+                            <button class="complete-lesson-btn">
+                                Mark as Complete
+                            </button>
+                            
+                            <a href="/05module/theme_performance.html" class="lesson-nav-button next">
+                                <span>
+                                    <small>Next</small><br>
+                                    Theme Performance Optimization
+                                </span>
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="site-footer" role="contentinfo">
+            <div class="footer-container">
+                <div class="footer-content">
+                    <div class="footer-section footer-about">
+                        <h3>PHP WordPress Development</h3>
+                        <p>Complete Web Development Course</p>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Quick Links</h4>
+                        <ul class="footer-links">
+                            <li><a href="/">Home</a></li>
+                            <li><a href="/module5.html">Module 5</a></li>
+                            <li><a href="/resources.html">Resources</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Support</h4>
+                        <ul class="footer-links">
+                            <li><a href="/about.html">About</a></li>
+                            <li><a href="/contact.html">Contact</a></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="footer-bottom">
+                    <p>&copy; 2024 PHP WordPress Course. All rights reserved.</p>
+                    <p>This course material is for educational purposes only.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="/assets/js/prism.js"></script>
+    <script src="/assets/js/main.js"></script>
+    <script src="/assets/js/sidebar-toggle.js"></script>
+    <script src="/assets/js/progress-tracker.js"></script>
+    <script src="/assets/js/search.js"></script>
+    <script src="/assets/js/theme-toggle.js"></script>
+</body>
+</html>
