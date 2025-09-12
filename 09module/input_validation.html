@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Input Validation & Sanitization - WordPress Security</title>
+    <meta name="description" content="Learn how to validate and sanitize user input in WordPress plugins. Prevent security vulnerabilities with proper data handling.">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-enhanced.css">
+    <style>
+        .validation-header {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .validation-section {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+        .code-example {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <header class="site-header">
+            <div class="header-container">
+                <div class="site-branding">
+                    <a href="/" class="site-logo">
+                        <h1 class="site-title">PHP WordPress Development</h1>
+                    </a>
+                </div>
+            </div>
+        </header>
+        
+        <nav class="breadcrumb container">
+            <ol class="breadcrumb-list">
+                <li class="breadcrumb-item"><a href="/">Home</a> /</li>
+                <li class="breadcrumb-item"><a href="/module6.html">Module 6</a> /</li>
+                <li class="breadcrumb-item">Input Validation & Sanitization</li>
+            </ol>
+        </nav>
+        
+        <main class="main-content">
+            <div class="container">
+                <div class="content-with-sidebar">
+                    <aside class="sidebar">
+                        <div class="sidebar-nav">
+                            <h3 class="sidebar-title">Session 9: Security & Performance</h3>
+                            <ul class="sidebar-menu">
+                                <li><a href="/09module/security_principles.html">Security Principles</a></li>
+                                <li class="active"><a href="/09module/input_validation.html">Input Validation & Sanitization</a></li>
+                                <li><a href="/09module/capability_checks.html">Capability Checks & Permissions</a></li>
+                                <li><a href="/09module/data_encryption.html">Data Encryption</a></li>
+                                <li><a href="/09module/preventing_attacks.html">Preventing Common Attacks</a></li>
+                                <li><a href="/09module/performance_optimization.html">Performance Optimization</a></li>
+                                <li><a href="/09module/caching_strategies.html">Caching Strategies</a></li>
+                                <li><a href="/09module/homework_security_audit.html">Homework: Security Audit</a></li>
+                            </ul>
+                        </div>
+                    </aside>
+                    
+                    <article class="lesson-content">
+                        <div class="validation-header">
+                            <h1>🛡️ Input Validation & Sanitization</h1>
+                            <p class="lead">Secure your plugin by properly handling user input</p>
+                        </div>
+
+                        <div class="lesson-objectives">
+                            <h2>Learning Objectives</h2>
+                            <ul>
+                                <li>Understand validation vs sanitization</li>
+                                <li>Learn WordPress validation functions</li>
+                                <li>Master sanitization techniques</li>
+                                <li>Implement proper data escaping</li>
+                                <li>Handle different data types</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="lesson-body">
+                            <section>
+                                <h2>Validation vs Sanitization vs Escaping</h2>
+                                <div class="validation-section">
+                                    <h3>The Three Pillars of Data Security</h3>
+                                    <ul>
+                                        <li><strong>Validation:</strong> Check if data meets requirements (reject bad data)</li>
+                                        <li><strong>Sanitization:</strong> Clean data to make it safe (modify data)</li>
+                                        <li><strong>Escaping:</strong> Prepare data for safe output (context-specific)</li>
+                                    </ul>
+                                    
+                                    <div class="code-example">
+                                        <pre><code>// Validation - Check if valid
+if (!is_email($_POST['email'])) {
+    wp_die('Invalid email address');
+}
+
+// Sanitization - Make safe
+$email = sanitize_email($_POST['email']);
+
+// Escaping - Safe output
+echo esc_html($email);</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>WordPress Validation Functions</h2>
+                                <div class="validation-section">
+                                    <h3>Common Validation Functions</h3>
+                                    <div class="code-example">
+                                        <pre><code>// Email validation
+if (is_email($email)) {
+    // Valid email
+}
+
+// URL validation
+if (wp_http_validate_url($url)) {
+    // Valid URL
+}
+
+// Numeric validation
+if (is_numeric($value)) {
+    // Is a number
+}
+
+// Array validation
+if (is_array($data) && !empty($data)) {
+    // Valid non-empty array
+}
+
+// Custom validation
+function validate_phone($phone) {
+    return preg_match('/^[0-9]{3}-[0-9]{3}-[0-9]{4}$/', $phone);
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Sanitization Functions</h2>
+                                <div class="validation-section">
+                                    <h3>WordPress Sanitization API</h3>
+                                    <div class="code-example">
+                                        <pre><code>// Text fields
+$text = sanitize_text_field($_POST['text']);
+
+// Textarea
+$content = sanitize_textarea_field($_POST['content']);
+
+// Email
+$email = sanitize_email($_POST['email']);
+
+// URL
+$url = sanitize_url($_POST['url']);
+
+// File name
+$filename = sanitize_file_name($_FILES['upload']['name']);
+
+// HTML content
+$html = wp_kses_post($_POST['html_content']);
+
+// Custom HTML
+$allowed_html = array(
+    'a' => array(
+        'href' => array(),
+        'title' => array()
+    ),
+    'br' => array(),
+    'em' => array(),
+    'strong' => array()
+);
+$custom_html = wp_kses($_POST['custom_html'], $allowed_html);
+
+// SQL
+global $wpdb;
+$safe_sql = $wpdb->prepare("SELECT * FROM table WHERE id = %d", $id);</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Escaping Functions</h2>
+                                <div class="validation-section">
+                                    <h3>Context-Specific Escaping</h3>
+                                    <div class="code-example">
+                                        <pre><code>// HTML context
+echo esc_html($user_input);
+
+// Attribute context
+echo '<input value="' . esc_attr($value) . '">';
+
+// URL context
+echo '<a href="' . esc_url($url) . '">Link</a>';
+
+// JavaScript context
+echo '<script>var data = "' . esc_js($data) . '";</script>';
+
+// Textarea
+echo '<textarea>' . esc_textarea($content) . '</textarea>';
+
+// SQL context
+$safe_query = esc_sql($query);</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Complete Form Handling Example</h2>
+                                <div class="validation-section">
+                                    <h3>Secure Form Processing</h3>
+                                    <div class="code-example">
+                                        <pre><code>class Secure_Form_Handler {
+    
+    public function process_form() {
+        // Check nonce
+        if (!wp_verify_nonce($_POST['form_nonce'], 'my_form')) {
+            wp_die('Security check failed');
+        }
+        
+        // Validate required fields
+        $errors = array();
+        
+        if (empty($_POST['name'])) {
+            $errors[] = 'Name is required';
+        }
+        
+        if (!is_email($_POST['email'])) {
+            $errors[] = 'Valid email is required';
+        }
+        
+        if (!empty($errors)) {
+            return array('success' => false, 'errors' => $errors);
+        }
+        
+        // Sanitize data
+        $data = array(
+            'name' => sanitize_text_field($_POST['name']),
+            'email' => sanitize_email($_POST['email']),
+            'message' => sanitize_textarea_field($_POST['message']),
+            'website' => sanitize_url($_POST['website']),
+            'age' => absint($_POST['age'])
+        );
+        
+        // Save to database
+        global $wpdb;
+        $result = $wpdb->insert(
+            $wpdb->prefix . 'form_submissions',
+            $data,
+            array('%s', '%s', '%s', '%s', '%d')
+        );
+        
+        return array('success' => true);
+    }
+    
+    public function display_form() {
+        ?>
+        <form method="post">
+            <?php wp_nonce_field('my_form', 'form_nonce'); ?>
+            
+            <input type="text" 
+                   name="name" 
+                   value="<?php echo esc_attr($_POST['name'] ?? ''); ?>">
+            
+            <input type="email" 
+                   name="email" 
+                   value="<?php echo esc_attr($_POST['email'] ?? ''); ?>">
+            
+            <textarea name="message"><?php 
+                echo esc_textarea($_POST['message'] ?? ''); 
+            ?></textarea>
+            
+            <input type="submit" value="Submit">
+        </form>
+        <?php
+    }
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Best Practices</h2>
+                                <ul>
+                                    <li>Always validate on the server side</li>
+                                    <li>Sanitize as early as possible</li>
+                                    <li>Escape as late as possible</li>
+                                    <li>Use WordPress functions when available</li>
+                                    <li>Never trust user input</li>
+                                    <li>Validate data type and format</li>
+                                    <li>Set reasonable limits on input length</li>
+                                    <li>Use whitelisting over blacklisting</li>
+                                </ul>
+                            </section>
+
+                            <section class="resources">
+                                <h2>Resources</h2>
+                                <ul>
+                                    <li><a href="https://developer.wordpress.org/plugins/security/data-validation/">Data Validation</a></li>
+                                    <li><a href="https://developer.wordpress.org/plugins/security/securing-input/">Securing Input</a></li>
+                                    <li><a href="https://developer.wordpress.org/plugins/security/securing-output/">Securing Output</a></li>
+                                </ul>
+                            </section>
+                        </div>
+
+                        <div class="lesson-navigation">
+                            <a href="/09module/security_principles.html" class="lesson-nav-button prev">Previous: Security Principles</a>
+                            <button class="complete-lesson-btn">Mark as Complete</button>
+                            <a href="/09module/capability_checks.html" class="lesson-nav-button next">Next: Capability Checks</a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </main>
+
+        <footer class="site-footer">
+            <div class="footer-container">
+                <p>&copy; 2024 PHP WordPress Course. All rights reserved.</p>
+            </div>
+        </footer>
+    </div>
+    
+    <script src="/assets/js/main.js"></script>
+    <script src="/assets/js/progress-tracker.js"></script>
+</body>
+</html>

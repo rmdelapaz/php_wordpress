@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Encryption - WordPress Security</title>
+    <meta name="description" content="Learn how to encrypt sensitive data in WordPress plugins. Implement secure data storage and transmission.">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-enhanced.css">
+    <style>
+        .encryption-header {
+            background: linear-gradient(135deg, #ec4899 0%, #be185d 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .encryption-section {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+        .code-example {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <header class="site-header">
+            <div class="header-container">
+                <div class="site-branding">
+                    <a href="/" class="site-logo">
+                        <h1 class="site-title">PHP WordPress Development</h1>
+                    </a>
+                </div>
+            </div>
+        </header>
+        
+        <nav class="breadcrumb container">
+            <ol class="breadcrumb-list">
+                <li class="breadcrumb-item"><a href="/">Home</a> /</li>
+                <li class="breadcrumb-item"><a href="/module6.html">Module 6</a> /</li>
+                <li class="breadcrumb-item">Data Encryption</li>
+            </ol>
+        </nav>
+        
+        <main class="main-content">
+            <div class="container">
+                <div class="content-with-sidebar">
+                    <aside class="sidebar">
+                        <div class="sidebar-nav">
+                            <h3 class="sidebar-title">Session 9: Security & Performance</h3>
+                            <ul class="sidebar-menu">
+                                <li><a href="/09module/security_principles.html">Security Principles</a></li>
+                                <li><a href="/09module/input_validation.html">Input Validation & Sanitization</a></li>
+                                <li><a href="/09module/capability_checks.html">Capability Checks & Permissions</a></li>
+                                <li class="active"><a href="/09module/data_encryption.html">Data Encryption</a></li>
+                                <li><a href="/09module/preventing_attacks.html">Preventing Common Attacks</a></li>
+                                <li><a href="/09module/performance_optimization.html">Performance Optimization</a></li>
+                                <li><a href="/09module/caching_strategies.html">Caching Strategies</a></li>
+                                <li><a href="/09module/homework_security_audit.html">Homework: Security Audit</a></li>
+                            </ul>
+                        </div>
+                    </aside>
+                    
+                    <article class="lesson-content">
+                        <div class="encryption-header">
+                            <h1>🔐 Data Encryption</h1>
+                            <p class="lead">Protect sensitive data with encryption</p>
+                        </div>
+
+                        <div class="lesson-objectives">
+                            <h2>Learning Objectives</h2>
+                            <ul>
+                                <li>Understand encryption basics</li>
+                                <li>Use WordPress salts and keys</li>
+                                <li>Implement password hashing</li>
+                                <li>Encrypt sensitive data</li>
+                                <li>Secure API keys and credentials</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="lesson-body">
+                            <section>
+                                <h2>WordPress Security Keys & Salts</h2>
+                                <div class="encryption-section">
+                                    <h3>Using WordPress Constants</h3>
+                                    <div class="code-example">
+                                        <pre><code>// WordPress security keys in wp-config.php
+define('AUTH_KEY',         'unique-phrase-here');
+define('SECURE_AUTH_KEY',  'unique-phrase-here');
+define('LOGGED_IN_KEY',    'unique-phrase-here');
+define('NONCE_KEY',        'unique-phrase-here');
+define('AUTH_SALT',        'unique-phrase-here');
+define('SECURE_AUTH_SALT', 'unique-phrase-here');
+define('LOGGED_IN_SALT',   'unique-phrase-here');
+define('NONCE_SALT',       'unique-phrase-here');
+
+// Using salts in your plugin
+$salt = wp_salt('auth');
+$hashed = hash_hmac('sha256', $data, $salt);</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Password Hashing</h2>
+                                <div class="encryption-section">
+                                    <h3>WordPress Password Functions</h3>
+                                    <div class="code-example">
+                                        <pre><code>// Hash a password
+$password = 'user_password';
+$hash = wp_hash_password($password);
+
+// Verify password
+if (wp_check_password($password, $hash, $user_id)) {
+    // Password is correct
+}
+
+// Generate random password
+$random_password = wp_generate_password(12, true, true);
+
+// Set user password
+wp_set_password($new_password, $user_id);</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Encrypting Sensitive Data</h2>
+                                <div class="encryption-section">
+                                    <h3>Two-Way Encryption</h3>
+                                    <div class="code-example">
+                                        <pre><code>class Data_Encryptor {
+    private $key;
+    private $cipher = 'AES-256-CBC';
+    
+    public function __construct() {
+        $this->key = substr(hash('sha256', wp_salt('secure_auth')), 0, 32);
+    }
+    
+    public function encrypt($data) {
+        $iv = openssl_random_pseudo_bytes(16);
+        $encrypted = openssl_encrypt(
+            $data, 
+            $this->cipher, 
+            $this->key, 
+            0, 
+            $iv
+        );
+        return base64_encode($encrypted . '::' . $iv);
+    }
+    
+    public function decrypt($data) {
+        list($encrypted_data, $iv) = explode('::', base64_decode($data), 2);
+        return openssl_decrypt(
+            $encrypted_data, 
+            $this->cipher, 
+            $this->key, 
+            0, 
+            $iv
+        );
+    }
+}
+
+// Usage
+$encryptor = new Data_Encryptor();
+$encrypted = $encryptor->encrypt('sensitive data');
+$decrypted = $encryptor->decrypt($encrypted);</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Securing API Keys</h2>
+                                <div class="encryption-section">
+                                    <h3>Storing API Credentials</h3>
+                                    <div class="code-example">
+                                        <pre><code>// Store encrypted API key
+function store_api_key($key) {
+    $encryptor = new Data_Encryptor();
+    $encrypted = $encryptor->encrypt($key);
+    update_option('my_plugin_api_key', $encrypted);
+}
+
+// Retrieve and decrypt API key
+function get_api_key() {
+    $encrypted = get_option('my_plugin_api_key');
+    if ($encrypted) {
+        $encryptor = new Data_Encryptor();
+        return $encryptor->decrypt($encrypted);
+    }
+    return false;
+}
+
+// Use environment variables (better)
+$api_key = $_ENV['MY_API_KEY'] ?? get_api_key();</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Token Generation</h2>
+                                <div class="encryption-section">
+                                    <h3>Secure Token Creation</h3>
+                                    <div class="code-example">
+                                        <pre><code>// Generate secure token
+function generate_secure_token($length = 32) {
+    return bin2hex(random_bytes($length / 2));
+}
+
+// Time-limited token
+function generate_time_token($user_id, $action) {
+    $time = time();
+    $data = $user_id . '|' . $action . '|' . $time;
+    $hash = hash_hmac('sha256', $data, wp_salt());
+    return base64_encode($data . '|' . $hash);
+}
+
+// Verify time-limited token
+function verify_time_token($token, $max_age = 3600) {
+    $decoded = base64_decode($token);
+    list($user_id, $action, $time, $hash) = explode('|', $decoded);
+    
+    // Check expiration
+    if (time() - $time > $max_age) {
+        return false;
+    }
+    
+    // Verify hash
+    $data = $user_id . '|' . $action . '|' . $time;
+    $expected = hash_hmac('sha256', $data, wp_salt());
+    
+    return hash_equals($expected, $hash);
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Best Practices</h2>
+                                <ul>
+                                    <li>Never store passwords in plain text</li>
+                                    <li>Use WordPress built-in functions when available</li>
+                                    <li>Keep encryption keys secure</li>
+                                    <li>Use HTTPS for data transmission</li>
+                                    <li>Implement proper key rotation</li>
+                                    <li>Don't roll your own crypto</li>
+                                    <li>Use environment variables for sensitive config</li>
+                                </ul>
+                            </section>
+
+                            <section class="resources">
+                                <h2>Resources</h2>
+                                <ul>
+                                    <li><a href="https://developer.wordpress.org/plugins/security/securing-data/">Securing Data</a></li>
+                                    <li><a href="https://www.php.net/manual/en/book.openssl.php">PHP OpenSSL</a></li>
+                                </ul>
+                            </section>
+                        </div>
+
+                        <div class="lesson-navigation">
+                            <a href="/09module/capability_checks.html" class="lesson-nav-button prev">Previous: Capability Checks</a>
+                            <button class="complete-lesson-btn">Mark as Complete</button>
+                            <a href="/09module/preventing_attacks.html" class="lesson-nav-button next">Next: Preventing Attacks</a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </main>
+
+        <footer class="site-footer">
+            <div class="footer-container">
+                <p>&copy; 2024 PHP WordPress Course. All rights reserved.</p>
+            </div>
+        </footer>
+    </div>
+    
+    <script src="/assets/js/main.js"></script>
+    <script src="/assets/js/progress-tracker.js"></script>
+</body>
+</html>

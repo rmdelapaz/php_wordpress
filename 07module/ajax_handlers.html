@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    
+    <!-- SEO Meta Tags -->
+    <title>Setting up AJAX Handlers - PHP WordPress Course</title>
+    <meta name="description" content="Learn how to properly set up AJAX handlers in WordPress. Master server-side AJAX processing, response handling, and best practices.">
+    <meta name="keywords" content="PHP, WordPress, AJAX handlers, admin-ajax, wp_ajax, plugin development">
+    <meta name="author" content="PHP WordPress Course">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/favicon.png">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-enhanced.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-toggle.css">
+    
+    <!-- Custom styles for this lesson -->
+    <style>
+        .handlers-header {
+            background: linear-gradient(135deg, #f97316 0%, #ef4444 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .handler-concept {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .handler-concept h3 {
+            color: #f97316;
+            margin-top: 0;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 1rem;
+        }
+
+        .code-example {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+        }
+
+        .code-example pre {
+            margin: 0;
+            white-space: pre-wrap;
+        }
+
+        .handler-flow {
+            background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
+            border: 2px solid #f59e0b;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .flow-step {
+            display: flex;
+            align-items: center;
+            margin: 1rem 0;
+            padding: 1rem;
+            background: white;
+            border-radius: 6px;
+        }
+
+        .flow-number {
+            background: #f59e0b;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 1rem;
+        }
+
+        .handler-structure {
+            background: #f9fafb;
+            border: 2px solid #d1d5db;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .structure-item {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 1rem;
+            margin: 0.5rem 0;
+        }
+
+        .structure-item h5 {
+            color: #ef4444;
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+        }
+
+        .tip-box {
+            background: #f0fdf4;
+            border: 2px solid #10b981;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .warning-box {
+            background: #fef3c7;
+            border: 2px solid #fbbf24;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .error-box {
+            background: #fee2e2;
+            border: 2px solid #ef4444;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .response-types {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .response-card {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .response-card h5 {
+            color: #f97316;
+            margin-top: 0;
+        }
+
+        .response-card code {
+            display: block;
+            background: #f3f4f6;
+            padding: 0.5rem;
+            border-radius: 4px;
+            margin-top: 0.5rem;
+        }
+
+        .security-checklist {
+            background: white;
+            border: 2px solid #ef4444;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .checklist-item {
+            display: flex;
+            align-items: flex-start;
+            margin: 0.75rem 0;
+        }
+
+        .checklist-item input[type="checkbox"] {
+            margin-right: 0.75rem;
+            margin-top: 0.25rem;
+        }
+
+        .example-tabs {
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 2rem 0;
+        }
+
+        .tab-buttons {
+            display: flex;
+            background: #f3f4f6;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 1rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            color: #6b7280;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .tab-button.active {
+            background: white;
+            color: #f97316;
+            border-bottom: 2px solid #f97316;
+            margin-bottom: -2px;
+        }
+
+        .tab-content {
+            padding: 1.5rem;
+            background: white;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        .handler-methods {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 2rem 0;
+        }
+
+        .method-header {
+            background: #f97316;
+            color: white;
+            padding: 1rem;
+            font-weight: 600;
+        }
+
+        .method-content {
+            padding: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Skip to main content -->
+    <a href="#main-content" class="sr-only">Skip to main content</a>
+    
+    <div class="page-wrapper">
+        <!-- Header -->
+        <header class="site-header" role="banner">
+            <div class="header-container">
+                <div class="site-branding">
+                    <a href="/" class="site-logo">
+                        <h1 class="site-title">PHP WordPress Development</h1>
+                    </a>
+                </div>
+                
+                <nav class="main-navigation" role="navigation" aria-label="Main navigation">
+                    <button class="mobile-menu-btn" aria-label="Toggle navigation" aria-expanded="false">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    
+                    <div class="nav-menu">
+                        <ul class="nav-list">
+                            <li class="nav-item"><a href="/" class="nav-link">Home</a></li>
+                            <li class="nav-item dropdown">
+                                <button class="nav-link dropdown-toggle active" aria-haspopup="true">Modules</button>
+                                <div class="dropdown-menu">
+                                    <a href="/module1.html" class="dropdown-item">Module 1: Web Fundamentals</a>
+                                    <a href="/module2.html" class="dropdown-item">Module 2: PHP Fundamentals</a>
+                                    <a href="/module3.html" class="dropdown-item">Module 3: MySQL Database</a>
+                                    <a href="/module4.html" class="dropdown-item">Module 4: WordPress & Docker</a>
+                                    <a href="/module5.html" class="dropdown-item">Module 5: Theme Development</a>
+                                    <a href="/module6.html" class="dropdown-item active">Module 6: Plugin Development</a>
+                                    <a href="/module7.html" class="dropdown-item">Module 7: Advanced WordPress</a>
+                                    <a href="/module8.html" class="dropdown-item">Module 8: Deployment</a>
+                                    <a href="/module9.html" class="dropdown-item">Module 9: Final Project</a>
+                                </div>
+                            </li>
+                            <li class="nav-item"><a href="/resources.html" class="nav-link">Resources</a></li>
+                            <li class="nav-item"><a href="/about.html" class="nav-link">About</a></li>
+                        </ul>
+                    </div>
+                </nav>
+                
+                <div class="search-container">
+                    <div class="search-input-wrapper">
+                        <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                        </svg>
+                        <input type="search" class="search-input" placeholder="Search lessons..." aria-label="Search">
+                    </div>
+                    <div class="search-results"></div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-header">
+                <h2 class="progress-title">Course Progress</h2>
+                <span class="progress-text">Loading...</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-bar-fill">
+                    <span class="progress-bar-text"></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Breadcrumb -->
+        <nav class="breadcrumb container" aria-label="Breadcrumb">
+            <ol class="breadcrumb-list">
+                <li class="breadcrumb-item">
+                    <a href="/">Home</a>
+                    <span class="breadcrumb-separator">/</span>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="/module6.html">Module 6</a>
+                    <span class="breadcrumb-separator">/</span>
+                </li>
+                <li class="breadcrumb-item">
+                    <span aria-current="page">Setting up AJAX Handlers</span>
+                </li>
+            </ol>
+        </nav>
+        
+        <!-- Main Content -->
+        <main id="main-content" class="main-content" role="main">
+            <div class="container">
+                <div class="content-with-sidebar">
+                    <!-- Sidebar -->
+                    <aside class="sidebar">
+                        <div class="sidebar-nav">
+                            <h3 class="sidebar-title">Module 6: Plugin Development</h3>
+                            <div class="sidebar-section">
+                                <h4 class="sidebar-section-title">Session 7: AJAX in WordPress</h4>
+                                <ul class="sidebar-menu">
+                                    <li><a class="sidebar-link" href="/07module/ajax_overview.html">AJAX in WordPress Overview</a></li>
+                                    <li class="active"><a class="sidebar-link active" href="/07module/ajax_handlers.html">Setting up AJAX Handlers</a></li>
+                                    <li><a class="sidebar-link" href="/07module/admin_frontend_ajax.html">Admin and Frontend AJAX</a></li>
+                                    <li><a class="sidebar-link" href="/07module/ajax_security.html">AJAX Security with Nonces</a></li>
+                                    <li><a class="sidebar-link" href="/07module/ajax_error_handling.html">Error Handling in AJAX</a></li>
+                                    <li><a class="sidebar-link" href="/07module/loading_scripts.html">Loading Scripts for AJAX</a></li>
+                                    <li><a class="sidebar-link" href="/07module/homework_ajax_plugin.html">Homework: AJAX Plugin</a></li>
+                                </ul>
+                            </div>
+                            <div class="sidebar-section">
+                                <h4 class="sidebar-section-title">Quick Links</h4>
+                                <ul class="sidebar-menu">
+                                    <li><a class="sidebar-link" href="/module6.html">Module Overview</a></li>
+                                    <li><a class="sidebar-link" href="/07module/ajax_overview.html">← Previous Lesson</a></li>
+                                    <li><a class="sidebar-link next-session" href="/07module/admin_frontend_ajax.html">Next Lesson →</a></li>
+                                    <li><a class="sidebar-link" href="/">← Course Home</a></li>
+                                    <li><a class="sidebar-link" href="/resources.html">Resources</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </aside>
+                    
+                    <!-- Main Lesson Content -->
+                    <article class="lesson-content">
+                        <div class="handlers-header">
+                            <h1>🔧 Setting up AJAX Handlers</h1>
+                            <p class="lead">Master server-side AJAX processing in WordPress</p>
+                            <p>Learn to create robust AJAX handlers that process requests and return responses</p>
+                        </div>
+
+                        <!-- Learning Objectives -->
+                        <div class="lesson-objectives">
+                            <h2>Learning Objectives</h2>
+                            <ul>
+                                <li>Create and register AJAX handler functions</li>
+                                <li>Process AJAX requests on the server side</li>
+                                <li>Handle different types of data submissions</li>
+                                <li>Return appropriate responses (JSON, HTML, etc.)</li>
+                                <li>Implement proper security checks</li>
+                                <li>Optimize handler performance</li>
+                                <li>Debug AJAX handlers effectively</li>
+                            </ul>
+                        </div>
+                        
+                        <!-- Lesson Body -->
+                        <div class="lesson-body">
+                            <!-- AJAX Handler Structure -->
+                            <section>
+                                <h2>AJAX Handler Structure</h2>
+                                
+                                <div class="handler-structure">
+                                    <h3>Components of an AJAX Handler</h3>
+                                    
+                                    <div class="structure-item">
+                                        <h5>1. Hook Registration</h5>
+                                        <p>Register your handler function with WordPress AJAX hooks</p>
+                                    </div>
+                                    
+                                    <div class="structure-item">
+                                        <h5>2. Security Verification</h5>
+                                        <p>Check nonces and user capabilities</p>
+                                    </div>
+                                    
+                                    <div class="structure-item">
+                                        <h5>3. Data Validation</h5>
+                                        <p>Validate and sanitize incoming data</p>
+                                    </div>
+                                    
+                                    <div class="structure-item">
+                                        <h5>4. Business Logic</h5>
+                                        <p>Process the request and perform operations</p>
+                                    </div>
+                                    
+                                    <div class="structure-item">
+                                        <h5>5. Response Generation</h5>
+                                        <p>Create and send the response back to the client</p>
+                                    </div>
+                                    
+                                    <div class="structure-item">
+                                        <h5>6. Termination</h5>
+                                        <p>Properly end the handler execution</p>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Basic Handler Setup -->
+                            <section>
+                                <h2>Basic AJAX Handler Setup</h2>
+                                
+                                <div class="handler-concept">
+                                    <h3>Complete Handler Implementation</h3>
+                                    
+                                    <div class="code-example">
+                                        <pre><code class="language-php"><?php
+/**
+ * Complete AJAX Handler Setup
+ */
+class My_AJAX_Handler {
+    
+    /**
+     * Constructor
+     */
+    public function __construct() {
+        // Register AJAX actions
+        add_action( 'wp_ajax_my_action', array( $this, 'handle_ajax_request' ) );
+        add_action( 'wp_ajax_nopriv_my_action', array( $this, 'handle_ajax_request' ) );
+        
+        // Register scripts
+        add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_ajax_scripts' ) );
+    }
+    
+    /**
+     * Enqueue and localize scripts
+     */
+    public function enqueue_ajax_scripts() {
+        wp_enqueue_script(
+            'my-ajax-script',
+            plugin_dir_url( __FILE__ ) . 'js/ajax-handler.js',
+            array( 'jquery' ),
+            '1.0.0',
+            true
+        );
+        
+        // Localize script with AJAX URL and nonce
+        wp_localize_script( 'my-ajax-script', 'my_ajax_object', array(
+            'ajax_url' => admin_url( 'admin-ajax.php' ),
+            'nonce'    => wp_create_nonce( 'my_ajax_nonce' ),
+            'loading'  => __( 'Loading...', 'textdomain' ),
+            'error'    => __( 'An error occurred', 'textdomain' ),
+        ));
+    }
+    
+    /**
+     * Handle AJAX request
+     */
+    public function handle_ajax_request() {
+        // 1. Verify nonce
+        if ( ! isset( $_POST['nonce'] ) || 
+             ! wp_verify_nonce( $_POST['nonce'], 'my_ajax_nonce' ) ) {
+            wp_send_json_error( 'Invalid security token' );
+        }
+        
+        // 2. Check user capabilities (if needed)
+        if ( ! current_user_can( 'read' ) ) {
+            wp_send_json_error( 'Insufficient permissions' );
+        }
+        
+        // 3. Validate and sanitize input
+        $data = $this->validate_input( $_POST );
+        if ( is_wp_error( $data ) ) {
+            wp_send_json_error( $data->get_error_message() );
+        }
+        
+        // 4. Process the request
+        $result = $this->process_request( $data );
+        
+        // 5. Return response
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( array(
+                'message' => $result->get_error_message(),
+                'code'    => $result->get_error_code(),
+            ));
+        } else {
+            wp_send_json_success( array(
+                'message' => 'Request processed successfully',
+                'data'    => $result,
+            ));
+        }
+    }
+    
+    /**
+     * Validate input data
+     */
+    private function validate_input( $post_data ) {
+        $validated = array();
+        
+        // Validate required fields
+        if ( empty( $post_data['user_input'] ) ) {
+            return new WP_Error( 'missing_input', 'Required field is missing' );
+        }
+        
+        // Sanitize data
+        $validated['user_input'] = sanitize_text_field( $post_data['user_input'] );
+        
+        // Validate specific formats
+        if ( isset( $post_data['email'] ) ) {
+            $email = sanitize_email( $post_data['email'] );
+            if ( ! is_email( $email ) ) {
+                return new WP_Error( 'invalid_email', 'Invalid email address' );
+            }
+            $validated['email'] = $email;
+        }
+        
+        return $validated;
+    }
+    
+    /**
+     * Process the actual request
+     */
+    private function process_request( $data ) {
+        // Perform your business logic here
+        // Example: Save to database
+        global $wpdb;
+        
+        $result = $wpdb->insert(
+            $wpdb->prefix . 'my_table',
+            array(
+                'user_input' => $data['user_input'],
+                'created_at' => current_time( 'mysql' ),
+            ),
+            array( '%s', '%s' )
+        );
+        
+        if ( false === $result ) {
+            return new WP_Error( 'db_error', 'Failed to save data' );
+        }
+        
+        return array(
+            'id'      => $wpdb->insert_id,
+            'message' => 'Data saved successfully',
+        );
+    }
+}
+
+// Initialize
+new My_AJAX_Handler();</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Different Response Types -->
+                            <section>
+                                <h2>AJAX Response Types</h2>
+                                
+                                <div class="handler-concept">
+                                    <h3>Various Response Formats</h3>
+                                    
+                                    <div class="response-types">
+                                        <div class="response-card">
+                                            <h5>JSON Success</h5>
+                                            <code>wp_send_json_success( $data )</code>
+                                            <p>Returns: {success: true, data: ...}</p>
+                                        </div>
+                                        
+                                        <div class="response-card">
+                                            <h5>JSON Error</h5>
+                                            <code>wp_send_json_error( $data )</code>
+                                            <p>Returns: {success: false, data: ...}</p>
+                                        </div>
+                                        
+                                        <div class="response-card">
+                                            <h5>JSON Neutral</h5>
+                                            <code>wp_send_json( $data )</code>
+                                            <p>Returns: Custom JSON structure</p>
+                                        </div>
+                                        
+                                        <div class="response-card">
+                                            <h5>HTML Response</h5>
+                                            <code>echo $html; wp_die();</code>
+                                            <p>Returns: HTML content</p>
+                                        </div>
+                                        
+                                        <div class="response-card">
+                                            <h5>Plain Text</h5>
+                                            <code>echo $text; wp_die();</code>
+                                            <p>Returns: Plain text</p>
+                                        </div>
+                                        
+                                        <div class="response-card">
+                                            <h5>XML Response</h5>
+                                            <code>header('Content-Type: text/xml');</code>
+                                            <p>Returns: XML data</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Complex Handler Examples -->
+                            <section>
+                                <h2>Complex Handler Examples</h2>
+                                
+                                <div class="example-tabs">
+                                    <div class="tab-buttons">
+                                        <button class="tab-button active" data-tab="form">Form Handler</button>
+                                        <button class="tab-button" data-tab="search">Search Handler</button>
+                                        <button class="tab-button" data-tab="upload">Upload Handler</button>
+                                    </div>
+                                    
+                                    <div class="tab-content">
+                                        <!-- Form Handler -->
+                                        <div class="tab-panel active" id="form">
+                                            <h4>Contact Form Handler</h4>
+                                            <div class="code-example">
+                                                <pre><code class="language-php">function handle_contact_form() {
+    // Verify nonce
+    if ( ! wp_verify_nonce( $_POST['nonce'], 'contact_form_nonce' ) ) {
+        wp_send_json_error( 'Security check failed' );
+    }
+    
+    // Validate fields
+    $errors = array();
+    
+    $name = sanitize_text_field( $_POST['name'] ?? '' );
+    if ( empty( $name ) ) {
+        $errors['name'] = 'Name is required';
+    }
+    
+    $email = sanitize_email( $_POST['email'] ?? '' );
+    if ( ! is_email( $email ) ) {
+        $errors['email'] = 'Valid email is required';
+    }
+    
+    $message = sanitize_textarea_field( $_POST['message'] ?? '' );
+    if ( strlen( $message ) < 10 ) {
+        $errors['message'] = 'Message must be at least 10 characters';
+    }
+    
+    // Return errors if any
+    if ( ! empty( $errors ) ) {
+        wp_send_json_error( array(
+            'errors' => $errors,
+            'message' => 'Please fix the errors and try again',
+        ));
+    }
+    
+    // Process form (send email, save to database, etc.)
+    $sent = wp_mail(
+        get_option( 'admin_email' ),
+        'Contact Form Submission',
+        sprintf( "Name: %s\nEmail: %s\nMessage: %s", $name, $email, $message ),
+        array( 'From: ' . $email )
+    );
+    
+    if ( $sent ) {
+        // Save to database
+        global $wpdb;
+        $wpdb->insert(
+            $wpdb->prefix . 'contact_submissions',
+            array(
+                'name' => $name,
+                'email' => $email,
+                'message' => $message,
+                'submitted_at' => current_time( 'mysql' ),
+            )
+        );
+        
+        wp_send_json_success( array(
+            'message' => 'Thank you! Your message has been sent.',
+            'redirect' => home_url( '/thank-you/' ),
+        ));
+    } else {
+        wp_send_json_error( 'Failed to send message. Please try again.' );
+    }
+}
+add_action( 'wp_ajax_submit_contact', 'handle_contact_form' );
+add_action( 'wp_ajax_nopriv_submit_contact', 'handle_contact_form' );</code></pre>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Search Handler -->
+                                        <div class="tab-panel" id="search">
+                                            <h4>Live Search Handler</h4>
+                                            <div class="code-example">
+                                                <pre><code class="language-php">function handle_live_search() {
+    // Check nonce
+    if ( ! wp_verify_nonce( $_GET['nonce'], 'search_nonce' ) ) {
+        wp_send_json_error( 'Invalid nonce' );
+    }
+    
+    // Get and sanitize search term
+    $search_term = sanitize_text_field( $_GET['search'] ?? '' );
+    
+    if ( strlen( $search_term ) < 3 ) {
+        wp_send_json_error( 'Search term must be at least 3 characters' );
+    }
+    
+    // Perform search
+    $args = array(
+        'post_type' => array( 'post', 'page', 'product' ),
+        'post_status' => 'publish',
+        's' => $search_term,
+        'posts_per_page' => 10,
+        'orderby' => 'relevance',
+    );
+    
+    $query = new WP_Query( $args );
+    $results = array();
+    
+    if ( $query->have_posts() ) {
+        while ( $query->have_posts() ) {
+            $query->the_post();
+            
+            $results[] = array(
+                'id' => get_the_ID(),
+                'title' => get_the_title(),
+                'excerpt' => wp_trim_words( get_the_excerpt(), 15 ),
+                'url' => get_permalink(),
+                'type' => get_post_type(),
+                'thumbnail' => get_the_post_thumbnail_url( get_the_ID(), 'thumbnail' ),
+            );
+        }
+        wp_reset_postdata();
+    }
+    
+    // Return results
+    wp_send_json_success( array(
+        'results' => $results,
+        'count' => count( $results ),
+        'search_term' => $search_term,
+        'message' => sprintf( 'Found %d results for "%s"', count( $results ), $search_term ),
+    ));
+}
+add_action( 'wp_ajax_live_search', 'handle_live_search' );
+add_action( 'wp_ajax_nopriv_live_search', 'handle_live_search' );</code></pre>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Upload Handler -->
+                                        <div class="tab-panel" id="upload">
+                                            <h4>File Upload Handler</h4>
+                                            <div class="code-example">
+                                                <pre><code class="language-php">function handle_file_upload() {
+    // Check nonce
+    if ( ! wp_verify_nonce( $_POST['nonce'], 'upload_nonce' ) ) {
+        wp_send_json_error( 'Security check failed' );
+    }
+    
+    // Check user capabilities
+    if ( ! current_user_can( 'upload_files' ) ) {
+        wp_send_json_error( 'You do not have permission to upload files' );
+    }
+    
+    // Check if file was uploaded
+    if ( empty( $_FILES['file'] ) ) {
+        wp_send_json_error( 'No file uploaded' );
+    }
+    
+    $file = $_FILES['file'];
+    
+    // Validate file type
+    $allowed_types = array( 'jpg', 'jpeg', 'png', 'gif', 'pdf' );
+    $file_type = wp_check_filetype( $file['name'] );
+    
+    if ( ! in_array( $file_type['ext'], $allowed_types ) ) {
+        wp_send_json_error( 'Invalid file type. Allowed: ' . implode( ', ', $allowed_types ) );
+    }
+    
+    // Validate file size (5MB max)
+    $max_size = 5 * 1024 * 1024; // 5MB in bytes
+    if ( $file['size'] > $max_size ) {
+        wp_send_json_error( 'File size exceeds 5MB limit' );
+    }
+    
+    // Handle upload
+    require_once( ABSPATH . 'wp-admin/includes/file.php' );
+    require_once( ABSPATH . 'wp-admin/includes/media.php' );
+    require_once( ABSPATH . 'wp-admin/includes/image.php' );
+    
+    $upload = wp_handle_upload( $file, array( 'test_form' => false ) );
+    
+    if ( isset( $upload['error'] ) ) {
+        wp_send_json_error( $upload['error'] );
+    }
+    
+    // Create attachment
+    $attachment_id = wp_insert_attachment(
+        array(
+            'post_mime_type' => $upload['type'],
+            'post_title' => sanitize_file_name( $file['name'] ),
+            'post_content' => '',
+            'post_status' => 'inherit',
+        ),
+        $upload['file']
+    );
+    
+    // Generate metadata
+    wp_update_attachment_metadata(
+        $attachment_id,
+        wp_generate_attachment_metadata( $attachment_id, $upload['file'] )
+    );
+    
+    // Return success with file info
+    wp_send_json_success( array(
+        'message' => 'File uploaded successfully',
+        'attachment_id' => $attachment_id,
+        'url' => $upload['url'],
+        'type' => $upload['type'],
+        'size' => size_format( $file['size'] ),
+    ));
+}
+add_action( 'wp_ajax_upload_file', 'handle_file_upload' );</code></pre>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Handler with Database Operations -->
+                            <section>
+                                <h2>Database Operations in Handlers</h2>
+                                
+                                <div class="handler-concept">
+                                    <h3>CRUD Operations Handler</h3>
+                                    
+                                    <div class="code-example">
+                                        <pre><code class="language-php">class AJAX_CRUD_Handler {
+    
+    public function __construct() {
+        add_action( 'wp_ajax_crud_create', array( $this, 'create' ) );
+        add_action( 'wp_ajax_crud_read', array( $this, 'read' ) );
+        add_action( 'wp_ajax_crud_update', array( $this, 'update' ) );
+        add_action( 'wp_ajax_crud_delete', array( $this, 'delete' ) );
+    }
+    
+    /**
+     * Create record
+     */
+    public function create() {
+        $this->verify_request();
+        
+        global $wpdb;
+        $table = $wpdb->prefix . 'custom_table';
+        
+        $data = array(
+            'title' => sanitize_text_field( $_POST['title'] ),
+            'content' => sanitize_textarea_field( $_POST['content'] ),
+            'user_id' => get_current_user_id(),
+            'created_at' => current_time( 'mysql' ),
+        );
+        
+        $result = $wpdb->insert( $table, $data );
+        
+        if ( false === $result ) {
+            wp_send_json_error( 'Failed to create record' );
+        }
+        
+        wp_send_json_success( array(
+            'id' => $wpdb->insert_id,
+            'message' => 'Record created successfully',
+        ));
+    }
+    
+    /**
+     * Read records
+     */
+    public function read() {
+        $this->verify_request();
+        
+        global $wpdb;
+        $table = $wpdb->prefix . 'custom_table';
+        
+        // Pagination
+        $page = isset( $_GET['page'] ) ? absint( $_GET['page'] ) : 1;
+        $per_page = 10;
+        $offset = ( $page - 1 ) * $per_page;
+        
+        // Get records
+        $records = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT * FROM $table 
+                ORDER BY created_at DESC 
+                LIMIT %d OFFSET %d",
+                $per_page,
+                $offset
+            )
+        );
+        
+        // Get total count
+        $total = $wpdb->get_var( "SELECT COUNT(*) FROM $table" );
+        
+        wp_send_json_success( array(
+            'records' => $records,
+            'pagination' => array(
+                'page' => $page,
+                'per_page' => $per_page,
+                'total' => $total,
+                'pages' => ceil( $total / $per_page ),
+            ),
+        ));
+    }
+    
+    /**
+     * Update record
+     */
+    public function update() {
+        $this->verify_request();
+        
+        $id = absint( $_POST['id'] );
+        if ( ! $id ) {
+            wp_send_json_error( 'Invalid ID' );
+        }
+        
+        global $wpdb;
+        $table = $wpdb->prefix . 'custom_table';
+        
+        $data = array(
+            'title' => sanitize_text_field( $_POST['title'] ),
+            'content' => sanitize_textarea_field( $_POST['content'] ),
+            'updated_at' => current_time( 'mysql' ),
+        );
+        
+        $result = $wpdb->update(
+            $table,
+            $data,
+            array( 'id' => $id ),
+            null,
+            array( '%d' )
+        );
+        
+        if ( false === $result ) {
+            wp_send_json_error( 'Failed to update record' );
+        }
+        
+        wp_send_json_success( array(
+            'message' => 'Record updated successfully',
+            'updated' => $result,
+        ));
+    }
+    
+    /**
+     * Delete record
+     */
+    public function delete() {
+        $this->verify_request();
+        
+        $id = absint( $_POST['id'] );
+        if ( ! $id ) {
+            wp_send_json_error( 'Invalid ID' );
+        }
+        
+        global $wpdb;
+        $table = $wpdb->prefix . 'custom_table';
+        
+        $result = $wpdb->delete(
+            $table,
+            array( 'id' => $id ),
+            array( '%d' )
+        );
+        
+        if ( false === $result ) {
+            wp_send_json_error( 'Failed to delete record' );
+        }
+        
+        wp_send_json_success( array(
+            'message' => 'Record deleted successfully',
+            'deleted' => $result,
+        ));
+    }
+    
+    /**
+     * Verify request
+     */
+    private function verify_request() {
+        if ( ! wp_verify_nonce( $_REQUEST['nonce'], 'crud_nonce' ) ) {
+            wp_send_json_error( 'Invalid nonce' );
+        }
+        
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Insufficient permissions' );
+        }
+    }
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Handling Multiple Actions -->
+                            <section>
+                                <h2>Handling Multiple Actions</h2>
+                                
+                                <div class="handler-concept">
+                                    <h3>Single Handler for Multiple Actions</h3>
+                                    
+                                    <div class="code-example">
+                                        <pre><code class="language-php">class Multi_Action_Handler {
+    
+    public function __construct() {
+        add_action( 'wp_ajax_multi_handler', array( $this, 'route_action' ) );
+    }
+    
+    /**
+     * Route to appropriate method based on action
+     */
+    public function route_action() {
+        // Verify nonce
+        if ( ! wp_verify_nonce( $_REQUEST['nonce'], 'multi_nonce' ) ) {
+            wp_send_json_error( 'Invalid nonce' );
+        }
+        
+        // Get sub-action
+        $sub_action = sanitize_text_field( $_REQUEST['sub_action'] ?? '' );
+        
+        // Route to appropriate method
+        switch ( $sub_action ) {
+            case 'get_data':
+                $this->get_data();
+                break;
+                
+            case 'save_data':
+                $this->save_data();
+                break;
+                
+            case 'delete_data':
+                $this->delete_data();
+                break;
+                
+            case 'export_data':
+                $this->export_data();
+                break;
+                
+            default:
+                wp_send_json_error( 'Invalid action: ' . $sub_action );
+        }
+    }
+    
+    private function get_data() {
+        // Implementation
+        wp_send_json_success( array( 'data' => 'Retrieved data' ) );
+    }
+    
+    private function save_data() {
+        // Implementation
+        wp_send_json_success( array( 'message' => 'Data saved' ) );
+    }
+    
+    private function delete_data() {
+        // Implementation
+        wp_send_json_success( array( 'message' => 'Data deleted' ) );
+    }
+    
+    private function export_data() {
+        // Implementation
+        wp_send_json_success( array( 'file' => 'export.csv' ) );
+    }
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Performance Optimization -->
+                            <section>
+                                <h2>Performance Optimization</h2>
+                                
+                                <div class="handler-concept">
+                                    <h3>Optimized Handler Techniques</h3>
+                                    
+                                    <div class="code-example">
+                                        <pre><code class="language-php">class Optimized_AJAX_Handler {
+    
+    /**
+     * Cached handler with transients
+     */
+    public function cached_handler() {
+        check_ajax_referer( 'cached_nonce', 'nonce' );
+        
+        $cache_key = 'ajax_cache_' . md5( serialize( $_REQUEST ) );
+        $cached = get_transient( $cache_key );
+        
+        if ( false !== $cached ) {
+            wp_send_json_success( array(
+                'data' => $cached,
+                'cached' => true,
+            ));
+        }
+        
+        // Expensive operation
+        $result = $this->expensive_operation();
+        
+        // Cache for 1 hour
+        set_transient( $cache_key, $result, HOUR_IN_SECONDS );
+        
+        wp_send_json_success( array(
+            'data' => $result,
+            'cached' => false,
+        ));
+    }
+    
+    /**
+     * Batch processing handler
+     */
+    public function batch_handler() {
+        check_ajax_referer( 'batch_nonce', 'nonce' );
+        
+        $batch_size = 50;
+        $offset = absint( $_POST['offset'] ?? 0 );
+        
+        global $wpdb;
+        $items = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT * FROM {$wpdb->posts} 
+                WHERE post_type = 'post' 
+                LIMIT %d OFFSET %d",
+                $batch_size,
+                $offset
+            )
+        );
+        
+        // Process items
+        $processed = array();
+        foreach ( $items as $item ) {
+            $processed[] = $this->process_item( $item );
+        }
+        
+        // Check if more items exist
+        $has_more = count( $items ) === $batch_size;
+        
+        wp_send_json_success( array(
+            'processed' => count( $processed ),
+            'offset' => $offset + $batch_size,
+            'has_more' => $has_more,
+            'message' => sprintf( 'Processed %d items', count( $processed ) ),
+        ));
+    }
+    
+    /**
+     * Debounced handler
+     */
+    public function debounced_search() {
+        check_ajax_referer( 'search_nonce', 'nonce' );
+        
+        $search_id = sanitize_text_field( $_POST['search_id'] );
+        
+        // Store search timestamp
+        $transient_key = 'search_' . $search_id;
+        $last_search = get_transient( $transient_key );
+        
+        // If searched within last 500ms, ignore
+        if ( $last_search && ( time() - $last_search ) < 0.5 ) {
+            wp_send_json_error( 'Too many requests' );
+        }
+        
+        set_transient( $transient_key, time(), 1 );
+        
+        // Perform search
+        $results = $this->perform_search( $_POST['query'] );
+        
+        wp_send_json_success( $results );
+    }
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Security Checklist -->
+                            <section>
+                                <h2>Security Checklist</h2>
+                                
+                                <div class="security-checklist">
+                                    <h3>Essential Security Measures</h3>
+                                    
+                                    <div class="checklist-item">
+                                        <input type="checkbox" id="check1">
+                                        <label for="check1">Always verify nonces using wp_verify_nonce()</label>
+                                    </div>
+                                    
+                                    <div class="checklist-item">
+                                        <input type="checkbox" id="check2">
+                                        <label for="check2">Check user capabilities with current_user_can()</label>
+                                    </div>
+                                    
+                                    <div class="checklist-item">
+                                        <input type="checkbox" id="check3">
+                                        <label for="check3">Sanitize all input data appropriately</label>
+                                    </div>
+                                    
+                                    <div class="checklist-item">
+                                        <input type="checkbox" id="check4">
+                                        <label for="check4">Validate data types and formats</label>
+                                    </div>
+                                    
+                                    <div class="checklist-item">
+                                        <input type="checkbox" id="check5">
+                                        <label for="check5">Use prepared statements for database queries</label>
+                                    </div>
+                                    
+                                    <div class="checklist-item">
+                                        <input type="checkbox" id="check6">
+                                        <label for="check6">Escape output when returning HTML</label>
+                                    </div>
+                                    
+                                    <div class="checklist-item">
+                                        <input type="checkbox" id="check7">
+                                        <label for="check7">Implement rate limiting for sensitive operations</label>
+                                    </div>
+                                    
+                                    <div class="checklist-item">
+                                        <input type="checkbox" id="check8">
+                                        <label for="check8">Log important actions for audit trails</label>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Debugging Handlers -->
+                            <section>
+                                <h2>Debugging AJAX Handlers</h2>
+                                
+                                <div class="handler-concept">
+                                    <h3>Debugging Techniques</h3>
+                                    
+                                    <div class="code-example">
+                                        <pre><code class="language-php">/**
+ * Debug-friendly AJAX handler
+ */
+function debug_ajax_handler() {
+    // Enable error reporting for debugging
+    if ( WP_DEBUG ) {
+        error_reporting( E_ALL );
+        ini_set( 'display_errors', 1 );
+    }
+    
+    // Log incoming request
+    error_log( 'AJAX Request: ' . print_r( $_REQUEST, true ) );
+    
+    try {
+        // Verify nonce
+        if ( ! wp_verify_nonce( $_REQUEST['nonce'], 'debug_nonce' ) ) {
+            throw new Exception( 'Invalid nonce' );
+        }
+        
+        // Process request
+        $result = process_request();
+        
+        // Log successful result
+        error_log( 'AJAX Success: ' . print_r( $result, true ) );
+        
+        // Add debug info in development
+        if ( WP_DEBUG ) {
+            $result['debug'] = array(
+                'memory_usage' => memory_get_peak_usage( true ),
+                'execution_time' => microtime( true ) - $_SERVER['REQUEST_TIME_FLOAT'],
+                'queries' => get_num_queries(),
+            );
+        }
+        
+        wp_send_json_success( $result );
+        
+    } catch ( Exception $e ) {
+        // Log error
+        error_log( 'AJAX Error: ' . $e->getMessage() );
+        error_log( 'Stack trace: ' . $e->getTraceAsString() );
+        
+        // Send error response
+        wp_send_json_error( array(
+            'message' => $e->getMessage(),
+            'code' => $e->getCode(),
+            'file' => WP_DEBUG ? $e->getFile() : '',
+            'line' => WP_DEBUG ? $e->getLine() : '',
+        ));
+    }
+}
+
+// Browser console debugging
+function console_log_ajax() {
+    wp_send_json_success( array(
+        'message' => 'Check browser console',
+        'console' => array(
+            'log' => 'console.log("Debug info:", ' . json_encode( $_REQUEST ) . ');',
+            'table' => 'console.table(' . json_encode( $_REQUEST ) . ');',
+        ),
+    ));
+}</code></pre>
+                                    </div>
+                                    
+                                    <div class="tip-box">
+                                        <h4>💡 Debugging Tips:</h4>
+                                        <ul>
+                                            <li>Use browser DevTools Network tab to inspect requests</li>
+                                            <li>Check PHP error logs for server-side errors</li>
+                                            <li>Use error_log() to debug values</li>
+                                            <li>Return debug info in responses during development</li>
+                                            <li>Use Query Monitor plugin for database queries</li>
+                                            <li>Test with WP_DEBUG enabled</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Best Practices -->
+                            <section>
+                                <h2>Best Practices</h2>
+                                
+                                <div class="tip-box">
+                                    <h4>✅ Do's</h4>
+                                    <ul>
+                                        <li>Always validate and sanitize input</li>
+                                        <li>Use appropriate response functions (wp_send_json_*)</li>
+                                        <li>Implement proper error handling</li>
+                                        <li>Keep handlers focused on single responsibilities</li>
+                                        <li>Use transients for caching when appropriate</li>
+                                        <li>Document your AJAX endpoints</li>
+                                        <li>Test with different user roles</li>
+                                    </ul>
+                                </div>
+                                
+                                <div class="warning-box">
+                                    <h4>❌ Don'ts</h4>
+                                    <ul>
+                                        <li>Don't skip security checks</li>
+                                        <li>Don't output anything before wp_send_json functions</li>
+                                        <li>Don't forget to terminate with wp_die()</li>
+                                        <li>Don't trust client-side validation alone</li>
+                                        <li>Don't expose sensitive information</li>
+                                        <li>Don't perform heavy operations without pagination</li>
+                                    </ul>
+                                </div>
+                            </section>
+
+                            <!-- Practice Exercise -->
+                            <section>
+                                <h2>Practice Exercise</h2>
+                                <div class="alert alert-success">
+                                    <div class="alert-icon">💻</div>
+                                    <div class="alert-content">
+                                        <div class="alert-title">Build a Complete AJAX Handler</div>
+                                        <div class="alert-message">
+                                            <p>Create a task management AJAX handler with the following features:</p>
+                                            <ol>
+                                                <li>Create new tasks (title, description, priority)</li>
+                                                <li>List tasks with pagination</li>
+                                                <li>Update task status (pending, in-progress, completed)</li>
+                                                <li>Delete tasks</li>
+                                                <li>Search tasks by title</li>
+                                                <li>Filter tasks by status</li>
+                                            </ol>
+                                            <p><strong>Requirements:</strong></p>
+                                            <ul>
+                                                <li>Implement all CRUD operations</li>
+                                                <li>Add proper security checks</li>
+                                                <li>Include error handling</li>
+                                                <li>Use JSON responses</li>
+                                                <li>Add caching for list operations</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Resources -->
+                            <section class="resources">
+                                <h2>Additional Resources</h2>
+                                <ul>
+                                    <li><a href="https://developer.wordpress.org/reference/hooks/wp_ajax_action/" target="_blank">wp_ajax_{action} Hook Reference</a></li>
+                                    <li><a href="https://developer.wordpress.org/reference/functions/wp_send_json_success/" target="_blank">wp_send_json_success() Documentation</a></li>
+                                    <li><a href="https://developer.wordpress.org/reference/functions/wp_verify_nonce/" target="_blank">wp_verify_nonce() Reference</a></li>
+                                    <li><a href="https://codex.wordpress.org/AJAX_in_Plugins" target="_blank">AJAX in Plugins Guide</a></li>
+                                    <li><a href="https://developer.wordpress.org/plugins/security/" target="_blank">Plugin Security Best Practices</a></li>
+                                </ul>
+                            </section>
+                        </div>
+
+                        <!-- Lesson Navigation -->
+                        <div class="lesson-navigation">
+                            <a href="/07module/ajax_overview.html" class="lesson-nav-button prev">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"/>
+                                </svg>
+                                <span>
+                                    <small>Previous</small><br>
+                                    AJAX Overview
+                                </span>
+                            </a>
+                            
+                            <button class="complete-lesson-btn">
+                                Mark as Complete
+                            </button>
+                            
+                            <a href="/07module/admin_frontend_ajax.html" class="lesson-nav-button next">
+                                <span>
+                                    <small>Next</small><br>
+                                    Admin and Frontend AJAX
+                                </span>
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="site-footer" role="contentinfo">
+            <div class="footer-container">
+                <div class="footer-content">
+                    <div class="footer-section footer-about">
+                        <h3>PHP WordPress Development</h3>
+                        <p>Complete Web Development Course</p>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Quick Links</h4>
+                        <ul class="footer-links">
+                            <li><a href="/">Home</a></li>
+                            <li><a href="/module6.html">Module 6</a></li>
+                            <li><a href="/resources.html">Resources</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Support</h4>
+                        <ul class="footer-links">
+                            <li><a href="/about.html">About</a></li>
+                            <li><a href="/contact.html">Contact</a></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="footer-bottom">
+                    <p>&copy; 2024 PHP WordPress Course. All rights reserved.</p>
+                    <p>This course material is for educational purposes only.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- JavaScript for tabs -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabPanels = document.querySelectorAll('.tab-panel');
+        
+        tabButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const tabId = this.getAttribute('data-tab');
+                
+                // Remove active class from all
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabPanels.forEach(panel => panel.classList.remove('active'));
+                
+                // Add active class to clicked
+                this.classList.add('active');
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+    });
+    </script>
+    
+    <!-- JavaScript -->
+    <script src="/assets/js/prism.js"></script>
+    <script src="/assets/js/main.js"></script>
+    <script src="/assets/js/sidebar-toggle.js"></script>
+    <script src="/assets/js/progress-tracker.js"></script>
+    <script src="/assets/js/search.js"></script>
+    <script src="/assets/js/theme-toggle.js"></script>
+</body>
+</html>

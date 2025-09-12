@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication & Permissions - WordPress REST API</title>
+    <meta name="description" content="Learn about REST API authentication methods and permission handling in WordPress. Secure your API endpoints properly.">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-enhanced.css">
+    <style>
+        .auth-header {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .auth-section {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+        .code-example {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <header class="site-header">
+            <div class="header-container">
+                <div class="site-branding">
+                    <a href="/" class="site-logo">
+                        <h1 class="site-title">PHP WordPress Development</h1>
+                    </a>
+                </div>
+            </div>
+        </header>
+        
+        <nav class="breadcrumb container">
+            <ol class="breadcrumb-list">
+                <li class="breadcrumb-item"><a href="/">Home</a> /</li>
+                <li class="breadcrumb-item"><a href="/module6.html">Module 6</a> /</li>
+                <li class="breadcrumb-item">Authentication & Permissions</li>
+            </ol>
+        </nav>
+        
+        <main class="main-content">
+            <div class="container">
+                <div class="content-with-sidebar">
+                    <aside class="sidebar">
+                        <div class="sidebar-nav">
+                            <h3 class="sidebar-title">Session 8: REST API</h3>
+                            <ul class="sidebar-menu">
+                                <li><a href="/08module/rest_api_intro.html">REST API Introduction</a></li>
+                                <li><a href="/08module/endpoints_routes.html">Endpoints and Routes</a></li>
+                                <li><a href="/08module/using_rest_api.html">Using REST API in Plugins</a></li>
+                                <li><a href="/08module/custom_endpoints.html">Creating Custom Endpoints</a></li>
+                                <li class="active"><a href="/08module/authentication.html">Authentication & Permissions</a></li>
+                                <li><a href="/08module/extending_endpoints.html">Extending Existing Endpoints</a></li>
+                                <li><a href="/08module/homework_rest_api.html">Homework: REST API Plugin</a></li>
+                            </ul>
+                        </div>
+                    </aside>
+                    
+                    <article class="lesson-content">
+                        <div class="auth-header">
+                            <h1>🔐 Authentication & Permissions</h1>
+                            <p class="lead">Secure your REST API endpoints with proper authentication</p>
+                        </div>
+
+                        <div class="lesson-objectives">
+                            <h2>Learning Objectives</h2>
+                            <ul>
+                                <li>Understand authentication methods</li>
+                                <li>Implement cookie authentication</li>
+                                <li>Use application passwords</li>
+                                <li>Create permission callbacks</li>
+                                <li>Handle capability checks</li>
+                                <li>Secure custom endpoints</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="lesson-body">
+                            <section>
+                                <h2>Authentication Methods</h2>
+                                <div class="auth-section">
+                                    <h3>Cookie Authentication (Default)</h3>
+                                    <div class="code-example">
+                                        <pre><code>// Cookie authentication with nonce
+wp_localize_script('my-script', 'wpApiSettings', array(
+    'root' => esc_url_raw(rest_url()),
+    'nonce' => wp_create_nonce('wp_rest'),
+));
+
+// JavaScript usage
+fetch('/wp-json/wp/v2/posts', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+        'Content-Type': 'application/json',
+        'X-WP-Nonce': wpApiSettings.nonce
+    },
+    body: JSON.stringify(postData)
+});</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Application Passwords</h2>
+                                <div class="auth-section">
+                                    <h3>Using Application Passwords</h3>
+                                    <div class="code-example">
+                                        <pre><code>// Basic Auth with Application Password
+$username = 'admin';
+$app_password = 'xxxx xxxx xxxx xxxx xxxx xxxx';
+
+$headers = array(
+    'Authorization' => 'Basic ' . base64_encode($username . ':' . $app_password),
+    'Content-Type' => 'application/json',
+);
+
+$response = wp_remote_post('https://site.com/wp-json/wp/v2/posts', array(
+    'headers' => $headers,
+    'body' => json_encode($data),
+));</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Permission Callbacks</h2>
+                                <div class="auth-section">
+                                    <h3>Implementing Permission Checks</h3>
+                                    <div class="code-example">
+                                        <pre><code>register_rest_route('myplugin/v1', '/private-data', array(
+    'methods' => 'GET',
+    'callback' => 'get_private_data',
+    'permission_callback' => function($request) {
+        // Check if user is logged in
+        if (!is_user_logged_in()) {
+            return false;
+        }
+        
+        // Check specific capability
+        if (!current_user_can('manage_options')) {
+            return false;
+        }
+        
+        // Check custom conditions
+        $user = wp_get_current_user();
+        if (!in_array('administrator', $user->roles)) {
+            return false;
+        }
+        
+        return true;
+    },
+));
+
+// Different permission levels
+function public_permission() {
+    return true; // Anyone can access
+}
+
+function logged_in_permission() {
+    return is_user_logged_in();
+}
+
+function admin_permission() {
+    return current_user_can('manage_options');
+}
+
+function owner_permission($request) {
+    $post_id = $request->get_param('id');
+    $post = get_post($post_id);
+    return $post && $post->post_author == get_current_user_id();
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Custom Authentication</h2>
+                                <div class="auth-section">
+                                    <h3>API Key Authentication</h3>
+                                    <div class="code-example">
+                                        <pre><code>// Custom authentication filter
+add_filter('rest_authentication_errors', function($result) {
+    // If authentication already failed, return that error
+    if (!empty($result)) {
+        return $result;
+    }
+    
+    // Check for API key in header
+    $api_key = $_SERVER['HTTP_X_API_KEY'] ?? '';
+    
+    if (empty($api_key)) {
+        return null; // No API key provided, continue normal auth
+    }
+    
+    // Validate API key
+    $user = validate_api_key($api_key);
+    
+    if (!$user) {
+        return new WP_Error(
+            'invalid_api_key',
+            'Invalid API key',
+            array('status' => 401)
+        );
+    }
+    
+    // Set current user
+    wp_set_current_user($user->ID);
+    
+    return true;
+});
+
+function validate_api_key($key) {
+    // Check if key exists in database
+    $user_id = get_user_meta_by_key('api_key', $key);
+    return $user_id ? get_user_by('id', $user_id) : false;
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>JWT Authentication</h2>
+                                <div class="auth-section">
+                                    <h3>JSON Web Token Implementation</h3>
+                                    <div class="code-example">
+                                        <pre><code>// Generate JWT token
+function generate_jwt_token($user) {
+    $secret = wp_salt('auth');
+    $issued_at = time();
+    $expiration = $issued_at + (DAY_IN_SECONDS * 7);
+    
+    $payload = array(
+        'iss' => get_bloginfo('url'),
+        'iat' => $issued_at,
+        'exp' => $expiration,
+        'user_id' => $user->ID,
+        'user_email' => $user->user_email,
+    );
+    
+    // Use a JWT library to encode
+    return jwt_encode($payload, $secret);
+}
+
+// Validate JWT token
+add_filter('determine_current_user', function($user) {
+    $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    
+    if (!preg_match('/Bearer\s+(.*)$/i', $auth_header, $matches)) {
+        return $user;
+    }
+    
+    $token = $matches[1];
+    
+    try {
+        $decoded = jwt_decode($token, wp_salt('auth'));
+        return $decoded->user_id;
+    } catch (Exception $e) {
+        return $user;
+    }
+}, 20);</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Capability Checks</h2>
+                                <div class="auth-section">
+                                    <h3>Fine-grained Permissions</h3>
+                                    <div class="code-example">
+                                        <pre><code>// Check various capabilities
+function advanced_permission_callback($request) {
+    $action = $request->get_route();
+    
+    // Different permissions for different methods
+    switch ($request->get_method()) {
+        case 'GET':
+            return current_user_can('read');
+            
+        case 'POST':
+            return current_user_can('edit_posts');
+            
+        case 'PUT':
+        case 'PATCH':
+            $id = $request->get_param('id');
+            return current_user_can('edit_post', $id);
+            
+        case 'DELETE':
+            $id = $request->get_param('id');
+            return current_user_can('delete_post', $id);
+            
+        default:
+            return false;
+    }
+}
+
+// Custom capability
+add_filter('user_has_cap', function($caps, $cap, $args) {
+    if ($cap[0] === 'use_rest_api') {
+        $user = get_user_by('id', $args[1]);
+        $caps['use_rest_api'] = user_can($user, 'edit_posts');
+    }
+    return $caps;
+}, 10, 3);</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Security Best Practices</h2>
+                                <ul>
+                                    <li>Always use HTTPS for API calls</li>
+                                    <li>Implement rate limiting</li>
+                                    <li>Validate all input data</li>
+                                    <li>Use nonces for state-changing operations</li>
+                                    <li>Log authentication attempts</li>
+                                    <li>Rotate API keys regularly</li>
+                                    <li>Never expose sensitive data</li>
+                                    <li>Use the principle of least privilege</li>
+                                </ul>
+                            </section>
+
+                            <section class="resources">
+                                <h2>Resources</h2>
+                                <ul>
+                                    <li><a href="https://developer.wordpress.org/rest-api/using-the-rest-api/authentication/">REST API Authentication</a></li>
+                                    <li><a href="https://make.wordpress.org/core/2020/11/05/application-passwords-integration-guide/">Application Passwords Guide</a></li>
+                                </ul>
+                            </section>
+                        </div>
+
+                        <div class="lesson-navigation">
+                            <a href="/08module/custom_endpoints.html" class="lesson-nav-button prev">Previous: Custom Endpoints</a>
+                            <button class="complete-lesson-btn">Mark as Complete</button>
+                            <a href="/08module/extending_endpoints.html" class="lesson-nav-button next">Next: Extending Endpoints</a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </main>
+
+        <footer class="site-footer">
+            <div class="footer-container">
+                <p>&copy; 2024 PHP WordPress Course. All rights reserved.</p>
+            </div>
+        </footer>
+    </div>
+    
+    <script src="/assets/js/main.js"></script>
+    <script src="/assets/js/progress-tracker.js"></script>
+</body>
+</html>

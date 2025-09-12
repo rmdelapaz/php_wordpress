@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caching Strategies - WordPress Plugin Development</title>
+    <meta name="description" content="Learn caching strategies for WordPress plugins. Implement transients, object caching, and optimize performance.">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-enhanced.css">
+    <style>
+        .caching-header {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .caching-section {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+        .code-example {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <header class="site-header">
+            <div class="header-container">
+                <div class="site-branding">
+                    <a href="/" class="site-logo">
+                        <h1 class="site-title">PHP WordPress Development</h1>
+                    </a>
+                </div>
+            </div>
+        </header>
+        
+        <nav class="breadcrumb container">
+            <ol class="breadcrumb-list">
+                <li class="breadcrumb-item"><a href="/">Home</a> /</li>
+                <li class="breadcrumb-item"><a href="/module6.html">Module 6</a> /</li>
+                <li class="breadcrumb-item">Caching Strategies</li>
+            </ol>
+        </nav>
+        
+        <main class="main-content">
+            <div class="container">
+                <div class="content-with-sidebar">
+                    <aside class="sidebar">
+                        <div class="sidebar-nav">
+                            <h3 class="sidebar-title">Session 9: Security & Performance</h3>
+                            <ul class="sidebar-menu">
+                                <li><a href="/09module/security_principles.html">Security Principles</a></li>
+                                <li><a href="/09module/input_validation.html">Input Validation & Sanitization</a></li>
+                                <li><a href="/09module/capability_checks.html">Capability Checks & Permissions</a></li>
+                                <li><a href="/09module/data_encryption.html">Data Encryption</a></li>
+                                <li><a href="/09module/preventing_attacks.html">Preventing Common Attacks</a></li>
+                                <li><a href="/09module/performance_optimization.html">Performance Optimization</a></li>
+                                <li class="active"><a href="/09module/caching_strategies.html">Caching Strategies</a></li>
+                                <li><a href="/09module/homework_security_audit.html">Homework: Security Audit</a></li>
+                            </ul>
+                        </div>
+                    </aside>
+                    
+                    <article class="lesson-content">
+                        <div class="caching-header">
+                            <h1>💾 Caching Strategies</h1>
+                            <p class="lead">Implement effective caching in WordPress plugins</p>
+                        </div>
+
+                        <div class="lesson-objectives">
+                            <h2>Learning Objectives</h2>
+                            <ul>
+                                <li>Understand WordPress caching mechanisms</li>
+                                <li>Implement transient caching</li>
+                                <li>Use object caching effectively</li>
+                                <li>Cache API responses</li>
+                                <li>Implement cache invalidation</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="lesson-body">
+                            <section>
+                                <h2>WordPress Transients API</h2>
+                                <div class="caching-section">
+                                    <h3>Using Transients</h3>
+                                    <div class="code-example">
+                                        <pre><code>// Set transient
+set_transient('my_data', $data, 12 * HOUR_IN_SECONDS);
+
+// Get transient
+$data = get_transient('my_data');
+if (false === $data) {
+    // Cache miss - regenerate data
+    $data = expensive_operation();
+    set_transient('my_data', $data, 12 * HOUR_IN_SECONDS);
+}
+
+// Delete transient
+delete_transient('my_data');
+
+// Example: Cache API response
+function get_api_data() {
+    $cache_key = 'api_response_' . md5(serialize(func_get_args()));
+    
+    if (false === ($data = get_transient($cache_key))) {
+        $response = wp_remote_get('https://api.example.com/data');
+        
+        if (!is_wp_error($response)) {
+            $data = wp_remote_retrieve_body($response);
+            set_transient($cache_key, $data, HOUR_IN_SECONDS);
+        }
+    }
+    
+    return $data;
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Object Caching</h2>
+                                <div class="caching-section">
+                                    <h3>WordPress Object Cache</h3>
+                                    <div class="code-example">
+                                        <pre><code>// Object cache (memory cache for current request)
+wp_cache_set('my_key', $data, 'my_group', 3600);
+$data = wp_cache_get('my_key', 'my_group');
+wp_cache_delete('my_key', 'my_group');
+
+// Cache implementation
+class Cache_Manager {
+    private $cache_group = 'my_plugin';
+    
+    public function get($key) {
+        // Try object cache first
+        $data = wp_cache_get($key, $this->cache_group);
+        
+        if (false === $data) {
+            // Try transient
+            $data = get_transient($this->cache_group . '_' . $key);
+            
+            if (false !== $data) {
+                // Store in object cache for this request
+                wp_cache_set($key, $data, $this->cache_group);
+            }
+        }
+        
+        return $data;
+    }
+    
+    public function set($key, $data, $expiration = 3600) {
+        // Set both caches
+        wp_cache_set($key, $data, $this->cache_group, $expiration);
+        set_transient($this->cache_group . '_' . $key, $data, $expiration);
+    }
+    
+    public function delete($key) {
+        wp_cache_delete($key, $this->cache_group);
+        delete_transient($this->cache_group . '_' . $key);
+    }
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Query Result Caching</h2>
+                                <div class="caching-section">
+                                    <h3>Cache Database Queries</h3>
+                                    <div class="code-example">
+                                        <pre><code>function get_popular_posts($limit = 10) {
+    $cache_key = 'popular_posts_' . $limit;
+    
+    // Try cache first
+    $posts = get_transient($cache_key);
+    
+    if (false === $posts) {
+        global $wpdb;
+        
+        $posts = $wpdb->get_results($wpdb->prepare("
+            SELECT p.*, COUNT(pm.meta_id) as view_count
+            FROM {$wpdb->posts} p
+            LEFT JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+            WHERE pm.meta_key = 'post_views'
+            AND p.post_status = 'publish'
+            GROUP BY p.ID
+            ORDER BY view_count DESC
+            LIMIT %d
+        ", $limit));
+        
+        // Cache for 6 hours
+        set_transient($cache_key, $posts, 6 * HOUR_IN_SECONDS);
+    }
+    
+    return $posts;
+}
+
+// Clear cache when posts are updated
+add_action('save_post', function($post_id) {
+    // Clear all popular posts caches
+    delete_transient('popular_posts_5');
+    delete_transient('popular_posts_10');
+});</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Fragment Caching</h2>
+                                <div class="caching-section">
+                                    <h3>Cache HTML Fragments</h3>
+                                    <div class="code-example">
+                                        <pre><code>function get_cached_widget($widget_id) {
+    $cache_key = 'widget_html_' . $widget_id;
+    $html = get_transient($cache_key);
+    
+    if (false === $html) {
+        ob_start();
+        // Generate widget HTML
+        render_widget($widget_id);
+        $html = ob_get_clean();
+        
+        // Cache for 1 day
+        set_transient($cache_key, $html, DAY_IN_SECONDS);
+    }
+    
+    return $html;
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Cache Invalidation</h2>
+                                <div class="caching-section">
+                                    <h3>Smart Cache Clearing</h3>
+                                    <div class="code-example">
+                                        <pre><code>class Smart_Cache {
+    
+    public function invalidate_post_cache($post_id) {
+        // Clear specific post cache
+        delete_transient('post_data_' . $post_id);
+        
+        // Clear related caches
+        $categories = wp_get_post_categories($post_id);
+        foreach ($categories as $cat_id) {
+            delete_transient('category_posts_' . $cat_id);
+        }
+        
+        // Clear archive caches
+        delete_transient('recent_posts');
+        delete_transient('popular_posts');
+    }
+    
+    public function setup_hooks() {
+        // Clear cache on post save
+        add_action('save_post', array($this, 'invalidate_post_cache'));
+        
+        // Clear cache on comment
+        add_action('comment_post', function($comment_id) {
+            $comment = get_comment($comment_id);
+            $this->invalidate_post_cache($comment->comment_post_ID);
+        });
+    }
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Best Practices</h2>
+                                <ul>
+                                    <li>Use appropriate expiration times</li>
+                                    <li>Implement cache warming strategies</li>
+                                    <li>Clear cache on relevant events</li>
+                                    <li>Use unique cache keys</li>
+                                    <li>Monitor cache hit rates</li>
+                                    <li>Consider external caching solutions</li>
+                                    <li>Don't cache user-specific data globally</li>
+                                </ul>
+                            </section>
+
+                            <section class="resources">
+                                <h2>Resources</h2>
+                                <ul>
+                                    <li><a href="https://developer.wordpress.org/apis/transients/">Transients API</a></li>
+                                    <li><a href="https://developer.wordpress.org/reference/classes/wp_object_cache/">WP Object Cache</a></li>
+                                </ul>
+                            </section>
+                        </div>
+
+                        <div class="lesson-navigation">
+                            <a href="/09module/performance_optimization.html" class="lesson-nav-button prev">Previous: Performance</a>
+                            <button class="complete-lesson-btn">Mark as Complete</button>
+                            <a href="/09module/homework_security_audit.html" class="lesson-nav-button next">Next: Homework</a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </main>
+
+        <footer class="site-footer">
+            <div class="footer-container">
+                <p>&copy; 2024 PHP WordPress Course. All rights reserved.</p>
+            </div>
+        </footer>
+    </div>
+    
+    <script src="/assets/js/main.js"></script>
+    <script src="/assets/js/progress-tracker.js"></script>
+</body>
+</html>

@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    
+    <!-- SEO Meta Tags -->
+    <title>AJAX Security with Nonces - PHP WordPress Course</title>
+    <meta name="description" content="Master WordPress AJAX security using nonces. Learn to protect AJAX endpoints from CSRF attacks and implement robust security measures.">
+    <meta name="keywords" content="PHP, WordPress, AJAX security, nonces, CSRF protection, plugin security">
+    <meta name="author" content="PHP WordPress Course">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/favicon.png">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-enhanced.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-toggle.css">
+    
+    <!-- Custom styles for this lesson -->
+    <style>
+        .security-header {
+            background: linear-gradient(135deg, #dc2626 0%, #f97316 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .security-concept {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .security-concept h3 {
+            color: #dc2626;
+            margin-top: 0;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 1rem;
+        }
+
+        .code-example {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+        }
+
+        .code-example pre {
+            margin: 0;
+            white-space: pre-wrap;
+        }
+
+        .threat-model {
+            background: #fee2e2;
+            border: 2px solid #ef4444;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .threat-model h4 {
+            color: #b91c1c;
+            margin-top: 0;
+        }
+
+        .security-checklist {
+            background: white;
+            border: 2px solid #10b981;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .checklist-item {
+            display: flex;
+            align-items: flex-start;
+            margin: 0.75rem 0;
+        }
+
+        .checklist-item input[type="checkbox"] {
+            margin-right: 0.75rem;
+            margin-top: 0.25rem;
+        }
+
+        .tip-box {
+            background: #f0fdf4;
+            border: 2px solid #10b981;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .warning-box {
+            background: #fef3c7;
+            border: 2px solid #fbbf24;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .danger-box {
+            background: #fee2e2;
+            border: 2px solid #ef4444;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .vulnerability-example {
+            background: #1f2937;
+            color: #ef4444;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            border: 2px solid #ef4444;
+        }
+
+        .secure-example {
+            background: #064e3b;
+            color: #10b981;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            border: 2px solid #10b981;
+        }
+    </style>
+</head>
+<body>
+    <!-- Skip to main content -->
+    <a href="#main-content" class="sr-only">Skip to main content</a>
+    
+    <div class="page-wrapper">
+        <!-- Header -->
+        <header class="site-header" role="banner">
+            <div class="header-container">
+                <div class="site-branding">
+                    <a href="/" class="site-logo">
+                        <h1 class="site-title">PHP WordPress Development</h1>
+                    </a>
+                </div>
+                
+                <nav class="main-navigation" role="navigation" aria-label="Main navigation">
+                    <button class="mobile-menu-btn" aria-label="Toggle navigation" aria-expanded="false">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    
+                    <div class="nav-menu">
+                        <ul class="nav-list">
+                            <li class="nav-item"><a href="/" class="nav-link">Home</a></li>
+                            <li class="nav-item dropdown">
+                                <button class="nav-link dropdown-toggle active" aria-haspopup="true">Modules</button>
+                                <div class="dropdown-menu">
+                                    <a href="/module1.html" class="dropdown-item">Module 1: Web Fundamentals</a>
+                                    <a href="/module2.html" class="dropdown-item">Module 2: PHP Fundamentals</a>
+                                    <a href="/module3.html" class="dropdown-item">Module 3: MySQL Database</a>
+                                    <a href="/module4.html" class="dropdown-item">Module 4: WordPress & Docker</a>
+                                    <a href="/module5.html" class="dropdown-item">Module 5: Theme Development</a>
+                                    <a href="/module6.html" class="dropdown-item active">Module 6: Plugin Development</a>
+                                    <a href="/module7.html" class="dropdown-item">Module 7: Advanced WordPress</a>
+                                    <a href="/module8.html" class="dropdown-item">Module 8: Deployment</a>
+                                    <a href="/module9.html" class="dropdown-item">Module 9: Final Project</a>
+                                </div>
+                            </li>
+                            <li class="nav-item"><a href="/resources.html" class="nav-link">Resources</a></li>
+                            <li class="nav-item"><a href="/about.html" class="nav-link">About</a></li>
+                        </ul>
+                    </div>
+                </nav>
+                
+                <div class="search-container">
+                    <div class="search-input-wrapper">
+                        <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                        </svg>
+                        <input type="search" class="search-input" placeholder="Search lessons..." aria-label="Search">
+                    </div>
+                    <div class="search-results"></div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-header">
+                <h2 class="progress-title">Course Progress</h2>
+                <span class="progress-text">Loading...</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-bar-fill">
+                    <span class="progress-bar-text"></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Breadcrumb -->
+        <nav class="breadcrumb container" aria-label="Breadcrumb">
+            <ol class="breadcrumb-list">
+                <li class="breadcrumb-item">
+                    <a href="/">Home</a>
+                    <span class="breadcrumb-separator">/</span>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="/module6.html">Module 6</a>
+                    <span class="breadcrumb-separator">/</span>
+                </li>
+                <li class="breadcrumb-item">
+                    <span aria-current="page">AJAX Security with Nonces</span>
+                </li>
+            </ol>
+        </nav>
+        
+        <!-- Main Content -->
+        <main id="main-content" class="main-content" role="main">
+            <div class="container">
+                <div class="content-with-sidebar">
+                    <!-- Sidebar -->
+                    <aside class="sidebar">
+                        <div class="sidebar-nav">
+                            <h3 class="sidebar-title">Module 6: Plugin Development</h3>
+                            <div class="sidebar-section">
+                                <h4 class="sidebar-section-title">Session 7: AJAX in WordPress</h4>
+                                <ul class="sidebar-menu">
+                                    <li><a class="sidebar-link" href="/07module/ajax_overview.html">AJAX in WordPress Overview</a></li>
+                                    <li><a class="sidebar-link" href="/07module/ajax_handlers.html">Setting up AJAX Handlers</a></li>
+                                    <li><a class="sidebar-link" href="/07module/admin_frontend_ajax.html">Admin and Frontend AJAX</a></li>
+                                    <li class="active"><a class="sidebar-link active" href="/07module/ajax_security.html">AJAX Security with Nonces</a></li>
+                                    <li><a class="sidebar-link" href="/07module/ajax_error_handling.html">Error Handling in AJAX</a></li>
+                                    <li><a class="sidebar-link" href="/07module/loading_scripts.html">Loading Scripts for AJAX</a></li>
+                                    <li><a class="sidebar-link" href="/07module/homework_ajax_plugin.html">Homework: AJAX Plugin</a></li>
+                                </ul>
+                            </div>
+                            <div class="sidebar-section">
+                                <h4 class="sidebar-section-title">Quick Links</h4>
+                                <ul class="sidebar-menu">
+                                    <li><a class="sidebar-link" href="/module6.html">Module Overview</a></li>
+                                    <li><a class="sidebar-link" href="/07module/admin_frontend_ajax.html">← Previous Lesson</a></li>
+                                    <li><a class="sidebar-link next-session" href="/07module/ajax_error_handling.html">Next Lesson →</a></li>
+                                    <li><a class="sidebar-link" href="/">← Course Home</a></li>
+                                    <li><a class="sidebar-link" href="/resources.html">Resources</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </aside>
+                    
+                    <!-- Main Lesson Content -->
+                    <article class="lesson-content">
+                        <div class="security-header">
+                            <h1>🔐 AJAX Security with Nonces</h1>
+                            <p class="lead">Protect your AJAX endpoints from attacks</p>
+                            <p>Master WordPress nonces and implement bulletproof AJAX security</p>
+                        </div>
+
+                        <!-- Learning Objectives -->
+                        <div class="lesson-objectives">
+                            <h2>Learning Objectives</h2>
+                            <ul>
+                                <li>Understand WordPress nonces and their purpose</li>
+                                <li>Implement nonces in AJAX requests</li>
+                                <li>Protect against CSRF attacks</li>
+                                <li>Validate and verify security tokens</li>
+                                <li>Handle nonce expiration and renewal</li>
+                                <li>Implement additional security layers</li>
+                            </ul>
+                        </div>
+                        
+                        <!-- Lesson Body -->
+                        <div class="lesson-body">
+                            <!-- Understanding Nonces -->
+                            <section>
+                                <h2>Understanding WordPress Nonces</h2>
+                                
+                                <div class="security-concept">
+                                    <h3>What is a Nonce?</h3>
+                                    <p><strong>Nonce</strong> stands for "Number used ONCE" - but in WordPress, it's a security token valid for 12-24 hours.</p>
+                                    
+                                    <div class="tip-box">
+                                        <h4>📚 Key Facts:</h4>
+                                        <ul>
+                                            <li>User-specific and action-specific</li>
+                                            <li>Protects against CSRF attacks</li>
+                                            <li>Changes every 12 hours</li>
+                                            <li>Valid for up to 24 hours</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Complete Implementation -->
+                            <section>
+                                <h2>Complete Secure Implementation</h2>
+                                
+                                <div class="security-concept">
+                                    <h3>PHP: Server-Side Security</h3>
+                                    
+                                    <div class="code-example">
+                                        <pre><code class="language-php"><?php
+// Enqueue scripts with nonce
+function enqueue_secure_ajax() {
+    wp_enqueue_script('secure-ajax', plugin_dir_url(__FILE__) . 'ajax.js', array('jquery'));
+    
+    // Create and pass nonce
+    wp_localize_script('secure-ajax', 'ajax_object', array(
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('ajax_security_nonce')
+    ));
+}
+add_action('wp_enqueue_scripts', 'enqueue_secure_ajax');
+
+// Secure AJAX handler
+function secure_ajax_handler() {
+    // 1. Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'ajax_security_nonce')) {
+        wp_die('Security check failed');
+    }
+    
+    // 2. Check capabilities
+    if (!current_user_can('edit_posts')) {
+        wp_die('Insufficient permissions');
+    }
+    
+    // 3. Validate input
+    $data = sanitize_text_field($_POST['data']);
+    
+    // 4. Process request
+    // Your secure logic here
+    
+    wp_send_json_success('Processed securely');
+}
+add_action('wp_ajax_secure_action', 'secure_ajax_handler');
+add_action('wp_ajax_nopriv_secure_action', 'secure_ajax_handler');</code></pre>
+                                    </div>
+                                </div>
+                                
+                                <div class="security-concept">
+                                    <h3>JavaScript: Client-Side Security</h3>
+                                    
+                                    <div class="code-example">
+                                        <pre><code class="language-javascript">jQuery(document).ready(function($) {
+    $('.ajax-button').on('click', function(e) {
+        e.preventDefault();
+        
+        $.ajax({
+            url: ajax_object.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'secure_action',
+                nonce: ajax_object.nonce,  // Include nonce
+                data: 'user_data'
+            },
+            success: function(response) {
+                if (response.success) {
+                    console.log('Success:', response.data);
+                }
+            },
+            error: function(xhr) {
+                console.error('Security error:', xhr.responseText);
+            }
+        });
+    });
+});</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Common Threats -->
+                            <section>
+                                <h2>Security Threats & Solutions</h2>
+                                
+                                <div class="threat-model">
+                                    <h4>🚨 CSRF Attack Prevention</h4>
+                                    
+                                    <div class="vulnerability-example">
+                                        <h4>❌ Vulnerable Code</h4>
+                                        <pre><code>// NO nonce verification - DANGEROUS!
+function insecure_handler() {
+    update_option('critical_setting', $_POST['value']);
+    wp_die('Updated');
+}</code></pre>
+                                    </div>
+                                    
+                                    <div class="secure-example">
+                                        <h4>✅ Secure Code</h4>
+                                        <pre><code>// With nonce verification - SECURE
+function secure_handler() {
+    check_ajax_referer('my_nonce', 'security');
+    update_option('critical_setting', sanitize_text_field($_POST['value']));
+    wp_die('Updated securely');
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Security Checklist -->
+                            <section>
+                                <h2>AJAX Security Checklist</h2>
+                                
+                                <div class="security-checklist">
+                                    <h3>✅ Essential Security Measures</h3>
+                                    
+                                    <div class="checklist-item">
+                                        <input type="checkbox" id="check1">
+                                        <label for="check1">Implement nonce verification on all endpoints</label>
+                                    </div>
+                                    
+                                    <div class="checklist-item">
+                                        <input type="checkbox" id="check2">
+                                        <label for="check2">Use action-specific nonces</label>
+                                    </div>
+                                    
+                                    <div class="checklist-item">
+                                        <input type="checkbox" id="check3">
+                                        <label for="check3">Check user capabilities</label>
+                                    </div>
+                                    
+                                    <div class="checklist-item">
+                                        <input type="checkbox" id="check4">
+                                        <label for="check4">Sanitize all input data</label>
+                                    </div>
+                                    
+                                    <div class="checklist-item">
+                                        <input type="checkbox" id="check5">
+                                        <label for="check5">Implement rate limiting</label>
+                                    </div>
+                                    
+                                    <div class="checklist-item">
+                                        <input type="checkbox" id="check6">
+                                        <label for="check6">Handle nonce expiration</label>
+                                    </div>
+                                    
+                                    <div class="checklist-item">
+                                        <input type="checkbox" id="check7">
+                                        <label for="check7">Use HTTPS for all requests</label>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Best Practices -->
+                            <section>
+                                <h2>Best Practices</h2>
+                                
+                                <div class="tip-box">
+                                    <h4>✅ Do's</h4>
+                                    <ul>
+                                        <li>Always use wp_create_nonce() and wp_verify_nonce()</li>
+                                        <li>Create action-specific nonces</li>
+                                        <li>Implement automatic nonce refresh</li>
+                                        <li>Combine nonces with capability checks</li>
+                                        <li>Log failed security checks</li>
+                                        <li>Use HTTPS to prevent token interception</li>
+                                    </ul>
+                                </div>
+                                
+                                <div class="danger-box">
+                                    <h4>❌ Don'ts</h4>
+                                    <ul>
+                                        <li>Don't rely on client-side security alone</li>
+                                        <li>Don't expose nonces in URLs</li>
+                                        <li>Don't use the same nonce for all actions</li>
+                                        <li>Don't store nonces in localStorage</li>
+                                        <li>Don't skip verification for "simple" requests</li>
+                                        <li>Don't reveal security details in errors</li>
+                                    </ul>
+                                </div>
+                            </section>
+
+                            <!-- Practice Exercise -->
+                            <section>
+                                <h2>Practice Exercise</h2>
+                                <div class="alert alert-success">
+                                    <div class="alert-icon">💻</div>
+                                    <div class="alert-content">
+                                        <div class="alert-title">Build Secure AJAX Features</div>
+                                        <div class="alert-message">
+                                            <p>Create a secure voting system with:</p>
+                                            <ol>
+                                                <li>User voting via AJAX</li>
+                                                <li>One vote per user enforcement</li>
+                                                <li>Guest voting with IP tracking</li>
+                                                <li>Rate limiting</li>
+                                                <li>Nonce refresh for long sessions</li>
+                                                <li>Security event logging</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Resources -->
+                            <section class="resources">
+                                <h2>Additional Resources</h2>
+                                <ul>
+                                    <li><a href="https://developer.wordpress.org/reference/functions/wp_create_nonce/" target="_blank">wp_create_nonce() Documentation</a></li>
+                                    <li><a href="https://developer.wordpress.org/reference/functions/wp_verify_nonce/" target="_blank">wp_verify_nonce() Documentation</a></li>
+                                    <li><a href="https://developer.wordpress.org/plugins/security/nonces/" target="_blank">WordPress Nonces Guide</a></li>
+                                    <li><a href="https://owasp.org/www-community/attacks/csrf" target="_blank">OWASP CSRF Attack Documentation</a></li>
+                                </ul>
+                            </section>
+                        </div>
+
+                        <!-- Lesson Navigation -->
+                        <div class="lesson-navigation">
+                            <a href="/07module/admin_frontend_ajax.html" class="lesson-nav-button prev">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"/>
+                                </svg>
+                                <span>
+                                    <small>Previous</small><br>
+                                    Admin and Frontend AJAX
+                                </span>
+                            </a>
+                            
+                            <button class="complete-lesson-btn">
+                                Mark as Complete
+                            </button>
+                            
+                            <a href="/07module/ajax_error_handling.html" class="lesson-nav-button next">
+                                <span>
+                                    <small>Next</small><br>
+                                    Error Handling in AJAX
+                                </span>
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="site-footer" role="contentinfo">
+            <div class="footer-container">
+                <div class="footer-content">
+                    <div class="footer-section footer-about">
+                        <h3>PHP WordPress Development</h3>
+                        <p>Complete Web Development Course</p>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Quick Links</h4>
+                        <ul class="footer-links">
+                            <li><a href="/">Home</a></li>
+                            <li><a href="/module6.html">Module 6</a></li>
+                            <li><a href="/resources.html">Resources</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Support</h4>
+                        <ul class="footer-links">
+                            <li><a href="/about.html">About</a></li>
+                            <li><a href="/contact.html">Contact</a></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="footer-bottom">
+                    <p>&copy; 2024 PHP WordPress Course. All rights reserved.</p>
+                    <p>This course material is for educational purposes only.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="/assets/js/prism.js"></script>
+    <script src="/assets/js/main.js"></script>
+    <script src="/assets/js/sidebar-toggle.js"></script>
+    <script src="/assets/js/progress-tracker.js"></script>
+    <script src="/assets/js/search.js"></script>
+    <script src="/assets/js/theme-toggle.js"></script>
+</body>
+</html>

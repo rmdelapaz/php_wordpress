@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extending Existing Endpoints - WordPress REST API</title>
+    <meta name="description" content="Learn how to extend and modify existing WordPress REST API endpoints. Add custom fields and modify responses.">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-enhanced.css">
+    <style>
+        .extending-header {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .extend-section {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+        .code-example {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <header class="site-header">
+            <div class="header-container">
+                <div class="site-branding">
+                    <a href="/" class="site-logo">
+                        <h1 class="site-title">PHP WordPress Development</h1>
+                    </a>
+                </div>
+            </div>
+        </header>
+        
+        <nav class="breadcrumb container">
+            <ol class="breadcrumb-list">
+                <li class="breadcrumb-item"><a href="/">Home</a> /</li>
+                <li class="breadcrumb-item"><a href="/module6.html">Module 6</a> /</li>
+                <li class="breadcrumb-item">Extending Existing Endpoints</li>
+            </ol>
+        </nav>
+        
+        <main class="main-content">
+            <div class="container">
+                <div class="content-with-sidebar">
+                    <aside class="sidebar">
+                        <div class="sidebar-nav">
+                            <h3 class="sidebar-title">Session 8: REST API</h3>
+                            <ul class="sidebar-menu">
+                                <li><a href="/08module/rest_api_intro.html">REST API Introduction</a></li>
+                                <li><a href="/08module/endpoints_routes.html">Endpoints and Routes</a></li>
+                                <li><a href="/08module/using_rest_api.html">Using REST API in Plugins</a></li>
+                                <li><a href="/08module/custom_endpoints.html">Creating Custom Endpoints</a></li>
+                                <li><a href="/08module/authentication.html">Authentication & Permissions</a></li>
+                                <li class="active"><a href="/08module/extending_endpoints.html">Extending Existing Endpoints</a></li>
+                                <li><a href="/08module/homework_rest_api.html">Homework: REST API Plugin</a></li>
+                            </ul>
+                        </div>
+                    </aside>
+                    
+                    <article class="lesson-content">
+                        <div class="extending-header">
+                            <h1>🔧 Extending Existing Endpoints</h1>
+                            <p class="lead">Modify and enhance WordPress core REST API endpoints</p>
+                        </div>
+
+                        <div class="lesson-objectives">
+                            <h2>Learning Objectives</h2>
+                            <ul>
+                                <li>Add custom fields to existing endpoints</li>
+                                <li>Modify response data</li>
+                                <li>Filter API queries</li>
+                                <li>Add custom meta fields</li>
+                                <li>Register additional fields</li>
+                                <li>Customize collection parameters</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="lesson-body">
+                            <section>
+                                <h2>Adding Custom Fields</h2>
+                                <div class="extend-section">
+                                    <h3>Register Additional Fields</h3>
+                                    <div class="code-example">
+                                        <pre><code>// Add custom fields to posts endpoint
+add_action('rest_api_init', function() {
+    // Simple field
+    register_rest_field('post', 'custom_field', array(
+        'get_callback' => function($post) {
+            return get_post_meta($post['id'], 'custom_field', true);
+        },
+        'update_callback' => function($value, $post) {
+            update_post_meta($post->ID, 'custom_field', $value);
+        },
+        'schema' => array(
+            'description' => 'Custom field for posts',
+            'type' => 'string',
+        ),
+    ));
+    
+    // Computed field
+    register_rest_field('post', 'reading_time', array(
+        'get_callback' => function($post) {
+            $content = $post['content']['rendered'];
+            $word_count = str_word_count(strip_tags($content));
+            return ceil($word_count / 200) . ' min read';
+        },
+    ));
+});</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Modifying Responses</h2>
+                                <div class="extend-section">
+                                    <h3>Filter Response Data</h3>
+                                    <div class="code-example">
+                                        <pre><code>// Modify posts response
+add_filter('rest_prepare_post', function($response, $post, $request) {
+    // Add custom data
+    $response->data['custom_data'] = array(
+        'likes' => get_post_meta($post->ID, 'likes', true),
+        'views' => get_post_meta($post->ID, 'views', true),
+    );
+    
+    // Add links
+    $response->add_link(
+        'custom',
+        rest_url('myplugin/v1/posts/' . $post->ID)
+    );
+    
+    return $response;
+}, 10, 3);</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Custom Query Parameters</h2>
+                                <div class="extend-section">
+                                    <h3>Add Collection Parameters</h3>
+                                    <div class="code-example">
+                                        <pre><code>// Add custom query parameters
+add_filter('rest_post_collection_params', function($params) {
+    $params['featured'] = array(
+        'description' => 'Filter featured posts',
+        'type' => 'boolean',
+        'default' => false,
+    );
+    return $params;
+});
+
+// Handle custom parameters
+add_filter('rest_post_query', function($args, $request) {
+    if ($request->get_param('featured')) {
+        $args['meta_query'] = array(
+            array(
+                'key' => 'featured',
+                'value' => '1',
+            ),
+        );
+    }
+    return $args;
+}, 10, 2);</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Meta Fields Registration</h2>
+                                <div class="extend-section">
+                                    <h3>Register Meta for REST API</h3>
+                                    <div class="code-example">
+                                        <pre><code>// Register meta fields
+register_meta('post', 'custom_meta', array(
+    'type' => 'string',
+    'single' => true,
+    'show_in_rest' => true,
+    'auth_callback' => function() {
+        return current_user_can('edit_posts');
+    },
+));
+
+// Register with schema
+register_meta('post', 'product_data', array(
+    'type' => 'object',
+    'single' => true,
+    'show_in_rest' => array(
+        'schema' => array(
+            'type' => 'object',
+            'properties' => array(
+                'price' => array('type' => 'number'),
+                'sku' => array('type' => 'string'),
+                'stock' => array('type' => 'integer'),
+            ),
+        ),
+    ),
+));</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Removing Fields</h2>
+                                <div class="extend-section">
+                                    <h3>Hide Sensitive Data</h3>
+                                    <div class="code-example">
+                                        <pre><code>// Remove fields from response
+add_filter('rest_prepare_user', function($response, $user, $request) {
+    // Remove email for non-admins
+    if (!current_user_can('list_users')) {
+        unset($response->data['email']);
+        unset($response->data['registered_date']);
+    }
+    return $response;
+}, 10, 3);
+
+// Unregister field
+add_action('rest_api_init', function() {
+    unregister_rest_field('post', 'guid');
+}, 20);</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Best Practices</h2>
+                                <ul>
+                                    <li>Always validate and sanitize custom fields</li>
+                                    <li>Use appropriate permission callbacks</li>
+                                    <li>Document your modifications</li>
+                                    <li>Don't remove core fields others might depend on</li>
+                                    <li>Test with different user roles</li>
+                                    <li>Consider backward compatibility</li>
+                                    <li>Cache computed fields when possible</li>
+                                </ul>
+                            </section>
+
+                            <section class="resources">
+                                <h2>Resources</h2>
+                                <ul>
+                                    <li><a href="https://developer.wordpress.org/rest-api/extending-the-rest-api/modifying-responses/">Modifying Responses</a></li>
+                                    <li><a href="https://developer.wordpress.org/rest-api/extending-the-rest-api/adding-custom-endpoints/">Adding Custom Fields</a></li>
+                                </ul>
+                            </section>
+                        </div>
+
+                        <div class="lesson-navigation">
+                            <a href="/08module/authentication.html" class="lesson-nav-button prev">Previous: Authentication</a>
+                            <button class="complete-lesson-btn">Mark as Complete</button>
+                            <a href="/08module/homework_rest_api.html" class="lesson-nav-button next">Next: Homework</a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </main>
+
+        <footer class="site-footer">
+            <div class="footer-container">
+                <p>&copy; 2024 PHP WordPress Course. All rights reserved.</p>
+            </div>
+        </footer>
+    </div>
+    
+    <script src="/assets/js/main.js"></script>
+    <script src="/assets/js/progress-tracker.js"></script>
+</body>
+</html>

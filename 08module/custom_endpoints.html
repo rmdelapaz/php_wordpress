@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Creating Custom Endpoints - WordPress REST API</title>
+    <meta name="description" content="Learn how to create custom REST API endpoints in WordPress. Build your own API routes for plugins and custom functionality.">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-enhanced.css">
+    <style>
+        .custom-endpoints-header {
+            background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .endpoint-section {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+        .code-example {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <header class="site-header">
+            <div class="header-container">
+                <div class="site-branding">
+                    <a href="/" class="site-logo">
+                        <h1 class="site-title">PHP WordPress Development</h1>
+                    </a>
+                </div>
+            </div>
+        </header>
+        
+        <nav class="breadcrumb container">
+            <ol class="breadcrumb-list">
+                <li class="breadcrumb-item"><a href="/">Home</a> /</li>
+                <li class="breadcrumb-item"><a href="/module6.html">Module 6</a> /</li>
+                <li class="breadcrumb-item">Creating Custom Endpoints</li>
+            </ol>
+        </nav>
+        
+        <main class="main-content">
+            <div class="container">
+                <div class="content-with-sidebar">
+                    <aside class="sidebar">
+                        <div class="sidebar-nav">
+                            <h3 class="sidebar-title">Session 8: REST API</h3>
+                            <ul class="sidebar-menu">
+                                <li><a href="/08module/rest_api_intro.html">REST API Introduction</a></li>
+                                <li><a href="/08module/endpoints_routes.html">Endpoints and Routes</a></li>
+                                <li><a href="/08module/using_rest_api.html">Using REST API in Plugins</a></li>
+                                <li class="active"><a href="/08module/custom_endpoints.html">Creating Custom Endpoints</a></li>
+                                <li><a href="/08module/authentication.html">Authentication & Permissions</a></li>
+                                <li><a href="/08module/extending_endpoints.html">Extending Existing Endpoints</a></li>
+                                <li><a href="/08module/homework_rest_api.html">Homework: REST API Plugin</a></li>
+                            </ul>
+                        </div>
+                    </aside>
+                    
+                    <article class="lesson-content">
+                        <div class="custom-endpoints-header">
+                            <h1>🛠️ Creating Custom Endpoints</h1>
+                            <p class="lead">Build your own REST API endpoints for custom functionality</p>
+                        </div>
+
+                        <div class="lesson-objectives">
+                            <h2>Learning Objectives</h2>
+                            <ul>
+                                <li>Register custom REST API routes</li>
+                                <li>Handle different HTTP methods</li>
+                                <li>Validate and sanitize parameters</li>
+                                <li>Implement permission callbacks</li>
+                                <li>Return proper responses</li>
+                                <li>Document custom endpoints</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="lesson-body">
+                            <section>
+                                <h2>Registering Custom Routes</h2>
+                                <div class="endpoint-section">
+                                    <h3>Basic Route Registration</h3>
+                                    <div class="code-example">
+                                        <pre><code>add_action('rest_api_init', function() {
+    register_rest_route('myplugin/v1', '/books', array(
+        'methods' => 'GET',
+        'callback' => 'get_books',
+        'permission_callback' => '__return_true',
+    ));
+});
+
+function get_books($request) {
+    $args = array(
+        'post_type' => 'book',
+        'posts_per_page' => 10,
+    );
+    
+    $query = new WP_Query($args);
+    $books = array();
+    
+    foreach ($query->posts as $post) {
+        $books[] = array(
+            'id' => $post->ID,
+            'title' => $post->post_title,
+            'content' => $post->post_content,
+        );
+    }
+    
+    return rest_ensure_response($books);
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Complete CRUD Endpoints</h2>
+                                <div class="endpoint-section">
+                                    <h3>Full CRUD Implementation</h3>
+                                    <div class="code-example">
+                                        <pre><code>class My_Custom_API {
+    
+    public function __construct() {
+        add_action('rest_api_init', array($this, 'register_routes'));
+    }
+    
+    public function register_routes() {
+        $namespace = 'myplugin/v1';
+        
+        // Collection endpoints
+        register_rest_route($namespace, '/items', array(
+            array(
+                'methods' => WP_REST_Server::READABLE,
+                'callback' => array($this, 'get_items'),
+                'permission_callback' => '__return_true',
+                'args' => array(
+                    'page' => array(
+                        'default' => 1,
+                        'sanitize_callback' => 'absint',
+                    ),
+                    'per_page' => array(
+                        'default' => 10,
+                        'sanitize_callback' => 'absint',
+                    ),
+                ),
+            ),
+            array(
+                'methods' => WP_REST_Server::CREATABLE,
+                'callback' => array($this, 'create_item'),
+                'permission_callback' => array($this, 'create_permission'),
+                'args' => array(
+                    'title' => array(
+                        'required' => true,
+                        'sanitize_callback' => 'sanitize_text_field',
+                    ),
+                    'content' => array(
+                        'required' => true,
+                        'sanitize_callback' => 'wp_kses_post',
+                    ),
+                ),
+            ),
+        ));
+        
+        // Single item endpoints
+        register_rest_route($namespace, '/items/(?P<id>\d+)', array(
+            array(
+                'methods' => WP_REST_Server::READABLE,
+                'callback' => array($this, 'get_item'),
+                'permission_callback' => '__return_true',
+            ),
+            array(
+                'methods' => WP_REST_Server::EDITABLE,
+                'callback' => array($this, 'update_item'),
+                'permission_callback' => array($this, 'update_permission'),
+            ),
+            array(
+                'methods' => WP_REST_Server::DELETABLE,
+                'callback' => array($this, 'delete_item'),
+                'permission_callback' => array($this, 'delete_permission'),
+            ),
+        ));
+    }
+    
+    // GET all items
+    public function get_items($request) {
+        $page = $request->get_param('page');
+        $per_page = $request->get_param('per_page');
+        
+        $args = array(
+            'post_type' => 'custom_item',
+            'paged' => $page,
+            'posts_per_page' => $per_page,
+        );
+        
+        $query = new WP_Query($args);
+        $items = array();
+        
+        foreach ($query->posts as $post) {
+            $items[] = $this->prepare_item($post);
+        }
+        
+        $response = rest_ensure_response($items);
+        $response->header('X-WP-Total', $query->found_posts);
+        $response->header('X-WP-TotalPages', $query->max_num_pages);
+        
+        return $response;
+    }
+    
+    // GET single item
+    public function get_item($request) {
+        $id = $request->get_param('id');
+        $post = get_post($id);
+        
+        if (!$post) {
+            return new WP_Error('not_found', 'Item not found', array('status' => 404));
+        }
+        
+        return rest_ensure_response($this->prepare_item($post));
+    }
+    
+    // CREATE item
+    public function create_item($request) {
+        $post_data = array(
+            'post_title' => $request->get_param('title'),
+            'post_content' => $request->get_param('content'),
+            'post_type' => 'custom_item',
+            'post_status' => 'publish',
+        );
+        
+        $post_id = wp_insert_post($post_data);
+        
+        if (is_wp_error($post_id)) {
+            return $post_id;
+        }
+        
+        $post = get_post($post_id);
+        return rest_ensure_response($this->prepare_item($post));
+    }
+    
+    // UPDATE item
+    public function update_item($request) {
+        $id = $request->get_param('id');
+        
+        $post_data = array(
+            'ID' => $id,
+            'post_title' => $request->get_param('title'),
+            'post_content' => $request->get_param('content'),
+        );
+        
+        $result = wp_update_post($post_data);
+        
+        if (is_wp_error($result)) {
+            return $result;
+        }
+        
+        $post = get_post($id);
+        return rest_ensure_response($this->prepare_item($post));
+    }
+    
+    // DELETE item
+    public function delete_item($request) {
+        $id = $request->get_param('id');
+        $force = $request->get_param('force');
+        
+        $result = wp_delete_post($id, $force);
+        
+        if (!$result) {
+            return new WP_Error('delete_failed', 'Failed to delete item', array('status' => 500));
+        }
+        
+        return rest_ensure_response(array('deleted' => true));
+    }
+    
+    // Prepare item for response
+    private function prepare_item($post) {
+        return array(
+            'id' => $post->ID,
+            'title' => $post->post_title,
+            'content' => $post->post_content,
+            'date' => $post->post_date,
+            'author' => $post->post_author,
+            'status' => $post->post_status,
+        );
+    }
+    
+    // Permission callbacks
+    public function create_permission() {
+        return current_user_can('edit_posts');
+    }
+    
+    public function update_permission($request) {
+        $id = $request->get_param('id');
+        return current_user_can('edit_post', $id);
+    }
+    
+    public function delete_permission($request) {
+        $id = $request->get_param('id');
+        return current_user_can('delete_post', $id);
+    }
+}
+
+new My_Custom_API();</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Parameter Validation</h2>
+                                <div class="endpoint-section">
+                                    <h3>Validate and Sanitize Input</h3>
+                                    <div class="code-example">
+                                        <pre><code>register_rest_route('myplugin/v1', '/search', array(
+    'methods' => 'GET',
+    'callback' => 'search_handler',
+    'permission_callback' => '__return_true',
+    'args' => array(
+        'term' => array(
+            'required' => true,
+            'type' => 'string',
+            'minLength' => 3,
+            'maxLength' => 100,
+            'sanitize_callback' => 'sanitize_text_field',
+            'validate_callback' => function($value) {
+                return strlen($value) >= 3;
+            },
+        ),
+        'category' => array(
+            'type' => 'integer',
+            'minimum' => 1,
+            'sanitize_callback' => 'absint',
+        ),
+        'orderby' => array(
+            'type' => 'string',
+            'default' => 'date',
+            'enum' => array('date', 'title', 'modified'),
+        ),
+    ),
+));</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Error Handling</h2>
+                                <div class="endpoint-section">
+                                    <h3>Proper Error Responses</h3>
+                                    <div class="code-example">
+                                        <pre><code>function handle_api_request($request) {
+    // Check if resource exists
+    $item = get_item($request->get_param('id'));
+    
+    if (!$item) {
+        return new WP_Error(
+            'item_not_found',
+            'The requested item does not exist',
+            array('status' => 404)
+        );
+    }
+    
+    // Check permissions
+    if (!current_user_can('read_private_items')) {
+        return new WP_Error(
+            'forbidden',
+            'You do not have permission to access this resource',
+            array('status' => 403)
+        );
+    }
+    
+    // Validate data
+    if (empty($request->get_param('required_field'))) {
+        return new WP_Error(
+            'missing_field',
+            'Required field is missing',
+            array('status' => 400)
+        );
+    }
+    
+    // Success response
+    return rest_ensure_response(array(
+        'success' => true,
+        'data' => $item,
+    ));
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Custom Namespacing</h2>
+                                <div class="endpoint-section">
+                                    <h3>Organize Your API</h3>
+                                    <div class="code-example">
+                                        <pre><code>// Good namespace structure
+$namespace = 'myplugin/v1';
+$base = 'books';
+
+// Public endpoints
+register_rest_route($namespace, '/' . $base, array(...));
+
+// Admin endpoints
+register_rest_route($namespace . '/admin', '/' . $base, array(...));
+
+// Internal endpoints
+register_rest_route($namespace . '/internal', '/sync', array(...));</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Best Practices</h2>
+                                <ul>
+                                    <li>Always use namespacing with version numbers</li>
+                                    <li>Implement proper permission callbacks</li>
+                                    <li>Validate and sanitize all input</li>
+                                    <li>Return consistent response formats</li>
+                                    <li>Use appropriate HTTP status codes</li>
+                                    <li>Document your endpoints</li>
+                                    <li>Handle errors gracefully</li>
+                                    <li>Consider rate limiting for public endpoints</li>
+                                </ul>
+                            </section>
+
+                            <section class="resources">
+                                <h2>Resources</h2>
+                                <ul>
+                                    <li><a href="https://developer.wordpress.org/rest-api/extending-the-rest-api/adding-custom-endpoints/">Adding Custom Endpoints</a></li>
+                                    <li><a href="https://developer.wordpress.org/rest-api/extending-the-rest-api/routes-and-endpoints/">Routes and Endpoints</a></li>
+                                </ul>
+                            </section>
+                        </div>
+
+                        <div class="lesson-navigation">
+                            <a href="/08module/using_rest_api.html" class="lesson-nav-button prev">Previous: Using REST API</a>
+                            <button class="complete-lesson-btn">Mark as Complete</button>
+                            <a href="/08module/authentication.html" class="lesson-nav-button next">Next: Authentication</a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </main>
+
+        <footer class="site-footer">
+            <div class="footer-container">
+                <p>&copy; 2024 PHP WordPress Course. All rights reserved.</p>
+            </div>
+        </footer>
+    </div>
+    
+    <script src="/assets/js/main.js"></script>
+    <script src="/assets/js/progress-tracker.js"></script>
+</body>
+</html>

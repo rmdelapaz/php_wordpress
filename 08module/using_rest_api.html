@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Using REST API in Plugins - WordPress Development</title>
+    <meta name="description" content="Learn how to integrate WordPress REST API in plugins. Make API calls, handle responses, and build interactive features.">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-enhanced.css">
+    <style>
+        .using-api-header {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .api-integration {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+        .code-example {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <header class="site-header">
+            <div class="header-container">
+                <div class="site-branding">
+                    <a href="/" class="site-logo">
+                        <h1 class="site-title">PHP WordPress Development</h1>
+                    </a>
+                </div>
+            </div>
+        </header>
+        
+        <nav class="breadcrumb container">
+            <ol class="breadcrumb-list">
+                <li class="breadcrumb-item"><a href="/">Home</a> /</li>
+                <li class="breadcrumb-item"><a href="/module6.html">Module 6</a> /</li>
+                <li class="breadcrumb-item">Using REST API in Plugins</li>
+            </ol>
+        </nav>
+        
+        <main class="main-content">
+            <div class="container">
+                <div class="content-with-sidebar">
+                    <aside class="sidebar">
+                        <div class="sidebar-nav">
+                            <h3 class="sidebar-title">Session 8: REST API</h3>
+                            <ul class="sidebar-menu">
+                                <li><a href="/08module/rest_api_intro.html">REST API Introduction</a></li>
+                                <li><a href="/08module/endpoints_routes.html">Endpoints and Routes</a></li>
+                                <li class="active"><a href="/08module/using_rest_api.html">Using REST API in Plugins</a></li>
+                                <li><a href="/08module/custom_endpoints.html">Creating Custom Endpoints</a></li>
+                                <li><a href="/08module/authentication.html">Authentication & Permissions</a></li>
+                                <li><a href="/08module/extending_endpoints.html">Extending Existing Endpoints</a></li>
+                                <li><a href="/08module/homework_rest_api.html">Homework: REST API Plugin</a></li>
+                            </ul>
+                        </div>
+                    </aside>
+                    
+                    <article class="lesson-content">
+                        <div class="using-api-header">
+                            <h1>🔌 Using REST API in Plugins</h1>
+                            <p class="lead">Integrate REST API functionality into your WordPress plugins</p>
+                        </div>
+
+                        <div class="lesson-objectives">
+                            <h2>Learning Objectives</h2>
+                            <ul>
+                                <li>Make REST API calls from plugins</li>
+                                <li>Handle API responses properly</li>
+                                <li>Implement error handling</li>
+                                <li>Use WordPress HTTP API functions</li>
+                                <li>Build admin interfaces with REST API</li>
+                                <li>Create frontend features using API</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="lesson-body">
+                            <section>
+                                <h2>WordPress HTTP API Functions</h2>
+                                <div class="api-integration">
+                                    <h3>Making API Calls from Plugins</h3>
+                                    <div class="code-example">
+                                        <pre><code>// GET Request
+$response = wp_remote_get('https://site.com/wp-json/wp/v2/posts');
+$body = wp_remote_retrieve_body($response);
+$data = json_decode($body, true);
+
+// POST Request
+$response = wp_remote_post($url, array(
+    'headers' => array('Content-Type' => 'application/json'),
+    'body' => json_encode($data),
+));
+
+// Custom Request
+$response = wp_remote_request($url, array(
+    'method' => 'PUT',
+    'headers' => array('X-WP-Nonce' => wp_create_nonce('wp_rest')),
+    'body' => json_encode($data),
+));</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Complete Plugin Example</h2>
+                                <div class="api-integration">
+                                    <h3>REST API Client Class</h3>
+                                    <div class="code-example">
+                                        <pre><code>class My_Plugin_API {
+    private $api_base;
+    
+    public function __construct() {
+        $this->api_base = rest_url('wp/v2/');
+        add_action('admin_menu', array($this, 'add_menu'));
+        add_action('wp_ajax_fetch_posts', array($this, 'ajax_fetch_posts'));
+    }
+    
+    // Fetch posts from API
+    public function get_posts($args = array()) {
+        $url = add_query_arg($args, $this->api_base . 'posts');
+        $response = wp_remote_get($url);
+        
+        if (is_wp_error($response)) {
+            return false;
+        }
+        
+        return json_decode(wp_remote_retrieve_body($response), true);
+    }
+    
+    // Create post via API
+    public function create_post($data) {
+        $response = wp_remote_post($this->api_base . 'posts', array(
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'X-WP-Nonce' => wp_create_nonce('wp_rest'),
+            ),
+            'body' => json_encode($data),
+        ));
+        
+        return $this->handle_response($response);
+    }
+    
+    // Handle response
+    private function handle_response($response) {
+        if (is_wp_error($response)) {
+            return array('success' => false, 'message' => $response->get_error_message());
+        }
+        
+        $code = wp_remote_retrieve_response_code($response);
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+        
+        return array(
+            'success' => ($code >= 200 && $code < 300),
+            'data' => $body,
+            'code' => $code
+        );
+    }
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Frontend Integration</h2>
+                                <div class="api-integration">
+                                    <h3>JavaScript API Calls</h3>
+                                    <div class="code-example">
+                                        <pre><code>// Using Fetch API
+async function loadPosts() {
+    try {
+        const response = await fetch('/wp-json/wp/v2/posts?per_page=5');
+        const posts = await response.json();
+        displayPosts(posts);
+    } catch (error) {
+        console.error('Error loading posts:', error);
+    }
+}
+
+// Using wp.api (Backbone client)
+wp.api.loadPromise.done(function() {
+    const posts = new wp.api.collections.Posts();
+    posts.fetch().done(function() {
+        console.log(posts.toJSON());
+    });
+});</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Authentication in Plugins</h2>
+                                <div class="api-integration">
+                                    <h3>Using Nonces for Authentication</h3>
+                                    <div class="code-example">
+                                        <pre><code>// Server-side nonce creation
+wp_localize_script('my-script', 'my_api', array(
+    'nonce' => wp_create_nonce('wp_rest'),
+    'api_url' => rest_url('wp/v2/'),
+));
+
+// Client-side usage
+fetch('/wp-json/wp/v2/posts', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'X-WP-Nonce': my_api.nonce
+    },
+    body: JSON.stringify(postData)
+});</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Error Handling</h2>
+                                <div class="api-integration">
+                                    <h3>Robust Error Handling</h3>
+                                    <div class="code-example">
+                                        <pre><code>function safe_api_call($url, $args = array()) {
+    $response = wp_remote_get($url, $args);
+    
+    // Check for WP_Error
+    if (is_wp_error($response)) {
+        error_log('API Error: ' . $response->get_error_message());
+        return false;
+    }
+    
+    // Check response code
+    $code = wp_remote_retrieve_response_code($response);
+    if ($code !== 200) {
+        error_log('API returned code: ' . $code);
+        return false;
+    }
+    
+    // Parse JSON
+    $body = wp_remote_retrieve_body($response);
+    $data = json_decode($body, true);
+    
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        error_log('JSON decode error: ' . json_last_error_msg());
+        return false;
+    }
+    
+    return $data;
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Caching API Responses</h2>
+                                <div class="api-integration">
+                                    <h3>Transient Caching</h3>
+                                    <div class="code-example">
+                                        <pre><code>function get_cached_posts() {
+    $cache_key = 'my_plugin_posts';
+    $posts = get_transient($cache_key);
+    
+    if (false === $posts) {
+        // Cache miss - fetch from API
+        $response = wp_remote_get(rest_url('wp/v2/posts'));
+        
+        if (!is_wp_error($response)) {
+            $posts = json_decode(wp_remote_retrieve_body($response), true);
+            // Cache for 1 hour
+            set_transient($cache_key, $posts, HOUR_IN_SECONDS);
+        }
+    }
+    
+    return $posts;
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Best Practices</h2>
+                                <ul>
+                                    <li>Always handle errors gracefully</li>
+                                    <li>Use appropriate authentication methods</li>
+                                    <li>Cache responses when possible</li>
+                                    <li>Set reasonable timeouts</li>
+                                    <li>Validate and sanitize all data</li>
+                                    <li>Use wp_remote_* functions instead of curl</li>
+                                    <li>Check capabilities before sensitive operations</li>
+                                </ul>
+                            </section>
+
+                            <section class="resources">
+                                <h2>Resources</h2>
+                                <ul>
+                                    <li><a href="https://developer.wordpress.org/plugins/http-api/">WordPress HTTP API</a></li>
+                                    <li><a href="https://developer.wordpress.org/rest-api/using-the-rest-api/">Using the REST API</a></li>
+                                </ul>
+                            </section>
+                        </div>
+
+                        <div class="lesson-navigation">
+                            <a href="/08module/endpoints_routes.html" class="lesson-nav-button prev">Previous: Endpoints and Routes</a>
+                            <button class="complete-lesson-btn">Mark as Complete</button>
+                            <a href="/08module/custom_endpoints.html" class="lesson-nav-button next">Next: Creating Custom Endpoints</a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </main>
+
+        <footer class="site-footer">
+            <div class="footer-container">
+                <p>&copy; 2024 PHP WordPress Course. All rights reserved.</p>
+            </div>
+        </footer>
+    </div>
+    
+    <script src="/assets/js/main.js"></script>
+    <script src="/assets/js/progress-tracker.js"></script>
+</body>
+</html>

@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preventing Common Attacks - WordPress Security</title>
+    <meta name="description" content="Learn how to prevent XSS, CSRF, SQL injection and other common attacks in WordPress plugins.">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-enhanced.css">
+    <style>
+        .attacks-header {
+            background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .attack-section {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+        .code-example {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+        }
+        .vulnerable { background: #fee2e2; border-left: 4px solid #dc2626; }
+        .secure { background: #dcfce7; border-left: 4px solid #16a34a; }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <header class="site-header">
+            <div class="header-container">
+                <div class="site-branding">
+                    <a href="/" class="site-logo">
+                        <h1 class="site-title">PHP WordPress Development</h1>
+                    </a>
+                </div>
+            </div>
+        </header>
+        
+        <nav class="breadcrumb container">
+            <ol class="breadcrumb-list">
+                <li class="breadcrumb-item"><a href="/">Home</a> /</li>
+                <li class="breadcrumb-item"><a href="/module6.html">Module 6</a> /</li>
+                <li class="breadcrumb-item">Preventing Common Attacks</li>
+            </ol>
+        </nav>
+        
+        <main class="main-content">
+            <div class="container">
+                <div class="content-with-sidebar">
+                    <aside class="sidebar">
+                        <div class="sidebar-nav">
+                            <h3 class="sidebar-title">Session 9: Security & Performance</h3>
+                            <ul class="sidebar-menu">
+                                <li><a href="/09module/security_principles.html">Security Principles</a></li>
+                                <li><a href="/09module/input_validation.html">Input Validation & Sanitization</a></li>
+                                <li><a href="/09module/capability_checks.html">Capability Checks & Permissions</a></li>
+                                <li><a href="/09module/data_encryption.html">Data Encryption</a></li>
+                                <li class="active"><a href="/09module/preventing_attacks.html">Preventing Common Attacks</a></li>
+                                <li><a href="/09module/performance_optimization.html">Performance Optimization</a></li>
+                                <li><a href="/09module/caching_strategies.html">Caching Strategies</a></li>
+                                <li><a href="/09module/homework_security_audit.html">Homework: Security Audit</a></li>
+                            </ul>
+                        </div>
+                    </aside>
+                    
+                    <article class="lesson-content">
+                        <div class="attacks-header">
+                            <h1>⚔️ Preventing Common Attacks</h1>
+                            <p class="lead">Defend against XSS, CSRF, SQL injection and more</p>
+                        </div>
+
+                        <div class="lesson-objectives">
+                            <h2>Learning Objectives</h2>
+                            <ul>
+                                <li>Prevent Cross-Site Scripting (XSS)</li>
+                                <li>Stop Cross-Site Request Forgery (CSRF)</li>
+                                <li>Prevent SQL Injection</li>
+                                <li>Block file inclusion attacks</li>
+                                <li>Prevent code injection</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="lesson-body">
+                            <section>
+                                <h2>Cross-Site Scripting (XSS) Prevention</h2>
+                                <div class="attack-section">
+                                    <h3>XSS Attack Prevention</h3>
+                                    
+                                    <div class="code-example vulnerable">
+                                        <strong>❌ Vulnerable Code:</strong>
+                                        <pre><code>// Direct output of user input
+echo $_GET['search'];
+echo '<div>' . $_POST['comment'] . '</div>';</code></pre>
+                                    </div>
+                                    
+                                    <div class="code-example secure">
+                                        <strong>✅ Secure Code:</strong>
+                                        <pre><code>// Escape all output
+echo esc_html($_GET['search']);
+echo '<div>' . esc_html($_POST['comment']) . '</div>';
+
+// Context-specific escaping
+echo '<a href="' . esc_url($_POST['url']) . '">';
+echo '<input value="' . esc_attr($_POST['value']) . '">';
+echo '<script>var data = ' . wp_json_encode($data) . ';</script>';</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Cross-Site Request Forgery (CSRF) Prevention</h2>
+                                <div class="attack-section">
+                                    <h3>Using Nonces</h3>
+                                    
+                                    <div class="code-example vulnerable">
+                                        <strong>❌ Vulnerable Code:</strong>
+                                        <pre><code>// No CSRF protection
+if ($_POST['delete']) {
+    wp_delete_post($_POST['post_id']);
+}</code></pre>
+                                    </div>
+                                    
+                                    <div class="code-example secure">
+                                        <strong>✅ Secure Code:</strong>
+                                        <pre><code>// Form with nonce
+<form method="post">
+    <?php wp_nonce_field('delete_post', 'delete_nonce'); ?>
+    <input type="hidden" name="post_id" value="123">
+    <input type="submit" name="delete" value="Delete">
+</form>
+
+// Verify nonce
+if (isset($_POST['delete'])) {
+    if (!wp_verify_nonce($_POST['delete_nonce'], 'delete_post')) {
+        die('Security check failed');
+    }
+    wp_delete_post($_POST['post_id']);
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>SQL Injection Prevention</h2>
+                                <div class="attack-section">
+                                    <h3>Safe Database Queries</h3>
+                                    
+                                    <div class="code-example vulnerable">
+                                        <strong>❌ Vulnerable Code:</strong>
+                                        <pre><code>// Direct SQL with user input
+global $wpdb;
+$id = $_GET['id'];
+$query = "SELECT * FROM {$wpdb->posts} WHERE ID = $id";
+$results = $wpdb->get_results($query);</code></pre>
+                                    </div>
+                                    
+                                    <div class="code-example secure">
+                                        <strong>✅ Secure Code:</strong>
+                                        <pre><code>// Use prepared statements
+global $wpdb;
+$id = intval($_GET['id']);
+$query = $wpdb->prepare(
+    "SELECT * FROM {$wpdb->posts} WHERE ID = %d",
+    $id
+);
+$results = $wpdb->get_results($query);
+
+// Multiple parameters
+$results = $wpdb->get_results($wpdb->prepare(
+    "SELECT * FROM {$wpdb->posts} 
+     WHERE post_author = %d AND post_status = %s",
+    $user_id,
+    $status
+));</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>File Inclusion Attack Prevention</h2>
+                                <div class="attack-section">
+                                    <h3>Safe File Handling</h3>
+                                    
+                                    <div class="code-example vulnerable">
+                                        <strong>❌ Vulnerable Code:</strong>
+                                        <pre><code>// Direct file inclusion
+$page = $_GET['page'];
+include $page . '.php';
+
+// Unsafe file upload
+move_uploaded_file($_FILES['file']['tmp_name'], 
+                   'uploads/' . $_FILES['file']['name']);</code></pre>
+                                    </div>
+                                    
+                                    <div class="code-example secure">
+                                        <strong>✅ Secure Code:</strong>
+                                        <pre><code>// Whitelist allowed files
+$allowed_pages = array('home', 'about', 'contact');
+$page = $_GET['page'];
+
+if (in_array($page, $allowed_pages)) {
+    include $page . '.php';
+}
+
+// Safe file upload
+$allowed_types = array('jpg', 'jpeg', 'png', 'pdf');
+$file_info = wp_check_filetype($_FILES['file']['name']);
+
+if (in_array($file_info['ext'], $allowed_types)) {
+    $upload = wp_handle_upload($_FILES['file'], array(
+        'test_form' => false
+    ));
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Code Injection Prevention</h2>
+                                <div class="attack-section">
+                                    <h3>Avoiding Dangerous Functions</h3>
+                                    
+                                    <div class="code-example vulnerable">
+                                        <strong>❌ Never Use:</strong>
+                                        <pre><code>// Dangerous functions
+eval($_POST['code']);
+assert($_GET['expression']);
+system($_POST['command']);
+exec($_POST['cmd']);
+create_function('', $_POST['func']);</code></pre>
+                                    </div>
+                                    
+                                    <div class="code-example secure">
+                                        <strong>✅ Safe Alternatives:</strong>
+                                        <pre><code>// Use whitelisting and specific functions
+$allowed_actions = array('save', 'delete', 'update');
+$action = $_POST['action'];
+
+if (in_array($action, $allowed_actions)) {
+    switch ($action) {
+        case 'save':
+            save_data();
+            break;
+        case 'delete':
+            delete_data();
+            break;
+        case 'update':
+            update_data();
+            break;
+    }
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Complete Security Implementation</h2>
+                                <div class="attack-section">
+                                    <h3>Secure Form Handler</h3>
+                                    <div class="code-example">
+                                        <pre><code>class Secure_Form_Handler {
+    
+    public function render_form() {
+        ?>
+        <form method="post" enctype="multipart/form-data">
+            <?php wp_nonce_field('secure_form_action', 'secure_nonce'); ?>
+            
+            <input type="text" name="title" required>
+            <textarea name="content"></textarea>
+            <input type="file" name="attachment">
+            <input type="submit" value="Submit">
+        </form>
+        <?php
+    }
+    
+    public function process_form() {
+        // 1. Verify nonce (CSRF protection)
+        if (!wp_verify_nonce($_POST['secure_nonce'], 'secure_form_action')) {
+            wp_die('Security check failed');
+        }
+        
+        // 2. Check capabilities
+        if (!current_user_can('edit_posts')) {
+            wp_die('Insufficient permissions');
+        }
+        
+        // 3. Validate input
+        if (empty($_POST['title'])) {
+            wp_die('Title is required');
+        }
+        
+        // 4. Sanitize data
+        $title = sanitize_text_field($_POST['title']);
+        $content = wp_kses_post($_POST['content']);
+        
+        // 5. Handle file upload safely
+        if (!empty($_FILES['attachment']['name'])) {
+            $allowed = array('pdf', 'doc', 'docx');
+            $file_info = wp_check_filetype($_FILES['attachment']['name']);
+            
+            if (!in_array($file_info['ext'], $allowed)) {
+                wp_die('Invalid file type');
+            }
+            
+            $upload = wp_handle_upload($_FILES['attachment'], array(
+                'test_form' => false
+            ));
+        }
+        
+        // 6. Use prepared statements for database
+        global $wpdb;
+        $wpdb->insert(
+            $wpdb->prefix . 'custom_table',
+            array(
+                'title' => $title,
+                'content' => $content,
+                'user_id' => get_current_user_id()
+            ),
+            array('%s', '%s', '%d')
+        );
+        
+        // 7. Escape output when displaying
+        echo '<div class="notice">';
+        echo esc_html__('Form submitted successfully', 'textdomain');
+        echo '</div>';
+    }
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Security Headers</h2>
+                                <div class="attack-section">
+                                    <h3>Add Security Headers</h3>
+                                    <div class="code-example">
+                                        <pre><code>// Add security headers
+add_action('send_headers', function() {
+    header('X-Frame-Options: SAMEORIGIN');
+    header('X-Content-Type-Options: nosniff');
+    header('X-XSS-Protection: 1; mode=block');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+    
+    // Content Security Policy
+    header("Content-Security-Policy: default-src 'self'");
+});</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Best Practices</h2>
+                                <ul>
+                                    <li>Always escape output based on context</li>
+                                    <li>Use nonces for all state-changing operations</li>
+                                    <li>Never trust user input</li>
+                                    <li>Use prepared statements for all database queries</li>
+                                    <li>Whitelist allowed values</li>
+                                    <li>Avoid dangerous PHP functions</li>
+                                    <li>Keep WordPress and plugins updated</li>
+                                    <li>Log and monitor suspicious activity</li>
+                                </ul>
+                            </section>
+
+                            <section class="resources">
+                                <h2>Resources</h2>
+                                <ul>
+                                    <li><a href="https://owasp.org/www-project-top-ten/">OWASP Top 10</a></li>
+                                    <li><a href="https://developer.wordpress.org/plugins/security/">WordPress Security Guide</a></li>
+                                </ul>
+                            </section>
+                        </div>
+
+                        <div class="lesson-navigation">
+                            <a href="/09module/data_encryption.html" class="lesson-nav-button prev">Previous: Data Encryption</a>
+                            <button class="complete-lesson-btn">Mark as Complete</button>
+                            <a href="/09module/performance_optimization.html" class="lesson-nav-button next">Next: Performance Optimization</a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </main>
+
+        <footer class="site-footer">
+            <div class="footer-container">
+                <p>&copy; 2024 PHP WordPress Course. All rights reserved.</p>
+            </div>
+        </footer>
+    </div>
+    
+    <script src="/assets/js/main.js"></script>
+    <script src="/assets/js/progress-tracker.js"></script>
+</body>
+</html>
