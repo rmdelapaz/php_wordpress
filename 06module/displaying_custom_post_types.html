@@ -1,0 +1,823 @@
+                        <li>Use descriptive URLs with proper permalinks</li>
+                                    </ul>
+                                </div>
+
+                                <div class="tip-box">
+                                    <h4>✅ Accessibility Best Practices</h4>
+                                    <ul>
+                                        <li>Use proper ARIA labels and roles</li>
+                                        <li>Ensure keyboard navigation works</li>
+                                        <li>Provide alt text for images</li>
+                                        <li>Use sufficient color contrast</li>
+                                        <li>Make interactive elements focusable</li>
+                                        <li>Test with screen readers</li>
+                                    </ul>
+                                </div>
+
+                                <div class="warning-box">
+                                    <h4>❌ Common Mistakes to Avoid</h4>
+                                    <ul>
+                                        <li>Forgetting to reset post data after custom queries</li>
+                                        <li>Not checking if posts exist before looping</li>
+                                        <li>Using query_posts() instead of WP_Query</li>
+                                        <li>Not escaping output data</li>
+                                        <li>Loading all posts without pagination</li>
+                                        <li>Not handling empty states gracefully</li>
+                                        <li>Hardcoding post type names instead of using variables</li>
+                                    </ul>
+                                </div>
+                            </section>
+
+                            <!-- Advanced Techniques -->
+                            <section>
+                                <h2>Advanced Display Techniques</h2>
+                                
+                                <div class="display-concept">
+                                    <h3>Related Posts Based on Taxonomy</h3>
+                                    
+                                    <div class="code-example">
+                                        <pre><code class="language-php">function get_related_products( $post_id, $limit = 4 ) {
+    // Get current post's categories
+    $terms = wp_get_post_terms( $post_id, 'product_category', array( 'fields' => 'ids' ) );
+    
+    if ( empty( $terms ) ) {
+        return false;
+    }
+    
+    $args = array(
+        'post_type' => 'product',
+        'posts_per_page' => $limit,
+        'post__not_in' => array( $post_id ),
+        'tax_query' => array(
+            array(
+                'taxonomy' => 'product_category',
+                'field' => 'term_id',
+                'terms' => $terms,
+                'operator' => 'IN'
+            )
+        ),
+        'orderby' => 'rand'
+    );
+    
+    return new WP_Query( $args );
+}
+
+// Usage in single-product.php
+$related = get_related_products( get_the_ID(), 4 );
+
+if ( $related && $related->have_posts() ) : ?>
+    <div class="related-products">
+        <h3>Related Products</h3>
+        <div class="products-grid">
+            <?php while ( $related->have_posts() ) : $related->the_post(); ?>
+                <div class="product-item">
+                    <?php the_post_thumbnail( 'medium' ); ?>
+                    <h4><?php the_title(); ?></h4>
+                    <a href="<?php the_permalink(); ?>">View Product</a>
+                </div>
+            <?php endwhile; ?>
+        </div>
+    </div>
+    <?php wp_reset_postdata();
+endif;</code></pre>
+                                    </div>
+                                </div>
+
+                                <div class="display-concept">
+                                    <h3>Custom Query with Caching</h3>
+                                    
+                                    <div class="code-example">
+                                        <pre><code class="language-php">function get_featured_products_cached() {
+    $cache_key = 'featured_products_' . get_current_blog_id();
+    $products = get_transient( $cache_key );
+    
+    if ( false === $products ) {
+        $args = array(
+            'post_type' => 'product',
+            'posts_per_page' => 6,
+            'meta_query' => array(
+                array(
+                    'key' => '_featured',
+                    'value' => 'yes',
+                    'compare' => '='
+                )
+            ),
+            'orderby' => 'modified',
+            'order' => 'DESC'
+        );
+        
+        $products = new WP_Query( $args );
+        
+        // Cache for 12 hours
+        set_transient( $cache_key, $products, 12 * HOUR_IN_SECONDS );
+    }
+    
+    return $products;
+}
+
+// Clear cache when products are updated
+function clear_featured_products_cache( $post_id ) {
+    if ( get_post_type( $post_id ) === 'product' ) {
+        delete_transient( 'featured_products_' . get_current_blog_id() );
+    }
+}
+add_action( 'save_post', 'clear_featured_products_cache' );
+add_action( 'deleted_post', 'clear_featured_products_cache' );</code></pre>
+                                    </div>
+                                </div>
+
+                                <div class="display-concept">
+                                    <h3>Infinite Scroll Implementation</h3>
+                                    
+                                    <div class="code-example">
+                                        <pre><code class="language-javascript">// Infinite scroll for products
+(function($) {
+    var page = 2;
+    var loading = false;
+    var $container = $('#products-container');
+    var $window = $(window);
+    
+    function loadMoreProducts() {
+        if (loading) return;
+        
+        loading = true;
+        
+        $.ajax({
+            url: ajax_object.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'infinite_scroll_products',
+                page: page,
+                nonce: ajax_object.nonce
+            },
+            success: function(response) {
+                if (response.success && response.data.html) {
+                    $container.append(response.data.html);
+                    page++;
+                    loading = false;
+                    
+                    if (!response.data.has_more) {
+                        $window.off('scroll', checkScroll);
+                    }
+                } else {
+                    $window.off('scroll', checkScroll);
+                }
+            },
+            error: function() {
+                loading = false;
+            }
+        });
+    }
+    
+    function checkScroll() {
+        if ($window.scrollTop() + $window.height() > $(document).height() - 100) {
+            loadMoreProducts();
+        }
+    }
+    
+    $window.on('scroll', checkScroll);
+})(jQuery);</code></pre>
+                                    </div>
+                                </div>
+
+                                <div class="display-concept">
+                                    <h3>Faceted Search/Filtering</h3>
+                                    
+                                    <div class="code-example">
+                                        <pre><code class="language-php">// Complex filtering system
+class Product_Filter {
+    
+    public function __construct() {
+        add_action( 'wp_ajax_filter_products', array( $this, 'handle_filter' ) );
+        add_action( 'wp_ajax_nopriv_filter_products', array( $this, 'handle_filter' ) );
+    }
+    
+    public function handle_filter() {
+        check_ajax_referer( 'filter_nonce', 'nonce' );
+        
+        $args = array(
+            'post_type' => 'product',
+            'posts_per_page' => 12,
+            'paged' => $_POST['page'] ?? 1
+        );
+        
+        // Price range filter
+        if ( ! empty( $_POST['min_price'] ) || ! empty( $_POST['max_price'] ) ) {
+            $args['meta_query'][] = array(
+                'key' => '_price',
+                'value' => array( 
+                    floatval( $_POST['min_price'] ?? 0 ), 
+                    floatval( $_POST['max_price'] ?? 999999 ) 
+                ),
+                'type' => 'NUMERIC',
+                'compare' => 'BETWEEN'
+            );
+        }
+        
+        // Category filter
+        if ( ! empty( $_POST['categories'] ) ) {
+            $args['tax_query'][] = array(
+                'taxonomy' => 'product_category',
+                'field' => 'slug',
+                'terms' => array_map( 'sanitize_text_field', $_POST['categories'] )
+            );
+        }
+        
+        // Brand filter
+        if ( ! empty( $_POST['brands'] ) ) {
+            $args['tax_query'][] = array(
+                'taxonomy' => 'product_brand',
+                'field' => 'slug',
+                'terms' => array_map( 'sanitize_text_field', $_POST['brands'] )
+            );
+        }
+        
+        // Features filter
+        if ( ! empty( $_POST['features'] ) ) {
+            foreach ( $_POST['features'] as $feature ) {
+                $args['meta_query'][] = array(
+                    'key' => '_feature_' . sanitize_key( $feature ),
+                    'value' => 'yes',
+                    'compare' => '='
+                );
+            }
+        }
+        
+        // Sorting
+        if ( ! empty( $_POST['orderby'] ) ) {
+            switch ( $_POST['orderby'] ) {
+                case 'price_asc':
+                    $args['orderby'] = 'meta_value_num';
+                    $args['meta_key'] = '_price';
+                    $args['order'] = 'ASC';
+                    break;
+                case 'price_desc':
+                    $args['orderby'] = 'meta_value_num';
+                    $args['meta_key'] = '_price';
+                    $args['order'] = 'DESC';
+                    break;
+                case 'name':
+                    $args['orderby'] = 'title';
+                    $args['order'] = 'ASC';
+                    break;
+                case 'newest':
+                    $args['orderby'] = 'date';
+                    $args['order'] = 'DESC';
+                    break;
+            }
+        }
+        
+        // Search term
+        if ( ! empty( $_POST['search'] ) ) {
+            $args['s'] = sanitize_text_field( $_POST['search'] );
+        }
+        
+        $query = new WP_Query( $args );
+        
+        ob_start();
+        
+        if ( $query->have_posts() ) {
+            while ( $query->have_posts() ) {
+                $query->the_post();
+                get_template_part( 'template-parts/content', 'product' );
+            }
+        } else {
+            echo '<p>No products found matching your criteria.</p>';
+        }
+        
+        $html = ob_get_clean();
+        
+        wp_send_json_success( array(
+            'html' => $html,
+            'found_posts' => $query->found_posts,
+            'max_pages' => $query->max_num_pages
+        ) );
+    }
+}
+
+new Product_Filter();</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Complete Example -->
+                            <section>
+                                <h2>Complete Implementation Example</h2>
+                                
+                                <div class="display-concept">
+                                    <h3>Full-Featured Product Display System</h3>
+                                    
+                                    <div class="code-example">
+                                        <pre><code class="language-php"><?php
+/**
+ * Complete Product Display System
+ * File: product-display-system.php
+ */
+
+class Product_Display_System {
+    
+    public function __construct() {
+        // Shortcodes
+        add_shortcode( 'product_grid', array( $this, 'product_grid_shortcode' ) );
+        add_shortcode( 'featured_products', array( $this, 'featured_products_shortcode' ) );
+        
+        // AJAX handlers
+        add_action( 'wp_ajax_load_products', array( $this, 'ajax_load_products' ) );
+        add_action( 'wp_ajax_nopriv_load_products', array( $this, 'ajax_load_products' ) );
+        
+        // Enqueue scripts
+        add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
+    }
+    
+    /**
+     * Product Grid Shortcode
+     */
+    public function product_grid_shortcode( $atts ) {
+        $atts = shortcode_atts( array(
+            'columns' => 3,
+            'rows' => 4,
+            'category' => '',
+            'featured' => 'no',
+            'orderby' => 'date',
+            'order' => 'DESC',
+            'show_filters' => 'no',
+            'show_pagination' => 'yes'
+        ), $atts, 'product_grid' );
+        
+        $posts_per_page = intval( $atts['columns'] ) * intval( $atts['rows'] );
+        $paged = get_query_var( 'paged' ) ? get_query_var( 'paged' ) : 1;
+        
+        $args = array(
+            'post_type' => 'product',
+            'posts_per_page' => $posts_per_page,
+            'paged' => $paged,
+            'orderby' => $atts['orderby'],
+            'order' => $atts['order']
+        );
+        
+        // Add category filter
+        if ( ! empty( $atts['category'] ) ) {
+            $args['tax_query'] = array(
+                array(
+                    'taxonomy' => 'product_category',
+                    'field' => 'slug',
+                    'terms' => explode( ',', $atts['category'] )
+                )
+            );
+        }
+        
+        // Add featured filter
+        if ( $atts['featured'] === 'yes' ) {
+            $args['meta_query'] = array(
+                array(
+                    'key' => '_featured',
+                    'value' => 'yes'
+                )
+            );
+        }
+        
+        $products = new WP_Query( $args );
+        
+        ob_start();
+        ?>
+        
+        <div class="product-display-system" data-columns="<?php echo esc_attr( $atts['columns'] ); ?>">
+            
+            <?php if ( $atts['show_filters'] === 'yes' ) : ?>
+                <?php $this->render_filters(); ?>
+            <?php endif; ?>
+            
+            <div class="products-grid columns-<?php echo esc_attr( $atts['columns'] ); ?>">
+                <?php
+                if ( $products->have_posts() ) {
+                    while ( $products->have_posts() ) {
+                        $products->the_post();
+                        $this->render_product_card();
+                    }
+                } else {
+                    echo '<p class="no-products">No products found.</p>';
+                }
+                ?>
+            </div>
+            
+            <?php if ( $atts['show_pagination'] === 'yes' && $products->max_num_pages > 1 ) : ?>
+                <div class="products-pagination">
+                    <?php
+                    echo paginate_links( array(
+                        'total' => $products->max_num_pages,
+                        'current' => $paged,
+                        'prev_text' => '&laquo;',
+                        'next_text' => '&raquo;'
+                    ) );
+                    ?>
+                </div>
+            <?php endif; ?>
+            
+        </div>
+        
+        <?php
+        wp_reset_postdata();
+        return ob_get_clean();
+    }
+    
+    /**
+     * Featured Products Shortcode
+     */
+    public function featured_products_shortcode( $atts ) {
+        $atts = shortcode_atts( array(
+            'count' => 4,
+            'style' => 'carousel' // carousel, grid, list
+        ), $atts, 'featured_products' );
+        
+        $args = array(
+            'post_type' => 'product',
+            'posts_per_page' => intval( $atts['count'] ),
+            'meta_query' => array(
+                array(
+                    'key' => '_featured',
+                    'value' => 'yes'
+                )
+            ),
+            'orderby' => 'rand'
+        );
+        
+        $products = new WP_Query( $args );
+        
+        ob_start();
+        ?>
+        
+        <div class="featured-products style-<?php echo esc_attr( $atts['style'] ); ?>">
+            <?php
+            if ( $products->have_posts() ) {
+                if ( $atts['style'] === 'carousel' ) {
+                    $this->render_carousel( $products );
+                } elseif ( $atts['style'] === 'list' ) {
+                    $this->render_list( $products );
+                } else {
+                    $this->render_grid( $products );
+                }
+            }
+            ?>
+        </div>
+        
+        <?php
+        wp_reset_postdata();
+        return ob_get_clean();
+    }
+    
+    /**
+     * Render Product Card
+     */
+    private function render_product_card() {
+        $price = get_post_meta( get_the_ID(), '_price', true );
+        $sale_price = get_post_meta( get_the_ID(), '_sale_price', true );
+        $in_stock = get_post_meta( get_the_ID(), '_in_stock', true );
+        ?>
+        
+        <article class="product-card" data-product-id="<?php the_ID(); ?>">
+            <div class="product-card-image">
+                <?php if ( has_post_thumbnail() ) : ?>
+                    <a href="<?php the_permalink(); ?>">
+                        <?php the_post_thumbnail( 'medium' ); ?>
+                    </a>
+                <?php else : ?>
+                    <div class="no-image">
+                        <span>No Image</span>
+                    </div>
+                <?php endif; ?>
+                
+                <?php if ( $sale_price ) : ?>
+                    <span class="sale-badge">Sale!</span>
+                <?php endif; ?>
+                
+                <?php if ( $in_stock === 'no' ) : ?>
+                    <span class="out-of-stock">Out of Stock</span>
+                <?php endif; ?>
+            </div>
+            
+            <div class="product-card-content">
+                <h3 class="product-title">
+                    <a href="<?php the_permalink(); ?>"><?php the_title(); ?></a>
+                </h3>
+                
+                <div class="product-meta">
+                    <?php
+                    $categories = get_the_terms( get_the_ID(), 'product_category' );
+                    if ( $categories && ! is_wp_error( $categories ) ) {
+                        echo '<div class="product-categories">';
+                        foreach ( $categories as $category ) {
+                            echo '<a href="' . get_term_link( $category ) . '" class="category-link">';
+                            echo esc_html( $category->name );
+                            echo '</a>';
+                        }
+                        echo '</div>';
+                    }
+                    ?>
+                </div>
+                
+                <div class="product-price">
+                    <?php if ( $sale_price ) : ?>
+                        <span class="regular-price strike">$<?php echo number_format( $price, 2 ); ?></span>
+                        <span class="sale-price">$<?php echo number_format( $sale_price, 2 ); ?></span>
+                    <?php elseif ( $price ) : ?>
+                        <span class="regular-price">$<?php echo number_format( $price, 2 ); ?></span>
+                    <?php else : ?>
+                        <span class="price-contact">Contact for Price</span>
+                    <?php endif; ?>
+                </div>
+                
+                <div class="product-excerpt">
+                    <?php echo wp_trim_words( get_the_excerpt(), 15 ); ?>
+                </div>
+                
+                <div class="product-actions">
+                    <a href="<?php the_permalink(); ?>" class="btn btn-primary">View Details</a>
+                    <?php if ( $in_stock !== 'no' ) : ?>
+                        <button class="btn btn-secondary add-to-cart" 
+                                data-product-id="<?php the_ID(); ?>">
+                            Add to Cart
+                        </button>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </article>
+        
+        <?php
+    }
+    
+    /**
+     * Render Filters
+     */
+    private function render_filters() {
+        ?>
+        <div class="product-filters">
+            <div class="filter-group">
+                <label>Category:</label>
+                <select class="filter-category">
+                    <option value="">All Categories</option>
+                    <?php
+                    $categories = get_terms( 'product_category' );
+                    foreach ( $categories as $category ) {
+                        echo '<option value="' . $category->slug . '">' . $category->name . '</option>';
+                    }
+                    ?>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label>Sort By:</label>
+                <select class="filter-orderby">
+                    <option value="date">Newest</option>
+                    <option value="title">Name</option>
+                    <option value="price_asc">Price: Low to High</option>
+                    <option value="price_desc">Price: High to Low</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label>Price Range:</label>
+                <input type="number" class="filter-min-price" placeholder="Min" />
+                <input type="number" class="filter-max-price" placeholder="Max" />
+            </div>
+            
+            <button class="btn apply-filters">Apply Filters</button>
+            <button class="btn reset-filters">Reset</button>
+        </div>
+        <?php
+    }
+    
+    /**
+     * AJAX Load Products
+     */
+    public function ajax_load_products() {
+        check_ajax_referer( 'product_display_nonce', 'nonce' );
+        
+        // Get and sanitize parameters
+        $page = isset( $_POST['page'] ) ? absint( $_POST['page'] ) : 1;
+        $category = isset( $_POST['category'] ) ? sanitize_text_field( $_POST['category'] ) : '';
+        $orderby = isset( $_POST['orderby'] ) ? sanitize_text_field( $_POST['orderby'] ) : 'date';
+        $min_price = isset( $_POST['min_price'] ) ? floatval( $_POST['min_price'] ) : 0;
+        $max_price = isset( $_POST['max_price'] ) ? floatval( $_POST['max_price'] ) : 999999;
+        
+        // Build query
+        $args = array(
+            'post_type' => 'product',
+            'posts_per_page' => 12,
+            'paged' => $page
+        );
+        
+        // Add filters...
+        // (Similar to previous filter implementation)
+        
+        $query = new WP_Query( $args );
+        
+        ob_start();
+        
+        if ( $query->have_posts() ) {
+            while ( $query->have_posts() ) {
+                $query->the_post();
+                $this->render_product_card();
+            }
+        }
+        
+        $html = ob_get_clean();
+        
+        wp_send_json_success( array(
+            'html' => $html,
+            'max_pages' => $query->max_num_pages,
+            'found_posts' => $query->found_posts
+        ) );
+    }
+    
+    /**
+     * Enqueue Scripts
+     */
+    public function enqueue_scripts() {
+        wp_enqueue_script( 
+            'product-display', 
+            plugin_dir_url( __FILE__ ) . 'js/product-display.js', 
+            array( 'jquery' ), 
+            '1.0.0', 
+            true 
+        );
+        
+        wp_localize_script( 'product-display', 'product_display', array(
+            'ajax_url' => admin_url( 'admin-ajax.php' ),
+            'nonce' => wp_create_nonce( 'product_display_nonce' )
+        ) );
+        
+        wp_enqueue_style( 
+            'product-display', 
+            plugin_dir_url( __FILE__ ) . 'css/product-display.css', 
+            array(), 
+            '1.0.0' 
+        );
+    }
+}
+
+// Initialize
+new Product_Display_System();</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Practice Exercise -->
+                            <section>
+                                <h2>Practice Exercise</h2>
+                                <div class="alert alert-success">
+                                    <div class="alert-icon">💻</div>
+                                    <div class="alert-content">
+                                        <div class="alert-title">Build a Complete Product Catalog</div>
+                                        <div class="alert-message">
+                                            <p>Create a fully-featured product display system with the following requirements:</p>
+                                            
+                                            <ol>
+                                                <li><strong>Create Multiple Display Templates:</strong>
+                                                    <ul>
+                                                        <li>Grid view (3 columns)</li>
+                                                        <li>List view (full width)</li>
+                                                        <li>Card view (2 columns)</li>
+                                                    </ul>
+                                                </li>
+                                                <li><strong>Implement Filtering System:</strong>
+                                                    <ul>
+                                                        <li>Filter by category</li>
+                                                        <li>Filter by price range</li>
+                                                        <li>Filter by availability</li>
+                                                        <li>Search functionality</li>
+                                                    </ul>
+                                                </li>
+                                                <li><strong>Add Sorting Options:</strong>
+                                                    <ul>
+                                                        <li>Sort by name</li>
+                                                        <li>Sort by price</li>
+                                                        <li>Sort by date added</li>
+                                                        <li>Sort by popularity</li>
+                                                    </ul>
+                                                </li>
+                                                <li><strong>Create Pagination:</strong>
+                                                    <ul>
+                                                        <li>Standard pagination</li>
+                                                        <li>Load more button</li>
+                                                        <li>Infinite scroll option</li>
+                                                    </ul>
+                                                </li>
+                                                <li><strong>Build Quick View Feature:</strong>
+                                                    <ul>
+                                                        <li>Modal popup for product details</li>
+                                                        <li>AJAX loading of product info</li>
+                                                        <li>Image gallery in modal</li>
+                                                    </ul>
+                                                </li>
+                                                <li><strong>Add Related Products:</strong>
+                                                    <ul>
+                                                        <li>Based on categories</li>
+                                                        <li>Based on tags</li>
+                                                        <li>Recently viewed products</li>
+                                                    </ul>
+                                                </li>
+                                            </ol>
+                                            
+                                            <p><strong>Bonus Challenges:</strong></p>
+                                            <ul>
+                                                <li>Implement wishlist functionality</li>
+                                                <li>Add compare products feature</li>
+                                                <li>Create product recommendations</li>
+                                                <li>Build advanced search with autocomplete</li>
+                                                <li>Add product reviews and ratings display</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Resources -->
+                            <section class="resources">
+                                <h2>Additional Resources</h2>
+                                <ul>
+                                    <li><a href="https://developer.wordpress.org/reference/classes/wp_query/" target="_blank">WP_Query Documentation</a></li>
+                                    <li><a href="https://developer.wordpress.org/themes/basics/the-loop/" target="_blank">The WordPress Loop</a></li>
+                                    <li><a href="https://developer.wordpress.org/reference/functions/paginate_links/" target="_blank">paginate_links() Function</a></li>
+                                    <li><a href="https://developer.wordpress.org/reference/hooks/pre_get_posts/" target="_blank">pre_get_posts Hook</a></li>
+                                    <li><a href="https://developer.wordpress.org/themes/basics/template-hierarchy/" target="_blank">Template Hierarchy</a></li>
+                                    <li><a href="https://codex.wordpress.org/AJAX_in_Plugins" target="_blank">AJAX in WordPress</a></li>
+                                    <li><a href="https://developer.wordpress.org/apis/handbook/transients/" target="_blank">Transients API</a></li>
+                                </ul>
+                            </section>
+                        </div>
+
+                        <!-- Lesson Navigation -->
+                        <div class="lesson-navigation">
+                            <a href="/06module/custom_fields_meta_boxes.html" class="lesson-nav-button prev">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"/>
+                                </svg>
+                                <span>
+                                    <small>Previous</small><br>
+                                    Custom Fields and Meta Boxes
+                                </span>
+                            </a>
+                            
+                            <button class="complete-lesson-btn">
+                                Mark as Complete
+                            </button>
+                            
+                            <a href="/06module/cpt_templates_archives.html" class="lesson-nav-button next">
+                                <span>
+                                    <small>Next</small><br>
+                                    CPT Templates and Archives
+                                </span>
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="site-footer" role="contentinfo">
+            <div class="footer-container">
+                <div class="footer-content">
+                    <div class="footer-section footer-about">
+                        <h3>PHP WordPress Development</h3>
+                        <p>Complete Web Development Course</p>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Quick Links</h4>
+                        <ul class="footer-links">
+                            <li><a href="/">Home</a></li>
+                            <li><a href="/module6.html">Module 6</a></li>
+                            <li><a href="/resources.html">Resources</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="footer-section">
+                        <h4>Support</h4>
+                        <ul class="footer-links">
+                            <li><a href="/about.html">About</a></li>
+                            <li><a href="/contact.html">Contact</a></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="footer-bottom">
+                    <p>&copy; 2024 PHP WordPress Course. All rights reserved.</p>
+                    <p>This course material is for educational purposes only.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="/assets/js/prism.js"></script>
+    <script src="/assets/js/main.js"></script>
+    <script src="/assets/js/sidebar-toggle.js"></script>
+    <script src="/assets/js/progress-tracker.js"></script>
+    <script src="/assets/js/search.js"></script>
+    <script src="/assets/js/theme-toggle.js"></script>
+</body>
+</html>
