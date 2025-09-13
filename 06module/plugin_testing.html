@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plugin Testing Strategies - WordPress Plugin Development</title>
+    <meta name="description" content="Learn comprehensive testing strategies for WordPress plugins. Master unit testing, integration testing, and automated testing workflows.">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-enhanced.css">
+    <style>
+        .testing-header {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .testing-section {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+        .code-example {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <header class="site-header">
+            <div class="header-container">
+                <div class="site-branding">
+                    <a href="/" class="site-logo">
+                        <h1 class="site-title">PHP WordPress Development</h1>
+                    </a>
+                </div>
+            </div>
+        </header>
+        
+        <nav class="breadcrumb container">
+            <ol class="breadcrumb-list">
+                <li class="breadcrumb-item"><a href="/">Home</a> /</li>
+                <li class="breadcrumb-item"><a href="/module6.html">Module 6</a> /</li>
+                <li class="breadcrumb-item">Plugin Testing</li>
+            </ol>
+        </nav>
+        
+        <main class="main-content">
+            <div class="container">
+                <div class="content-with-sidebar">
+                    <aside class="sidebar">
+                        <div class="sidebar-nav">
+                            <h3 class="sidebar-title">Session 10: Distribution & Maintenance</h3>
+                            <ul class="sidebar-menu">
+                                <li><a href="/06module/plugin_development_workflow.html">Development Workflow</a></li>
+                                <li><a href="/06module/version_control.html">Version Control</a></li>
+                                <li class="active"><a href="/06module/plugin_testing.html">Testing Strategies</a></li>
+                                <li><a href="/06module/documentation_best_practices.html">Documentation</a></li>
+                                <li><a href="/06module/internationalization.html">Internationalization</a></li>
+                                <li><a href="/06module/plugin_distribution.html">Distribution</a></li>
+                                <li><a href="/06module/repository_guidelines.html">Repository Guidelines</a></li>
+                                <li><a href="/06module/plugin_maintenance.html">Maintenance & Updates</a></li>
+                                <li><a href="/06module/final_project.html">Final Project</a></li>
+                            </ul>
+                        </div>
+                    </aside>
+                    
+                    <article class="lesson-content">
+                        <div class="testing-header">
+                            <h1>🧪 Plugin Testing Strategies</h1>
+                            <p class="lead">Ensure plugin quality with comprehensive testing</p>
+                        </div>
+
+                        <div class="lesson-objectives">
+                            <h2>Learning Objectives</h2>
+                            <ul>
+                                <li>Set up PHPUnit for WordPress</li>
+                                <li>Write unit tests</li>
+                                <li>Implement integration testing</li>
+                                <li>Use automated testing tools</li>
+                                <li>Test across WordPress versions</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="lesson-body">
+                            <section>
+                                <h2>Setting Up PHPUnit</h2>
+                                <div class="testing-section">
+                                    <h3>Installation and Configuration</h3>
+                                    <div class="code-example">
+                                        <pre><code># Install PHPUnit
+composer require --dev phpunit/phpunit
+
+# Set up WordPress test suite
+bash bin/install-wp-tests.sh wordpress_test root '' localhost latest
+
+# phpunit.xml configuration
+<?xml version="1.0"?>
+<phpunit bootstrap="tests/bootstrap.php">
+    <testsuites>
+        <testsuite name="plugin">
+            <directory>./tests/</directory>
+        </testsuite>
+    </testsuites>
+</phpunit></code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Writing Unit Tests</h2>
+                                <div class="testing-section">
+                                    <h3>Basic Test Example</h3>
+                                    <div class="code-example">
+                                        <pre><code>class Test_Plugin_Functions extends WP_UnitTestCase {
+    
+    public function setUp(): void {
+        parent::setUp();
+        // Setup test environment
+    }
+    
+    public function test_plugin_activation() {
+        activate_plugin('my-plugin/my-plugin.php');
+        $this->assertTrue(is_plugin_active('my-plugin/my-plugin.php'));
+    }
+    
+    public function test_custom_post_type_registration() {
+        $this->assertTrue(post_type_exists('my_custom_type'));
+    }
+    
+    public function test_shortcode_output() {
+        $output = do_shortcode('[my_shortcode]');
+        $this->assertStringContainsString('expected content', $output);
+    }
+    
+    public function test_ajax_handler() {
+        $_POST['action'] = 'my_ajax_action';
+        $_POST['nonce'] = wp_create_nonce('my_nonce');
+        
+        $this->_handleAjax('my_ajax_action');
+        
+        $response = json_decode($this->_last_response);
+        $this->assertTrue($response->success);
+    }
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Integration Testing</h2>
+                                <div class="testing-section">
+                                    <h3>Testing Database Operations</h3>
+                                    <div class="code-example">
+                                        <pre><code>class Test_Database_Operations extends WP_UnitTestCase {
+    
+    public function test_create_custom_table() {
+        global $wpdb;
+        
+        // Run table creation
+        my_plugin_create_tables();
+        
+        // Check if table exists
+        $table_name = $wpdb->prefix . 'my_custom_table';
+        $this->assertEquals($table_name, $wpdb->get_var(
+            "SHOW TABLES LIKE '$table_name'"
+        ));
+    }
+    
+    public function test_data_insertion() {
+        global $wpdb;
+        
+        $data = array(
+            'name' => 'Test Item',
+            'value' => 'Test Value'
+        );
+        
+        $result = $wpdb->insert(
+            $wpdb->prefix . 'my_custom_table',
+            $data
+        );
+        
+        $this->assertNotFalse($result);
+        $this->assertEquals(1, $wpdb->insert_id);
+    }
+}</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>JavaScript Testing</h2>
+                                <div class="testing-section">
+                                    <h3>Jest Configuration</h3>
+                                    <div class="code-example">
+                                        <pre><code>// jest.config.js
+module.exports = {
+    testEnvironment: 'jsdom',
+    setupFilesAfterEnv: ['<rootDir>/tests/js/setup.js'],
+    testMatch: ['**/tests/js/**/*.test.js']
+};
+
+// Example test
+describe('Plugin JavaScript', () => {
+    test('AJAX request handler', () => {
+        const mockCallback = jest.fn();
+        myPlugin.sendAjaxRequest(mockCallback);
+        
+        expect(mockCallback).toHaveBeenCalled();
+    });
+});</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Automated Testing</h2>
+                                <div class="testing-section">
+                                    <h3>GitHub Actions CI/CD</h3>
+                                    <div class="code-example">
+                                        <pre><code># .github/workflows/tests.yml
+name: Plugin Tests
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        wordpress: ['5.9', '6.0', '6.1']
+        php: ['7.4', '8.0', '8.1']
+    
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+      
+      - name: Install dependencies
+        run: composer install
+      
+      - name: Run tests
+        run: ./vendor/bin/phpunit</code></pre>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Manual Testing Checklist</h2>
+                                <div class="testing-section">
+                                    <h3>Essential Tests</h3>
+                                    <ul>
+                                        <li>✅ Plugin activation/deactivation</li>
+                                        <li>✅ Multisite compatibility</li>
+                                        <li>✅ Different user roles</li>
+                                        <li>✅ PHP version compatibility</li>
+                                        <li>✅ WordPress version compatibility</li>
+                                        <li>✅ Theme compatibility</li>
+                                        <li>✅ Plugin conflicts</li>
+                                        <li>✅ Performance testing</li>
+                                        <li>✅ Security testing</li>
+                                        <li>✅ Accessibility testing</li>
+                                    </ul>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h2>Best Practices</h2>
+                                <ul>
+                                    <li>Write tests before fixing bugs</li>
+                                    <li>Test edge cases</li>
+                                    <li>Use continuous integration</li>
+                                    <li>Test on different environments</li>
+                                    <li>Document test requirements</li>
+                                    <li>Maintain test coverage above 80%</li>
+                                </ul>
+                            </section>
+
+                            <section class="resources">
+                                <h2>Resources</h2>
+                                <ul>
+                                    <li><a href="https://make.wordpress.org/core/handbook/testing/automated-testing/phpunit/">WordPress PHPUnit</a></li>
+                                    <li><a href="https://phpunit.de/documentation.html">PHPUnit Documentation</a></li>
+                                    <li><a href="https://jestjs.io/">Jest Testing Framework</a></li>
+                                </ul>
+                            </section>
+                        </div>
+
+                        <div class="lesson-navigation">
+                            <a href="/06module/version_control.html" class="lesson-nav-button prev">Previous: Version Control</a>
+                            <button class="complete-lesson-btn">Mark as Complete</button>
+                            <a href="/06module/documentation_best_practices.html" class="lesson-nav-button next">Next: Documentation</a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </main>
+
+        <footer class="site-footer">
+            <div class="footer-container">
+                <p>&copy; 2024 PHP WordPress Course. All rights reserved.</p>
+            </div>
+        </footer>
+    </div>
+    
+    <script src="/assets/js/main.js"></script>
+    <script src="/assets/js/progress-tracker.js"></script>
+</body>
+</html>
