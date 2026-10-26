@@ -107,8 +107,8 @@
                 <p>You met the <code>wp_options</code> table in Lesson 2.2: one row per option, a name, a value and an autoload flag, with everything that is autoloaded fetched in a single query at the start of every request. Every screen under Settings in the admin is a form over a handful of those rows (Lesson 2.1 matched them up). Your plugin's settings belong there too, with the Options API you already know: <code>get_option()</code>, <code>add_option()</code>, <code>update_option()</code>, <code>delete_option()</code>.</p>
 
                 <div class="card card-info">
-                    <h4>💡 Mental model: one labelled box on the shared shelf</h4>
-                    <p>Think of <code>wp_options</code> as a shelf in the back office that every plugin shares. You could put each of your settings on it loose, four little notes with your name on them, or you could put one labelled box there, <code>pagesco_books_settings</code>, with all your notes inside. One box is easier to find, to load in one go, and to throw away when you leave. WordPress stores the box as a serialized PHP array (you saw serialized values in Lesson 2.2) and hands it back to you as an array.</p>
+                    <h4>💡 Mental model: one labeled box on the shared shelf</h4>
+                    <p>Think of <code>wp_options</code> as a shelf in the back office that every plugin shares. You could put each of your settings on it loose, four little notes with your name on them, or you could put one labeled box there, <code>pagesco_books_settings</code>, with all your notes inside. One box is easier to find, to load in one go, and to throw away when you leave. WordPress stores the box as a serialized PHP array (you saw serialized values in Lesson 2.2) and hands it back to you as an array.</p>
                 </div>
 
                 <p>The Pages &amp; Co. plugin gets exactly one option for its settings, as the course plan says. Ask for it before it exists, and WordPress has nothing to give:</p>
@@ -219,7 +219,7 @@ final class Settings implements Feature {
 		return $clean;
 	}
 }</code></pre>
-                <p>Four settings, chosen because the shop will really use them: the sentence the plugin adds to the store notice (today it is hard-coded in <code>StoreNotice</code>), whether the notice shows its "See events" link, how many books a list shows (the book blocks in Module 6 use it), and how many events the events listing shows (Lesson 5.5). Three parts of the class matter now:</p>
+                <p>Four settings, chosen because the shop will really use them: the sentence the plugin adds to the store notice (today it is hard-coded in <code>StoreNotice</code>), whether the notice shows its "See events" link, how many books a list shows (the book blocks in Module 6 and the REST API in Lesson 7.2 use it), and how many events the events listing shows (Lesson 5.5). Three parts of the class matter now:</p>
                 <ul>
                     <li><code>defaults()</code> is the single place the default values live. The notice sentence is the one the shop already shows, so nothing changes on the site until someone saves something different.</li>
                     <li><code>get( $key )</code> reads the option and fills any missing key from the defaults with <code>wp_parse_args()</code> (Lesson 1.3). That matters when a later version of the plugin adds a fifth setting: sites that saved the old four still get a value for the new one.</li>
@@ -324,7 +324,7 @@ final class SettingsPage implements Feature {
 		&lt;?php
 	}
 }</code></pre>
-                <p>The <code>current_user_can()</code> check inside <code>render()</code> repeats what the menu already enforces. That is Lesson 5.3's defense in depth: the callback should never depend on how it was reached. List the feature and look at the Settings menu as the administrator sees it (logged in as <code>admin</code>):</p>
+                <p>The <code>current_user_can()</code> check inside <code>render()</code> repeats what the menu already enforces. That is defense in depth, the habit behind Lesson 5.3's capability checks: the callback should never depend on how it was reached. List the feature and look at the Settings menu as the administrator sees it (logged in as <code>admin</code>):</p>
                 <pre data-cli><code class="language-bash">sed -i '/Settings::class,/a\			Admin\\SettingsPage::class,' wp-content/plugins/pagesco-books/src/Plugin.php
 grep -n "::class," wp-content/plugins/pagesco-books/src/Plugin.php</code></pre>
                 <div class="card card-output">
@@ -633,7 +633,7 @@ graph TD
 # Does what your browser does when you press "Save Changes" on
 # Settings &gt; Pages &amp; Co. Books (Lesson 5.4). Run it in the WP-CLI container:
 #   sh pagesco-save.sh 'pagesco_books_settings[events_limit]=5' ...
-# A field you leave out is not sent, exactly like an unticked checkbox.
+# A field you leave out is not sent, exactly like an unchecked checkbox.
 
 SITE=http://localhost:8080
 PAGE="$SITE/wp-admin/options-general.php?page=pagesco-books"
@@ -665,7 +665,7 @@ if [ "${ANSWER%% *}" = 302 ]; then
 else
 	grep -o '&lt;div class="wp-die-message"&gt;.*&lt;/div&gt;' /tmp/pagesco-answer.html | sed 's/&lt;[^&gt;]*&gt;//g'
 fi</code></pre>
-                <p>Send all four fields, as the browser would with the box ticked, but with an Events to show value the sanitize callback should refuse:</p>
+                <p>Send all four fields, as the browser would with the box checked, but with an Events to show value the sanitize callback should refuse:</p>
                 <pre data-cli><code class="language-bash">sh pagesco-save.sh 'pagesco_books_settings[notice_extra]=Open until 9 p.m. on Thursdays.' 'pagesco_books_settings[show_events_link]=1' 'pagesco_books_settings[books_per_page]=8' 'pagesco_books_settings[events_limit]=50'
 wp option get pagesco_books_settings</code></pre>
                 <div class="card card-output">
@@ -682,7 +682,7 @@ array (
                 <p>Read it from the top. <code>options.php</code> answered with a <code>302</code> redirect back to your page with <code>settings-updated=true</code>: the nonce, the capability and the allowed options list all passed. The page then printed your error, "Events to show must be between 1 and 20.", instead of "Settings saved.". And the option row now exists: Books per list was stored as <code>8</code>, while Events to show kept its old value, <code>5</code>, because <code>sanitize()</code> refused 50 and fell back to the saved value.</p>
                 <div class="card card-info">
                     <h4>💡 What a sanitize callback must do</h4>
-                    <p>It receives whatever arrived (treat it as hostile: it might not even be an array) and must <strong>return the complete value to store</strong>. Clean each key with the function for its type (<code>sanitize_text_field()</code>, <code>absint()</code>), turn the checkbox into a real boolean (an unticked box sends nothing at all, so "missing" means "off"), and for a value you reject, call <code>add_settings_error( $setting, $code, $message )</code> and keep the old value rather than storing nonsense. Errors are kept for one page load and printed above your form by <code>settings_errors()</code>, which core calls for you on pages under Settings.</p>
+                    <p>It receives whatever arrived (treat it as hostile: it might not even be an array) and must <strong>return the complete value to store</strong>. Clean each key with the function for its type (<code>sanitize_text_field()</code>, <code>absint()</code>), turn the checkbox into a real boolean (an unchecked box sends nothing at all, so "missing" means "off"), and for a value you reject, call <code>add_settings_error( $setting, $code, $message )</code> and keep the old value rather than storing nonsense. Errors are kept for one page load and printed above your form by <code>settings_errors()</code>, which core calls for you on pages under Settings.</p>
                 </div>
             </section>
 
@@ -702,10 +702,10 @@ Error: The pagesco-books options page is not in the allowed options list.</code>
                 <pre data-cli><code class="language-bash">sed -i 's/settings_fields( self::SLUG );/settings_fields( Settings::GROUP );/' wp-content/plugins/pagesco-books/src/Admin/SettingsPage.php</code></pre>
 
                 <h3>2. Reading a checkbox that was not sent</h3>
-                <p>An unticked checkbox is not sent as "0": it is not sent at all. A sanitize callback that reads it without checking, here in a throwaway must-use plugin, warns on every save with the box unticked:</p>
+                <p>An unchecked checkbox is not sent as "0": it is not sent at all. A sanitize callback that reads it without checking, here in a throwaway must-use plugin, warns on every save with the box unchecked:</p>
                 <pre data-file="wp-content/mu-plugins/mistake-checkbox.php"><code class="language-php">&lt;?php
 /**
- * Plugin Name: Mistake: Unticked Checkbox
+ * Plugin Name: Mistake: Unchecked Checkbox
  */
 
 add_action(
@@ -733,7 +733,7 @@ array (
   'show_events_link' =&gt; false,
 )</code></pre>
                 </div>
-                <p><strong>What it means:</strong> <code>$input['show_events_link']</code> does not exist, so PHP warns and uses <code>null</code>, which happens to cast to <code>false</code>. The value is right by luck and the warning lands in the debug log on every save with the box unticked. <strong>Fix:</strong> test for the key: <code>! empty( $input['show_events_link'] )</code>, as <code>Settings::sanitize()</code> does, or <code>isset()</code>, or <code>$input['key'] ?? false</code>.</p>
+                <p><strong>What it means:</strong> <code>$input['show_events_link']</code> does not exist, so PHP warns and uses <code>null</code>, which happens to cast to <code>false</code>. The value is right by luck and the warning lands in the debug log on every save with the box unchecked. <strong>Fix:</strong> test for the key: <code>! empty( $input['show_events_link'] )</code>, as <code>Settings::sanitize()</code> does, or <code>isset()</code>, or <code>$input['key'] ?? false</code>.</p>
 
                 <h3>3. Updating part of the array from code</h3>
                 <p>The form always sends every field. Code does not have to. A one-line "just change the events limit" goes wrong in a way no error reports:</p>
@@ -823,7 +823,7 @@ final class StoreNotice implements Feature {
 
                 <div class="card card-info">
                     <h3>🛠️ Step 2: Change the notice from the admin <span class="step-time">(10 min)</span></h3>
-                    <p>Marketing wants to announce signed copies and drop the events link for a week. Open <strong>Settings &gt; Pages &amp; Co. Books</strong>, type "Signed copies of Dune this week." into Notice addition, untick Events link and press Save Changes. Or send the same form with the script (no <code>show_events_link</code> field: that is the unticked box):</p>
+                    <p>Marketing wants to announce signed copies and drop the events link for a week. Open <strong>Settings &gt; Pages &amp; Co. Books</strong>, type "Signed copies of Dune this week." into Notice addition, uncheck Events link and press Save Changes. Or send the same form with the script (no <code>show_events_link</code> field: that is the unchecked box):</p>
                     <pre data-cli><code class="language-bash">sh pagesco-save.sh 'pagesco_books_settings[notice_extra]=Signed copies of &lt;b&gt;Dune&lt;/b&gt; this week.' 'pagesco_books_settings[books_per_page]=6' 'pagesco_books_settings[events_limit]=5'</code></pre>
                     <div class="card card-output">
                         <h4>Output</h4>

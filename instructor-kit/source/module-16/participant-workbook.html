@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Workbook: Session 16</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Student workbook —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">write in it · bring it to every session</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Participant Workbook</div>
+    <h1>Session 16: Distribution and Deployment</h1>
+    <p class="sub">Your workbook for Session 16: a warm-up, the key ideas of Lessons 8.3 and 8.4, worked examples, the guided labs, predict-then-run practice, the two projects' checklists, the final project's planning page, a self-check for each lesson, and your exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Lessons <b>8.3–8.4</b></span>
+      <span class="chip">Session <b>16</b> · 3 hours</span>
+      <span class="chip">Name: ____________________</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Session Goals</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Write strings a translator can translate, and know how PHP and JavaScript translations reach the page.</li>
+  <li>Check a theme and its blocks for accessibility three ways, and say what tools miss.</li>
+  <li>Prepare a release: versions, readme, a ZIP without development files, an uninstall that deletes only on opt-in.</li>
+  <li>Keep the shop's code in Git, build releases from a tag, move a database safely, configure a site for production.</li>
+  <li>Read the final project's brief, milestones and rubric, and start your plan.</li>
+</ul>
+
+  <div class="sec"><h2>Warm-up: Lessons 8.1 and 8.2</h2><span class="rule"></span></div>
+<p>Five questions from last session, no notes.</p>
+<div class="q"><div class="qn">W1</div><div class="qt">On a live site, where do PHP's messages go, and why not to wp-content/debug.log?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W2</div><div class="qt">Which command runs the plugin's tests, and in which site?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W3</div><div class="qt">get_posts() with 'fields' =&gt; 'ids', then get_post_meta() for each ID: what is that called, and the fix?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W4</div><div class="qt">What makes a cached result of EventsTable::find() unreachable after a new event is added?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W5</div><div class="qt">The theme's hero image got two fixes. Which, and what did each change?</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Lessons</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">8.3</span><h3>Internationalization, Accessibility &amp; Distribution</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Generate a POT file with wp i18n make-pot, write translator-friendly strings, and produce .mo, .l10n.php and JavaScript .json translations with WP-CLI</li>
+  <li>Explain how WordPress 7.1 finds a plugin's translations, for PHP (Domain Path) and for scripts (wp_set_script_translations() and block.json)</li>
+  <li>Check a theme and its blocks for accessibility with contrast ratios, a keyboard walk and an automated axe audit, and say what automated checks miss</li>
+  <li>Prepare a plugin for distribution: a valid readme.txt, version numbers, the directory guidelines, a release ZIP without development files, and a clean Plugin Check report</li>
+  <li>Write an uninstall routine that removes content only when an administrator has opted in</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>i18n</b> is your code (translation functions, one text domain); <b>l10n</b> is translation files; <b>a11y</b> is a quality of every page.</li>
+  <li><b>Translator-friendly strings:</b> whole sentences, numbered placeholders, a translators comment, <code class="inline">_n()</code> for counts, <code class="inline">_x()</code> for ambiguous words, literals only; escape translations too.</li>
+  <li><b>make-pot → POT → PO → make-mo, make-php, make-json --no-purge.</b> Since 6.8, Text Domain and Domain Path are enough for PHP; scripts need <code class="inline">wp_set_script_translations()</code> (block.json's textdomain for blocks) and a JSON named after the MD5 of the script's path.</li>
+  <li><b>Accessibility:</b> contrast computed (4.5:1, 3:1), a keyboard walk (order, visible focus), axe or Lighthouse; then a screen reader. Tools find perhaps a third of the problems.</li>
+  <li><b>Distribution:</b> a valid readme.txt, consistent versions, honest requirements, ABSPATH guards, documented external services, Plugin Check; a ZIP without development files, built with a production autoloader.</li>
+  <li><b>Uninstall</b> deletes content only on the administrator's opt-in, and registers what it needs: the plugin is not loaded.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: a plural and its comments</div>
+<p><code class="inline">_n()</code> chooses the form for a count; the language's plural rule decides how many forms there are. On your site, in English:</p>
+<pre class="code">wp eval 'echo esc_html( sprintf( _n( "%d seat", "%d seats", 1, "pagesco-books" ), 1 ) ), " | ", esc_html( sprintf( _n( "%d seat", "%d seats", 20, "pagesco-books" ), 20 ) ), "\n";'</pre>
+<pre class="out">1 seat | 20 seats</pre><p>How many strings of the plugin carry a translators comment? Count them in a fresh POT (in /tmp, so nothing changes):</p>
+<pre class="code">wp i18n make-pot wp-content/plugins/pagesco-books /tmp/pagesco-w.pot --exclude=src/blocks,tests &gt; /dev/null
+grep -c '^#. translators:' /tmp/pagesco-w.pot
+rm /tmp/pagesco-w.pot</pre>
+<pre class="out">14</pre><p>Every one of them has a placeholder; make-pot warns about each placeholder string without one.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li><code class="inline">cp labs/module-16/l8_3-i18n-a11y-distribution/plural_strings_starter.php wordpress/</code>, then <code class="inline">wp eval-file --use-include plural_strings_starter.php</code>.</li>
+  <li>Read the translator's file at the top: its msgids are the strings your code must use, exactly.</li>
+  <li>TODO 1 to 4: <code class="inline">_n()</code>, numbered placeholders, <code class="inline">_x()</code>, a whole sentence; a translators comment for each placeholder.</li>
+</ul>
+<div class="write tall"></div>
+<ul class="tick">
+  <li>Finished early? <code class="inline">a11y_scan_starter.sh</code>, then <code class="inline">debug_seats_spanish.php</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Predict, then run</div>
+<p>Write your prediction first, then run it on your site. A wrong prediction you can explain is worth more than a right guess.</p>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it. (Which language is this site in?)</div><pre class="code">wp eval 'echo get_locale(), " ", determine_locale(), "\n";'</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it. (A script path, hashed.)</div><pre class="code">printf '%s' 'build/blocks/book-card/index.js' | md5sum | cut -d' ' -f1</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>Release 1.1.0</b> (lesson page, "Project: Release 1.1.0"). In class: Steps 1 and 2.</p>
+<ul class="tick">
+  <li>☐ Step 1: the delete-all setting, off by default</li>
+  <li>☐ Step 2: uninstall tested both ways from a backup: 11 books kept, then 0, then 11 again</li>
+  <li>☐ Step 3: Spanish: POT, PO, MO, l10n.php, three JSON; seen on the front end and in Maria's Dashboard</li>
+  <li>☐ Step 4: the notice a region, the navigation as links, the focus ring</li>
+  <li>☐ Step 5: 1.1.0, readme.txt, the ZIP, Plugin Check without errors, <code class="inline">composer lint</code> 0</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">make-pot prints <code class="inline">Warning: Multiple placeholders should be ordered.</code> for <code class="inline">__( 'Showing %s of %s books', 'pagesco-books' )</code>. What is the fix?</div><div class="opts"><div class="opt">A) Nothing: it is only a warning, and the POT file was written</div><div class="opt">B) Split it into two strings, one per number</div><div class="opt">C) Numbered placeholders, <code class="inline">'Showing %1$s of %2$s books'</code>, with a translators comment naming both</div><div class="opt">D) Use <code class="inline">_n()</code> instead of <code class="inline">__()</code></div></div></div>
+<div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">The Book Card's editor script is <code class="inline">build/blocks/book-card/index.js</code>. In the WP-CLI container this prints its hash. Which file holds its Spanish strings?</div><pre class="code">printf '%s' 'build/blocks/book-card/index.js' | md5sum | cut -d' ' -f1</pre><div class="write"></div></div>
+<div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">The contrast script printed <code class="inline">slate    on paper      5.8:1  AA</code>. What does that allow?</div><div class="opts"><div class="opt">A) Normal-size text in slate on paper meets WCAG AA (4.5:1), but not AAA (7:1)</div><div class="opt">B) Only large text: normal text needs 7:1</div><div class="opt">C) Nothing: anything under 7:1 fails WCAG</div><div class="opt">D) Slate is safe on every background of the palette</div></div></div>
+<div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">Why does the new uninstall.php read the opt-in with <code class="inline">get_option( 'pagesco_books_settings', array() )</code> and not with <code class="inline">Settings::get( 'delete_data' )</code>?</div><div class="opts"><div class="opt">A) get_option() is faster</div><div class="opt">B) Settings::get() would translate the value</div><div class="opt">C) uninstall.php runs after the option is deleted</div><div class="opt">D) During uninstall the plugin is not loaded: its classes, post type and taxonomy are not there</div></div></div>
+<div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">Which of these must NOT be in the release ZIP of Pages &amp; Co. Books?</div><div class="opts"><div class="opt">A) <code class="inline">build/blocks/blocks-manifest.php</code></div><div class="opt">B) <code class="inline">phpcs.xml.dist</code></div><div class="opt">C) <code class="inline">languages/pagesco-books-es_ES.l10n.php</code></div><div class="opt">D) <code class="inline">vendor/autoload.php</code></div></div></div>
+<div class="q" data-sc="6" data-kind="short"><div class="qn">Q6</div><div class="qt">What does <code class="inline">--no-purge</code> change in <code class="inline">wp i18n make-json pagesco-books-es_ES.po --no-purge</code>?</div><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>Use one site you visit every day with the keyboard only for five minutes. Can you always see where you are, and reach everything? Then think of a client who sells abroad: which parts of the site would a translation file cover, and which would need a multilingual content plugin?</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">8.4</span><h3>Deployment &amp; Maintenance</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Choose a hosting type for a WordPress project by what it needs, and explain how code, content and configuration move between development, staging and production</li>
+  <li>Keep a WordPress project's own code in Git with a .gitignore, and build release files from a tagged commit with composer install --no-dev, npm ci, npm run build and the plugin ZIP</li>
+  <li>Move a database with wp db export, wp db import and wp search-replace, including serialized values and a plugin's own tables</li>
+  <li>Configure WordPress for production: debugging and development mode off, the environment type, secrets outside the code, a real cron job, file editing disabled and a least-privilege database account</li>
+  <li>Back up a site and prove the backup with a restore, deploy an update, and keep a maintenance checklist</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>Code goes up, content comes down, configuration stays.</b> A Site Editor change on the live site is content.</li>
+  <li><b>Production:</b> WP_DEBUG off and errors only in a log, WP_ENVIRONMENT_TYPE production, no WP_DEVELOPMENT_MODE, DISALLOW_FILE_EDIT, DISABLE_WP_CRON with a real cron job, secrets on the server only; raise the theme's Version with each release.</li>
+  <li><b>Git</b> tracks only your own source: a .gitignore that ignores everything and lets your folders back in; tag every release; never deploy the repository.</li>
+  <li><b>Release builds</b> from a tag in a clean folder: <code class="inline">composer install --no-dev --optimize-autoloader</code>, <code class="inline">npm ci</code>, <code class="inline">npm run build</code>, <code class="inline">npm run plugin-zip</code>.</li>
+  <li><b>Migrations:</b> <code class="inline">wp search-replace</code> (serialized data), <code class="inline">--all-tables-with-prefix</code>, <code class="inline">--skip-columns=guid</code>, <code class="inline">--dry-run</code> first, <code class="inline">--export</code> for a launch file; after importing a development database, reset passwords and remove application passwords.</li>
+  <li><b>Running a live site:</b> a cron job, daily backups kept elsewhere and proven by a restore, updates through staging, a least-privilege database account, a maintenance checklist.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: production settings, asked</div>
+<p>Three of the production settings, asked of your development site:</p>
+<pre class="code">wp eval 'printf( "%s | %s | %s\n", wp_get_environment_type(), wp_get_development_mode(), defined( "DISALLOW_FILE_EDIT" ) ? "no file editor" : "file editor on" );'</pre>
+<pre class="out">local | theme | file editor on</pre><p>And one that core derives from the environment: application passwords work without HTTPS only on local sites:</p>
+<pre class="code">wp eval 'var_dump( wp_is_application_passwords_available() );'</pre>
+<pre class="out">bool(true)</pre><p>On the rehearsal server the same commands print production, an empty development mode, no file editor, and false (recorded in the lesson, Step 5).</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li><code class="inline">cp labs/module-16/l8_4-deployment-maintenance/migration_preview_starter.sh wordpress/</code>, then <code class="inline">docker compose run --rm wpcli sh migration_preview_starter.sh</code>.</li>
+  <li>TODO 1 to 4: never a search-replace without <code class="inline">--dry-run</code> or <code class="inline">--export</code>.</li>
+  <li>Finished early? <code class="inline">restore_drill_starter.sh</code>, <code class="inline">cron_audit_starter.php</code>, then <code class="inline">debug_launch_check.sh</code>.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>Which table is missing without --all-tables-with-prefix?</td><td></td></tr>
+<tr><td>What is the 34?</td><td></td></tr>
+<tr><td>What did the database say at the end, and why?</td><td></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Predict, then run</div>
+<p>Write your prediction first, then run it on your site. A wrong prediction you can explain is worth more than a right guess.</p>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it. (The tables WordPress registers.)</div><pre class="code">wp db tables | wc -l</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it. (A move to the real address, counted.)</div><pre class="code">wp search-replace 'http://localhost:8080' 'https://www.pagesco.example' --all-tables-with-prefix --skip-columns=guid --dry-run --format=count</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>Launch Day, Rehearsed</b> (lesson page). In class: Step 3. At home: Steps 1 and 2 (after 8.3's Step 5), then 4 to 7.</p>
+<ul class="tick">
+  <li>☐ Step 3: pagesco-live unzipped, .env with my passwords, <code class="inline">docker compose up -d</code></li>
+  <li>☐ Step 1: commit, tag release-1, the release files built from the tag</li>
+  <li>☐ Step 2: the launch database: 13 tables</li>
+  <li>☐ Step 4: launched at http://localhost:8081, new passwords saved</li>
+  <li>☐ Step 5: the production settings checked</li>
+  <li>☐ Step 6: a backup, a deleted book, restored</li>
+  <li>☐ Step 7: release 2 deployed without touching the database</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">Maria changed the header in the live site's Site Editor. You deploy theme 1.2.0 with a new parts/header.html. What do visitors see?</div><div class="opts"><div class="opt">A) The new header from the theme's file</div><div class="opt">B) Maria's header: Site Editor changes are saved in the database, and they win over the theme's files</div><div class="opt">C) Both headers, one above the other</div><div class="opt">D) An error until someone resets the template part</div></div></div>
+<div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt">On the course site after Lesson 8.3: what does this print, and which table makes the difference?</div><pre class="code">echo "$(wp db tables | wc -l) $(wp db tables --all-tables-with-prefix | wc -l)"</pre><div class="write"></div></div>
+<div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">Why does every migration command in Lesson 8.4 say <code class="inline">--skip-columns=guid</code>?</div><div class="opts"><div class="opt">A) The GUID is an identifier feed readers use to recognize posts, not a link: it must not change</div><div class="opt">B) GUID columns are serialized and would break</div><div class="opt">C) The guid column is too long for search-replace</div><div class="opt">D) WordPress rewrites GUIDs itself on the first request</div></div></div>
+<div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">The project's .gitignore says <code class="inline">!/themes/</code>, then <code class="inline">/themes/*</code>, then <code class="inline">!/themes/pagesco/</code>. Why not just <code class="inline">!/themes/pagesco/</code> after <code class="inline">/*</code>?</div><div class="opts"><div class="opt">A) Git reads .gitignore from the bottom up</div><div class="opt">B) The order does not matter; it is only for readability</div><div class="opt">C) Without the first line Git would also track Twenty Twenty-Five</div><div class="opt">D) Git cannot let a file back in when its folder is ignored: the folder is let in, its contents ignored again, then the one subfolder let in</div></div></div>
+<div class="q" data-sc="11" data-kind="short"><div class="qn">Q11</div><div class="qt">In a clean copy of the tagged plugin (git archive), which Composer command builds the production autoloader, and what does it leave out?</div><div class="write"></div></div>
+<div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">On the rehearsal server the account pagesco_app has no LOCK TABLES right. What happens to <code class="inline">wp db export "$BACKUP"</code>?</div><div class="opts"><div class="opt">A) It works: WP-CLI locks nothing</div><div class="opt">B) It asks for the root password</div><div class="opt">C) It fails with error 1044, and leaves a small header-only file under the backup's name</div><div class="opt">D) It exports only the tables the account may lock</div></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>The live shop goes down at 9 p.m. on a Thursday, during the book club. Write, step by step, what you would do in the first fifteen minutes: where you look first, how you roll back, which backup you use, whom you tell. Which part of today's rehearsal made that plan possible?</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>The Final Project: Reserve &amp; Pick Up</h2><span class="rule"></span></div>
+<div class="blk lab"><div class="h">Your plan (start in class, finish tonight)</div>
+<p>Read Lesson 9.1's Brief again at home. Underline the nouns (the data) and the verbs (the actions). Then fill the table: for each of Maria's requirements, where the rule is enforced and which doors reach it.</p>
+<table class="timing">
+<thead><tr><th>Requirement (Maria's words)</th><th>The rule, and where it lives</th><th>The doors (form, REST, block, screen)</th></tr></thead>
+<tbody>
+<tr><td>1.</td><td></td><td></td></tr>
+<tr><td>2.</td><td></td><td></td></tr>
+<tr><td>3.</td><td></td><td></td></tr>
+<tr><td>4.</td><td></td><td></td></tr>
+<tr><td>5.</td><td></td><td></td></tr>
+<tr><td>6.</td><td></td><td></td></tr>
+<tr><td>7.</td><td></td><td></td></tr>
+<tr><td>8.</td><td></td><td></td></tr>
+</tbody>
+</table>
+<p>Three questions I still have:</p>
+<div class="write tall"></div>
+<div class="blk"><div class="h">Milestones</div>
+<table class="timing">
+<thead><tr><th>#</th><th>Milestone</th><th>Uses lessons</th><th>Time</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Plan, and measure before you build</td><td>1.1, 8.2</td><td>15 min</td></tr>
+<tr><td>2</td><td>The data: a holds table and two settings</td><td>5.1, 5.4, 5.5</td><td>25 min</td></tr>
+<tr><td>3</td><td>The rules, and the email</td><td>1.3, 2.3, 5.3, 1.2</td><td>30 min</td></tr>
+<tr><td>4</td><td>REST routes, form handlers and the staff screen</td><td>5.3, 5.4, 7.1, 7.2</td><td>30 min</td></tr>
+<tr><td>5</td><td>Two blocks: Reserve for Pickup and My Holds</td><td>3.2, 6.1, 6.3, 6.4</td><td>45 min</td></tr>
+<tr><td>6</td><td>Live prices on the front page</td><td>3.3, 6.3</td><td>15 min</td></tr>
+<tr><td>7</td><td>Quality: standards, tests, speed, accessibility</td><td>8.1, 8.2, 8.3</td><td>30 min</td></tr>
+<tr><td>8</td><td>Release 1.2.0</td><td>8.3, 8.4</td><td>20 min</td></tr>
+<tr><td>9</td><td>Deploy to the rehearsal server</td><td>8.4, 7.3</td><td>25 min</td></tr>
+<tr><td>10</td><td>Write-up and showcase</td><td>all</td><td>15 min</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">How it is assessed</div>
+<table class="timing">
+<thead><tr><th>Area</th><th>Points</th></tr></thead>
+<tbody>
+<tr><td>Features</td><td>20</td></tr>
+<tr><td>Data and rules</td><td>15</td></tr>
+<tr><td>Security and privacy</td><td>20</td></tr>
+<tr><td>Blocks and experience</td><td>15</td></tr>
+<tr><td>Code quality</td><td>10</td></tr>
+<tr><td>Testing</td><td>10</td></tr>
+<tr><td>Release and deploy</td><td>5</td></tr>
+<tr><td>Write-up and showcase</td><td>5</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">E1</div><div class="qt">Give one example each of code, content and configuration on the Pages &amp; Co. site, and how each moves to the live site.</div><div class="write"></div></div>
+<div class="q"><div class="qn">E2</div><div class="qt">Name two translator-friendly rules for strings.</div><div class="write"></div></div>
+<div class="q"><div class="qn">E3</div><div class="qt">Which two Reserve &amp; Pick Up requirements do you expect to be the hardest, and which layer handles each?</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Notes</h2><span class="rule"></span></div>
+<div class="notes-lines"></div>
+
+  <div class="sec"><h2>Homework Checklist</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ Lesson 8.3 project Steps 3 to 5 and the Release note</li>
+  <li>☐ Lesson 8.4 project Steps 1, 2, 4 to 7 and the Deployment note</li>
+  <li>☐ 8.3 Exercises 1 and 2; 8.4 Exercises 1 and 2</li>
+  <li>☐ Both Quick Quizzes, both journal entries</li>
+  <li>☐ The final project's plan: the requirements table and three questions (no building yet)</li>
+  <li>☐ Optional: <code class="inline">a11y_scan_starter.sh</code>, <code class="inline">release_check_starter.sh</code>, <code class="inline">debug_seats_spanish.php</code>, <code class="inline">restore_drill_starter.sh</code>, <code class="inline">cron_audit_starter.php</code>, <code class="inline">debug_launch_check.sh</code></li>
+</ul>
+<div class="blk"><div class="h">Bring list for Session 17</div>
+<ul class="tick">
+  <li>The site as Lesson 8.4 leaves it: <code class="inline">wordpress/wp-content</code> is a Git repository with a clean working copy and the tags release-1 and release-2 (<code class="inline">git status</code>, <code class="inline">git tag -n</code>), plugin and theme 1.1.1, <code class="inline">composer lint</code> exits 0.</li>
+  <li>The rehearsal server <code class="inline">~/pagesco-live</code> launched, with plugin and theme 1.1.1, its new passwords in your password manager, <code class="inline">LOCK TABLES</code> granted, and one backup in <code class="inline">backups/</code> (Lesson 8.4, Steps 3 to 7). <code class="inline">docker compose up -d</code> in its folder before the session.</li>
+  <li>The test environment works: <code class="inline">npx @wordpress/env start</code> in the plugin's folder, the twelve tests green (Node.js 24; the node:24 and composer:2 images pulled).</li>
+  <li>An internet connection for npx and <code class="inline">npm ci</code> (Lesson 9.1's Milestones 5 and 8).</li>
+  <li>Your plan for Reserve &amp; Pick Up from tonight's homework (the requirements-to-layers table, the questions you still have), Lesson 9.1 open in a browser tab, pagesco-plan.txt, the journal and the workbook.</li>
+</ul>
+</div>
+
+  <div class="sec"><h2>Glossary</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>i18n · l10n · a11y</td><td>Internationalization (your code) · localization (translation files) · accessibility</td></tr>
+<tr><td>POT · PO · MO · l10n.php</td><td>The template · one language's translation · compiled for PHP · the PHP-array format (6.5+)</td></tr>
+<tr><td>text domain</td><td>The name that ties a plugin's strings to its translations (<code class="inline">pagesco-books</code>)</td></tr>
+<tr><td>WCAG 2.2 AA</td><td>The usual accessibility target: contrast 4.5:1, keyboard access, visible focus, ...</td></tr>
+<tr><td>Plugin Check</td><td>The plugin review team's checker (a plugin with a WP-CLI command)</td></tr>
+<tr><td>staging</td><td>A copy of production on the same kind of server, for trying releases with real data</td></tr>
+<tr><td>release tag</td><td>An annotated Git tag on the commit that went live (<code class="inline">release-1</code>)</td></tr>
+<tr><td><code class="inline">git archive</code></td><td>Writes exactly the files of a commit, nothing else: the clean copy a build starts from</td></tr>
+<tr><td><code class="inline">wp search-replace</code></td><td>Replaces text in the database, including inside serialized values</td></tr>
+<tr><td>GUID</td><td>A post's permanent identifier; looks like a URL, never changed by a migration</td></tr>
+<tr><td>least privilege</td><td>An account with only the rights it needs (pagesco_app: its own database)</td></tr>
+</tbody>
+</table>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 16 · Participant Workbook · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

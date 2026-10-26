@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Workbook: Session 11</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Student workbook —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">write in it · bring it to every session</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Participant Workbook</div>
+    <h1>Session 11: Custom Tables, Shortcodes and Block Setup</h1>
+    <p class="sub">Your workbook for Session 11: the warm-up, the key ideas of Lessons 5.5 and 6.1, worked examples, the guided labs, predict-then-run practice, a self-check for each lesson, and your exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Lessons <b>5.5–6.1</b></span>
+      <span class="chip">Session <b>11</b> · 3 hours</span>
+      <span class="chip">Name: ____________________</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Session Goals</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Write shortcodes that return escaped HTML, with attributes handled by shortcode_atts().</li>
+  <li>Decide when a custom table is the right storage, create and migrate one with dbDelta() and a schema version, and read and write it with $wpdb and placeholders.</li>
+  <li>Set up the block toolchain: Node 24, @wordpress/create-block in the existing plugin, @wordpress/scripts.</li>
+  <li>Build the Book Card, register it from the manifest with a Blocks feature, and say what each built file is for.</li>
+</ul>
+
+  <div class="sec"><h2>Start Here: Warm-up</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Five questions on Session 10</div>
+<div class="q"><div class="qn">W1</div><div class="qt">A handler that changes data: the four checks, in order?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W2</div><div class="qt"><code class="inline">settings_fields()</code> takes the group or the page slug?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W3</div><div class="qt">What does an unticked checkbox send?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W4</div><div class="qt"><code class="inline">$wpdb-&gt;prepare()</code>: which placeholder for a table name?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W5</div><div class="qt">What does uninstall.php remove, and what does it keep?</div><div class="write"></div></div>
+</div>
+<div class="blk lab"><div class="h">Homework check and Node</div>
+<ul class="tick">
+  <li>☐ <code class="inline">grep -c '::class,' wordpress/wp-content/plugins/pagesco-books/src/Plugin.php</code> prints 9</li>
+  <li>☐ <code class="inline">node --version</code> prints v24 (or I use the node:24 image)</li>
+  <li>☐ wordpress/wp-content/plugins/pagesco-books/package.json copied from Lesson 6.1, and <code class="inline">npm install</code> running in a second terminal in that folder</li>
+</ul>
+</div>
+
+  <div class="sec"><h2>Lessons</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">5.5</span><h3>Shortcodes, $wpdb &amp; Custom Tables</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Register shortcodes with add_shortcode() whose callbacks return escaped HTML, with attributes handled by shortcode_atts()</li>
+  <li>Decide when a custom table is the right storage, and when post types, meta, taxonomies or options are</li>
+  <li>Create and upgrade a table with dbDelta() and a schema version stored in an option</li>
+  <li>Read and write rows with $wpdb: insert(), update(), delete(), get_row(), get_var(), get_results(), always through prepare() or format arrays</li>
+  <li>Remove the table and its version option in uninstall.php</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>A shortcode</b> is <code class="inline">add_shortcode( $tag, $callback )</code> on init; the callback RETURNS escaped HTML and never echoes.</li>
+  <li><b><code class="inline">shortcode_atts( $defaults, $atts, $tag )</code></b> fills defaults, drops undeclared attributes (all values are strings) and creates the <code class="inline">shortcode_atts_{$tag}</code> filter.</li>
+  <li><b>A custom table</b> is for many uniform rows queried by their fields; post types, taxonomies and options come with far more for free.</li>
+  <li><b><code class="inline">dbDelta()</code></b> creates a table or adds missing columns and indexes from a carefully formatted CREATE TABLE; it never renames or drops.</li>
+  <li><b>A schema version</b> in an option, compared on every request: raise it with every schema change, because updates do not rerun activation.</li>
+  <li><b>Every <code class="inline">$wpdb</code> value</b> through placeholders (<code class="inline">%s</code>, <code class="inline">%d</code>, <code class="inline">%f</code>, <code class="inline">%i</code>) or the format arrays of insert(), update(), delete().</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: one table, two ways in</div>
+<p>After the project: the Café's events through the shortcode, then the same table asked in SQL:</p>
+<pre class="code">wp eval 'echo do_shortcode( "[pagesco_events location=\"Café\"]" ), "\n";'</pre>
+<pre class="out">&lt;ul class="pagesco-events"&gt;&lt;li class="pagesco-event"&gt;&lt;strong&gt;An evening with Ana Ruiz&lt;/strong&gt; &lt;time datetime="2027-11-11T18:30"&gt;Thursday, November 11, 6:30 pm&lt;/time&gt; &lt;span class="pagesco-event__where"&gt;Café, 40 seats&lt;/span&gt;&lt;/li&gt;&lt;li class="pagesco-event"&gt;&lt;strong&gt;Poetry open mic&lt;/strong&gt; &lt;time datetime="2027-11-18T19:30"&gt;Thursday, November 18, 7:30 pm&lt;/time&gt; &lt;span class="pagesco-event__where"&gt;Café, 30 seats&lt;/span&gt;&lt;/li&gt;&lt;/ul&gt;</pre><pre class="code">wp db query "SELECT location, COUNT(*) AS events, SUM(capacity) AS seats FROM wp_pagesco_events GROUP BY location ORDER BY seats DESC"</pre>
+<pre class="out">location	events	seats
+Café	2	70
+Reading corner	2	40
+Children's corner	1	15
+Front of the shop	1	0</pre><p>The shortcode reads through EventsTable::find() (a %s placeholder for the location, the setting's limit); the GROUP BY and SUM on real columns is where a table pays off.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li><code class="inline">cp labs/module-11/l5_5-custom-tables/wishlist_table_starter.php wordpress/</code>, then <code class="inline">wp eval-file --use-include wishlist_table_starter.php</code>.</li>
+  <li>TODOs 1 to 5 in order; run after each. Stuck half-way? <code class="inline">wp db query "DROP TABLE IF EXISTS wp_pagesco_lab_wishlist"</code>.</li>
+</ul>
+<div class="write tall"></div>
+<ul class="tick">
+  <li>Done when the output ends with <code class="inline">tables left: 0</code>. Finished early? The open_hours shortcode lab, then <code class="inline">debug_events_report.php</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Predict, then run</div>
+<p>Write your prediction first, then run it on your site.</p>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it. (Page 14 is the Events page, not a book.)</div><pre class="code">wp eval 'echo do_shortcode( "[pagesco_book id=\"14\"]" ) === "" ? "(empty)" : "a card", "\n";'</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it. (The events table after the seeding.)</div><pre class="code">wp eval 'global $wpdb; echo $wpdb-&gt;get_var( "SELECT COUNT(*) FROM " . PagesCo\Books\EventsTable::name() ), "\n";'</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>The Events Calendar</b> (lesson page). In class: Steps 1 and 2. At home: Steps 3 and 4.</p>
+<ul class="tick">
+  <li>☐ BookShortcode and EventsTable (version 1) listed; the table exists</li>
+  <li>☐ Step 1: version 2, capacity added on the next request</li>
+  <li>☐ Step 2: uninstall.php drops the table and both options</li>
+  <li>☐ Steps 3 and 4: EventsShortcode, six events, the Events page lists five</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="1" data-kind="short"><div class="qn">Q1</div><div class="qt">What does this print?</div><pre class="code">wp eval 'echo wp_json_encode( shortcode_atts( array( "limit" =&gt; 5, "location" =&gt; "" ),
+    array( "limit" =&gt; "3", "color" =&gt; "red" ), "pagesco_events" ) ), "\n";'</pre><div class="write"></div></div>
+<div class="q" data-sc="2"><div class="qn">Q2</div><div class="qt">Which of these do you get for free with a post type, but must build yourself for a custom table?</div><div class="opts"><div class="opt">A) A REST route, admin screens, revisions and export</div><div class="opt">B) Fast queries on an indexed column</div><div class="opt">C) A schema you control column by column</div><div class="opt">D) JOINs with wp_posts</div></div></div>
+<div class="q" data-sc="3" data-kind="short"><div class="qn">Q3</div><div class="qt">On the finished Lesson 5.5 site, what does this print?</div><pre class="code">wp eval 'global $wpdb; echo $wpdb-&gt;prepare( "SELECT title FROM %i WHERE location = %s",
+    PagesCo\Books\EventsTable::name(), "Café" ), "\n";'</pre><div class="write"></div></div>
+<div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">EventsTable::add() calls $wpdb->insert(). Where does it find the new row's ID?</div><div class="opts"><div class="opt">A) In the return value of insert()</div><div class="opt">B) <code class="inline">$wpdb-&gt;insert_id</code></div><div class="opt">C) <code class="inline">$wpdb-&gt;last_query</code></div><div class="opt">D) Only with a second query, SELECT LAST_INSERT_ID()</div></div></div>
+<div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">Why does EventsTable check the schema version on every request (maybe_upgrade() on init), and not only on activation?</div><div class="opts"><div class="opt">A) Because dbDelta() must run on every request</div><div class="opt">B) Because the activation hook cannot create tables</div><div class="opt">C) Because a plugin update replaces the files but does not run the activation hook again</div><div class="opt">D) Because the version option is not autoloaded</div></div></div>
+<div class="q" data-sc="6" data-kind="short"><div class="qn">Q6</div><div class="qt">On the finished Lesson 5.5 site, what does this print?</div><pre class="code">wp eval 'echo do_shortcode( "[pagesco_events location=\"Reading corner\" limit=\"1\"]" ), "\n";'</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>Add the events table to the storage list in pagesco-plan.txt, with its owner and what deactivation and deletion do to it. Then name, for a client site you know, one kind of data for each row of the lesson's "store it as" table, and write the CREATE TABLE columns for the custom-table one.</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">6.1</span><h3>Block Development Setup</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Describe a block type as WordPress sees it: block.json metadata, an editor script with edit and save, styles, and (later) PHP rendering</li>
+  <li>Scaffold a block into an existing plugin with npx @wordpress/create-block and --no-plugin, and read every generated file</li>
+  <li>Build blocks with @wordpress/scripts, and say what each file in build/ is for, including index.asset.php and the blocks manifest</li>
+  <li>Register all built blocks from a plugin feature with wp_register_block_types_from_metadata_collection()</li>
+  <li>Recognize the setup mistakes that cost beginners an afternoon: a second plugin by accident, a missing build, and stale build files</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>A block type</b> is block.json metadata plus an editor script with <b>edit</b> (the editing view) and <b>save</b> (the stored HTML), plus styles; a static block's front end needs no JavaScript.</li>
+  <li><b><code class="inline">npx @wordpress/create-block@latest &lt;slug&gt; --no-plugin --target-dir=src/blocks/&lt;slug&gt; --namespace=pagesco --textdomain=pagesco-books</code></b> adds a block to the existing plugin.</li>
+  <li><b><code class="inline">npm run build</code></b> (@wordpress/scripts) turns src/blocks into build/blocks: compiled scripts and styles, <code class="inline">index.asset.php</code> (dependencies + version) and, with --blocks-manifest, <code class="inline">blocks-manifest.php</code>.</li>
+  <li><b><code class="inline">wp_register_block_types_from_metadata_collection( $dir, $manifest )</code></b> on init registers every built block and its asset handles: the Blocks feature.</li>
+  <li><b>WordPress reads only build/</b>: rebuild after every change (or keep <code class="inline">npm start</code> running), and build wherever the plugin is installed from source.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: the shelf, not the kit</div>
+<p>After the project: is the build's block.json the same file as the source's?</p>
+<pre class="code">cd wp-content/plugins/pagesco-books &amp;&amp; diff src/blocks/book-card/block.json build/blocks/book-card/block.json &gt; /dev/null &amp;&amp; echo same || echo differ</pre>
+<pre class="out">differ</pre><p>Different: the build rewrites it (formatting, and file: paths relative to build/). And the saved text survives minification word for word:</p>
+<pre class="code">grep -o '"Book Card: a staff pick is coming soon."' wp-content/plugins/pagesco-books/build/blocks/book-card/index.js</pre>
+<pre class="out">"Book Card: a staff pick is coming soon."</pre></div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li><code class="inline">cp -r labs/module-11/l6_1-block-setup/shelf_label_starter wordpress/wp-content/plugins/pagesco-shelf-label</code>, <code class="inline">wp plugin activate pagesco-shelf-label</code>, copy <code class="inline">test_shelf_label.sh</code> into wordpress/ and run it.</li>
+  <li>TODO 1 in <code class="inline">pagesco-shelf-label.php</code>; with Node, TODO 2 (keywords, then <code class="inline">npm install</code> and <code class="inline">npm run build</code> in the lab plugin's folder).</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>Why does the page show the label before TODO 1?</td><td></td></tr>
+<tr><td>Why does it have no stylesheet then?</td><td></td></tr>
+</tbody>
+</table>
+<ul class="tick">
+  <li>Done when the test prints <code class="inline">front end: 1 stylesheet(s)</code>. Then <code class="inline">wp plugin deactivate pagesco-shelf-label</code> and remove the folder and the test.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Predict, then run</div>
+<p>Write your prediction first, then run it on your site.</p>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it. (The manifest, required as PHP.)</div><pre class="code">wp eval 'echo implode( ", ", array_keys( require WP_PLUGIN_DIR . "/pagesco-books/build/blocks/blocks-manifest.php" ) ), "\n";'</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it. (The block's stylesheet on the home page.)</div><pre class="code">curl -s http://localhost:8080/ | grep -c 'pagesco-book-card-style'</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>The Book Card's First Draft</b> (lesson page). In class: Steps 1 and 2. At home: Steps 3 and 4.</p>
+<ul class="tick">
+  <li>☐ package.json, npm install, npm run build; the Blocks feature (thirteen features)</li>
+  <li>☐ Step 1: the shop's block.json, edit, save, styles; no view.js</li>
+  <li>☐ Step 2: the Book Card in the editor</li>
+  <li>☐ Steps 3 and 4: the front end and the final check</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">Which file in build/blocks/book-card/ has no source file of its own in src/?</div><div class="opts"><div class="opt">A) <code class="inline">block.json</code></div><div class="opt">B) <code class="inline">index.js</code></div><div class="opt">C) <code class="inline">style-index.css</code></div><div class="opt">D) <code class="inline">index.asset.php</code>, the dependency list and version hash</div></div></div>
+<div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt">On the finished Lesson 6.1 site, what does this print?</div><pre class="code">wp eval 'echo implode( ", ", WP_Block_Type_Registry::get_instance()
+    -&gt;get_registered( "pagesco/book-card" )-&gt;style_handles ), "\n";'</pre><div class="write"></div></div>
+<div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">You worked all afternoon with npm start running. What do you run before you commit or deploy?</div><div class="opts"><div class="opt">A) <code class="inline">npm run build</code>: the minified production files, without .map files</div><div class="opt">B) <code class="inline">npm install</code> again</div><div class="opt">C) <code class="inline">npx @wordpress/create-block</code> again</div><div class="opt">D) Nothing: npm start already wrote build/</div></div></div>
+<div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">Posts already contain the Book Card. A developer renames the block from pagesco/book-card to pagesco/staff-pick. What happens to those posts?</div><div class="opts"><div class="opt">A) WordPress renames the block in every post automatically</div><div class="opt">B) Nothing visible: names are cosmetic</div><div class="opt">C) Their stored comments still say wp:pagesco/book-card, a block that no longer exists: the editor cannot handle them</div><div class="opt">D) The posts are deleted</div></div></div>
+<div class="q" data-sc="11" data-kind="short"><div class="qn">Q11</div><div class="qt">On the finished Lesson 6.1 site, what does this print, and why not 4?</div><pre class="code">grep -c "'wp-" wp-content/plugins/pagesco-books/build/blocks/book-card/index.asset.php</pre><div class="write"></div></div>
+<div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">What does <code class="inline">npx @wordpress/create-block@latest book-card --no-plugin --target-dir=src/blocks/book-card</code> NOT create?</div><div class="opts"><div class="opt">A) A block.json</div><div class="opt">B) A plugin PHP file, a package.json and node_modules/</div><div class="opt">C) An edit.js and a save.js</div><div class="opt">D) A view.js</div></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>Draw the path of the Book Card from src/blocks/book-card/ to a visitor's screen in your own boxes and arrows. Then write what you would check first if (a) the block is missing from the inserter, (b) the inserter shows an old version, (c) the front end looks unstyled.</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">E1</div><div class="qt">Why must a shortcode callback return its HTML instead of echoing it?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E2</div><div class="qt">You add a column to schema(). What else must change, and why?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E3</div><div class="qt">Name the path of the Book Card from your files to the editor.</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Notes</h2><span class="rule"></span></div>
+<div class="notes-lines"></div>
+
+  <div class="sec"><h2>Homework Checklist</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ 5.5 project Steps 3 and 4</li>
+  <li>☐ 6.1 project Steps 3 and 4</li>
+  <li>☐ Exercises 1 to 3 of both lessons (Exercise 4 is a stretch)</li>
+  <li>☐ Both Quick Quizzes and both journal entries</li>
+  <li>☐ Labs not reached: open_hours, debug_events_report, core_blocks_tour, debug_block_registration</li>
+</ul>
+
+  <div class="sec"><h2>Glossary</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>shortcode</td><td>A [tag] in content that a callback replaces with HTML on display</td></tr>
+<tr><td>custom table</td><td>A table of your own, <code class="inline">{$wpdb-&gt;prefix}pagesco_events</code>, for uniform rows</td></tr>
+<tr><td>dbDelta()</td><td>Creates or extends a table from a CREATE TABLE statement; only adds</td></tr>
+<tr><td>schema version</td><td>An option (<code class="inline">pagesco_books_db_version</code>) compared with the code's DB_VERSION</td></tr>
+<tr><td>block.json</td><td>A block type's metadata: name, title, attributes, supports, files</td></tr>
+<tr><td>edit / save</td><td>The editing view (React) / the function that returns the stored HTML</td></tr>
+<tr><td>@wordpress/scripts</td><td>WordPress's build tool (webpack, Babel, Sass, dependency extraction)</td></tr>
+<tr><td>index.asset.php</td><td>The built script's dependency handles and version hash</td></tr>
+<tr><td>blocks manifest</td><td><code class="inline">build/blocks/blocks-manifest.php</code>: every block.json as one PHP array</td></tr>
+</tbody>
+</table>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 11 · Participant Workbook · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

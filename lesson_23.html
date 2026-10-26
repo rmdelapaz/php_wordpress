@@ -1,8 +1,1301 @@
 <!DOCTYPE html>
-<html lang="en"><head><title>probe</title></head><body>
-<main id="main-content" data-state="after:lesson_22">
-<pre data-cli><code class="language-bash">wp plugin list --fields=name,status
-wp user application-password list admin --fields=uuid,name
-wp user list --fields=ID,user_login,roles</code></pre>
-<div class="card card-output"><h4>Output</h4><pre><code>FILL</code></pre></div>
-</main></body></html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="The WordPress REST API on WordPress 7.1: routes and endpoints, reading the Pages &amp; Co. catalog with _fields, _embed, filters and pagination headers, cookie and nonce authentication, application passwords, apiFetch, and REST errors, with a stock dashboard widget. PHP and WordPress Development Lesson 7.1.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Using the REST API - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 7: APIs &amp; Integration</a></li>
+            <li aria-current="page">Lesson 7.1: Using the REST API</li>
+        </ul>
+    </nav>
+
+    <main id="main-content" data-state="after:lesson_22">
+        <div class="container">
+            <header>
+                <h1>🌐 Lesson 7.1: Using the REST API</h1>
+                <p class="lead">Every page of the Pages &amp; Co. site so far is HTML, made for a person with a browser. But the block editor, a phone app, the shop's inventory system or a partner's website do not want HTML: they want the data, in a form a program can read, and a safe way to change it. That is the WordPress REST API. It has been answering at <code>/wp-json/</code> on your site all along (the editor used it in Lesson 6.3 without asking you). Today you read the shop's catalog through it, learn the two ways a request proves who sent it, and build a dashboard widget that changes stock with a click, without a page load.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Explain routes, endpoints, methods, JSON responses and status codes, and list the routes your site offers</li>
+                        <li>Read the catalog from core endpoints and shape the answer with <code>_fields</code>, <code>_embed</code>, <code>context</code>, filters and the pagination headers</li>
+                        <li>Authenticate the right way: cookie plus nonce for logged-in JavaScript, application passwords for other programs</li>
+                        <li>Call the REST API from JavaScript with <code>apiFetch</code>, and handle its errors</li>
+                        <li>Read REST errors (400, 401, 403, 404) and tell "who are you?" from "you may not"</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 140 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_22.html">Lesson 6.4: The Interactivity API</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> an application password for the shop's inventory script, and a "Stock at a glance" dashboard widget that reads and updates books through the REST API with <code>apiFetch</code></li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (application passwords need 5.6+; everything here works on 6.8, the plugin's minimum)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 6.4, the WP-CLI container for <code>curl</code>, and a browser with its developer tools (<kbd>F12</kbd>)</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#basics" class="toc-link">The Shop's Service Counter</a></li>
+                        <li><a href="#reading" class="toc-link">Reading the Catalog</a></li>
+                        <li><a href="#auth" class="toc-link">Who Is Asking? Authentication</a></li>
+                        <li><a href="#apifetch" class="toc-link">apiFetch: the REST API from JavaScript</a></li>
+                        <li><a href="#errors" class="toc-link">When the Answer Is No: REST Errors</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Stock at a Glance</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="basics" class="lesson-section">
+                <h2>🛎️ The Shop's Service Counter</h2>
+                <p>A REST API is a set of addresses (URLs) that return data instead of pages, plus a few rules for using them. WordPress has shipped one in core since version 4.7, and the block editor is built on it: every time you saved a post in Module 6, the editor sent your blocks to the REST API, not to an old-style form. Five words cover most of it:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Word</th><th>Means</th><th>On your site</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><strong>Base</strong></td><td>where the API lives</td><td><code>http://localhost:8080/wp-json/</code></td></tr>
+                            <tr><td><strong>Namespace</strong></td><td>a group of routes, with a version</td><td><code>wp/v2</code> (core content), <code>pagesco/v1</code> (yours, from Lesson 7.2)</td></tr>
+                            <tr><td><strong>Route</strong></td><td>a path pattern under the base</td><td><code>/wp/v2/books</code>, <code>/wp/v2/books/(?P&lt;id&gt;[\d]+)</code></td></tr>
+                            <tr><td><strong>Endpoint</strong></td><td>a route plus an HTTP method: one thing you can do</td><td><code>GET /wp/v2/books/30</code> reads Dune; <code>POST /wp/v2/books/30</code> updates it</td></tr>
+                            <tr><td><strong>Response</strong></td><td>JSON, a status code and headers</td><td><code>200 OK</code>, <code>X-WP-Total: 11</code>, <code>{"id":30,…}</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The methods carry the meaning, as in any REST API: <code>GET</code> reads, <code>POST</code> creates (and, in WordPress, also updates), <code>PUT</code> and <code>PATCH</code> update, <code>DELETE</code> deletes. Every request goes through the same steps inside WordPress:</p>
+
+                <div class="mermaid">
+graph TD
+    A["GET /wp-json/wp/v2/books/30"] --> B["rest_api_loaded: this is a REST request"]
+    B --> C["authentication: cookie and nonce, or application password"]
+    C --> D["route and method matched"]
+    D --> E["arguments validated and sanitized"]
+    E --> F["permission check"]
+    F --> G["callback: the controller reads the book"]
+    G --> H["JSON, status code, headers"]
+                </div>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: the service counter</h4>
+                    <p>The shop floor is the website: customers wander, browse and read the shelves (HTML). At the back is a service counter with a list of what it handles ("ask for a book by its number", "change a price"). Anyone may ask the counter for public information; for anything that changes the shop, the clerk first checks who you are (authentication) and then whether your role allows it (permission). What you get back is a neat package (JSON) with a slip stapled to it: the status code and the headers. Lesson 7.2 adds counters of the shop's own.</p>
+                </div>
+
+                <h3>Ask the API about itself</h3>
+                <p>The base URL describes the site and lists its namespaces. Open <code>http://localhost:8080/wp-json/</code> in your browser (Firefox and Chrome show JSON readably); three of its fields:</p>
+                <pre data-web="/wp-json/" data-json-pick="name,url,namespaces"><code class="language-text">http://localhost:8080/wp-json/   (the fields name, url and namespaces)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>{
+  "name": "Pages &amp;amp; Co.",
+  "url": "http://localhost:8080",
+  "namespaces": [
+    "oembed/1.0",
+    "wp/v2",
+    "wp-site-health/v1",
+    "wp-block-editor/v1",
+    "wp-abilities/v1"
+  ]
+}</code></pre>
+                </div>
+                <p>The name arrives HTML-escaped, as it is stored (Lesson 1.2). The namespaces are core's: content (<code>wp/v2</code>), oEmbed, Site Health, the block editor's helpers and the Abilities API. The full answer also lists every route with its arguments, which makes it long; the server can list the routes for one subject more readably. From the WP-CLI container:</p>
+                <pre data-cli><code class="language-bash">wp eval 'foreach ( array_keys( rest_get_server()-&gt;get_routes() ) as $route ) { if ( str_contains( $route, "books" ) || str_contains( $route, "genres" ) ) { echo $route, "\n"; } }'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>/wp/v2/books
+/wp/v2/books/(?P&lt;id&gt;[\d]+)
+/wp/v2/books/(?P&lt;id&gt;[\d]+)/autosaves
+/wp/v2/books/(?P&lt;parent&gt;[\d]+)/autosaves/(?P&lt;id&gt;[\d]+)
+/wp/v2/genres
+/wp/v2/genres/(?P&lt;id&gt;[\d]+)</code></pre>
+                </div>
+                <p>These exist because Lesson 5.2 registered the Book post type and the Genre taxonomy with <code>show_in_rest</code> and <code>rest_base</code>: WordPress built the routes, their arguments and their permission checks for you. <code>(?P&lt;id&gt;[\d]+)</code> is a regular expression with a named group: the route matches <code>/wp/v2/books/30</code> and hands the controller <code>id = 30</code>. (Autosaves are the editor's.) Every page of the site also tells programs where the API is, in its <code>&lt;head&gt;</code>:</p>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | grep -o '&lt;link rel="https://api.w.org/"[^&gt;]*&gt;'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;link rel="https://api.w.org/" href="http://localhost:8080/wp-json/" /&gt;</code></pre>
+                </div>
+                <p>With plain permalinks (no <code>/%postname%/</code>, Lesson 1.2) <code>/wp-json/</code> does not exist; the same API answers at <code>/?rest_route=/wp/v2/books</code>. That form works on every site, which is why code should build URLs with <code>rest_url( 'wp/v2/books' )</code> in PHP rather than typing <code>/wp-json/</code>:</p>
+                <pre data-web="/?rest_route=/wp/v2/books/30&amp;_fields=id,slug"><code class="language-text">http://localhost:8080/?rest_route=/wp/v2/books/30&amp;_fields=id,slug</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>{"id":30,"slug":"dune"}</code></pre>
+                </div>
+            </section>
+
+            <section id="reading" class="lesson-section">
+                <h2>📚 Reading the Catalog</h2>
+                <p>The collection route lists books. Ask it from the WP-CLI container, keeping the headers and the size of the body (the body goes to a file):</p>
+                <pre data-cli><code class="language-bash">curl -s -D - -o books.json http://localhost:8080/wp-json/wp/v2/books | grep -E '^(HTTP|Link|X-WP-)'
+wc -c &lt; books.json
+rm books.json</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>HTTP/1.1 200 OK
+Link: &lt;http://localhost:8080/wp-json/wp/v2/books?page=2&gt;; rel="next"
+X-WP-Total: 11
+X-WP-TotalPages: 2
+13202</code></pre>
+                </div>
+                <p>Ten books (the default page size) in over 13 KB, and the headers say there are 11 in all, on 2 pages, with a <code>Link</code> to the next page. One book, with the fields this lesson cares about picked out (your browser shows more: dates, <code>guid</code>, <code>excerpt</code>, <code>template</code>, <code>class_list</code>…):</p>
+                <pre data-web="/wp-json/wp/v2/books/30" data-json-pick="id,slug,status,type,link,title,content,meta,genres,_links.wp:term"><code class="language-text">http://localhost:8080/wp-json/wp/v2/books/30</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>{
+  "id": 30,
+  "slug": "dune",
+  "status": "publish",
+  "type": "book",
+  "link": "http://localhost:8080/books/dune/",
+  "title": {
+    "rendered": "Dune"
+  },
+  "content": {
+    "rendered": "",
+    "protected": false
+  },
+  "meta": {
+    "pagesco_author": "Frank Herbert",
+    "pagesco_price": 14.99,
+    "pagesco_pages": 412,
+    "pagesco_published": "1965-08-01",
+    "pagesco_in_stock": true,
+    "pagesco_isbn": ""
+  },
+  "genres": [
+    5,
+    6
+  ],
+  "_links": {
+    "wp:term": [
+      {
+        "taxonomy": "genre",
+        "embeddable": true,
+        "href": "http://localhost:8080/wp-json/wp/v2/genres?post=30"
+      }
+    ]
+  }
+}</code></pre>
+                </div>
+                <ul>
+                    <li><strong><code>title.rendered</code></strong> is the title after the display filters (<code>the_title</code>, Lesson 2.3), ready for HTML. Editors get a <code>raw</code> version too, as you will see.</li>
+                    <li><strong><code>meta</code></strong> holds the six keys Lesson 5.2 registered with <code>show_in_rest</code>, in their registered types: the price is a number, the stock a real <code>true</code>. Unregistered or protected (<code>_</code>) keys never appear.</li>
+                    <li><strong><code>genres</code></strong> are term IDs (Fiction 5, Science Fiction 6), not names: the REST API links resources rather than copying them.</li>
+                    <li><strong><code>_links</code></strong> points to related resources, here the book's genres. You can ask the server to include them (embed), below.</li>
+                </ul>
+
+                <h3>Ask for less: _fields</h3>
+                <p>Most clients need a few fields. <code>_fields</code> takes a comma-separated list, with dots for nested fields, and the server leaves the rest out (it even skips computing most of them):</p>
+                <pre data-web="/wp-json/wp/v2/books?_fields=id,title.rendered,meta.pagesco_price&amp;per_page=3" data-json><code class="language-text">http://localhost:8080/wp-json/wp/v2/books?_fields=id,title.rendered,meta.pagesco_price&amp;per_page=3</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>[
+  {
+    "id": 40,
+    "title": {
+      "rendered": "Animal Farm"
+    },
+    "meta": {
+      "pagesco_price": 8.49
+    }
+  },
+  {
+    "id": 39,
+    "title": {
+      "rendered": "Fahrenheit 451"
+    },
+    "meta": {
+      "pagesco_price": 10.49
+    }
+  },
+  {
+    "id": 38,
+    "title": {
+      "rendered": "Lord of the Rings"
+    },
+    "meta": {
+      "pagesco_price": 15.99
+    }
+  }
+]</code></pre>
+                </div>
+                <p>The newest three first: collections are ordered by date, newest first, unless you say otherwise. These are the query parameters of a post-type collection you will use most:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Parameter</th><th>Does</th><th>Example</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>per_page</code>, <code>page</code></td><td>page size (1 to 100, default 10) and page number</td><td><code>?per_page=4&amp;page=2</code></td></tr>
+                            <tr><td><code>orderby</code>, <code>order</code></td><td>sort: <code>date</code>, <code>title</code>, <code>id</code>, <code>slug</code>, <code>modified</code>, <code>include</code>… and <code>asc</code>/<code>desc</code></td><td><code>?orderby=title&amp;order=asc</code></td></tr>
+                            <tr><td><code>search</code></td><td>words in the title, content or excerpt</td><td><code>?search=hobbit</code></td></tr>
+                            <tr><td><code>slug</code>, <code>include</code>, <code>exclude</code></td><td>particular posts</td><td><code>?slug=dune</code></td></tr>
+                            <tr><td><code>genres</code> (the taxonomy's <code>rest_base</code>)</td><td>books with these term IDs</td><td><code>?genres=8</code></td></tr>
+                            <tr><td><code>status</code></td><td>other statuses than <code>publish</code> (authenticated only)</td><td><code>?status=draft</code></td></tr>
+                            <tr><td><code>context</code></td><td><code>view</code> (default), <code>embed</code> (fewer fields), <code>edit</code> (raw values, needs permission)</td><td><code>?context=edit</code></td></tr>
+                            <tr><td><code>_fields</code>, <code>_embed</code></td><td>which fields; include linked resources</td><td><code>?_embed=wp:term</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Filtering by genre takes the term's ID, so a client first reads the genres (with their counts), then asks for the fantasy books:</p>
+                <pre data-web="/wp-json/wp/v2/genres?_fields=id,name,slug,count" data-json><code class="language-text">http://localhost:8080/wp-json/wp/v2/genres?_fields=id,name,slug,count</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>[
+  {
+    "id": 7,
+    "count": 6,
+    "name": "Classic",
+    "slug": "classic"
+  },
+  {
+    "id": 9,
+    "count": 3,
+    "name": "Dystopian",
+    "slug": "dystopian"
+  },
+  {
+    "id": 8,
+    "count": 2,
+    "name": "Fantasy",
+    "slug": "fantasy"
+  },
+  {
+    "id": 5,
+    "count": 11,
+    "name": "Fiction",
+    "slug": "fiction"
+  },
+  {
+    "id": 6,
+    "count": 3,
+    "name": "Science Fiction",
+    "slug": "science-fiction"
+  }
+]</code></pre>
+                </div>
+                <pre data-web="/wp-json/wp/v2/books?genres=8&amp;orderby=title&amp;order=asc&amp;_fields=id,title.rendered" data-json><code class="language-text">http://localhost:8080/wp-json/wp/v2/books?genres=8&amp;orderby=title&amp;order=asc&amp;_fields=id,title.rendered</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>[
+  {
+    "id": 38,
+    "title": {
+      "rendered": "Lord of the Rings"
+    }
+  },
+  {
+    "id": 35,
+    "title": {
+      "rendered": "The Hobbit"
+    }
+  }
+]</code></pre>
+                </div>
+
+                <h3>Pages of results</h3>
+                <p>A collection never returns everything at once: the most is 100 per request. The totals travel in headers, so the body stays a plain list. Page 2 of the catalog in pages of 4:</p>
+                <pre data-web="/wp-json/wp/v2/books?per_page=4&amp;page=2&amp;_fields=id" data-headers="X-WP-Total,X-WP-TotalPages,Link"><code class="language-text">http://localhost:8080/wp-json/wp/v2/books?per_page=4&amp;page=2&amp;_fields=id   (status line, three headers, body)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>HTTP/1.1 200 OK
+Link: &lt;http://localhost:8080/wp-json/wp/v2/books?per_page=4&amp;page=1&amp;_fields=id&gt;; rel="prev", &lt;http://localhost:8080/wp-json/wp/v2/books?per_page=4&amp;page=3&amp;_fields=id&gt;; rel="next"
+X-WP-Total: 11
+X-WP-TotalPages: 3
+
+[{"id":36},{"id":35},{"id":34},{"id":33}]</code></pre>
+                </div>
+                <p><code>X-WP-Total</code> counts the matching books, <code>X-WP-TotalPages</code> the pages at this <code>per_page</code>, and <code>Link</code> carries ready-made URLs for the previous and next pages (a standard header, RFC 8288). A client that wants the whole catalog reads page 1, then loops up to <code>X-WP-TotalPages</code> (Exercise 1).</p>
+
+                <h3>Include related resources: _embed</h3>
+                <p>To show genre names, a client would need a second request to every <code>wp:term</code> link. <code>_embed</code> makes the server do it and put the results under <code>_embedded</code>; <code>_embed=wp:term</code> embeds only that relation. The embedded genres are long objects, so a few lines of PHP (the WP-CLI container has PHP, of course) print only their names: <code>wp:term</code> holds one list per taxonomy, and the book has one taxonomy.</p>
+                <pre data-cli><code class="language-bash">curl -s 'http://localhost:8080/wp-json/wp/v2/books/30?_embed=wp:term&amp;_fields=id,_links,_embedded' | php -r '$book = json_decode( stream_get_contents( STDIN ), true ); foreach ( $book["_embedded"]["wp:term"][0] as $term ) { echo $term["name"], "\n"; }'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Fiction
+Science Fiction</code></pre>
+                </div>
+                <p>Notice <code>_links</code> and <code>_embedded</code> in <code>_fields</code>: embedding works through the links, so a field list without them embeds nothing (Common Mistake 1).</p>
+            </section>
+
+            <section id="auth" class="lesson-section">
+                <h2>🔐 Who Is Asking? Authentication</h2>
+                <p>Everything so far was anonymous, and public data is public: the same books anyone sees on the site. Now try to change something. Put Dune on sale with a <code>POST</code> carrying JSON:</p>
+                <pre data-web="/wp-json/wp/v2/books/30" data-method="POST" data-body='{"meta":{"pagesco_price":12.99}}'><code class="language-bash">curl -s -X POST -H 'Content-Type: application/json' -d '{"meta":{"pagesco_price":12.99}}' http://localhost:8080/wp-json/wp/v2/books/30</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>{"code":"rest_cannot_edit","message":"Sorry, you are not allowed to edit this post.","data":{"status":401}}</code></pre>
+                </div>
+                <p>Refused, with status <code>401</code> (Unauthorized): the counter does not know who you are. A request proves its sender in one of three ways:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Method</th><th>Who uses it</th><th>How it travels</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><strong>Cookie + nonce</strong></td><td>JavaScript on the site's own pages, for the logged-in user (the editor, your widget)</td><td>the browser's login cookie, plus the header <code>X-WP-Nonce</code></td></tr>
+                            <tr><td><strong>Application password</strong></td><td>other programs: scripts, apps, other servers, the WP-CLI container</td><td>HTTP Basic authentication, <code>Authorization: Basic …</code>, over HTTPS</td></tr>
+                            <tr><td><strong>Plugins</strong> (OAuth 2, JWT)</td><td>larger integrations with token flows</td><td>whatever the plugin defines; not in core</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Cookie + nonce</h3>
+                <p>When you log in, WordPress gives your browser a <code>wordpress_logged_in_…</code> cookie, and the browser sends it with every request to the site. That is exactly the danger Lesson 5.3 called CSRF: a page on another site can make your browser send a request to your shop, cookie included. So on REST requests WordPress ignores the cookie unless the request also carries a <strong>nonce</strong> for the action <code>wp_rest</code>, which only pages of your own site can know. You can watch the rule work with <code>curl</code>, from the WP-CLI container: log in as Maria into a cookie file (as Lesson 5.4's <code>pagesco-save.sh</code> did), ask "who am I?" without and with a nonce, and once with a made-up one. <code>admin-ajax.php?action=rest-nonce</code> is the address core's JavaScript uses to fetch a fresh nonce:</p>
+                <pre data-cli><code class="language-bash">curl -s -o /dev/null -c jar.txt http://localhost:8080/wp-login.php
+curl -s -o /dev/null -b jar.txt -c jar.txt --data-urlencode log=maria --data-urlencode pwd=maria-pass -d testcookie=1 http://localhost:8080/wp-login.php
+curl -s -b jar.txt 'http://localhost:8080/wp-json/wp/v2/users/me?_fields=id,name'; echo
+NONCE=$(curl -s -b jar.txt 'http://localhost:8080/wp-admin/admin-ajax.php?action=rest-nonce')
+curl -s -b jar.txt -H "X-WP-Nonce: $NONCE" 'http://localhost:8080/wp-json/wp/v2/users/me?_fields=id,name'; echo
+curl -s -b jar.txt -H 'X-WP-Nonce: 0123456789' 'http://localhost:8080/wp-json/wp/v2/users/me?_fields=id,name'; echo
+rm jar.txt</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>{"code":"rest_not_logged_in","message":"You are not currently logged in.","data":{"status":401}}
+{"id":2,"name":"Maria Lopez"}
+{"code":"rest_cookie_invalid_nonce","message":"Cookie check failed","data":{"status":403}}</code></pre>
+                </div>
+                <p>Three answers, three lessons. With only the cookie, the API treats the request as anonymous: <code>rest_not_logged_in</code>, although Maria is logged in. With the right nonce, the same cookie is accepted and <code>/users/me</code> answers with Maria. With a wrong nonce, WordPress does not quietly fall back to anonymous; it says <code>rest_cookie_invalid_nonce</code>, <code>403</code>, so a stale page knows it must fetch a new one. Nonces are tied to the user's login session and live 12 to 24 hours. Delete the cookie file (the last command): it is as good as Maria's login while it exists.</p>
+                <p>On a real page you never fetch nonces by hand. WordPress prints one for the logged-in user whenever a script that uses <code>apiFetch</code> is on the page (next section). Older code does the same by hand with <code>wp_localize_script( 'handle', 'wpApiSettings', array( 'root' =&gt; esc_url_raw( rest_url() ), 'nonce' =&gt; wp_create_nonce( 'wp_rest' ) ) )</code> and an <code>X-WP-Nonce</code> header in <code>fetch()</code>; it still works.</p>
+
+                <h3>Application passwords</h3>
+                <p>The shop's inventory system is a script on another machine: it has no browser and no cookie, and it should never know Maria's real password. For programs, WordPress has <strong>application passwords</strong>: 24-character passwords that a user creates per application, that only work for API requests (never for <code>wp-login.php</code>), are stored hashed, record when and from where they were last used, and can be revoked one by one. In the admin they are at the bottom of <strong>Users &gt; Profile</strong>: type a name under <strong>New Application Password Name</strong>, click <strong>Add Application Password</strong>, and copy the password from the notice, which shows it once.</p>
+                <figure>
+                    <img src="images/lesson_23_app_password.png" alt="The Application Passwords section of Maria Lopez's profile in the WordPress admin: an explanation, a New Application Password Name field, an Add Application Password button, a notice saying Your new password for Inventory script is, followed by the password and a Copy button, and a table with the columns Name, Created, Last Used, Last IP and Revoke." width="898" height="577" loading="lazy">
+                    <figcaption>Users &gt; Profile &gt; Application Passwords: the new password is shown once; afterwards only its name and usage are.</figcaption>
+                </figure>
+                <p>Or with WP-CLI, for Maria, whose role (Editor) can change any book but cannot install plugins or manage users: give a program the smallest role that does its job.</p>
+                <pre data-cli><code class="language-bash">wp user application-password create maria "Inventory script" --porcelain</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your password will differ)</h4>
+                    <pre><code>kcheayM59M0WGgUgbF3YvlOw</code></pre>
+                </div>
+                <p><code>--porcelain</code> prints only the password. Keep it in your password manager, never in a file under <code>wordpress/</code>, which the web server would happily hand to anyone who guesses the name. For the commands in this lesson, put it into a shell variable in the WP-CLI container (spaces, as the admin screen shows them, are allowed: WordPress removes them):</p>
+                <pre data-norun><code class="language-bash">PASS='paste the 24 characters here'</code></pre>
+                <p><code>curl --user "maria:$PASS"</code> sends the user name and the application password with HTTP Basic authentication. Who am I now, and the sale that was refused a moment ago:</p>
+                <pre data-web="/wp-json/wp/v2/users/me?_fields=id,name" data-auth="maria"><code class="language-bash">curl -s --user "maria:$PASS" 'http://localhost:8080/wp-json/wp/v2/users/me?_fields=id,name'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>{"id":2,"name":"Maria Lopez"}</code></pre>
+                </div>
+                <pre data-web="/wp-json/wp/v2/books/30?_fields=id,meta.pagesco_price" data-auth="maria" data-method="POST" data-body='{"meta":{"pagesco_price":12.99}}'><code class="language-bash">curl -s --user "maria:$PASS" -X POST -H 'Content-Type: application/json' -d '{"meta":{"pagesco_price":12.99}}' 'http://localhost:8080/wp-json/wp/v2/books/30?_fields=id,meta.pagesco_price'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>{"id":30,"meta":{"pagesco_price":12.99}}</code></pre>
+                </div>
+                <p>The answer to a successful update is the updated book (here only the fields you asked for). The REST API ran the same checks the edit screen runs: Maria may edit book 30, the meta key is registered, and the value has the registered type. Dune's page follows at once, through Lesson 6.3's binding:</p>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/books/dune/ | grep -o 'has-large-font-size wp-block-paragraph"&gt;[^&lt;]*'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>has-large-font-size wp-block-paragraph"&gt;$12.99</code></pre>
+                </div>
+                <p>The sale is over; put the price back:</p>
+                <pre data-web="/wp-json/wp/v2/books/30?_fields=id,meta.pagesco_price" data-auth="maria" data-method="POST" data-body='{"meta":{"pagesco_price":14.99}}'><code class="language-bash">curl -s --user "maria:$PASS" -X POST -H 'Content-Type: application/json' -d '{"meta":{"pagesco_price":14.99}}' 'http://localhost:8080/wp-json/wp/v2/books/30?_fields=id,meta.pagesco_price'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>{"id":30,"meta":{"pagesco_price":14.99}}</code></pre>
+                </div>
+
+                <div class="card card-danger">
+                    <h4>🛑 Basic authentication needs HTTPS</h4>
+                    <p>Basic authentication only encodes the user name and password (Base64), it does not encrypt them: on plain HTTP anyone on the network path can read them. WordPress therefore offers application passwords only on HTTPS sites, or where <code>WP_ENVIRONMENT_TYPE</code> is <code>local</code>, as on your Docker site. On a live site, HTTPS is not optional (Lesson 8.4), and a program's password is revoked the moment the program is retired or a laptop is lost: <strong>Revoke</strong> on the profile screen, or <code>wp user application-password delete</code>.</p>
+                </div>
+                <div class="card card-info">
+                    <h4>🧩 Version note: application passwords and old tutorials</h4>
+                    <p>Application passwords arrived in core in WordPress 5.6. Tutorials from before that install the "Basic Auth" plugin, which sends the account's real password with every request, or a JWT plugin. On 5.6 and later neither is needed for scripts and apps; if you inherit a site with the Basic Auth plugin, replace it with application passwords.</p>
+                </div>
+            </section>
+
+            <section id="apifetch" class="lesson-section">
+                <h2>🧰 apiFetch: the REST API from JavaScript</h2>
+                <p>In the browser, JavaScript could call <code>fetch()</code> and add the nonce itself. WordPress ships a small wrapper that does the bookkeeping: <strong><code>@wordpress/api-fetch</code></strong>, the same one the block editor and <code>@wordpress/core-data</code> use. It prefixes the API's root URL, adds the nonce and the user's language (<code>_locale=user</code>), sends <code>data</code> as JSON, parses the response, and when the server says no, rejects with the server's error object. It even fetches a new nonce and retries when the old one has expired. In a script you build with <code>wp-scripts</code> (Module 6) you write <code>import apiFetch from '@wordpress/api-fetch';</code>, and the build turns it into the global <code>wp.apiFetch</code> plus a dependency <code>wp-api-fetch</code> in <code>index.asset.php</code>. A plain script without a build uses the global and names the dependency itself.</p>
+                <p>When a page loads the <code>wp-api-fetch</code> script, WordPress prints its setup right after it, with a nonce for the user who is viewing the page. The Dashboard loads it already (core's own features use it); in Maria's Dashboard source:</p>
+                <pre data-web="/wp-admin/" data-login="maria" data-select="#wp-api-fetch-js-after"><code class="language-text">http://localhost:8080/wp-admin/   (logged in as maria; View Source, search for wp-api-fetch-js-after)</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your nonce will differ)</h4>
+                    <pre><code>&lt;script id="wp-api-fetch-js-after"&gt;
+wp.apiFetch.use( wp.apiFetch.createRootURLMiddleware( "http://localhost:8080/wp-json/" ) );
+wp.apiFetch.nonceMiddleware = wp.apiFetch.createNonceMiddleware( "af9403b2d7" );
+wp.apiFetch.use( wp.apiFetch.nonceMiddleware );
+wp.apiFetch.use( wp.apiFetch.mediaUploadMiddleware );
+wp.apiFetch.nonceEndpoint = "http://localhost:8080/wp-admin/admin-ajax.php?action=rest-nonce";
+//# sourceURL=wp-api-fetch-js-after
+&lt;/script&gt;</code></pre>
+                </div>
+                <p>The root URL middleware, the nonce middleware with this page's nonce, and <code>nonceEndpoint</code>, the <code>rest-nonce</code> address you used with <code>curl</code>, for refreshing it. Your code only says what it wants:</p>
+                <pre><code class="language-js">// Read: GET is the default; path is relative to /wp-json/.
+const books = await wp.apiFetch( { path: '/wp/v2/books?_fields=id,title&amp;per_page=100' } );
+
+// Write: method and data (sent as JSON); the answer is the updated book.
+const book = await wp.apiFetch( {
+	path: '/wp/v2/books/33',
+	method: 'POST',
+	data: { meta: { pagesco_in_stock: true } },
+} );
+
+// Errors: a rejected promise carrying the server's JSON error.
+try {
+	await wp.apiFetch( { path: '/wp/v2/books/99' } );
+} catch ( error ) {
+	console.log( error.code, error.message, error.data.status ); // rest_post_invalid_id Invalid post ID. 404
+}</code></pre>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Option</th><th>Does</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>path</code></td><td>the route and query, relative to the API root: <code>/wp/v2/books?per_page=5</code></td></tr>
+                            <tr><td><code>url</code></td><td>a full URL instead (no root prefix), for example another site's API</td></tr>
+                            <tr><td><code>method</code></td><td><code>GET</code> (default), <code>POST</code>, <code>PUT</code>, <code>DELETE</code>…</td></tr>
+                            <tr><td><code>data</code></td><td>an object sent as the JSON body</td></tr>
+                            <tr><td><code>parse: false</code></td><td>resolve with the raw <code>Response</code>, to read headers such as <code>X-WP-Total</code> (and, on errors, reject with it unparsed)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The project's widget uses all of this. On the front end the same setup is printed when a front-end script depends on <code>wp-api-fetch</code>; for a visitor who is not logged in the nonce simply belongs to "nobody", and public <code>GET</code> requests work as with <code>curl</code>. Script modules (Lesson 6.4's <code>view.js</code>) cannot load <code>wp-api-fetch</code>, which is a classic script; for public data they use plain <code>fetch()</code>, as Lesson 7.2 shows.</p>
+            </section>
+
+            <section id="errors" class="lesson-section">
+                <h2>🚦 When the Answer Is No: REST Errors</h2>
+                <p>Every REST error has the same shape: a machine-readable <code>code</code>, a human <code>message</code>, and <code>data</code> with the HTTP <code>status</code>. Validation errors add which parameters failed and why. Ask for too many books:</p>
+                <pre data-web="/wp-json/wp/v2/books?per_page=500" data-json data-headers=""><code class="language-text">http://localhost:8080/wp-json/wp/v2/books?per_page=500</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>HTTP/1.1 400 Bad Request
+
+{
+  "code": "rest_invalid_param",
+  "message": "Invalid parameter(s): per_page",
+  "data": {
+    "status": 400,
+    "params": {
+      "per_page": "per_page must be between 1 (inclusive) and 100 (inclusive)"
+    },
+    "details": {
+      "per_page": {
+        "code": "rest_out_of_bounds",
+        "message": "per_page must be between 1 (inclusive) and 100 (inclusive)",
+        "data": null
+      }
+    }
+  }
+}</code></pre>
+                </div>
+                <p>Every argument of a route has a schema (type, minimum, maximum, allowed values), and WordPress checks requests against it before any code of the controller runs. The shop's most wanted query fails the same way, because the core route only knows its own sort orders:</p>
+                <pre data-web="/wp-json/wp/v2/books?orderby=price" data-json><code class="language-text">http://localhost:8080/wp-json/wp/v2/books?orderby=price</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>{
+  "code": "rest_invalid_param",
+  "message": "Invalid parameter(s): orderby",
+  "data": {
+    "status": 400,
+    "params": {
+      "orderby": "orderby is not one of author, date, id, include, modified, parent, relevance, slug, include_slugs, and title."
+    },
+    "details": {
+      "orderby": {
+        "code": "rest_not_in_enum",
+        "message": "orderby is not one of author, date, id, include, modified, parent, relevance, slug, include_slugs, and title.",
+        "data": null
+      }
+    }
+  }
+}</code></pre>
+                </div>
+                <p>Remember that one: books by price, by genre slug, only in stock, in a compact shape, is exactly what Lesson 7.2's own endpoint will offer. Now the two refusals that are about people. Devon is an author. Give him an application password the same way (<code>wp user application-password create devon "Test" --porcelain</code>, into a variable <code>DEVON_PASS</code>), and let him try to change a book he does not own:</p>
+                <pre data-web="/wp-json/wp/v2/books/30" data-auth="devon" data-method="POST" data-body='{"meta":{"pagesco_price":1}}'><code class="language-bash">curl -s --user "devon:$DEVON_PASS" -X POST -H 'Content-Type: application/json' -d '{"meta":{"pagesco_price":1}}' http://localhost:8080/wp-json/wp/v2/books/30</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>{"code":"rest_cannot_edit","message":"Sorry, you are not allowed to edit this post.","data":{"status":403}}</code></pre>
+                </div>
+                <p>The same code as the anonymous attempt, <code>rest_cannot_edit</code>, but status <code>403</code> (Forbidden) instead of <code>401</code>. That difference is the most useful thing in an error:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Status</th><th>Means</th><th>Typical codes</th><th>Check</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>400</code> Bad Request</td><td>the request itself is wrong</td><td><code>rest_invalid_param</code>, <code>rest_missing_callback_param</code></td><td><code>data.params</code>: which argument, and why</td></tr>
+                            <tr><td><code>401</code> Unauthorized</td><td>"who are you?": not authenticated</td><td><code>rest_not_logged_in</code>, <code>rest_cannot_edit</code>, <code>rest_forbidden_context</code></td><td>the nonce, the <code>--user</code>, the application password</td></tr>
+                            <tr><td><code>403</code> Forbidden</td><td>"I know you, and no"</td><td><code>rest_cannot_edit</code>, <code>rest_cookie_invalid_nonce</code></td><td>the user's role and capabilities (Lesson 5.3)</td></tr>
+                            <tr><td><code>404</code> Not Found</td><td>no such route, or no such item</td><td><code>rest_no_route</code>, <code>rest_post_invalid_id</code></td><td>the spelling of the route, the ID</td></tr>
+                            <tr><td><code>500</code></td><td>the server failed</td><td>a PHP error, or an error without a status (Lesson 7.2)</td><td><code>debug.log</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Two 404s, one for a misspelled route and one for a book that does not exist:</p>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/wp-json/wp/v2/bookz; echo
+curl -s http://localhost:8080/wp-json/wp/v2/books/99; echo</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>{"code":"rest_no_route","message":"No route was found matching the URL and request method.","data":{"status":404}}
+{"code":"rest_post_invalid_id","message":"Invalid post ID.","data":{"status":404}}</code></pre>
+                </div>
+                <p>And <code>context=edit</code>, which returns raw values (the unfiltered title, the content as block markup) only to users who could edit the item:</p>
+                <pre data-cli><code class="language-bash">curl -s 'http://localhost:8080/wp-json/wp/v2/books/30?context=edit'; echo</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>{"code":"rest_forbidden_context","message":"Sorry, you are not allowed to edit this post.","data":{"status":401}}</code></pre>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <h3>1. _fields without _links, and _embed embeds nothing</h3>
+                <p>A tidy field list, the genres to embed, and a count of how often <code>_embedded</code> appears in the answer:</p>
+                <pre data-cli data-exit="1"><code class="language-bash">curl -s 'http://localhost:8080/wp-json/wp/v2/books/30?_embed=wp:term&amp;_fields=id,title' | grep -c '_embedded'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>0</code></pre>
+                </div>
+                <p><strong>What it means:</strong> no error, no embedded genres, and <code>grep -c</code> counts 0 (and exits with status 1). <code>_fields</code> is applied to the response, and since 5.4 WordPress only embeds links that survive it: without <code>_links</code> in the list there is nothing to follow, and without <code>_embedded</code> the result would be cut off anyway. <strong>Fix:</strong> <code>_fields=id,title,_links,_embedded</code>, as in Reading the Catalog.</p>
+
+                <h3>2. fetch() without the nonce</h3>
+                <p>A widget's first draft often uses the browser's own <code>fetch()</code>. Logged in as Maria on the Dashboard, type both versions into the developer tools' Console and compare. Recorded with Playwright in Chromium on a WordPress 7.1 site built by this lesson (each answer as JSON, and what the Network panel showed for the two requests):</p>
+                <pre><code class="language-text">&gt; await ( await fetch( '/wp-json/wp/v2/users/me?_fields=id,name' ) ).json()
+{"code":"rest_not_logged_in","message":"You are not currently logged in.","data":{"status":401}}
+&gt; await wp.apiFetch( { path: '/wp/v2/users/me?_fields=id,name' } )
+{"id":2,"name":"Maria Lopez"}
+
+Network:  GET /wp-json/wp/v2/users/me?_fields=id,name                        no X-WP-Nonce header   401
+          GET /wp-json/wp/v2/users/me?_fields=id%2Cname&amp;_locale=user          X-WP-Nonce header      200</code></pre>
+                <p><strong>What it means:</strong> the browser did send Maria's cookie, and WordPress, finding no nonce, treated the request as anonymous: "You are not currently logged in." on a screen where she plainly is. <code>apiFetch</code> added the nonce from the page's setup and got her answer. <strong>Fix:</strong> use <code>wp.apiFetch</code> (or send <code>X-WP-Nonce</code> yourself) for every request that needs the user; and when an API says "not logged in" while you are, check the nonce before anything else.</p>
+
+                <h3>3. The account password instead of an application password</h3>
+                <p>Maria's login password works on <code>wp-login.php</code>, so it seems natural to give it to <code>curl</code>:</p>
+                <pre data-cli><code class="language-bash">curl -s --user 'maria:maria-pass' 'http://localhost:8080/wp-json/wp/v2/users/me?_fields=id,name'; echo</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>{"code":"rest_not_logged_in","message":"You are not currently logged in.","data":{"status":401}}</code></pre>
+                </div>
+                <p><strong>What it means:</strong> Basic authentication on the REST API accepts application passwords only; the account password is rejected, and on this site the API answers as if no credentials were sent at all. A mistyped, revoked or copied-with-a-missing-character application password gets exactly the same answer, which is deliberate: the API does not help a guesser by saying which part was wrong. <strong>Fix:</strong> create an application password for the program, and when you get <code>rest_not_logged_in</code> with <code>--user</code>, check the password (Users &gt; Profile shows whether it was ever used: <strong>Last Used</strong>).</p>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Stock at a Glance</h2>
+                <p>The booksellers want two things: the inventory script should mark books sold out the moment the last copy is sold, and on the Dashboard they want the whole catalog's stock with a button per book, without opening eleven edit screens. You already have the script's credentials; now you use them, then build the widget as a feature of the plugin. Allow about 40 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: The inventory script sells the last copy <span class="step-time">(8 min)</span></h3>
+                    <p>A customer buys the last Fahrenheit 451 (book 39). The inventory system sends what any program would, with Maria's "Inventory script" password from the WP-CLI container:</p>
+                    <pre data-web="/wp-json/wp/v2/books/39?_fields=id,title.rendered,meta.pagesco_in_stock" data-auth="maria" data-method="POST" data-body='{"meta":{"pagesco_in_stock":false}}'><code class="language-bash">curl -s --user "maria:$PASS" -X POST -H 'Content-Type: application/json' -d '{"meta":{"pagesco_in_stock":false}}' 'http://localhost:8080/wp-json/wp/v2/books/39?_fields=id,title.rendered,meta.pagesco_in_stock'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>{"id":39,"title":{"rendered":"Fahrenheit 451"},"meta":{"pagesco_in_stock":false}}</code></pre>
+                    </div>
+                    <p>The book's page (Lesson 6.3's facts list) says so at once:</p>
+                    <pre data-web="/books/fahrenheit-451/" data-select="ul.pagesco-book-facts li"><code class="language-text">http://localhost:8080/books/fahrenheit-451/   (View Source: the first fact)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;li&gt;Sold out&lt;/li&gt;</code></pre>
+                    </div>
+                    <p>A delivery arrives the same afternoon, and the script puts the book back:</p>
+                    <pre data-web="/wp-json/wp/v2/books/39?_fields=id,title.rendered,meta.pagesco_in_stock" data-auth="maria" data-method="POST" data-body='{"meta":{"pagesco_in_stock":true}}'><code class="language-bash">curl -s --user "maria:$PASS" -X POST -H 'Content-Type: application/json' -d '{"meta":{"pagesco_in_stock":true}}' 'http://localhost:8080/wp-json/wp/v2/books/39?_fields=id,title.rendered,meta.pagesco_in_stock'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>{"id":39,"title":{"rendered":"Fahrenheit 451"},"meta":{"pagesco_in_stock":true}}</code></pre>
+                    </div>
+                    <p>Two requests, and the shop's pages, the Book List and the Find a Book page followed each time, because they all read the meta when they render. That is the point of keeping data in one place.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: The widget as a feature <span class="step-time">(12 min)</span></h3>
+                    <p>A dashboard widget is two hooks: <code>wp_dashboard_setup</code> to add it with <code>wp_add_dashboard_widget()</code>, and <code>admin_enqueue_scripts</code> to load its script on the Dashboard only (Lesson 4.3's enqueueing, with the hook suffix check from Lesson 5.4's exercises). The widget prints an empty frame; the script fills it. Create <code>wordpress/wp-content/plugins/pagesco-books/src/Admin/StockWidget.php</code>:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/Admin/StockWidget.php"><code class="language-php">&lt;?php
+/**
+ * The "Stock at a glance" dashboard widget.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books\Admin;
+
+use PagesCo\Books\Feature;
+
+/**
+ * Adds a dashboard widget that lists the books and switches their stock through the REST API.
+ */
+final class StockWidget implements Feature {
+
+	/**
+	 * The widget's ID, which is also its script's handle.
+	 */
+	public const HANDLE = 'pagesco-stock-widget';
+
+	/**
+	 * Hooks the widget and its script.
+	 */
+	public function register(): void {
+		add_action( 'wp_dashboard_setup', array( $this, 'add_widget' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue' ) );
+	}
+
+	/**
+	 * Who sees the widget: users who may edit everyone's books (editors and administrators).
+	 */
+	private function can_use(): bool {
+		return current_user_can( 'edit_others_posts' );
+	}
+
+	/**
+	 * Adds the widget to the Dashboard.
+	 */
+	public function add_widget(): void {
+		if ( ! $this-&gt;can_use() ) {
+			return;
+		}
+
+		wp_add_dashboard_widget( self::HANDLE, __( 'Stock at a glance', 'pagesco-books' ), array( $this, 'render' ) );
+	}
+
+	/**
+	 * Prints the widget's frame; the script fills the list.
+	 */
+	public function render(): void {
+		?&gt;
+		&lt;p class="pagesco-stock-widget__status" aria-live="polite"&gt;&lt;?php esc_html_e( 'Loading the catalog…', 'pagesco-books' ); ?&gt;&lt;/p&gt;
+		&lt;ul class="pagesco-stock-widget__books"&gt;&lt;/ul&gt;
+		&lt;?php
+	}
+
+	/**
+	 * Loads the script on the Dashboard only.
+	 *
+	 * @param string $hook_suffix The current admin screen.
+	 */
+	public function enqueue( $hook_suffix ): void {
+		if ( 'index.php' !== $hook_suffix || ! $this-&gt;can_use() ) {
+			return;
+		}
+
+		wp_enqueue_script(
+			self::HANDLE,
+			plugins_url( 'assets/js/stock-widget.js', PAGESCO_BOOKS_FILE ),
+			array( 'wp-api-fetch', 'wp-i18n' ),
+			PAGESCO_BOOKS_VERSION,
+			array( 'in_footer' =&gt; true )
+		);
+		wp_set_script_translations( self::HANDLE, 'pagesco-books' );
+	}
+}</code></pre>
+                    <ul>
+                        <li><strong>The capability check</strong> decides who sees the widget. It is a convenience, not the protection: every request the script sends is checked again by the REST API, book by book, exactly as Devon's attempt was.</li>
+                        <li><strong>The dependencies</strong> <code>wp-api-fetch</code> and <code>wp-i18n</code> make WordPress load both before the script and print the nonce setup you saw. <code>wp_set_script_translations()</code> connects the script's strings to the <code>pagesco-books</code> translations (Lesson 8.3 produces them).</li>
+                        <li><strong>The widget ID</strong> becomes the <code>id</code> of the widget's box on the Dashboard, which is how the script finds it.</li>
+                    </ul>
+                    <p>Add the feature after <code>BookBindings</code> in <code>Plugin::feature_classes()</code> (in your editor; here with <code>sed</code>):</p>
+                    <pre data-cli><code class="language-bash">sed -i '/\t\t\tBookBindings::class,/a\			Admin\\StockWidget::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+grep -n -A 1 'BookBindings::class' wp-content/plugins/pagesco-books/src/Plugin.php</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>89:			BookBindings::class,
+90-			Admin\StockWidget::class,</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: The script <span class="step-time">(12 min)</span></h3>
+                    <p>Plain JavaScript in a new folder, no build step: everything it needs, WordPress provides. Create <code>wordpress/wp-content/plugins/pagesco-books/assets/js/stock-widget.js</code>:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/assets/js/stock-widget.js"><code class="language-js">/**
+ * Stock at a glance: lists the books and switches their stock, through the REST API.
+ *
+ * Plain JavaScript, no build step: wp.apiFetch and wp.i18n come from WordPress
+ * (the script's dependencies), and apiFetch sends the REST nonce for the logged-in user.
+ */
+( function () {
+	const { __, sprintf } = wp.i18n;
+	const widget = document.getElementById( 'pagesco-stock-widget' );
+
+	if ( ! widget ) {
+		return;
+	}
+
+	const status = widget.querySelector( '.pagesco-stock-widget__status' );
+	const list = widget.querySelector( '.pagesco-stock-widget__books' );
+
+	// One line per book: its title and stock, and a button that switches the stock.
+	function bookItem( book ) {
+		const item = document.createElement( 'li' );
+		const label = document.createElement( 'span' );
+		const button = document.createElement( 'button' );
+
+		label.textContent = book.meta.pagesco_in_stock
+			? /* translators: %s: book title. */ sprintf( __( '%s: in stock', 'pagesco-books' ), book.title.raw )
+			: /* translators: %s: book title. */ sprintf( __( '%s: sold out', 'pagesco-books' ), book.title.raw );
+
+		button.type = 'button';
+		button.className = 'button button-small';
+		button.textContent = book.meta.pagesco_in_stock
+			? __( 'Mark sold out', 'pagesco-books' )
+			: __( 'Mark in stock', 'pagesco-books' );
+		button.addEventListener( 'click', () =&gt; switchStock( book, item, button ) );
+
+		item.append( label, ' ', button );
+		return item;
+	}
+
+	// POST /wp/v2/books/&lt;id&gt; with the opposite stock; the answer is the updated book.
+	async function switchStock( book, item, button ) {
+		button.disabled = true;
+		try {
+			const updated = await wp.apiFetch( {
+				path: `/wp/v2/books/${ book.id }?context=edit&amp;_fields=id,title,meta`,
+				method: 'POST',
+				data: { meta: { pagesco_in_stock: ! book.meta.pagesco_in_stock } },
+			} );
+			item.replaceWith( bookItem( updated ) );
+			/* translators: %s: book title. */
+			status.textContent = sprintf( __( 'Saved: %s', 'pagesco-books' ), updated.title.raw );
+		} catch ( error ) {
+			status.textContent = error.message;
+			button.disabled = false;
+		}
+	}
+
+	// GET the catalog, sorted by title, with only the fields the widget needs.
+	wp.apiFetch( {
+		path: '/wp/v2/books?per_page=100&amp;orderby=title&amp;order=asc&amp;context=edit&amp;_fields=id,title,meta',
+	} )
+		.then( ( books ) =&gt; {
+			list.replaceChildren( ...books.map( bookItem ) );
+			/* translators: %d: number of books. */
+			status.textContent = sprintf( __( '%d books in the catalog.', 'pagesco-books' ), books.length );
+		} )
+		.catch( ( error ) =&gt; {
+			status.textContent = error.message;
+		} );
+} )();</code></pre>
+                    <ul>
+                        <li><strong><code>context=edit</code></strong> returns <code>title.raw</code>, the title exactly as typed. <code>title.rendered</code> is HTML (an apostrophe arrives as <code>&amp;#8217;</code>), and putting HTML into <code>textContent</code> would print the entity literally.</li>
+                        <li><strong><code>textContent</code>, never <code>innerHTML</code></strong>, for anything that came from the API: the JavaScript version of "escape late" (Lesson 5.3). A title with <code>&lt;script&gt;</code> in it shows as text.</li>
+                        <li><strong>The status line</strong> has <code>aria-live="polite"</code>, so screen readers announce "Saved: The Great Gatsby"; the button is disabled while its request runs, so a double click sends one request.</li>
+                        <li><strong>Errors</strong> are the server's: if Maria loses her role while the Dashboard is open, the next click shows "Sorry, you are not allowed to edit this post."</li>
+                        <li><strong><code>per_page=100</code></strong> is the maximum; a catalog of more than 100 books would read <code>X-WP-TotalPages</code> and fetch the other pages, or use Lesson 7.2's endpoint.</li>
+                    </ul>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 4: Try it as a bookseller <span class="step-time">(8 min)</span></h3>
+                    <p>Log in as Maria and open the Dashboard. The widget's frame comes from PHP, and the script tag from the enqueue, with the plugin's version for cache busting:</p>
+                    <pre data-web="/wp-admin/" data-login="maria" data-select="#pagesco-stock-widget .inside"><code class="language-text">http://localhost:8080/wp-admin/   (logged in as maria; View Source: the widget's content)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;div class="inside"&gt;
+		&lt;p class="pagesco-stock-widget__status" aria-live="polite"&gt;Loading the catalog…&lt;/p&gt;
+		&lt;ul class="pagesco-stock-widget__books"&gt;&lt;/ul&gt;
+		&lt;/div&gt;</code></pre>
+                    </div>
+                    <pre data-web="/wp-admin/" data-login="maria" data-select="#pagesco-stock-widget-js"><code class="language-text">http://localhost:8080/wp-admin/   (View Source: the script tag)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;script id="pagesco-stock-widget-js" src="http://localhost:8080/wp-content/plugins/pagesco-books/assets/js/stock-widget.js?ver=1.0.0"&gt;&lt;/script&gt;</code></pre>
+                    </div>
+                    <p>In the browser, the list appears a moment after the page. With the developer tools' Network panel open (filter: Fetch/XHR), click <strong>Mark in stock</strong> next to The Great Gatsby, then <strong>Mark sold out</strong> on the same line (the shop has no copies; you were testing). Recorded with Playwright in Chromium on a WordPress 7.1 site built by this lesson:</p>
+                    <pre><code class="language-text">Loaded          11 books in the catalog.
+                1984: in stock  [Mark sold out]   …   The Catcher in the Rye: sold out  [Mark in stock]
+                The Great Gatsby: sold out  [Mark in stock]   …   (eleven lines)
+Clicked Gatsby  Saved: The Great Gatsby   The Great Gatsby: in stock  [Mark sold out]    (database: true)
+Clicked again   Saved: The Great Gatsby   The Great Gatsby: sold out  [Mark in stock]    (database: false)
+
+Network (Fetch/XHR):
+  GET  /wp-json/wp/v2/books?per_page=100&amp;orderby=title&amp;order=asc&amp;context=edit&amp;_fields=id%2Ctitle%2Cmeta&amp;_locale=user   X-WP-Nonce
+  POST /wp-json/wp/v2/books/33?context=edit&amp;_fields=id%2Ctitle%2Cmeta&amp;_locale=user   X-WP-Nonce
+  POST /wp-json/wp/v2/books/33?context=edit&amp;_fields=id%2Ctitle%2Cmeta&amp;_locale=user   X-WP-Nonce
+Page loads: 1
+Console: no errors (only WordPress's own jQuery Migrate and React DevTools notices, which SCRIPT_DEBUG shows)</code></pre>
+                    <figure>
+                        <img src="images/lesson_23_widget.png" alt="The Stock at a glance widget on the WordPress Dashboard: the line Saved: Fahrenheit 451, then eleven books from 1984 to To Kill a Mockingbird, each with in stock or sold out and a small button, Mark sold out or Mark in stock; The Catcher in the Rye and The Great Gatsby are sold out." width="874" height="884" loading="lazy">
+                        <figcaption>Stock at a glance on Maria's Dashboard: every button is one REST request.</figcaption>
+                    </figure>
+                    <p>Check the result from the WP-CLI container, and the plugin's features and files:</p>
+                    <pre data-cli data-checkpoint><code class="language-bash">wp post meta get 39 pagesco_in_stock
+wp eval 'var_dump( (bool) get_post_meta( 33, "pagesco_in_stock", true ) );'
+grep -c "::class," wp-content/plugins/pagesco-books/src/Plugin.php
+ls wp-content/plugins/pagesco-books/assets/js</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>1
+bool(false)
+15
+stock-widget.js</code></pre>
+                    </div>
+                    <p>Fahrenheit 451 is in stock (<code>1</code>), Gatsby is sold out after your test, the plugin has fifteen features. In <code>pagesco-plan.txt</code>, under a new heading "APIs", note: "Core REST: /wp/v2/books (meta in REST), /wp/v2/genres. Inventory script = application password 'Inventory script' for maria (editor). Dashboard: Stock at a glance (Admin\StockWidget, assets/js/stock-widget.js, apiFetch)."</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li>Maria has an application password named "Inventory script", saved outside the <code>wordpress/</code> folder</li>
+                        <li>The inventory script can mark a book sold out with one <code>POST</code>, and the book's page shows it</li>
+                        <li><code>Admin\StockWidget</code> is the plugin's fifteenth feature, and <code>assets/js/stock-widget.js</code> exists</li>
+                        <li>Maria's Dashboard shows "Stock at a glance" with all eleven books; each button switches the stock without a page load</li>
+                        <li>Fahrenheit 451 is in stock again, and Gatsby and Catcher in the Rye are sold out, as before the lesson</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Run them in the WP-CLI container. Each one leaves the site as the project did. Try each one before you open the solution.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: The Whole Catalog, Page by Page</h3>
+                    <p>Write a shell loop that reads the catalog in pages of 4 titles, sorted by title: first one request to learn the number of pages, then one request per page, printing each page's titles under a heading such as <code>Page 2:</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>curl -s -I</code> fetches only the headers; <code>grep -i '^X-WP-TotalPages'</code> and <code>tr -dc '0-9'</code> keep the number. <code>seq 1 $PAGES</code> counts. <code>grep -o '"rendered":"[^"]*"'</code> picks the titles out of each page.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">API='http://localhost:8080/wp-json/wp/v2/books?per_page=4&amp;orderby=title&amp;order=asc&amp;_fields=title'
+PAGES=$(curl -s -I "$API" | grep -i '^X-WP-TotalPages' | tr -dc '0-9')
+for page in $(seq 1 "$PAGES"); do
+	echo "Page $page:"
+	curl -s "$API&amp;page=$page" | grep -o '"rendered":"[^"]*"'
+done</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Page 1:
+"rendered":"1984"
+"rendered":"Animal Farm"
+"rendered":"Brave New World"
+"rendered":"Dune"
+Page 2:
+"rendered":"Fahrenheit 451"
+"rendered":"Lord of the Rings"
+"rendered":"Pride and Prejudice"
+"rendered":"The Catcher in the Rye"
+Page 3:
+"rendered":"The Great Gatsby"
+"rendered":"The Hobbit"
+"rendered":"To Kill a Mockingbird"</code></pre>
+                        </div>
+                        <p>Three pages for eleven books. A client never assumes it got everything; it reads the headers. (<code>-I</code> sends a <code>HEAD</code> request: the same headers, no body.)</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: A Draft Round Trip with a Throwaway Password</h3>
+                    <p>In one shell session: create an application password "Exercise 2" for Maria into a variable, create a draft book "Emma" (author Jane Austen, $9.49) with it, show that anonymous visitors cannot read the draft while Maria can (with <code>context=edit</code>), delete the draft for good, revoke the password, and show that the password no longer works.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>PASS=$(wp user application-password create … --porcelain)</code>. Create with <code>POST /wp/v2/books</code> and a JSON body with <code>title</code>, <code>status</code> and <code>meta</code>; ask for <code>_fields=id</code> and keep the number with <code>grep -o '[0-9]*'</code>. <code>DELETE /wp/v2/books/ID?force=true</code> skips the trash. <code>wp user application-password list maria --name="Exercise 2" --field=uuid</code> finds the password to delete.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">EX_PASS=$(wp user application-password create maria "Exercise 2" --porcelain)
+API=http://localhost:8080/wp-json/wp/v2/books
+ID=$(curl -s --user "maria:$EX_PASS" -X POST -H 'Content-Type: application/json' -d '{"title":"Emma","status":"draft","meta":{"pagesco_author":"Jane Austen","pagesco_price":9.49}}' "$API?_fields=id" | grep -o '[0-9]*')
+curl -s "$API/$ID?_fields=id,status"; echo
+curl -s --user "maria:$EX_PASS" "$API/$ID?context=edit&amp;_fields=status,title.raw,meta.pagesco_author"; echo
+curl -s --user "maria:$EX_PASS" -X DELETE "$API/$ID?force=true&amp;_fields=deleted"; echo
+wp user application-password delete maria "$(wp user application-password list maria --name='Exercise 2' --field=uuid)"
+curl -s --user "maria:$EX_PASS" "$API?status=draft&amp;_fields=id"; echo</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>{"code":"rest_forbidden","message":"Sorry, you are not allowed to do that.","data":{"status":401}}
+{"status":"draft","title":{"raw":"Emma"},"meta":{"pagesco_author":"Jane Austen"}}
+{"deleted":true}
+Success: Deleted 1 of 1 application password.
+{"code":"rest_invalid_param","message":"Invalid parameter(s): status","data":{"status":400,"params":{"status":"Status is forbidden."},"details":{"status":{"code":"rest_forbidden_status","message":"Status is forbidden.","data":{"status":401}}}}}</code></pre>
+                        </div>
+                        <p>The anonymous request gets <code>401</code> for the draft: it exists, but you are not allowed to see it, and the API does not even say that it is a draft. Maria sees the raw title and the meta. The delete answers <code>{"deleted":true}</code> (without <code>force=true</code>, books would go to the trash and the answer would be the trashed book). After the revoke, the same password asking for drafts is anonymous again: <code>status</code> is "forbidden". Revoking is instant, which is why one password per program is the rule.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: Restock Two Books in One Request</h3>
+                    <p>Core has a batch route, <code>POST /wp-json/batch/v1</code>, that runs several requests to routes that allow it (post-type routes do) in one HTTP request. Mark Gatsby (33) and Catcher in the Rye (37) in stock in one batch, look at the answer, then undo it with a second batch.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The body is <code>{"requests":[{"method":"POST","path":"/wp/v2/books/33?_fields=id,meta.pagesco_in_stock","body":{"meta":{…}}}, …]}</code>. Each request's <code>path</code> starts at the namespace, without <code>/wp-json</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-web="/wp-json/batch/v1" data-auth="maria" data-method="POST" data-body='{"requests":[{"method":"POST","path":"/wp/v2/books/33?_fields=id,meta.pagesco_in_stock","body":{"meta":{"pagesco_in_stock":true}}},{"method":"POST","path":"/wp/v2/books/37?_fields=id,meta.pagesco_in_stock","body":{"meta":{"pagesco_in_stock":true}}}]}' data-json><code class="language-bash">curl -s --user "maria:$PASS" -X POST -H 'Content-Type: application/json' -d '{"requests":[{"method":"POST","path":"/wp/v2/books/33?_fields=id,meta.pagesco_in_stock","body":{"meta":{"pagesco_in_stock":true}}},{"method":"POST","path":"/wp/v2/books/37?_fields=id,meta.pagesco_in_stock","body":{"meta":{"pagesco_in_stock":true}}}]}' http://localhost:8080/wp-json/batch/v1</code></pre>
+                        <div class="card card-output">
+                            <h4>Output (pretty-printed here)</h4>
+                            <pre><code>{
+  "responses": [
+    {
+      "body": {
+        "id": 33,
+        "meta": {
+          "pagesco_in_stock": true
+        }
+      },
+      "status": 200,
+      "headers": {
+        "Allow": "GET, POST, PUT, PATCH, DELETE"
+      }
+    },
+    {
+      "body": {
+        "id": 37,
+        "meta": {
+          "pagesco_in_stock": true
+        }
+      },
+      "status": 200,
+      "headers": {
+        "Allow": "GET, POST, PUT, PATCH, DELETE"
+      }
+    }
+  ]
+}</code></pre>
+                        </div>
+                        <p>One response per request, each with its own <code>status</code> and headers, in the order sent: a batch is a convenience for the network, not a transaction (one request may fail while the other succeeds; with <code>"validation":"require-all-validate"</code> in the body, nothing runs unless every request validates). The undo:</p>
+                        <pre data-web="/wp-json/batch/v1" data-auth="maria" data-method="POST" data-body='{"requests":[{"method":"POST","path":"/wp/v2/books/33?_fields=id","body":{"meta":{"pagesco_in_stock":false}}},{"method":"POST","path":"/wp/v2/books/37?_fields=id","body":{"meta":{"pagesco_in_stock":false}}}]}' data-json><code class="language-bash">curl -s --user "maria:$PASS" -X POST -H 'Content-Type: application/json' -d '{"requests":[{"method":"POST","path":"/wp/v2/books/33?_fields=id","body":{"meta":{"pagesco_in_stock":false}}},{"method":"POST","path":"/wp/v2/books/37?_fields=id","body":{"meta":{"pagesco_in_stock":false}}}]}' http://localhost:8080/wp-json/batch/v1</code></pre>
+                        <div class="card card-output">
+                            <h4>Output (pretty-printed here)</h4>
+                            <pre><code>{
+  "responses": [
+    {
+      "body": {
+        "id": 33
+      },
+      "status": 200,
+      "headers": {
+        "Allow": "GET, POST, PUT, PATCH, DELETE"
+      }
+    },
+    {
+      "body": {
+        "id": 37
+      },
+      "status": 200,
+      "headers": {
+        "Allow": "GET, POST, PUT, PATCH, DELETE"
+      }
+    }
+  ]
+}</code></pre>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 4: Genre Names Without _embed (Stretch)</h3>
+                    <p>Every client of <code>/wp/v2/books</code> that shows genres needs <code>_embed</code> or a second request. Add a read-only field <code>genre_names</code> to the book responses with <code>register_rest_field()</code> (in a temporary must-use plugin), check it for Dune, and remove the plugin.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>register_rest_field( 'book', 'genre_names', array( 'get_callback' =&gt; …, 'schema' =&gt; … ) )</code> on <code>rest_api_init</code>. The callback receives the prepared response as an array; <code>$data['id']</code> is the book. <code>wp_get_post_terms( $id, 'genre', array( 'fields' =&gt; 'names' ) )</code> returns the names.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/mu-plugins/exercise-genre-names.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Exercise: Genre Names in the REST API
+ */
+
+add_action(
+	'rest_api_init',
+	function () {
+		register_rest_field(
+			'book',
+			'genre_names',
+			array(
+				'get_callback' =&gt; function ( $data ) {
+					return wp_get_post_terms( $data['id'], 'genre', array( 'fields' =&gt; 'names' ) );
+				},
+				'schema'       =&gt; array(
+					'description' =&gt; 'The names of the book\'s genres.',
+					'type'        =&gt; 'array',
+					'items'       =&gt; array( 'type' =&gt; 'string' ),
+					'context'     =&gt; array( 'view', 'edit' ),
+					'readonly'    =&gt; true,
+				),
+			)
+		);
+	}
+);</code></pre>
+                        <pre data-web="/wp-json/wp/v2/books/30?_fields=id,genres,genre_names" data-json><code class="language-text">http://localhost:8080/wp-json/wp/v2/books/30?_fields=id,genres,genre_names</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>{
+  "id": 30,
+  "genres": [
+    5,
+    6
+  ],
+  "genre_names": [
+    "Fiction",
+    "Science Fiction"
+  ]
+}</code></pre>
+                        </div>
+                        <p>A registered field takes part in everything: <code>_fields</code>, the route's schema (an <code>OPTIONS</code> request lists it), and with an <code>update_callback</code> it could even be written. It is the right tool to <em>extend</em> core's routes for every client; Lesson 7.2 builds routes with a shape of their own. Remove it:</p>
+                        <pre data-cli><code class="language-bash">rm wp-content/mu-plugins/exercise-genre-names.php</code></pre>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> A mobile app needs the IDs and titles of the five newest books, and nothing else. Which request fits best?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That returns ten full book objects, over 13 KB. Which parameter keeps only the fields the app needs, and which one sets the page size?">
+                                A) GET /wp-json/wp/v2/books
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="per_page=5 gives five books, newest first by default, and _fields keeps only id and the rendered title.">
+                                B) GET /wp-json/wp/v2/books?per_page=5&amp;_fields=id,title.rendered
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="_embed adds related resources rather than removing fields. What does the app not want?">
+                                C) GET /wp-json/wp/v2/books?per_page=5&amp;_embed
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> Logged in as Maria, a script on the Dashboard calls <code>fetch( '/wp-json/wp/v2/books/33', { method: 'POST', … } )</code> with no other headers. What happens?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The cookie alone is not enough on REST requests. What else did the curl demonstration need?">
+                                A) The book is updated, because the browser sends Maria's cookie
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That code is for a nonce that is present but wrong. What does WordPress do when there is no nonce at all?">
+                                B) 403 rest_cookie_invalid_nonce
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Without an X-WP-Nonce header WordPress ignores the cookie, treats the request as anonymous and refuses the edit with 401. wp.apiFetch adds the nonce.">
+                                C) 401: the request is treated as anonymous, and the edit is refused
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> A partner's server should update prices every night. How should it authenticate?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="A program gets its own application password, for a user with no more rights than it needs, sent with Basic authentication over HTTPS, and revocable on its own.">
+                                A) With an application password of a user whose role can edit books, over HTTPS
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Basic authentication on the REST API accepts application passwords only. And would you hand an admin's real password to another company?">
+                                B) With the administrator's login password in the Authorization header
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Nonces belong to a logged-in browser session and expire within a day. Does a server have a session?">
+                                C) With a wp_rest nonce copied from the Dashboard
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> Devon (author) sends a correct application password and tries to change Dune's price. The answer is <code>rest_cannot_edit</code>. Which status does it carry?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The request is well formed. Is the problem the request, or the person?">
+                                A) 400
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="401 means WordPress does not know who is asking. Does it know Devon here?">
+                                B) 401
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Devon is authenticated, so it is not 401; his role cannot edit another author's book, so the answer is 403 Forbidden.">
+                                C) 403
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> The catalog has 11 books. What does <code>X-WP-TotalPages</code> say for <code>/wp-json/wp/v2/books?per_page=4&amp;page=1</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That is the page you asked for, not the number of pages. Divide the total by the page size, and round up.">
+                                A) 1
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Eleven books in pages of four make three pages (4, 4 and 3); the header is the same on every page.">
+                                B) 3
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That is X-WP-Total, the number of books. How many pages of four do they fill?">
+                                C) 11
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Should I turn the REST API off for security?</summary>
+                    <p>No: the block editor, the Site Editor, many plugins and your own widget run on it, and switching it off breaks them. Secure what it exposes instead. Everything it shows anonymously is public on the site anyway, with one surprise: <code>/wp-json/wp/v2/users</code> lists every user who has published content (on your site admin, Devon and Maria), with their names and slugs. Shops that care hide those through the <code>rest_endpoints</code> filter or a security plugin. The real protection is the same as for forms: capabilities on every change, which core's routes check and Lesson 7.2's <code>permission_callback</code> makes you check.</p>
+                </details>
+                <details>
+                    <summary>curl with --user works locally but not on my host: "not logged in". Why?</summary>
+                    <p>Some hosts (Apache with PHP as CGI or FastCGI, some proxies) do not pass the <code>Authorization</code> header to PHP. WordPress's own <code>.htaccess</code> block contains a line for exactly this, <code>RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]</code> (look at <code>wordpress/.htaccess</code>); if your host ignores <code>.htaccess</code> (nginx), its server configuration must pass the header. Also check that the site uses HTTPS, or application passwords are not offered at all.</p>
+                </details>
+                <details>
+                    <summary>What about GraphQL, OAuth and JWT?</summary>
+                    <p>All three are plugins, not core. WPGraphQL adds a GraphQL endpoint that many headless front ends prefer, because one query can fetch exactly the nested data a page needs. OAuth 2 and JWT plugins add token flows, for example "log in with your shop account" in a phone app. For scripts and server-to-server work, application passwords are core, simple and enough; core even has a flow to request one: <code>/wp-admin/authorize-application.php?app_name=…&amp;success_url=…</code> (the REST index advertises it under <code>authentication</code>).</p>
+                </details>
+                <details>
+                    <summary>Why does the core books route not offer price sorting or a genre slug filter?</summary>
+                    <p>Core's routes are generic: they know posts, terms and registered meta, not what your meta means. Sorting by an arbitrary meta key would also let anyone run expensive queries. You can add parameters to core routes with the <code>rest_book_query</code> filter, but when the shop wants its own shape and rules, the clean answer is its own route, which is Lesson 7.2.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Give the widget a search box. As the bookseller types, send <code>/wp/v2/books?search=…</code> (wait until typing pauses: a 300 ms debounce with <code>setTimeout</code> and <code>clearTimeout</code>), and show only the matches. Use <code>parse: false</code> once to read <code>X-WP-Total</code> and print "3 of 11 books". What should happen to an answer that arrives after a newer one (typing "du", then "dune")? Look up <code>AbortController</code>, which <code>apiFetch</code> accepts as <code>signal</code>.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> List every program that might want to talk to the Pages &amp; Co. site (the inventory system, a phone app, a newsletter tool, a partner bookstore…). For each one write: what it reads, what it changes, how it should authenticate, and which WordPress user and role it should run as. Which of them need no authentication at all?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>The REST API serves the site's data as JSON at <code>/wp-json/</code> (or <code>?rest_route=</code>): namespaces, routes, and endpoints (route + method); core builds routes for every type registered with <code>show_in_rest</code></li>
+                        <li>Shape answers with <code>_fields</code> (keep <code>_links</code> and <code>_embedded</code> when embedding), <code>_embed</code>, <code>context</code>, filters such as <code>genres</code> and <code>search</code>, and page with <code>per_page</code>/<code>page</code> plus <code>X-WP-Total</code>/<code>X-WP-TotalPages</code></li>
+                        <li>Cookie authentication needs a <code>wp_rest</code> nonce in <code>X-WP-Nonce</code>; without one the request is anonymous, with a wrong one it is refused (CSRF protection)</li>
+                        <li>Programs use application passwords: per program, Basic authentication over HTTPS, the smallest role that works, revocable; never the account password</li>
+                        <li><code>apiFetch</code> adds the root URL, nonce and locale, sends <code>data</code> as JSON and rejects with the server's error object</li>
+                        <li>Errors are <code>{ code, message, data.status }</code>: 400 the request, 401 who are you, 403 you may not, 404 no such route or item</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Fewer fields</td><td><code>/wp/v2/books?_fields=id,title.rendered,meta.pagesco_price</code></td></tr>
+                            <tr><td>A page of results and the totals</td><td><code>?per_page=4&amp;page=2</code>, headers <code>X-WP-Total</code>, <code>X-WP-TotalPages</code>, <code>Link</code></td></tr>
+                            <tr><td>Related resources inline</td><td><code>?_embed=wp:term&amp;_fields=id,_links,_embedded</code></td></tr>
+                            <tr><td>A program's credentials</td><td><code>wp user application-password create maria "Inventory script" --porcelain</code></td></tr>
+                            <tr><td>An authenticated request from a script</td><td><code>curl --user "maria:$PASS" -X POST -H 'Content-Type: application/json' -d '{…}' URL</code></td></tr>
+                            <tr><td>The API from the site's JavaScript</td><td>dependency <code>wp-api-fetch</code>; <code>await wp.apiFetch( { path, method, data } )</code></td></tr>
+                            <tr><td>A REST URL in PHP</td><td><code>rest_url( 'wp/v2/books' )</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You read the shop's catalog through its REST API, shaped, filtered and paged</li>
+                        <li>You proved how cookie authentication and nonces work, from the command line</li>
+                        <li>You gave the inventory script its own revocable credentials, with the right role</li>
+                        <li>You built a dashboard widget that reads and writes books with <code>apiFetch</code>, safely</li>
+                        <li>You can read any REST error and know whether to fix the request, the credentials or the permissions</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>Today you used the routes WordPress built for you, and hit their limits: no price order, genres as IDs, books as large objects. In <a href="lesson_24.html"><strong>Lesson 7.2: Custom REST Endpoints</strong></a> the plugin gets a namespace of its own, <code>pagesco/v1</code>, with a compact books route whose default page size is the Books per list setting from Lesson 5.4, and an events route that reads and writes Lesson 5.5's custom table. You will register routes with <code>register_rest_route()</code>, validate and sanitize their arguments, describe them with a schema, return proper errors, and write a <code>permission_callback</code> for every one of them.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure the "Stock at a glance" widget works for Maria, and that Fahrenheit 451 is in stock</li>
+                    <li>Keep the "Inventory script" password somewhere safe (not in <code>wordpress/</code>); Lesson 7.2 uses it again, together with Devon's "Test" password</li>
+                    <li>Reread Lesson 5.3's sanitize and validate section and Lesson 5.5's <code>EventsTable::find()</code> and <code>add()</code>: the endpoints call them</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Most of today was reading: URLs, headers, JSON, error codes. That is what working with any API feels like, WordPress or not, and it is a skill that transfers to every service you will ever connect to. If the authentication rules felt like a lot, keep the counter in mind: a nonce proves the request comes from your own page, an application password proves which program is calling, and capabilities decide what either may do. You have already used all three.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_22.html" class="prev-lesson">← Previous: The Interactivity API</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_24.html" class="next-lesson">Next: Custom REST Endpoints →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

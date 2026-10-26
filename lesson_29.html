@@ -1,0 +1,1637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Deployment and maintenance on WordPress 7.1: hosting types, the shop's code in Git, release builds with composer install --no-dev and npm, moving the database with wp search-replace, production wp-config settings, a real cron job, backups with a restore test, updates and hardening, rehearsed on a second, production-configured site. PHP and WordPress Development Lesson 8.4.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Deployment &amp; Maintenance - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 8: Professional Workflow</a></li>
+            <li aria-current="page">Lesson 8.4: Deployment &amp; Maintenance</li>
+        </ul>
+    </nav>
+
+    <main id="main-content" data-state="after:lesson_28">
+        <div class="container">
+            <header>
+                <h1>🚀 Lesson 8.4: Deployment &amp; Maintenance</h1>
+                <p class="lead">Pages &amp; Co. has a block theme, a tested and translated plugin and a release ZIP, and all of it lives at <code>http://localhost:8080</code>, where only you can see it. This lesson takes the shop live the way professionals do: the shop's code in Git, release files built from a tagged commit, the database moved with WP-CLI, and a production configuration with no debugging, no development mode and no secrets in the code. You will rehearse the whole launch on your own machine, on a second WordPress set up the way a real server is, and then keep it running: a real cron job, a backup you have actually restored, an update deploy, and a hardening and maintenance checklist.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Choose a hosting type for a WordPress project by what it needs, and explain how code, content and configuration move between development, staging and production</li>
+                        <li>Keep a WordPress project's own code in Git with a <code>.gitignore</code>, and build release files from a tagged commit with <code>composer install --no-dev</code>, <code>npm ci</code>, <code>npm run build</code> and the plugin ZIP</li>
+                        <li>Move a database with <code>wp db export</code>, <code>wp db import</code> and <code>wp search-replace</code>, including serialized values and a plugin's own tables</li>
+                        <li>Configure WordPress for production: debugging and development mode off, the environment type, secrets outside the code, a real cron job, file editing disabled and a least-privilege database account</li>
+                        <li>Back up a site and prove the backup with a restore, deploy an update, and keep a maintenance checklist</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 150 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_28.html">Lesson 8.3: Internationalization, Accessibility &amp; Distribution</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> a Git repository for the shop's code, release files built from tagged commits, and a production rehearsal of Pages &amp; Co. at <code>http://localhost:8081</code> that you launch, check, back up, restore and update to plugin 1.1.1</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (<code>WP_ENVIRONMENT_TYPE</code> needs 5.5, <code>WP_DEVELOPMENT_MODE</code> 6.3, the <code>Update URI</code> header 5.8 for plugins and 6.1 for themes)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 8.3, the WP-CLI container, Docker for <code>composer:2</code>, Node.js 24 as in Lesson 6.1, Git on your computer, the <code>pagesco-live</code> download from this lesson, and an internet connection for <code>npm ci</code></li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#environments" class="toc-link">Code, Content and Configuration</a></li>
+                        <li><a href="#hosting" class="toc-link">Hosting Types</a></li>
+                        <li><a href="#configuration" class="toc-link">Production Configuration</a></li>
+                        <li><a href="#git" class="toc-link">The Shop's Code in Git</a></li>
+                        <li><a href="#builds" class="toc-link">Release Builds</a></li>
+                        <li><a href="#database" class="toc-link">Moving the Database</a></li>
+                        <li><a href="#running" class="toc-link">Running a Live Site</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Launch Day, Rehearsed</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="environments" class="lesson-section">
+                <h2>🌍 Code, Content and Configuration</h2>
+                <p>Think of the day Pages &amp; Co. moves into a bigger store. The carpenter builds the new shelves in the workshop, tests them, and carries them in finished: nobody saws wood in the shop while customers browse. The books on the shelves belong to the shop; on moving day they come along once, and from then on the booksellers add and sell them in the store, not in the workshop. And the alarm code and the key to the safe are set for the new building and never painted on a shelf. A WordPress site moves the same way, and almost every deployment mistake comes from treating one of these three like another.</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: code goes up, content comes down, configuration stays</h4>
+                    <p><strong>Code</strong> (the theme, the plugin, the must-use plugin) is written on your computer, kept in Git, built into release files and deployed to the live site. Nobody edits it on the server. <strong>Content</strong> (the database and <code>wp-content/uploads</code>) is created on the live site by the shop's staff from launch day on: it travels from your machine to the server exactly once, at the launch, and afterwards only the other way, as a copy from live to your machine or to staging when you need real data. <strong>Configuration</strong> (<code>wp-config.php</code>, passwords, API keys, server settings) is written for each environment and never copied between them.</p>
+                </div>
+                <p>Professional projects have up to three environments:</p>
+                <ul>
+                    <li><strong>Development</strong> (<code>local</code> in WordPress's terms): your machine. Debugging on, test data, the supplier sandbox from Lesson 7.3.</li>
+                    <li><strong>Staging</strong>: a copy of the live site on the same kind of server, hidden from the public and from search engines, where a release or an update is tried with real data before it reaches customers.</li>
+                    <li><strong>Production</strong>: the live shop. Real customers, real orders, the real supplier.</li>
+                </ul>
+                <div class="mermaid">
+graph TD
+    A["development: your computer"] -->|"code: Git, a release build"| B["staging: a copy of production"]
+    B -->|"the same release files, tested"| C["production: the live shop"]
+    C -->|"content: copies of the database"| D["staging or development: real data to test with"]
+                </div>
+                <p>One consequence surprises people the first time: an edit an administrator makes in the Site Editor on the live site is <em>content</em>. Lesson 3.2 showed that the Site Editor saves templates and styles as posts in the database, and those posts win over the theme's files. If the shop's manager changes the header on the live site and you deploy a new <code>parts/header.html</code>, the manager's version stays visible. Changes that should become code are exported into the theme (Lesson 3.3), committed and deployed; everything else stays content.</p>
+                <p>In this lesson you rehearse the launch on your own machine. A download gives you a second WordPress, <strong>pagesco-live</strong>, at <code>http://localhost:8081</code>, configured as a server would be: its own database with a restricted account, no debugging, secrets in a private file, a scheduler instead of WP-Cron. It behaves like production in everything this lesson tests, with one exception: it is not on the internet, so it has no domain name and no HTTPS. Your development site at <code>http://localhost:8080</code> keeps running next to it, untouched.</p>
+            </section>
+
+            <section id="hosting" class="lesson-section">
+                <h2>🏢 Hosting Types</h2>
+                <p>Hosting offers come in four broad categories. Names and prices change all the time; what each category gives you, and what it leaves to you, does not:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Category</th><th>You manage</th><th>How code arrives</th><th>Fits</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><strong>Shared hosting</strong>: many sites on one server, a control panel</td><td>WordPress and its content; the host runs the server, PHP and MySQL</td><td>ZIP upload in wp-admin, SFTP; sometimes SSH and WP-CLI, rarely a build tool</td><td>small sites with little traffic and no custom build step, or with release ZIPs built elsewhere</td></tr>
+                            <tr><td><strong>Managed WordPress hosting</strong>: servers tuned for WordPress only</td><td>your code and content; the host handles updates of the server, often page caching, backups and staging copies</td><td>SSH and WP-CLI, Git or deploy integrations, ZIP upload</td><td>most business sites: the routine work is the host's, the code is yours</td></tr>
+                            <tr><td><strong>Virtual private server (VPS) or cloud server</strong>: a machine of your own, virtual</td><td>everything: operating system, web server, PHP, MySQL, security updates, backups, certificates</td><td>whatever you set up: Git and a build on the server, or files copied from a build service</td><td>teams with server skills, unusual requirements, many sites</td></tr>
+                            <tr><td><strong>Container platforms</strong>: your site as containers, like this course's Docker setup</td><td>the images and their configuration; the platform runs and restarts them</td><td>a new image, or a volume updated by a deploy job</td><td>teams that already run containers; persistent files (uploads) and the database need extra care</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Whatever the label, check a plan against what the project actually needs. For Pages &amp; Co.:</p>
+                <ul>
+                    <li><strong>PHP 8.2 or newer</strong> (the plugin's <code>Requires PHP</code>) and <strong>WordPress 6.9 or newer</strong> (its <code>Requires at least</code>, Lesson 8.3); MySQL 8.0 or newer (or a current MariaDB), as WordPress.org recommends.</li>
+                    <li><strong>SSH access with WP-CLI</strong>: this lesson's launch, migration and backups are WP-CLI commands, and so is every repair from Lesson 8.1.</li>
+                    <li><strong>A real cron job</strong> that can run a command on a schedule, for the nightly supplier sync (Lesson 7.3, and Running a Live Site below).</li>
+                    <li><strong>HTTPS</strong> with automatically renewed certificates, which almost every host now includes.</li>
+                    <li><strong>Backups</strong> you can restore yourself, kept somewhere other than the server, and ideally <strong>staging</strong> copies.</li>
+                    <li>Nice to have: page caching and a persistent object cache (Redis or Memcached), the host's job as Lesson 8.2 concluded.</li>
+                </ul>
+                <div class="card card-info">
+                    <h4>🧩 Version note: PHP on hosting plans</h4>
+                    <p>Many hosts still start new sites on PHP 8.3 or 8.4, and some keep old sites on 8.1 until someone changes it in the control panel. Pages &amp; Co. Books runs on 8.2 and newer, so 8.3 and 8.4 are fine: WordPress refuses to activate it on 8.1 because of its <code>Requires PHP: 8.2</code> header. The differences you have seen in this course (closure names in fatal errors, Lesson 2.3; fatal-error stack traces, Lesson 1.3) are cosmetic. Choose the newest version the host offers, and test on staging before you switch a live site.</p>
+                </div>
+            </section>
+
+            <section id="configuration" class="lesson-section">
+                <h2>⚙️ Production Configuration</h2>
+                <p>Your development site has the opposite of a production configuration on purpose. From the WP-CLI container, as always:</p>
+                <pre data-cli><code class="language-bash">wp eval 'foreach ( array( "WP_DEBUG", "WP_DEBUG_DISPLAY", "SCRIPT_DEBUG", "WP_ENVIRONMENT_TYPE", "WP_DEVELOPMENT_MODE", "DISALLOW_FILE_EDIT", "DISABLE_WP_CRON" ) as $name ) { printf( "%-20s %s\n", $name, defined( $name ) ? var_export( constant( $name ), true ) : "(not defined)" ); }'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>WP_DEBUG             true
+WP_DEBUG_DISPLAY     true
+SCRIPT_DEBUG         true
+WP_ENVIRONMENT_TYPE  'local'
+WP_DEVELOPMENT_MODE  'theme'
+DISALLOW_FILE_EDIT   (not defined)
+DISABLE_WP_CRON      (not defined)</code></pre>
+                </div>
+                <p>Here is what each setting should be on the live site, and why:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Setting</th><th>Development</th><th>Production</th><th>Why</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>WP_DEBUG</code></td><td><code>true</code></td><td><code>false</code></td><td>notices and deprecations are messages for developers (Lesson 8.1); to investigate a live problem, turn it on briefly with <code>WP_DEBUG_DISPLAY</code> <code>false</code> and <code>WP_DEBUG_LOG</code> set to a path outside the web root</td></tr>
+                            <tr><td>error display</td><td>on (<code>WP_DEBUG_DISPLAY</code>, the course's <code>php-dev.ini</code>)</td><td>off: PHP's <code>display_errors</code> Off, errors to the server's log</td><td>messages in a page break the layout and JSON, and show visitors file paths. The official WordPress image already ships <code>display_errors = Off</code> and logs to the container's output</td></tr>
+                            <tr><td><code>SCRIPT_DEBUG</code></td><td><code>true</code></td><td>not defined</td><td>visitors get core's minified JavaScript and CSS (Lesson 8.2 measured the difference)</td></tr>
+                            <tr><td><code>WP_ENVIRONMENT_TYPE</code></td><td><code>'local'</code></td><td><code>'production'</code> (also the default when it is not defined)</td><td>core and plugins behave differently per environment (below)</td></tr>
+                            <tr><td><code>WP_DEVELOPMENT_MODE</code></td><td><code>'theme'</code> since Lesson 3.3</td><td>not defined</td><td>it switches off the theme's pattern cache (below)</td></tr>
+                            <tr><td><code>DISALLOW_FILE_EDIT</code></td><td>not defined</td><td><code>true</code></td><td>no plugin and theme file editor in wp-admin: code changes go through Git (Running a Live Site)</td></tr>
+                            <tr><td><code>DISABLE_WP_CRON</code></td><td>not defined</td><td><code>true</code>, with a real cron job</td><td>scheduled events run on time, not on visitors' page views (Running a Live Site)</td></tr>
+                            <tr><td>secrets: database password, salts, the supplier's URL and key</td><td>in <code>wp-config.php</code> (the supplier's sandbox key since Lesson 7.3)</td><td>in the server's <code>wp-config.php</code> or environment, never in Git, different from development</td><td>below</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The rehearsal site gets exactly these settings from its <code>compose.yaml</code> (through the image's <code>WORDPRESS_CONFIG_EXTRA</code>, the same mechanism your development site uses for <code>WP_ENVIRONMENT_TYPE</code> since Lesson 1.2), and you will check them there in the project.</p>
+
+                <h3>The environment type</h3>
+                <p><code>wp_get_environment_type()</code> returns <code>local</code>, <code>development</code>, <code>staging</code> or <code>production</code>, from the <code>WP_ENVIRONMENT_TYPE</code> constant (or an environment variable of the same name), and <code>production</code> when neither is set. Core reads it in several places you have met: WordPress 7.1 sends pingbacks only from production sites, application passwords work without HTTPS only on <code>local</code> sites (Lesson 7.1), and Site Health reports it. Your own code may read it too, carefully: different <em>safety</em> rules per environment are fine (a plugin that allows a plain-HTTP sandbox on <code>local</code> only), different <em>features</em> make staging lie about production. The project adds one such safety rule to the plugin.</p>
+
+                <h3>Development mode and the pattern cache</h3>
+                <p>Lesson 3.3 turned on <code>WP_DEVELOPMENT_MODE</code> <code>'theme'</code> so that new pattern files showed up at once. Without it, WordPress caches the list of a theme's patterns in a site transient for 30 minutes, and the cache is valid only for the theme <code>Version</code> it was made for. See it on your own site: turn development mode off for a moment, let one page view fill the cache, and add a new pattern file, <code>wordpress/wp-content/themes/pagesco/patterns/gift-cards.php</code>:</p>
+                <pre data-cli><code class="language-bash">wp config delete WP_DEVELOPMENT_MODE
+curl -s -o /dev/null http://localhost:8080/
+wp db query "SELECT option_name FROM wp_options WHERE option_name LIKE '_site_transient_wp_theme_files_patterns%'"</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Deleted the constant 'WP_DEVELOPMENT_MODE' from the 'wp-config.php' file.
+option_name
+_site_transient_wp_theme_files_patterns-ab0ac91d73cd40af5667134910f64f93</code></pre>
+                </div>
+                <pre data-file="wp-content/themes/pagesco/patterns/gift-cards.php"><code class="language-php">&lt;?php
+/**
+ * Title: Gift cards
+ * Slug: pagesco/gift-cards
+ * Categories: pagesco, call-to-action
+ *
+ * @package pagesco
+ */
+
+?&gt;
+&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;Gift cards are available at the counter.&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;</code></pre>
+                <pre data-cli><code class="language-bash">wp eval 'var_dump( WP_Block_Patterns_Registry::get_instance()-&gt;is_registered( "pagesco/gift-cards" ) );'
+sed -i 's/^Version: 1.0.0$/Version: 1.1.0/' wp-content/themes/pagesco/style.css
+wp eval 'var_dump( WP_Block_Patterns_Registry::get_instance()-&gt;is_registered( "pagesco/gift-cards" ) );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>bool(false)
+bool(true)</code></pre>
+                </div>
+                <p>The new pattern did not exist for WordPress while the cached list from version 1.0.0 was valid. One changed <code>Version</code> line, and WordPress read the folder again. On a live site that is the difference between "the new pattern is there" and "the new pattern appears in half an hour, maybe": <strong>raise the theme's Version with every release that changes the theme</strong>. The pagesco theme has changed a lot since Lesson 3.2 (patterns, <code>functions.php</code>, the hero image of Lesson 8.2) without a new version, so 1.1.0 is the right number for its first release: keep it. Remove the demo pattern and turn development mode back on, for your machine only:</p>
+                <pre data-cli><code class="language-bash">rm wp-content/themes/pagesco/patterns/gift-cards.php
+wp config set WP_DEVELOPMENT_MODE theme</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Added the constant 'WP_DEVELOPMENT_MODE' to the 'wp-config.php' file with the value 'theme'.</code></pre>
+                </div>
+
+                <h3>Secrets</h3>
+                <p>A secret is anything that lets someone act as the site: the database password, the authentication keys and salts (Lesson 2.2), the supplier's API key, an SMTP password. Where yours are on the development site:</p>
+                <pre data-cli><code class="language-bash">grep -n -e "define( 'WP_DEBUG'" -e "WORDPRESS_CONFIG_EXTRA" -e "SUPPLIER" wp-config.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>116:define( 'WP_DEBUG', !!getenv_docker('WORDPRESS_DEBUG', '') );
+127:if ($configExtra = getenv_docker('WORDPRESS_CONFIG_EXTRA', '')) {
+131:define( 'PAGESCO_BOOKS_SUPPLIER_URL', 'http://localhost:8080/supplier-sandbox/v1/' );
+132:define( 'PAGESCO_BOOKS_SUPPLIER_KEY', 'sandbox-7f3a9c' );</code></pre>
+                </div>
+                <p>The Docker image's <code>wp-config.php</code> reads most values from environment variables (<code>getenv_docker()</code>, Lesson 2.2), and Lesson 7.3 wrote the sandbox's address and key into the file itself with <code>wp config set</code>. On your machine that is fine: the file is not in Git (it is outside <code>wp-content</code>, which you will put in Git), and the key only opens a fake supplier. For production the rules are:</p>
+                <ul>
+                    <li><strong>Secrets live on the server only</strong>: in its <code>wp-config.php</code>, written there and never committed, or in environment variables that <code>wp-config.php</code> reads, which hosting panels and container platforms let you set. The rehearsal site reads them from a file named <code>.env</code> next to its <code>compose.yaml</code>.</li>
+                    <li><strong>Every environment has its own</strong>: live database passwords, salts and the supplier's live key are not the ones on your machine or on staging, so a leaked development file opens nothing.</li>
+                    <li><strong>The supplier sandbox never ships.</strong> The <code>supplier-sandbox</code> folder from Lesson 7.3 sits in your WordPress folder, outside <code>wp-content</code>. It is not in Git and not in any release file, so it cannot reach the live site by accident; the live site gets the distributor's real HTTPS address and key instead.</li>
+                    <li><strong>Unique salts per site</strong>: the WordPress image generates random ones on first start, and <code>wp config shuffle-salts</code> (Lesson 2.2) replaces them, which logs everybody out.</li>
+                </ul>
+            </section>
+
+            <section id="git" class="lesson-section">
+                <h2>🗂️ The Shop's Code in Git</h2>
+                <p>Git is the source of truth for code: every release is a commit you can name, compare and rebuild, and the live site gets nothing that is not in one. The question for a WordPress project is what belongs in the repository. The rule: <strong>your own source code and the files that describe how to build it, and nothing that someone else maintains, that a tool generates, or that is content</strong>.</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>In Git</th><th>Not in Git</th><th>Why not</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>themes/pagesco/</code>, <code>plugins/pagesco-books/</code>, <code>mu-plugins/pagesco-site.php</code></td><td>WordPress core, Akismet, Hello Dolly, the Twenty Twenty themes</td><td>WordPress.org maintains them; they are installed and updated, not developed</td></tr>
+                            <tr><td><code>composer.json</code>, <code>composer.lock</code>, <code>package.json</code>, <code>package-lock.json</code></td><td><code>vendor/</code>, <code>node_modules/</code></td><td>Composer and npm rebuild them exactly from the lock files (Lessons 5.1, 6.1, 8.1)</td></tr>
+                            <tr><td><code>src/blocks/</code> sources, <code>languages/</code> (the PO you write and the files made from it)</td><td><code>build/</code>, <code>pagesco-books.zip</code></td><td>generated by <code>npm run build</code> and <code>npm run plugin-zip</code>; the translations stay in Git because rebuilding them needs a translator's tools</td></tr>
+                            <tr><td><code>phpcs.xml.dist</code>, <code>phpunit.xml.dist</code>, <code>.wp-env.json</code>, <code>tests/</code></td><td><code>.phpunit.result.cache</code></td><td>the configuration is shared by everyone; the cache is your machine's</td></tr>
+                            <tr><td></td><td><code>mu-plugins/mailpit-smtp.php</code>, <code>uploads/</code>, <code>languages/</code> of core, <code>debug.log</code>, <code>wp-config.php</code></td><td>development only, content, downloaded, logs, configuration</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The repository's root is <code>wordpress/wp-content</code>, where all of your code lives. Its <code>.gitignore</code> ignores everything first and then lets the shop's own folders back in, so a plugin installed next week is ignored automatically. Create <code>wordpress/wp-content/.gitignore</code>:</p>
+                <pre data-file="wp-content/.gitignore"><code class="language-text"># Pages &amp; Co.: Git keeps the shop's own code, and nothing else.
+# Everything in wp-content is ignored, then the shop's folders and files are let back in with "!".
+/*
+!/.gitignore
+
+!/mu-plugins/
+/mu-plugins/*
+!/mu-plugins/pagesco-site.php
+
+!/themes/
+/themes/*
+!/themes/pagesco/
+
+!/plugins/
+/plugins/*
+!/plugins/pagesco-books/
+
+# Inside the plugin: what Composer, npm and the tools make. A release build makes them again.
+/plugins/pagesco-books/vendor/
+/plugins/pagesco-books/node_modules/
+/plugins/pagesco-books/build/
+/plugins/pagesco-books/*.zip
+/plugins/pagesco-books/.phpunit.result.cache</code></pre>
+                <p>Why the pairs such as <code>!/themes/</code> and <code>/themes/*</code>: Git cannot let a file back in when its folder is ignored, so the folder itself is let in, its contents ignored again, and then the one subfolder you want is let in. Now the repository. Git runs on your computer (on Windows inside WSL, where your project lives), in a terminal in <code>wordpress/wp-content</code>. Git records an author with every commit: if you have not set your name and email for Git on this computer, set them for this repository with your own values:</p>
+                <pre data-node="wp-content"><code class="language-bash">git init -q -b main
+git config user.name "Your Name"
+git config user.email "you@example.com"
+git add .
+git status --short | wc -l
+git ls-files | cut -d/ -f1-2 | sort | uniq -c</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>91
+      1 .gitignore
+      1 mu-plugins/pagesco-site.php
+     66 plugins/pagesco-books
+     23 themes/pagesco</code></pre>
+                </div>
+                <p>Ninety-one files are staged: the <code>.gitignore</code>, the must-use plugin, 23 theme files and 66 of the plugin's. (If you took a theme screenshot in Lesson 3.3 or ran the tests in Lesson 8.1, your numbers differ by a file or two; <code>.phpunit.result.cache</code> stays out.) When you wonder why a file is missing, ask Git which rule ignores it:</p>
+                <pre data-node="wp-content"><code class="language-bash">git check-ignore -v mu-plugins/mailpit-smtp.php plugins/pagesco-books/vendor plugins/akismet uploads</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>.gitignore:7:/mu-plugins/*	mu-plugins/mailpit-smtp.php
+.gitignore:19:/plugins/pagesco-books/vendor/	plugins/pagesco-books/vendor
+.gitignore:15:/plugins/*	plugins/akismet
+.gitignore:3:/*	uploads</code></pre>
+                </div>
+                <p>Each line names the file, the line of <code>.gitignore</code> that ignores it, and the rule. The development mail plugin must never reach the live site (it sends every email to a Mailpit server that does not exist there), and the ignore rule guarantees it. The first commit is part of the project, together with the release it becomes.</p>
+                <div class="card card-success">
+                    <h4>✅ Commit often, tag what you deploy</h4>
+                    <p>Commit whenever something works, with a message that says why. When a commit goes live, give it an annotated tag (<code>git tag -a release-1 -m "..."</code>): the tag is the answer to "what exactly is on the live site?", the starting point for the next release's changelog, and the commit you rebuild if you ever need to roll back. Push the repository to a private remote (a Git hosting service, or a server you control), so that it does not live only on your laptop.</p>
+                </div>
+            </section>
+
+            <section id="builds" class="lesson-section">
+                <h2>📦 Release Builds</h2>
+                <p>The repository holds sources; the live site needs runnable files. A <strong>release build</strong> turns one into the other, and it starts from a commit, in a clean folder, never from your working copy. Your working copy has files that are not committed yet, the development packages of Lesson 8.1, and whatever you were trying out this afternoon. Here is the difference that matters most, in your working copy's Composer autoloader:</p>
+                <pre data-cli><code class="language-bash">grep -o "/[a-z-]*/[a-z-]*/[A-Za-z/_-]*\.php" wp-content/plugins/pagesco-books/vendor/composer/autoload_files.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>/myclabs/deep-copy/src/DeepCopy/deep_copy.php
+/phpunit/phpunit/src/Framework/Assert/Functions.php
+/yoast/phpunit-polyfills/phpunitpolyfills-autoload.php</code></pre>
+                </div>
+                <p>Three files from development packages that the autoloader <code>require</code>s on every load. A ZIP of this <code>vendor/composer</code> without those packages dies on the client's site with "Failed opening required" (Lesson 8.3, Common Mistake 3). Lesson 8.3 worked around it by regenerating the autoloader and putting it back. A clean build cannot get it wrong: in a fresh copy of the committed plugin, <code>composer install --no-dev</code> never downloads the development packages, so the autoloader it writes knows nothing about them. The steps, which the project runs:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Step</th><th>Command</th><th>Gives</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>a clean copy of a tagged commit</td><td><code>git archive</code></td><td>exactly the committed files, nothing else</td></tr>
+                            <tr><td>PHP dependencies for production</td><td><code>composer install --no-dev --optimize-autoloader</code></td><td><code>vendor/</code> with only the autoloader; <code>--optimize-autoloader</code> writes a class map, so PHP finds each class without searching folders</td></tr>
+                            <tr><td>JavaScript tools, exactly as locked</td><td><code>npm ci</code></td><td><code>node_modules/</code> from <code>package-lock.json</code>, deleted and installed fresh (<code>npm install</code> may update the lock file; <code>ci</code> never does)</td></tr>
+                            <tr><td>the blocks</td><td><code>npm run build</code></td><td><code>build/blocks/</code> (Lesson 6.1)</td></tr>
+                            <tr><td>the release file</td><td><code>npm run plugin-zip</code></td><td><code>pagesco-books.zip</code> with the <code>files</code> list of Lesson 8.3</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The theme needs no build step: <code>git archive --format=zip</code> packs its committed files into a ZIP directly, and the must-use plugin is a single file. How the files then reach the server depends on the host: an upload under Plugins &gt; Add Plugin ("Replace current with uploaded", Lesson 8.3's FAQ), <code>wp plugin install the.zip --force</code> over SSH, SFTP or <code>rsync</code> to the server, or a deploy service that runs these same build steps on every pushed tag (continuous delivery: Going Further). The build is the same in every case; only the last step differs.</p>
+            </section>
+
+            <section id="database" class="lesson-section">
+                <h2>🗄️ Moving the Database</h2>
+                <p>At the launch, the database travels once: the books, genres, pages, settings, events and users you made on your machine become the live shop's starting point. WordPress stores addresses in it as full URLs, so they must change on the way. Ask WP-CLI what would change, without changing anything (<code>--dry-run</code>), for the rehearsal site's address:</p>
+                <pre data-cli><code class="language-bash">wp search-replace 'http://localhost:8080' 'http://localhost:8081' --all-tables-with-prefix --skip-columns=guid --dry-run --report-changed-only</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+------------+--------------+--------------+------+
+| Table      | Column       | Replacements | Type |
++------------+--------------+--------------+------+
+| wp_options | option_value | 2            | PHP  |
+| wp_posts   | post_content | 6            | SQL  |
+| wp_users   | user_url     | 1            | SQL  |
++------------+--------------+--------------+------+
+Success: 9 replacements to be made.</code></pre>
+                </div>
+                <p>Nine replacements: <code>siteurl</code> and <code>home</code> in the options table, the administrator's website field in <code>wp_users</code>, and six rows of post content. Which six:</p>
+                <pre data-cli><code class="language-bash">wp eval 'global $wpdb; foreach ( $wpdb-&gt;get_results( "SELECT post_type, post_title, post_content FROM {$wpdb-&gt;posts} WHERE post_content LIKE \"%localhost:8080%\" ORDER BY ID" ) as $row ) { printf( "%-14s %-30s %d\n", $row-&gt;post_type, $row-&gt;post_title, substr_count( $row-&gt;post_content, "localhost:8080" ) ); }'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>page           Sample Page                    1
+page           Privacy Policy                 1
+wp_navigation  Navigation                     4
+post           Staff picks for the season     1
+revision       Staff picks for the season     1
+revision       Navigation                     4</code></pre>
+                </div>
+                <p>The header navigation (Lesson 8.3 turned its Page List into four links with stored addresses) and its revision, the Staff picks post with its Book Card link (Lesson 6.2) and a revision, and two pages WordPress created at the installation: the Sample Page links to the dashboard, and the Privacy Policy draft says "Our website address is: http://localhost:8080." (If you edited these in the editor, you have a few more revisions.) Nothing in the theme or plugin code contains the address; it is all content. Three options matter:</p>
+                <ul>
+                    <li><strong><code>--all-tables-with-prefix</code></strong>: by default <code>wp search-replace</code> and <code>wp db</code> commands work on the tables WordPress registers, the core ones. The plugin's <code>wp_pagesco_events</code> table (Lesson 5.5) is not among them. Here it has no addresses, but Common Mistake 2 shows what leaving it out costs.</li>
+                    <li><strong><code>--skip-columns=guid</code></strong>: the <code>guid</code> column of <code>wp_posts</code> looks like a URL (<code>http://localhost:8080/?p=30</code>) but is an identifier, which feed readers use to recognize posts they have seen. It is not used as a link, and WP-CLI's documentation leaves it alone in its own examples. Leave it.</li>
+                    <li><strong>The Type column</strong>: <code>SQL</code> means WP-CLI used MySQL's <code>REPLACE()</code>, which is safe because no value in that column is serialized; <code>PHP</code> means it loaded every value into PHP, unserialized it where needed, replaced, and serialized it again.</li>
+                </ul>
+                <h3>Serialized data</h3>
+                <p>That last point is why WordPress migrations use <code>wp search-replace</code> and not SQL. Lesson 2.2 showed that a serialized value records the length of every string (<code>s:34:"…"</code>), and that a plain SQL <code>REPLACE()</code> to a longer address breaks it. Your shop happens to have no serialized addresses yet, but plugins store them all the time: a settings array with a page address, a widget with a link. A demo option shows what <code>wp search-replace</code> does with one, for the real shop's address, <code>https://www.pagesco.example</code> (<code>--export</code> without a file name writes the changed SQL to the screen instead of changing the database):</p>
+                <pre data-cli><code class="language-bash">wp option add pagesco_demo_links '{"shop":"http://localhost:8080/find-a-book/"}' --format=json
+wp db query "SELECT option_value FROM wp_options WHERE option_name = 'pagesco_demo_links'"
+wp search-replace 'http://localhost:8080' 'https://www.pagesco.example' wp_options --export | grep -o "pagesco_demo_links', '[^']*'"
+wp option delete pagesco_demo_links</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Added 'pagesco_demo_links' option.
+option_value
+a:1:{s:4:"shop";s:34:"http://localhost:8080/find-a-book/";}
+
+pagesco_demo_links', 'a:1:{s:4:\"shop\";s:40:\"https://www.pagesco.example/find-a-book/\";}'
+Success: Deleted 'pagesco_demo_links' option.</code></pre>
+                </div>
+                <p>The string grew from 34 to 40 characters, and WP-CLI rewrote the length with it (the backslashes only escape the quotes inside the SQL). Your database was not touched, because <code>--export</code> writes instead of saving: the project uses exactly that, with a file name, to produce the launch database in one command.</p>
+                <div class="card card-info">
+                    <h4>💡 WP_HOME and WP_SITEURL</h4>
+                    <p>Lesson 2.2 mentioned two constants that override the <code>home</code> and <code>siteurl</code> options from <code>wp-config.php</code>. They help when a moved site redirects to its old address and you cannot reach wp-admin, but they change only those two values: the links in content still need <code>wp search-replace</code>. Use the replace, and leave the constants for emergencies.</p>
+                </div>
+            </section>
+
+            <section id="running" class="lesson-section">
+                <h2>🔧 Running a Live Site</h2>
+                <p>A launch is one day; the site then runs for years. Four routines keep it healthy.</p>
+
+                <h3>Scheduled tasks: a real cron job</h3>
+                <p>WP-Cron (Lesson 7.3) is not a scheduler: on each page view, WordPress checks whether an event is due and, if so, starts <code>wp-cron.php</code> with a request to itself. On a quiet night with no visitors, the 03:00 supplier sync runs when the first customer arrives at 07:40; on a busy site, the checks cost a little on every request; and behind some caches no request reaches PHP at all. Production sites turn the page-view trigger off with <code>define( 'DISABLE_WP_CRON', true );</code> and let the server's own scheduler run due events every few minutes. Your site's job, as WP-CLI sees it:</p>
+                <pre data-cli><code class="language-bash">wp cron event list --hook=pagesco_books_daily_sync --fields=hook,recurrence</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+--------------------------+------------+
+| hook                     | recurrence |
++--------------------------+------------+
+| pagesco_books_daily_sync | 1 day      |
++--------------------------+------------+</code></pre>
+                </div>
+                <p>On a server with SSH, the scheduler is <code>cron</code>, and its table (<code>crontab -e</code>) gets one line that runs WP-CLI every five minutes in the site's folder:</p>
+                <pre data-norun><code class="language-text">*/5 * * * * cd /var/www/pagesco &amp;&amp; wp cron event run --due-now --quiet</code></pre>
+                <p>Hosting panels offer the same as "cron jobs" in a form; without WP-CLI, the line requests <code>https://www.pagesco.example/wp-cron.php?doing_wp_cron</code> instead. The rehearsal site has a small <code>cron</code> container that does this every minute. WP-Cron's events and functions do not change at all: <code>wp_schedule_event()</code>, the Activator's <code>DailySync::schedule()</code> and the hook stay exactly as Lesson 7.3 wrote them. Only the trigger moves.</p>
+
+                <h3>Backups and restores</h3>
+                <p>Code is in Git, and configuration is written down; what only exists on the live server is content, so that is what a backup must hold:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>What</th><th>How</th><th>How often</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>the database</td><td><code>wp db export</code> (or the host's database backups)</td><td>daily for a shop, more often when orders come in all day</td></tr>
+                            <tr><td><code>wp-content/uploads</code></td><td>an archive (<code>tar</code>) or a sync tool</td><td>daily, or after uploads</td></tr>
+                            <tr><td>the server's configuration and secrets</td><td>a copy in a password manager or the team's vault</td><td>when they change</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The usual rule is <strong>3-2-1</strong>: three copies, on two kinds of storage, one of them somewhere else (a backup on the same server burns with the server). Keep several days and a few older copies, because a problem is often noticed a week late. And above all: <strong>a backup you have never restored is a hope, not a backup</strong>. Restore one on purpose, on staging or a rehearsal site, before you need to; you do it in the project.</p>
+
+                <h3>Updates</h3>
+                <p>WordPress applies minor core releases (7.1.3 to 7.1.4, security and bug fixes) automatically by default; major releases only when you choose so on Dashboard &gt; Updates, and plugins and themes only when you switch it on for each one (on the Plugins and Themes screens, or with WP-CLI). On your development site every one is off:</p>
+                <pre data-cli><code class="language-bash">wp plugin auto-updates status --all</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+---------------+----------+
+| name          | status   |
++---------------+----------+
+| akismet       | disabled |
+| hello         | disabled |
+| pagesco-books | disabled |
++---------------+----------+</code></pre>
+                </div>
+                <p>For your own code, updates are deploys: a new version, built and released like the first. For everything else the routine is: back up, update on staging, run a quick check (the smoke test of Exercise 3), then update production the same way and check again. WP-CLI makes each step one command (<code>wp core check-update</code>, <code>wp plugin list --update=available</code>, <code>wp core update</code>, <code>wp plugin update --all</code>). Two more things about updates and your own code:</p>
+                <ul>
+                    <li><strong>WordPress respects version control.</strong> With a <code>.git</code> folder in <code>wp-content</code>, automatic updates of plugins and themes are off on your machine, which is right: there, changes come through Git.
+                        <pre data-cli><code class="language-bash">wp eval 'require_once ABSPATH . "wp-admin/includes/admin.php"; require_once ABSPATH . "wp-admin/includes/class-wp-automatic-updater.php"; $updater = new WP_Automatic_Updater(); var_dump( $updater-&gt;is_vcs_checkout( WP_PLUGIN_DIR ), $updater-&gt;is_vcs_checkout( ABSPATH ) );'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>bool(true)
+bool(false)</code></pre>
+                        </div>
+                        WordPress looks for a version-control folder in the plugins folder and the folders above it: found for plugins, not for core, whose folder has none.</li>
+                    <li><strong>A private plugin must never be "updated" from WordPress.org.</strong> WordPress asks WordPress.org for updates of every installed plugin by its folder name. If anyone ever publishes a plugin called <code>pagesco-books</code> there, the shop's site would offer it as an update and replace your code. The <code>Update URI</code> header (WordPress 5.8 for plugins, 6.1 for themes) prevents that: any value that is not a WordPress.org address tells WordPress.org's update service to skip the plugin, and <code>false</code> is the usual value for code with no update server of its own. The project adds it to both.</li>
+                </ul>
+
+                <h3>Hardening</h3>
+                <p>Hardening means removing every way in that the site does not need. The checklist for Pages &amp; Co., with the rehearsal site doing each one:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Measure</th><th>How</th><th>Why</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>No file editing in wp-admin</td><td><code>DISALLOW_FILE_EDIT</code> <code>true</code>; stricter, <code>DISALLOW_FILE_MODS</code> also blocks installing and updating from wp-admin (and automatic updates)</td><td>a stolen administrator password must not mean "run any PHP you like"; and an edit on the server is overwritten by the next deploy</td></tr>
+                            <tr><td>A least-privilege database account</td><td>WordPress's own account, rights on its own database only (MySQL Foundations, Lesson 7.4)</td><td>if the site is broken into, the attacker cannot reach other databases, create MySQL users or administer the server</td></tr>
+                            <tr><td>HTTPS everywhere</td><td>a certificate (most hosts issue and renew one automatically), a redirect from HTTP, <code>https://</code> in <code>home</code> and <code>siteurl</code> (the search-replace), optionally <code>FORCE_SSL_ADMIN</code></td><td>passwords, cookies and the REST API's application passwords travel encrypted; application passwords do not even work on a production site without it (the project shows it)</td></tr>
+                            <tr><td>Strong, unique passwords and fewer administrators</td><td>reset every password that came from development, remove application passwords, a password manager, a two-factor plugin</td><td>your development database has <code>admin</code> / <code>password</code>, and it is about to become the live one</td></tr>
+                            <tr><td>Nothing unused</td><td>delete inactive plugins and themes (keep one default theme as a fallback)</td><td>inactive code can still have holes that a direct request reaches</td></tr>
+                            <tr><td>Nothing private in the web root</td><td>no dumps, logs, <code>.git</code> or <code>.env</code> where the web server serves them; deny them in the server configuration as a second line</td><td>Common Mistakes 1 and 3</td></tr>
+                            <tr><td>Less advertising</td><td>no version numbers in headers (<code>ServerTokens Prod</code>, <code>expose_php = Off</code>) and no generator tag (Lesson 2.3)</td><td>a small one: attackers' scanners match versions to known holes</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Your development site advertises its software freely (the response headers of the front page, from the WP-CLI container; the next header, <code>X-Powered-By</code>, names PHP's exact version too):</p>
+                <pre data-cli><code class="language-bash">curl -sI http://localhost:8080/ | grep -i '^server:'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Server: Apache/2.4.69 (Debian)</code></pre>
+                </div>
+
+                <h3>A maintenance checklist</h3>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>When</th><th>What</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>after every deploy</td><td>the smoke test (key pages answer, the notice and navigation are there, no PHP errors in the log), <code>wp plugin list</code> shows the new version</td></tr>
+                            <tr><td>weekly</td><td>updates: core, plugins, themes, on staging first; read the server's error log; check that last night's backup exists and the cron job ran (<code>wp cron event list</code>)</td></tr>
+                            <tr><td>monthly</td><td>a restore test; Site Health (Tools &gt; Site Health); remove users who left; review Core Web Vitals from real visitors (field data, Lesson 8.2) once the site has traffic</td></tr>
+                            <tr><td>every few months</td><td>the PHP version the host offers, and the plugin's and theme's <code>Tested up to</code> and <code>Requires</code> headers; rotate API keys and passwords; does the site still need every plugin?</td></tr>
+                            <tr><td>yearly</td><td>the domain and the certificate renew automatically (check that they did), the hosting plan still fits</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <h3>1. A database dump in the web root</h3>
+                <p>The quickest way to make a backup on a server is <code>wp db export</code> in the WordPress folder. Try it on your machine and then ask for the file like a stranger would (from the WP-CLI container):</p>
+                <pre data-cli><code class="language-bash">wp db export pagesco-dev.sql
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/pagesco-dev.sql
+curl -s http://localhost:8080/pagesco-dev.sql | grep -o "'admin','[$]wp[$]2y[$][0-9]*"</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Exported to 'pagesco-dev.sql'.
+200
+'admin','$wp$2y$12</code></pre>
+                </div>
+                <p><strong>What it means:</strong> 200: the whole database is a download, with every user's email address and password hash (the last line is the start of the administrator's), every setting and every order. Bots try names like <code>backup.sql</code> and <code>dump.sql</code> on every site, all day. <strong>Fix:</strong> write dumps outside the web root (the rehearsal site's <code>/backups</code>), move them off the server, and make the web server refuse <code>.sql</code> and <code>.log</code> files as a second line of defense (the rehearsal site's Apache configuration does; you will see the 403). Remove the file:</p>
+                <pre data-cli><code class="language-bash">rm pagesco-dev.sql</code></pre>
+
+                <h3>2. A migration that loses the plugin's table</h3>
+                <p>The launch database comes from <code>wp search-replace … --export=file</code>. Without <code>--all-tables-with-prefix</code>:</p>
+                <pre data-cli data-exit="1"><code class="language-bash">wp search-replace 'http://localhost:8080' 'http://localhost:8081' --skip-columns=guid --export=/tmp/check.sql &gt; /dev/null
+grep -c '^CREATE TABLE' /tmp/check.sql
+grep -c 'CREATE TABLE `wp_pagesco_events`' /tmp/check.sql</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>12
+0</code></pre>
+                </div>
+                <p><strong>What it means:</strong> twelve tables, the core ones, and no events table: <code>--export</code> writes only the tables it searched, and by default it searches the tables WordPress registers. The command says "Success", the file imports without an error, the books and pages are all there. On the rehearsal site, with a launch database made this way, the Events page says "No events are scheduled right now. Check back soon!", and only the server's log tells the truth (<code>docker compose logs wordpress</code> in <code>pagesco-live</code>, recorded):</p>
+                <div class="card card-output">
+                    <h4>Output (recorded on the rehearsal site)</h4>
+                    <pre><code>wordpress-1  | [26-Oct-2026 06:49:06 UTC] WordPress database error Table 'pagesco.wp_pagesco_events' doesn't exist for query SELECT id, title, starts_at, location, capacity FROM `wp_pagesco_events` ORDER BY starts_at ASC LIMIT 5 made by require('wp-blog-header.php'), require_once('wp-includes/template-loader.php'), include('wp-includes/template-canvas.php'), get_the_block_template_html, do_blocks, render_block, WP_Block-&gt;render, WP_Block-&gt;render, render_block_core_post_content, apply_filters('the_content'), WP_Hook-&gt;apply_filters, do_shortcode, preg_replace_callback, do_shortcode_tag, PagesCo\Books\Shortcodes\EventsShortcode-&gt;render, PagesCo\Books\EventsTable::find</code></pre>
+                </div>
+                <p>The plugin's query layer asked for a table that does not exist, and with debugging off nobody saw it. <code>EventsTable::maybe_upgrade()</code> (Lesson 5.5) does not help either, because the imported <code>pagesco_books_db_version</code> option says the table is already at version 2. <strong>Fix:</strong> <code>--all-tables-with-prefix</code> for every migration of a site with plugin tables, and a check of the file before you import it (the project counts the tables):</p>
+                <pre data-cli><code class="language-bash">wp db tables --all-tables-with-prefix | grep pagesco
+rm /tmp/check.sql</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>wp_pagesco_events</code></pre>
+                </div>
+
+                <h3>3. The repository in the web root</h3>
+                <p>Your Git repository lives in <code>wp-content</code>, inside the web root. On your machine nobody else can reach it. Put a repository like that on a server (the tempting "deploy" is <code>git clone</code> or <code>git pull</code> in the live <code>wp-content</code>), and:</p>
+                <pre data-cli><code class="language-bash">curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/wp-content/.git/config
+curl -s http://localhost:8080/wp-content/.git/HEAD</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>200
+ref: refs/heads/main</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the web server hands out <code>.git</code> like any other folder. With the configuration file and <code>HEAD</code>, freely available tools download the objects one by one and rebuild the whole repository: all the code, its history, and every secret anyone ever committed by mistake. <strong>Fix:</strong> deploy release files, not the repository; and deny hidden files and folders in the server configuration (the rehearsal's Apache configuration has a rule for it). On your machine, leave it: it is your development site.</p>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Launch Day, Rehearsed</h2>
+                <p>Seven steps: build release 1 and the launch database on your machine, set up the rehearsal server, launch, check the production settings, prove a backup, and deploy a first update. Allow about 85 minutes. Two terminals help: one in your development project (<code>pagesco-dev</code>, from Lesson 1.2) and one in the rehearsal server's folder (<code>pagesco-live</code>, from Step 3). The <code>wp</code> shortcut of Lesson 1.2 works in both, and always means the site whose folder you are in. Commands for the rehearsal site start with a comment line that says so; their output cards were recorded on the rehearsal site with the files from this lesson.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: Commit, tag and build release 1 <span class="step-time">(15 min)</span></h3>
+                    <p>Commit what you staged in "The Shop's Code in Git" and tag it, then make the clean copy: the plugin's committed files into <code>wordpress/release/pagesco-books</code>, the theme straight into a ZIP, the must-use plugin as a file. In <code>wordpress/wp-content</code>:</p>
+                    <pre data-node="wp-content"><code class="language-bash">git commit -q -m "Pages &amp; Co. release 1: theme 1.1.0, Pages &amp; Co. Books 1.1.0, site plugin 1.2.0"
+git tag -a release-1 -m "First launch"
+mkdir -p ../release
+git archive --format=tar --prefix=pagesco-books/ release-1:plugins/pagesco-books | tar -x -C ../release
+git archive --format=zip --prefix=pagesco/ -o ../release/pagesco.zip release-1:themes/pagesco
+git show release-1:mu-plugins/pagesco-site.php &gt; ../release/pagesco-site.php
+git tag -n
+ls ../release ../release/pagesco-books</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>release-1       First launch
+../release:
+pagesco-books
+pagesco-site.php
+pagesco.zip
+
+../release/pagesco-books:
+assets
+composer.json
+composer.lock
+languages
+package-lock.json
+package.json
+pagesco-books.php
+phpcs.xml.dist
+phpunit.xml.dist
+readme.txt
+src
+tests
+uninstall.php</code></pre>
+                    </div>
+                    <p><code>release-1:plugins/pagesco-books</code> means "that folder, as it was in the tagged commit", so whatever you change later cannot leak into this release. The copy has the sources, the lock files and the tests, and no <code>vendor/</code>, <code>node_modules/</code> or <code>build/</code>. (<code>wordpress/release</code> is inside your development site's web root, which only your machine can reach; it exists only while you build, and you delete it at the end of Step 3.) Now the production dependencies, with the Composer shortcut of Lesson 8.1, in <code>wordpress/release/pagesco-books</code>:</p>
+                    <pre data-composer="release/pagesco-books"><code class="language-bash">composer install --no-dev --optimize-autoloader
+ls vendor vendor/composer</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Composer could not detect the root package (pagesco/pagesco-books) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version
+Installing dependencies from lock file
+Verifying lock file contents can be installed on current platform.
+...
+Nothing to install, update or remove
+Generating optimized autoload files
+vendor:
+autoload.php
+composer
+
+vendor/composer:
+ClassLoader.php
+InstalledVersions.php
+LICENSE
+autoload_classmap.php
+autoload_namespaces.php
+autoload_psr4.php
+autoload_real.php
+autoload_static.php
+installed.json
+installed.php
+platform_check.php</code></pre>
+                    </div>
+                    <p>"Nothing to install": the plugin has no production dependencies, only development ones, and none of them came. <code>autoload_files.php</code> is gone. Then the blocks and the ZIP, in the same folder (<code>npm ci</code> downloads the packages of <code>package-lock.json</code>, about a minute the first time):</p>
+                    <pre data-node="release/pagesco-books"><code class="language-bash">npm ci --silent
+npm run build &gt; /dev/null
+npm run plugin-zip &gt; /dev/null
+ls build/blocks pagesco-books.zip</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>pagesco-books.zip
+
+build/blocks:
+blocks-manifest.php
+book-card
+book-filter
+book-list</code></pre>
+                    </div>
+                    <p>Keep the ZIP, throw the build folder away, and check what ships, from the WP-CLI container: the file counts of both ZIPs, and the plugin's autoloader loading a class with nothing else around it (the test that failed in Lesson 8.3):</p>
+                    <pre data-cli><code class="language-bash">mv release/pagesco-books/pagesco-books.zip release/
+rm -r release/pagesco-books
+unzip -l release/pagesco-books.zip | tail -1
+unzip -l release/pagesco.zip | tail -1
+unzip -q release/pagesco-books.zip -d /tmp/check
+php -r 'require "/tmp/check/pagesco-books/vendor/autoload.php"; var_dump( class_exists( "PagesCo\Books\Plugin" ) );'
+rm -r /tmp/check</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>   182185                     72 files
+   401658                     33 files
+bool(true)</code></pre>
+                    </div>
+                    <p>The plugin ZIP has the same 72 files as Lesson 8.3's, but is about 100 KB smaller: its <code>vendor/composer</code> no longer lists 34 development packages. And its autoloader works on its own.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: The launch database <span class="step-time">(5 min)</span></h3>
+                    <p>One command writes the database with the new address into a file, and changes nothing on your site. From the WP-CLI container:</p>
+                    <pre data-cli><code class="language-bash">wp search-replace 'http://localhost:8080' 'http://localhost:8081' --all-tables-with-prefix --skip-columns=guid --report-changed-only --export=release/pagesco-live.sql
+wp option get home
+grep -c '^CREATE TABLE' release/pagesco-live.sql
+grep -o 'http://localhost:808[01]' release/pagesco-live.sql | sort | uniq -c</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>+------------+--------------+--------------+------+
+| Table      | Column       | Replacements | Type |
++------------+--------------+--------------+------+
+| wp_options | option_value | 2            | PHP  |
+| wp_posts   | post_content | 6            | PHP  |
+| wp_users   | user_url     | 1            | PHP  |
++------------+--------------+--------------+------+
+Success: Made 9 replacements and exported to release/pagesco-live.sql.
+http://localhost:8080
+13
+     34 http://localhost:8080
+     15 http://localhost:8081</code></pre>
+                    </div>
+                    <p>Your site still says <code>http://localhost:8080</code>. The file has thirteen tables, the events table included, fifteen new addresses, and the old address only in the 34 GUIDs (your numbers may be a few higher if you edited pages in the editor). For the real shop, the second address would be <code>https://www.pagesco.example</code>.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: Set up the rehearsal server <span class="step-time">(15 min)</span></h3>
+                    <p>Download <a href="downloads/pagesco-live.zip">pagesco-live.zip</a> into your home folder (next to <code>pagesco-dev</code>) and unpack it. In a terminal on your computer:</p>
+                    <pre data-norun><code class="language-bash">cd ~
+curl -LO https://rays-php-wordpress.netlify.app/downloads/pagesco-live.zip
+unzip pagesco-live.zip
+cd pagesco-live
+cp .env.example .env
+mkdir wordpress deploy backups</code></pre>
+                    <p>What is in the folder:</p>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr><th>File</th><th>What it is</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><code>compose.yaml</code></td><td>project <code>pagesco-live</code>: <code>db</code> (MySQL 9.7, database <code>pagesco</code>), <code>wordpress</code> (port 8081, the production settings in <code>WORDPRESS_CONFIG_EXTRA</code>, no <code>WORDPRESS_DEBUG</code>), <code>wpcli</code> (with <code>deploy/</code> as <code>/deploy</code> and <code>backups/</code> as <code>/backups</code>), <code>cron</code> (runs due events every minute)</td></tr>
+                                <tr><td><code>.env.example</code></td><td>the secrets the site needs, as placeholders; your copy, <code>.env</code>, is the server's private configuration</td></tr>
+                                <tr><td><code>config/create-app-user.sh</code></td><td>runs once when the database is created: the account <code>pagesco_app</code> with rights on <code>pagesco</code> only</td></tr>
+                                <tr><td><code>config/apache-8081.conf</code></td><td>port 8081, <code>ServerTokens Prod</code>, and rules that refuse hidden files and folders, <code>.sql</code> and <code>.log</code> files</td></tr>
+                                <tr><td><code>config/php-production.ini</code></td><td><code>expose_php = Off</code> (the image already hides errors from visitors)</td></tr>
+                                <tr><td><code>config/compose.linux.yaml</code> and the WP-CLI image files</td><td>the same as in <code>pagesco-dev</code> (Lesson 1.2)</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p>Open <code>.env</code> in your editor and replace the two passwords with long random ones (a password manager generates them); leave the supplier's address, and put any text as its key. <code>deploy/</code> is the server's upload folder (in real life you would copy files there with SFTP or <code>rsync</code>), <code>backups/</code> its backup folder, both outside the web root. On Linux and WSL, add the same two lines as in Lesson 1.2, then start it:</p>
+                    <pre data-norun><code class="language-bash">printf 'PAGESCO_UID=%s\nPAGESCO_GID=%s\n' "$(id -u)" "$(id -g)" &gt;&gt; .env
+cp config/compose.linux.yaml compose.override.yaml</code></pre>
+                    <pre data-norun><code class="language-bash">docker compose up -d</code></pre>
+                    <div class="card card-output">
+                        <h4>Output (recorded; your first start also downloads and builds images)</h4>
+                        <pre><code> Image pagesco-wpcli:php8.5 Building
+...
+ Image pagesco-wpcli:php8.5 Built
+ Network pagesco-live_default Creating
+ Network pagesco-live_default Created
+ Volume pagesco-live_db_data Creating
+ Volume pagesco-live_db_data Created
+ Container pagesco-live-db-1 Creating
+ Container pagesco-live-db-1 Created
+ Container pagesco-live-wordpress-1 Creating
+ Container pagesco-live-wordpress-1 Created
+ Container pagesco-live-cron-1 Creating
+ Container pagesco-live-cron-1 Created
+ Container pagesco-live-db-1 Starting
+ Container pagesco-live-db-1 Started
+ Container pagesco-live-db-1 Waiting
+ Container pagesco-live-db-1 Healthy
+ Container pagesco-live-wordpress-1 Starting
+ Container pagesco-live-wordpress-1 Started
+ Container pagesco-live-cron-1 Starting
+ Container pagesco-live-cron-1 Started</code></pre>
+                    </div>
+                    <p>WordPress's files are there, the database is empty, and nothing is installed: this is a server on the day before a launch. Instead of installing, you will import the shop. Upload the release, on your computer, from your home folder:</p>
+                    <pre data-norun><code class="language-bash">cp pagesco-dev/wordpress/release/* pagesco-live/deploy/
+ls pagesco-live/deploy</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>pagesco-books.zip
+pagesco-live.sql
+pagesco-site.php
+pagesco.zip</code></pre>
+                    </div>
+                    <p>The build folder has done its job; remove it from your development site (WP-CLI container, in <code>pagesco-dev</code>):</p>
+                    <pre data-cli><code class="language-bash">rm -r release</code></pre>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 4: Launch <span class="step-time">(15 min)</span></h3>
+                    <p>Code first, then the database: the imported options name the <code>pagesco</code> theme and the <code>pagesco-books</code> plugin as active, so they should already be there. Open a shell in the rehearsal site's WP-CLI container and unpack the release (WordPress is not installed yet, so <code>unzip</code> rather than <code>wp plugin install</code>):</p>
+                    <pre data-norun><code class="language-bash"># rehearsal site: in pagesco-live
+docker compose run --rm wpcli sh</code></pre>
+                    <pre data-norun><code class="language-bash"># rehearsal site: in its WP-CLI container
+unzip -q /deploy/pagesco.zip -d wp-content/themes
+unzip -q /deploy/pagesco-books.zip -d wp-content/plugins
+mkdir -p wp-content/mu-plugins
+cp /deploy/pagesco-site.php wp-content/mu-plugins/
+wp db import /deploy/pagesco-live.sql</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Success: Imported from '/deploy/pagesco-live.sql'.</code></pre>
+                    </div>
+                    <p>The shop is live. Check it like a visitor and like its administrator:</p>
+                    <pre data-norun><code class="language-bash"># rehearsal site: in its WP-CLI container
+wp option get home
+wp theme list --status=active --fields=name,version
+wp plugin list --fields=name,status,version
+curl -s http://localhost:8081/ | grep -o '&lt;a class="wp-block-navigation-item__content" *href="[^"]*"'
+wp db query "SELECT COUNT(*) AS events FROM wp_pagesco_events"</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>http://localhost:8081
++---------+---------+
+| name    | version |
++---------+---------+
+| pagesco | 1.1.0   |
++---------+---------+
++---------------+----------+---------+
+| name          | status   | version |
++---------------+----------+---------+
+| akismet       | inactive | 5.7.2   |
+| hello         | inactive | 1.7.2   |
+| pagesco-books | active   | 1.1.0   |
+| pagesco-site  | must-use | 1.2.0   |
++---------------+----------+---------+
+&lt;a class="wp-block-navigation-item__content"  href="http://localhost:8081/about/"
+&lt;a class="wp-block-navigation-item__content"  href="http://localhost:8081/contact/"
+&lt;a class="wp-block-navigation-item__content"  href="http://localhost:8081/events/"
+&lt;a class="wp-block-navigation-item__content"  href="http://localhost:8081/find-a-book/"
+events
+7</code></pre>
+                    </div>
+                    <p>The new address, theme 1.1.0, plugin 1.1.0 active, and one must-use plugin, <code>pagesco-site</code>: <code>mailpit-smtp</code> stayed on your machine, as the <code>.gitignore</code> promised. The navigation links point to port 8081 (the search-replace fixed the addresses Lesson 8.3 left in the navigation), and the events table came along with its seven events (the Events page shows the next five, Lesson 5.4's "Events to show"). Now the launch-day tasks that come with importing a development database. It brought along the passwords <code>password</code>, <code>maria-pass</code> and <code>devon-pass</code>, Maria's application password from Lesson 7.1, cached supplier numbers from the sandbox, and WordPress's sample content:</p>
+                    <pre data-norun><code class="language-bash"># rehearsal site: in its WP-CLI container
+wp user reset-password admin maria devon --skip-email --show-password
+wp user application-password delete maria --all
+wp transient delete --all
+wp post delete 1 2 --force
+wp plugin delete akismet hello
+wp theme delete twentytwentythree twentytwentyfour</code></pre>
+                    <div class="card card-output">
+                        <h4>Output (your passwords will differ)</h4>
+                        <pre><code>Reset password for admin.
+Password: 4Zpd(Zbyl3*P@LS3d@lk^w0^
+Reset password for maria.
+Password: jh@XhNgavQVNted*dcZ22ine
+Reset password for devon.
+Password: I#3CzKYQuLy!$PKH16WqAmpf
+Success: Passwords reset for 3 users.
+Success: Deleted all application passwords.
+Success: 4 transients deleted from the database.
+Success: Deleted post 1.
+Success: Deleted post 2.
+Deleted 'akismet' plugin.
+Deleted 'hello' plugin.
+Success: Deleted 2 of 2 plugins.
+Deleted 'twentytwentythree' theme.
+Deleted 'twentytwentyfour' theme.
+Success: Deleted 2 of 2 themes.</code></pre>
+                    </div>
+                    <p>New random passwords for all three accounts, shown once (put yours in a password manager, and log in at <code>http://localhost:8081/wp-admin/</code> with the new admin password to see the live dashboard). Without <code>--skip-email</code>, WordPress would email each user; the rehearsal site has no mail server, which a real one needs for password resets and notifications (an SMTP plugin with the host's mail settings, the passwords in the server's configuration). Hello world! and the Sample Page are gone, and so are two plugins and two themes the shop never used; Twenty Twenty-Five stays as a fallback theme.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 5: Check the production settings <span class="step-time">(10 min)</span></h3>
+                    <p>Each line of the configuration, verified on the running site:</p>
+                    <pre data-norun><code class="language-bash"># rehearsal site: in its WP-CLI container
+wp eval 'printf( "debug %s, environment %s, development mode \"%s\", file editor %s, application passwords %s\n", var_export( WP_DEBUG, true ), wp_get_environment_type(), wp_get_development_mode(), current_user_can( "edit_plugins" ) ? "on" : "off", wp_is_application_passwords_available() ? "available" : "not available" );' --user=admin
+wp cron test
+wp db query "SHOW GRANTS"
+wp db query "CREATE DATABASE test"</code></pre>
+                    <div class="card card-output">
+                        <h4>Error</h4>
+                        <pre><code>debug false, environment production, development mode "", file editor off, application passwords not available
+Error: The DISABLE_WP_CRON constant is set to true. WP-Cron spawning is disabled.
+Grants for pagesco_app@%
+GRANT USAGE ON *.* TO `pagesco_app`@`%`
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER ON `pagesco`.* TO `pagesco_app`@`%`
+
+Error: Query failed: --------------
+CREATE DATABASE test
+--------------
+
+ERROR 1044 (42000) at line 1: Access denied for user 'pagesco_app'@'%' to database 'test'</code></pre>
+                    </div>
+                    <p>Debugging off, production, no development mode, no file editor even for the administrator, and no application passwords: WordPress allows them on a production site only over HTTPS, so Maria's inventory script gets a new one on the real, HTTPS site. WP-Cron's own spawning is off, and the database account can work in <code>pagesco</code> and nowhere else. Now prove that the scheduler took over: ask for one extra run of the nightly job, right now (a single event next to the daily one), wait a minute, and read the scheduler's log on your computer, in <code>pagesco-live</code>:</p>
+                    <pre data-norun><code class="language-bash"># rehearsal site: in its WP-CLI container
+wp cron event schedule pagesco_books_daily_sync now</code></pre>
+                    <div class="card card-output">
+                        <h4>Output (your time will differ)</h4>
+                        <pre><code>Success: Scheduled event with hook 'pagesco_books_daily_sync' for 2026-10-26 06:55:38 GMT.</code></pre>
+                    </div>
+                    <pre data-norun><code class="language-bash">docker compose logs cron | tail -3</code></pre>
+                    <div class="card card-output">
+                        <h4>Output (recorded; your times and counts will differ)</h4>
+                        <pre><code>cron-1  | Success: Executed a total of 0 cron events.
+cron-1  | Executed the cron event 'pagesco_books_daily_sync' in 0.04s.
+cron-1  | Success: Executed a total of 1 cron event.</code></pre>
+                    </div>
+                    <p>Every minute the scheduler runs whatever is due, usually nothing; this time the sync, which asked the (unreachable) supplier and found no past events to delete. The daily event is still scheduled for 03:00. And what visitors and their tools see (back in the WP-CLI container; a copy of the launch dump plays the forgotten backup of Common Mistake 1):</p>
+                    <pre data-norun><code class="language-bash"># rehearsal site: in its WP-CLI container
+curl -sI http://localhost:8081/ | grep -i -e '^server:' -e '^x-powered-by:'
+cp /deploy/pagesco-live.sql forgotten.sql
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8081/forgotten.sql
+rm forgotten.sql
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8081/supplier-sandbox/v1/availability</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Server: Apache
+403
+404</code></pre>
+                    </div>
+                    <p>"Apache" without a version and no <code>X-Powered-By</code> line; the forgotten dump is refused with 403, where your development site served it with 200; and the supplier sandbox does not exist here (404 is WordPress's own "not found" page). The live supplier is configured from <code>.env</code>, and its fictional address cannot be reached, so the Books screen's Supplier column says "Supplier not reachable" here: the bad-day handling of Lesson 7.3, working as designed.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 6: A backup, proven by a restore <span class="step-time">(10 min)</span></h3>
+                    <p>The first backup, into <code>/backups</code>, outside the web root. A variable keeps the dated file name for the rest of this shell session:</p>
+                    <pre data-norun><code class="language-bash"># rehearsal site: in its WP-CLI container
+BACKUP=/backups/pagesco-$(date +%Y%m%d-%H%M).sql
+wp db export "$BACKUP"
+ls -l /backups</code></pre>
+                    <div class="card card-output">
+                        <h4>Error (your file name will differ)</h4>
+                        <pre><code>mariadb-dump: Got error: 1044: "Access denied for user 'pagesco_app'@'%' to database 'pagesco'" when using LOCK TABLES
+total 4
+-rw-r--r--    1 1000     1000           831 Oct 26 06:54 pagesco-20261026-0654.sql</code></pre>
+                    </div>
+                    <p>Least privilege, measured: <code>wp db export</code> runs <code>mariadb-dump</code>, which locks each table while it reads it, and the account may not lock tables. Look at the folder, too: the failed export left a file with the backup's name and a few hundred bytes of header in it. A file in the backup folder is not a backup; its size and a restore test are what count. Restoring a dump needs the same right, because the dump contains <code>LOCK TABLES</code> statements. Grant exactly that, as the database's administrator, <code>root</code>, whose password is in your <code>.env</code> (in a second terminal, in <code>pagesco-live</code>; type the password when asked):</p>
+                    <pre data-norun><code class="language-bash">docker compose exec db mysql -uroot -p -e "GRANT LOCK TABLES ON pagesco.* TO 'pagesco_app'@'%';"</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Enter password:</code></pre>
+                    </div>
+                    <p>(To make it permanent for a new database, add <code>LOCK TABLES</code> to the <code>GRANT</code> line in <code>config/create-app-user.sh</code>.) Back in the WP-CLI container, the backup, and then the accident it is for: an editor deletes Dune for good.</p>
+                    <pre data-norun><code class="language-bash"># rehearsal site: in its WP-CLI container
+wp db export "$BACKUP"
+ls -l /backups
+wp post delete $(wp post list --post_type=book --name=dune --field=ID) --force
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8081/books/dune/</code></pre>
+                    <div class="card card-output">
+                        <h4>Output (your file name will differ)</h4>
+                        <pre><code>Success: Exported to '/backups/pagesco-20261026-0651.sql'.
+total 112
+-rw-r--r--    1 1000     1000        111190 Oct 26 06:51 pagesco-20261026-0651.sql
+Success: Deleted post 30.
+404</code></pre>
+                    </div>
+                    <p>Dune's page is gone (404). The restore:</p>
+                    <pre data-norun><code class="language-bash"># rehearsal site: in its WP-CLI container
+wp db import "$BACKUP"
+wp cache flush
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8081/books/dune/
+wp post list --post_type=book --format=count; echo</code></pre>
+                    <div class="card card-output">
+                        <h4>Output (your file name will differ)</h4>
+                        <pre><code>Success: Imported from '/backups/pagesco-20261026-0651.sql'.
+Success: The cache was flushed.
+200
+11</code></pre>
+                    </div>
+                    <p>Dune is back, with all eleven books. (<code>wp cache flush</code> empties the object cache, which on a host with Redis or Memcached would still remember the deleted book.) Read the import's output every time, not just its last line: in a first try of this lesson with an account that could not lock tables, <code>wp db import</code> printed thirteen "Access denied" errors and still ended with "Success". On a real server, copy the backup somewhere else right away, and let the host's scheduler (or the rehearsal's <code>cron</code> pattern) run the export every night; Exercise 2 writes the script. The shop has no uploads yet; once it has, the backup gets a second line: <code>tar -czf /backups/uploads-….tar.gz -C wp-content uploads</code>.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 7: The first update: release 2 <span class="step-time">(15 min)</span></h3>
+                    <p>Plugin 1.1.1 adds two production safeguards from this lesson. The supplier's API key travels in a header with every request (Lesson 7.3), so outside local development the plugin refuses an address that does not start with <code>https://</code>. And both the plugin and the theme get <code>Update URI: false</code>. Back in <code>pagesco-dev</code>. Replace <code>src/Supplier/Client.php</code> (new: the check in <code>url()</code>, and its line in the class comment):</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/Supplier/Client.php"><code class="language-php">&lt;?php
+/**
+ * The supplier's API (Riverside Books), over HTTP.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books\Supplier;
+
+use WP_Error;
+
+/**
+ * Asks the supplier what it has, and places orders. Every method returns data or a WP_Error, never both.
+ *
+ * The address and the API key come from wp-config.php: PAGESCO_BOOKS_SUPPLIER_URL and PAGESCO_BOOKS_SUPPLIER_KEY.
+ * Outside a local development site, the address must use HTTPS, because the key is sent with every request.
+ */
+final class Client {
+
+	/**
+	 * Seconds to wait for the supplier before giving up.
+	 */
+	private const TIMEOUT = 5;
+
+	/**
+	 * GET /availability: copies at the supplier and the next delivery date, keyed by ISBN.
+	 *
+	 * @param string[] $isbns ISBN-13s without dashes.
+	 * @return array&lt;string, array{available: int, next_delivery: string}&gt;|WP_Error
+	 */
+	public function availability( array $isbns ) {
+		$url = $this-&gt;url( 'availability' );
+		if ( is_wp_error( $url ) ) {
+			return $url;
+		}
+
+		$response = wp_remote_get(
+			add_query_arg( 'isbns', rawurlencode( implode( ',', $isbns ) ), $url ),
+			array(
+				'timeout' =&gt; self::TIMEOUT,
+				'headers' =&gt; $this-&gt;headers(),
+			)
+		);
+
+		$data = $this-&gt;decode( $response );
+		if ( is_wp_error( $data ) ) {
+			return $data;
+		}
+		if ( ! isset( $data['items'] ) || ! is_array( $data['items'] ) ) {
+			return new WP_Error( 'pagesco_supplier_bad_response', __( 'The supplier answered without a list of items.', 'pagesco-books' ) );
+		}
+
+		$availability = array();
+		foreach ( $data['items'] as $item ) {
+			$availability[ (string) ( $item['isbn'] ?? '' ) ] = array(
+				'available'     =&gt; (int) ( $item['available'] ?? 0 ),
+				'next_delivery' =&gt; (string) ( $item['next_delivery'] ?? '' ),
+			);
+		}
+
+		return $availability;
+	}
+
+	/**
+	 * POST /orders: orders copies of a book. Returns the supplier's order confirmation.
+	 *
+	 * @param string $isbn     ISBN-13 without dashes.
+	 * @param int    $quantity How many copies.
+	 * @return array|WP_Error
+	 */
+	public function order( string $isbn, int $quantity ) {
+		$url = $this-&gt;url( 'orders' );
+		if ( is_wp_error( $url ) ) {
+			return $url;
+		}
+
+		$response = wp_remote_post(
+			$url,
+			array(
+				'timeout' =&gt; self::TIMEOUT,
+				'headers' =&gt; $this-&gt;headers() + array( 'Content-Type' =&gt; 'application/json' ),
+				'body'    =&gt; wp_json_encode(
+					array(
+						'isbn'     =&gt; $isbn,
+						'quantity' =&gt; $quantity,
+					)
+				),
+			)
+		);
+
+		return $this-&gt;decode( $response );
+	}
+
+	/**
+	 * The full address of one of the supplier's endpoints, from the URL in wp-config.php.
+	 *
+	 * @param string $endpoint The endpoint's path, such as availability.
+	 * @return string|WP_Error
+	 */
+	private function url( string $endpoint ) {
+		if ( ! defined( 'PAGESCO_BOOKS_SUPPLIER_URL' ) || ! defined( 'PAGESCO_BOOKS_SUPPLIER_KEY' ) ) {
+			return new WP_Error( 'pagesco_supplier_not_configured', __( 'The supplier is not configured in wp-config.php.', 'pagesco-books' ) );
+		}
+
+		// The API key goes with every request: only over HTTPS, except on a local development site (Lesson 8.4).
+		if ( 'https' !== wp_parse_url( PAGESCO_BOOKS_SUPPLIER_URL, PHP_URL_SCHEME ) &amp;&amp; 'local' !== wp_get_environment_type() ) {
+			return new WP_Error( 'pagesco_supplier_insecure', __( 'The supplier address must start with https:// on this site.', 'pagesco-books' ) );
+		}
+
+		return trailingslashit( PAGESCO_BOOKS_SUPPLIER_URL ) . $endpoint;
+	}
+
+	/**
+	 * The headers every request sends: what we accept, and who we are.
+	 */
+	private function headers(): array {
+		return array(
+			'Accept'    =&gt; 'application/json',
+			'X-Api-Key' =&gt; PAGESCO_BOOKS_SUPPLIER_KEY,
+		);
+	}
+
+	/**
+	 * Turns an HTTP response into data, or into a WP_Error for each way it can go wrong.
+	 *
+	 * @param array|WP_Error $response What wp_remote_get() or wp_remote_post() returned.
+	 * @return array|WP_Error
+	 */
+	private function decode( $response ) {
+		// 1. No answer at all: DNS, connection refused, timeout.
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+		$data = json_decode( wp_remote_retrieve_body( $response ), true );
+
+		// 2. An answer, but not a success: 401, 404, 422, 503...
+		if ( $code &lt; 200 || $code &gt; 299 ) {
+			return new WP_Error(
+				'pagesco_supplier_http_error',
+				sprintf(
+					/* translators: 1: HTTP status code, 2: the supplier's message. */
+					__( 'The supplier answered %1$d: %2$s', 'pagesco-books' ),
+					$code,
+					is_array( $data ) &amp;&amp; isset( $data['message'] ) ? $data['message'] : wp_remote_retrieve_response_message( $response )
+				),
+				array(
+					'status'      =&gt; $code,
+					'retry_after' =&gt; wp_remote_retrieve_header( $response, 'retry-after' ),
+				)
+			);
+		}
+
+		// 3. A success that is not the JSON we expect.
+		if ( ! is_array( $data ) ) {
+			return new WP_Error( 'pagesco_supplier_bad_response', __( 'The supplier\'s answer is not JSON.', 'pagesco-books' ) );
+		}
+
+		return $data;
+	}
+}</code></pre>
+                    <p>The plugin's header: version 1.1.1 in the header and the constant, and <code>Update URI: false</code>. Replace <code>pagesco-books.php</code>:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/pagesco-books.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name:       Pages &amp; Co. Books
+ * Description:       The bookstore features of the Pages &amp; Co. website: books, genres, events and the shop's blocks.
+ * Version:           1.1.1
+ * Requires at least: 6.9
+ * Requires PHP:      8.2
+ * Author:            Pages &amp; Co.
+ * License:           GPL-2.0-or-later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain:       pagesco-books
+ * Domain Path:       /languages
+ * Update URI:        false
+ *
+ * @package PagesCo\Books
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+define( 'PAGESCO_BOOKS_VERSION', '1.1.1' );
+define( 'PAGESCO_BOOKS_FILE', __FILE__ );
+define( 'PAGESCO_BOOKS_DIR', plugin_dir_path( __FILE__ ) );
+
+require PAGESCO_BOOKS_DIR . 'vendor/autoload.php';
+
+add_action( 'plugins_loaded', array( PagesCo\Books\Plugin::instance(), 'boot' ) );
+
+register_activation_hook( __FILE__, array( PagesCo\Books\Activator::class, 'activate' ) );
+register_deactivation_hook( __FILE__, array( PagesCo\Books\Activator::class, 'deactivate' ) );</code></pre>
+                    <p>The theme's header: version 1.1.1, <code>Update URI: false</code>. Replace <code>wordpress/wp-content/themes/pagesco/style.css</code>:</p>
+                    <pre data-file="wp-content/themes/pagesco/style.css"><code class="language-css">/*
+Theme Name: Pages &amp; Co.
+Theme URI: https://example.com/pagesco/
+Author: Pages &amp; Co.
+Author URI: https://example.com/
+Description: The block theme of the Pages &amp; Co. independent bookstore.
+Requires at least: 6.6
+Tested up to: 7.1
+Requires PHP: 7.4
+Version: 1.1.1
+License: GNU General Public License v2 or later
+License URI: http://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: pagesco
+Update URI: false
+*/</code></pre>
+                    <p>The other places a version lives (Lesson 8.3): <code>readme.txt</code>'s Stable tag and changelog, and <code>package.json</code>. In your editor; here with <code>sed</code>, from the WP-CLI container, followed by the new POT (the new error message is a new string; the Spanish files stay as they are, so it shows in English until a translator adds it) and the check that WordPress reads both headers:</p>
+                    <pre data-cli><code class="language-bash">cd wp-content/plugins/pagesco-books
+sed -i 's/^Stable tag: 1.1.0$/Stable tag: 1.1.1/; s/^== Changelog ==$/&amp;\n\n= 1.1.1 =\n* Security: the supplier'"'"'s API key is sent only over HTTPS, except on a local development site.\n* Changed: an Update URI header, so that WordPress.org never offers an update for this private plugin./' readme.txt
+sed -i 's/"version": "1.1.0"/"version": "1.1.1"/' package.json
+grep -A4 '^== Changelog' readme.txt
+wp i18n make-pot . languages/pagesco-books.pot --exclude=src/blocks,tests
+grep 'must start with https' languages/pagesco-books.pot
+wp eval 'var_dump( get_plugin_data( WP_PLUGIN_DIR . "/pagesco-books/pagesco-books.php" )["UpdateURI"], wp_get_theme( "pagesco" )-&gt;get( "UpdateURI" ) );'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>== Changelog ==
+
+= 1.1.1 =
+* Security: the supplier's API key is sent only over HTTPS, except on a local development site.
+* Changed: an Update URI header, so that WordPress.org never offers an update for this private plugin.
+Plugin file detected.
+Success: POT file successfully generated.
+msgid "The supplier address must start with https:// on this site."
+string(5) "false"
+string(5) "false"</code></pre>
+                    </div>
+                    <p>Lesson 8.1's rule for new code, in the plugin's folder:</p>
+                    <pre data-composer="wp-content/plugins/pagesco-books"><code class="language-bash">composer lint; echo "exit status $?"</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>...
+exit status 0</code></pre>
+                    </div>
+                    <p>(Composer's note about the root package's version is gone: in a Git repository, Composer reads the version from Git.) Commit, tag, and build release 2 exactly like release 1 (in <code>wordpress/wp-content</code>, then the plugin copy, then the WP-CLI container):</p>
+                    <pre data-node="wp-content"><code class="language-bash">git add -A
+git commit -q -m "Pages &amp; Co. Books 1.1.1 and theme 1.1.1: HTTPS for the supplier, Update URI"
+git tag -a release-2 -m "Plugin 1.1.1, theme 1.1.1"
+mkdir -p ../release
+git archive --format=tar --prefix=pagesco-books/ release-2:plugins/pagesco-books | tar -x -C ../release
+git archive --format=zip --prefix=pagesco/ -o ../release/pagesco.zip release-2:themes/pagesco
+git diff --stat release-1 release-2</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code> plugins/pagesco-books/languages/pagesco-books.pot | 16 ++++++++++------
+ plugins/pagesco-books/package.json                |  2 +-
+ plugins/pagesco-books/pagesco-books.php           |  5 +++--
+ plugins/pagesco-books/readme.txt                  |  6 +++++-
+ plugins/pagesco-books/src/Supplier/Client.php     |  6 ++++++
+ themes/pagesco/style.css                          |  3 ++-
+ 6 files changed, 27 insertions(+), 11 deletions(-)</code></pre>
+                    </div>
+                    <pre data-composer="release/pagesco-books"><code class="language-bash">composer install --no-dev --optimize-autoloader</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Composer could not detect the root package (pagesco/pagesco-books) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version
+Installing dependencies from lock file
+Verifying lock file contents can be installed on current platform.
+...
+Nothing to install, update or remove
+Generating optimized autoload files</code></pre>
+                    </div>
+                    <pre data-node="release/pagesco-books"><code class="language-bash">npm ci --silent
+npm run build &gt; /dev/null
+npm run plugin-zip &gt; /dev/null</code></pre>
+                    <pre data-cli><code class="language-bash">mv release/pagesco-books/pagesco-books.zip release/
+rm -r release/pagesco-books
+ls release</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>pagesco-books.zip  pagesco.zip</code></pre>
+                    </div>
+                    <p>The <code>git diff --stat</code> is the release's real content: six files, one of them the regenerated POT. A later deploy is code only: <strong>no database import</strong>, because from launch day on, the live database is the original. Upload the two ZIPs (on your computer, from your home folder), and install them over the old versions on the rehearsal site, with WP-CLI this time, since WordPress is installed now:</p>
+                    <pre data-norun><code class="language-bash">cp pagesco-dev/wordpress/release/*.zip pagesco-live/deploy/</code></pre>
+                    <pre data-norun><code class="language-bash"># rehearsal site: in its WP-CLI container
+wp plugin install /deploy/pagesco-books.zip --force
+wp theme install /deploy/pagesco.zip --force
+wp plugin list --name=pagesco-books --fields=name,status,version
+wp theme list --name=pagesco --fields=name,status,version</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Unpacking the package...
+Installing the plugin...
+Removing the old version of the plugin...
+Plugin updated successfully.
+Success: Installed 1 of 1 plugins.
+Unpacking the package...
+Installing the theme...
+Removing the old version of the theme...
+Theme updated successfully.
+Success: Installed 1 of 1 themes.
++---------------+--------+---------+
+| name          | status | version |
++---------------+--------+---------+
+| pagesco-books | active | 1.1.1   |
++---------------+--------+---------+
++---------+--------+---------+
+| name    | status | version |
++---------+--------+---------+
+| pagesco | active | 1.1.1   |
++---------+--------+---------+</code></pre>
+                    </div>
+                    <p><code>--force</code> replaces the folders and keeps the plugin active; note that activation does not run on an update (Lesson 8.2's note about upgrade routines), which is why <code>EventsTable</code> checks its own version on every request. Does the new rule work? <code>docker compose run</code> can set an environment variable for one command, so give the rehearsal site a plain-HTTP supplier address for a moment, on your computer, in <code>pagesco-live</code>:</p>
+                    <pre data-norun><code class="language-bash">docker compose run --rm -e PAGESCO_BOOKS_SUPPLIER_URL=http://api.riverside.example/v1/ wpcli wp eval '$answer = ( new PagesCo\Books\Supplier\Client() )-&gt;availability( array( "9780441172719" ) ); echo $answer-&gt;get_error_code(), ": ", $answer-&gt;get_error_message(), "\n";'
+docker compose run --rm wpcli wp eval '$answer = ( new PagesCo\Books\Supplier\Client() )-&gt;availability( array( "9780441172719" ) ); echo $answer-&gt;get_error_code(), ": ", $answer-&gt;get_error_message(), "\n";'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>pagesco_supplier_insecure: The supplier address must start with https:// on this site.
+http_request_failed: cURL error 6: Could not resolve host: api.riverside.example (Domain name not found)</code></pre>
+                    </div>
+                    <p>With <code>http://</code>, the plugin refuses before anything leaves the server; with the configured <code>https://</code> address it tries, and fails only because the fictional distributor does not exist. On your development site, a <code>local</code> one, the sandbox keeps working over HTTP. Last, clean up the build folder and look at the history (WP-CLI container, then <code>wordpress/wp-content</code>):</p>
+                    <pre data-cli><code class="language-bash">rm -r release</code></pre>
+                    <pre data-node="wp-content" data-checkpoint><code class="language-bash">git status --short | wc -l
+git log --format=%s
+git tag -n</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>0
+Pages &amp; Co. Books 1.1.1 and theme 1.1.1: HTTPS for the supplier, Update URI
+Pages &amp; Co. release 1: theme 1.1.0, Pages &amp; Co. Books 1.1.0, site plugin 1.2.0
+release-1       First launch
+release-2       Plugin 1.1.1, theme 1.1.1</code></pre>
+                    </div>
+                    <p>A clean working copy, two commits, two tags: exactly what is on the live site, and how it got there. In <code>pagesco-plan.txt</code>, under a new heading "Deployment", note: "Git repo in wp-content (.gitignore: own code only). Release = tag + git archive + composer install --no-dev -o + npm ci/build/plugin-zip + theme git archive zip. Launch: code first, then wp search-replace --all-tables-with-prefix --skip-columns=guid --export, import, reset passwords, delete app passwords and transients. Live: WP_DEBUG off, production, no dev mode, DISALLOW_FILE_EDIT, DISABLE_WP_CRON + cron, pagesco_app (+ LOCK TABLES), secrets in .env, backups in /backups + restore test. Updates: code only, bump versions."</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>wordpress/wp-content</code> is a Git repository that tracks only the theme, the plugin's sources and the site plugin, with tags <code>release-1</code> and <code>release-2</code></li>
+                        <li>You built both releases from their tags in a clean folder, and the plugin ZIP's autoloader loads on its own</li>
+                        <li>The rehearsal site at <code>http://localhost:8081</code> runs the shop from the launch database, with the new address in the navigation and all seven events</li>
+                        <li>Its settings check out: no debugging, production, no development mode, no file editor, WP-Cron replaced by the scheduler, a database account limited to <code>pagesco</code></li>
+                        <li>The development passwords and application passwords are gone from the rehearsal site, and you restored a deleted book from a backup</li>
+                        <li>The rehearsal site runs plugin 1.1.1 and theme 1.1.1, deployed without touching its database</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: The Launch Checklist as Code</h3>
+                    <p>Write <code>pagesco-launch-check.php</code>, a script for <code>wp eval-file</code> that prints <code>ok</code> or <code>CHECK</code> for each production setting of this lesson: debugging off, the environment type, no development mode, no file editor, WP-Cron's spawning off, the supplier's address on HTTPS, and no user called <code>admin</code> with the password <code>password</code>. Run it on your development site (most lines should say CHECK), then copy it into <code>pagesco-live/deploy</code> and run it there with <code>wp eval-file /deploy/pagesco-launch-check.php</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>An array of label =&gt; boolean pairs and one <code>foreach</code>. <code>defined( 'X' ) &amp;&amp; X</code> tests a constant that may be missing; <code>wp_check_password( 'password', $user-&gt;user_pass, $user-&gt;ID )</code> tests a password against its stored hash.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="pagesco-launch-check.php" data-wp><code class="language-php">&lt;?php
+/**
+ * Checks the production settings of Lesson 8.4. Usage: wp eval-file pagesco-launch-check.php
+ */
+
+$pagesco_admin = get_user_by( 'login', 'admin' );
+
+$pagesco_checks = array(
+	'debugging off'                  =&gt; ! WP_DEBUG,
+	'environment is production'      =&gt; 'production' === wp_get_environment_type(),
+	'no development mode'            =&gt; '' === wp_get_development_mode(),
+	'no file editor in wp-admin'     =&gt; defined( 'DISALLOW_FILE_EDIT' ) &amp;&amp; DISALLOW_FILE_EDIT,
+	'WP-Cron spawning off'           =&gt; defined( 'DISABLE_WP_CRON' ) &amp;&amp; DISABLE_WP_CRON,
+	'supplier over HTTPS'            =&gt; defined( 'PAGESCO_BOOKS_SUPPLIER_URL' ) &amp;&amp; str_starts_with( PAGESCO_BOOKS_SUPPLIER_URL, 'https://' ),
+	'no admin with password password' =&gt; ! $pagesco_admin || ! wp_check_password( 'password', $pagesco_admin-&gt;user_pass, $pagesco_admin-&gt;ID ),
+);
+
+foreach ( $pagesco_checks as $pagesco_label =&gt; $pagesco_ok ) {
+	printf( "%-5s %s\n", $pagesco_ok ? 'ok' : 'CHECK', $pagesco_label );
+}</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>CHECK debugging off
+CHECK environment is production
+CHECK no development mode
+CHECK no file editor in wp-admin
+CHECK WP-Cron spawning off
+CHECK supplier over HTTPS
+CHECK no admin with password password</code></pre>
+                        </div>
+                        <p>On your development site every line says CHECK, as it should: it is a development site. On the rehearsal site, after Step 4, with the script copied into <code>pagesco-live/deploy</code> (recorded):</p>
+                        <div class="card card-output">
+                            <h4>Output (recorded on the rehearsal site)</h4>
+                            <pre><code>ok    debugging off
+ok    environment is production
+ok    no development mode
+ok    no file editor in wp-admin
+ok    WP-Cron spawning off
+ok    supplier over HTTPS
+ok    no admin with password password</code></pre>
+                        </div>
+                        <p>Seven times ok. Keep the script with your deployment notes and run it before every launch, and after any change to the server's configuration. Remove the copy in your development site's folder:</p>
+                        <pre data-cli><code class="language-bash">rm pagesco-launch-check.php</code></pre>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: A Nightly Backup Script</h3>
+                    <p>Write <code>pagesco-backup.sh</code>, a shell script that takes a backup folder as its argument, exports the database into it with the date and time in the file name, compresses it with <code>gzip</code>, and deletes backups in that folder older than 14 days. Try it on your development site with <code>/tmp/pagesco-backups</code> as the folder (from the WP-CLI container), and show that the compressed file is a real dump.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>set -e</code> stops the script at the first failing command, so a failed export never looks like a backup. <code>find "$folder" -name 'pagesco-*.sql.gz' -mtime +14 -delete</code> removes old files; <code>zcat file | head</code> reads a compressed file.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="pagesco-backup.sh"><code class="language-bash">#!/bin/sh
+# Backs up the Pages &amp; Co. database. Usage: sh pagesco-backup.sh /path/to/backups
+# Run it every night from the server's scheduler, and copy the folder to another place.
+set -e
+
+folder="${1:?usage: pagesco-backup.sh FOLDER}"
+file="$folder/pagesco-$(date +%Y%m%d-%H%M).sql"
+
+mkdir -p "$folder"
+wp db export "$file" --quiet
+gzip "$file"
+find "$folder" -name 'pagesco-*.sql.gz' -mtime +14 -delete
+
+echo "Backed up to $file.gz"</code></pre>
+                        <pre data-cli><code class="language-bash">sh pagesco-backup.sh /tmp/pagesco-backups
+zcat /tmp/pagesco-backups/pagesco-*.sql.gz | grep -c '^CREATE TABLE'
+rm -r /tmp/pagesco-backups pagesco-backup.sh</code></pre>
+                        <div class="card card-output">
+                            <h4>Output (your date and time will differ)</h4>
+                            <pre><code>Backed up to /tmp/pagesco-backups/pagesco-20261026-0646.sql.gz
+13</code></pre>
+                        </div>
+                        <p>Thirteen tables, the events table included (<code>wp db export</code> dumps the whole database, unlike the search-replace export of Common Mistake 2). On a server, a crontab line such as <code>15 3 * * * cd /var/www/pagesco &amp;&amp; sh /home/pagesco/pagesco-backup.sh /home/pagesco/backups</code> runs it at 03:15, after the supplier sync; the script itself lives outside the web root.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: A Smoke Test for Every Deploy (Stretch)</h3>
+                    <p>After each deploy you want to know in seconds that the shop works. Write <code>pagesco-smoke.sh</code>, which takes the site's address and checks that the front page, a book, Find a Book, Events and the books REST route answer with status 200 and contain an expected piece of text, prints one line per check, and exits with status 1 if any check failed. Run it against your development site.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>A function <code>check PATH TEXT</code> that fetches the page once into a variable with <code>curl -s -w '\n%{http_code}'</code>, reads the status from the last line (<code>tail -n 1</code>) and searches the rest with <code>grep -q</code>. Count failures in a variable and <code>exit</code> with it at the end.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="pagesco-smoke.sh"><code class="language-bash">#!/bin/sh
+# A smoke test of the Pages &amp; Co. shop. Usage: sh pagesco-smoke.sh http://localhost:8080
+base="${1:?usage: pagesco-smoke.sh BASE-URL}"
+failed=0
+
+check() {
+	answer=$(curl -s -w '\n%{http_code}' "$base$1")
+	status=$(printf '%s' "$answer" | tail -n 1)
+	if [ "$status" = "200" ] &amp;&amp; printf '%s' "$answer" | grep -q "$2"; then
+		echo "ok      $1"
+	else
+		echo "FAILED  $1 (status $status, looked for: $2)"
+		failed=1
+	fi
+}
+
+check /                          'class="pagesco-notice"'
+check /books/dune/               'Frank Herbert'
+check /find-a-book/              'wp-block-pagesco-book-filter'
+check /events/                   'class="pagesco-event"'
+check /wp-json/pagesco/v1/books  '"title":"1984"'
+
+exit $failed</code></pre>
+                        <pre data-cli><code class="language-bash">sh pagesco-smoke.sh http://localhost:8080; echo "exit status $?"
+sh pagesco-smoke.sh http://localhost:8080/nowhere; echo "exit status $?"
+rm pagesco-smoke.sh</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>ok      /
+ok      /books/dune/
+ok      /find-a-book/
+ok      /events/
+ok      /wp-json/pagesco/v1/books
+exit status 0
+FAILED  / (status 404, looked for: class="pagesco-notice")
+FAILED  /books/dune/ (status 404, looked for: Frank Herbert)
+FAILED  /find-a-book/ (status 301, looked for: wp-block-pagesco-book-filter)
+FAILED  /events/ (status 301, looked for: class="pagesco-event")
+FAILED  /wp-json/pagesco/v1/books (status 404, looked for: "title":"1984")
+exit status 1</code></pre>
+                        </div>
+                        <p>Five checks pass on the development site, and pointing the script at a wrong base address makes every check fail, with exit status 1, which is what a deploy job needs to stop and alert someone. Run it on the rehearsal site after each deploy (copy it into <code>deploy/</code>, then <code>sh /deploy/pagesco-smoke.sh http://localhost:8081</code> in its WP-CLI container); it belongs in the maintenance checklist's first row.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> The shop has been live for a month. You fixed a bug in the plugin and released 1.1.2. What do you deploy?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Since launch day, the booksellers have added books and changed prices on the live site. What would your development database do to them?">
+                                A) The plugin ZIP and a fresh export of your development database
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Code goes up, content comes down: after the launch the live database is the original, so an update deploys only the release files built from the new tag.">
+                                B) Only the plugin ZIP built from the release tag
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="It contains WordPress core, wp-config.php with the development settings, and the supplier sandbox. Which part changed?">
+                                C) Your whole wordpress folder, copied over the live one
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> You exported the launch database with <code>wp search-replace … --export=launch.sql</code>, without <code>--all-tables-with-prefix</code>. What is missing from the file?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The options table is one of WordPress's own. Which tables does the default leave out?">
+                                A) The options, so the site has no settings
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="--skip-columns=guid only skips replacing them; the column is still exported. What did grep count in Common Mistake 2?">
+                                B) The GUIDs of all posts
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="By default WP-CLI works on the tables WordPress registers; the plugin's wp_pagesco_events table is not one of them, so the export silently leaves it out.">
+                                C) The plugin's own events table
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> On a production site, you deploy the theme with a new pattern file but forget to change the theme's Version. What happens?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="Without development mode WordPress caches the theme's pattern list in a site transient for the current Version, for up to 30 minutes; a new Version makes the cache invalid at once.">
+                                A) The new pattern stays unknown until the cached pattern list expires
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The same version can be installed again with --force. What did the gift-cards demo show instead?">
+                                B) WordPress refuses to install a theme with the same version
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Development mode was off in the demo, and the new pattern still did not appear at first. Why not?">
+                                C) Nothing: patterns are always read from the files on every request
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> Someone steals the password of the rehearsal site's database account, <code>pagesco_app</code>. What can they do with it?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Look at SHOW GRANTS again: which database is named, and which privileges are missing?">
+                                A) Create MySQL users and read every database on the server
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The account has SELECT, INSERT, UPDATE and DELETE on pagesco. What does that allow?">
+                                B) Nothing, because the account cannot log in from outside
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Least privilege limits the damage: the account can read and change the shop's own database, which is serious, but it reaches no other database and cannot manage users or the server.">
+                                C) Read and change the shop's database, and nothing beyond it
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> A live site has <code>define( 'DISABLE_WP_CRON', true );</code> and no cron job on the server. What happens to the nightly supplier sync?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="DISABLE_WP_CRON only stops the page-view trigger. What is left to start the events?">
+                                A) It runs on the next page view instead, a little late
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="With page-view spawning off, nothing runs due events until something calls wp-cron.php or wp cron event run: the job waits, scheduled, forever.">
+                                B) It never runs: the event stays scheduled and nothing starts it
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The constant does not touch the stored events. Did the rehearsal's cron event list lose the job?">
+                                C) WordPress deletes all scheduled events
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Do I really need a staging site?</summary>
+                    <p>For a shop that takes money, yes, if the host makes it easy (many managed hosts create a staging copy in one click). Staging is where updates and releases meet real data and the real server before customers do. Give it <code>WP_ENVIRONMENT_TYPE</code> <code>staging</code>, keep it out of search engines (Settings &gt; Reading, "Discourage search engines", and a password in front), point the supplier at its sandbox, and make sure it cannot send email to real customers. Refresh it from production now and then with the same <code>wp search-replace</code> in the other direction.</p>
+                </details>
+                <details>
+                    <summary>How do I get the live content onto my machine to debug something?</summary>
+                    <p>The launch in reverse: <code>wp db export</code> on the live site, then on your machine <code>wp db import</code> and <code>wp search-replace 'https://www.pagesco.example' 'http://localhost:8080' --all-tables-with-prefix --skip-columns=guid</code>. Two cautions. The copy contains customers' personal data: keep it encrypted, delete it when you are done, and consider replacing email addresses (a small <code>wp eval</code> loop) before you work with it. And your machine will then have the live passwords' hashes: reset the admin password locally to something simple again.</p>
+                </details>
+                <details>
+                    <summary>My host cannot run Composer or npm. Should I commit vendor/ and build/?</summary>
+                    <p>Not to <code>main</code>. Build the release on your machine or in a build service, as in this lesson, and upload the ZIP. If the host insists on deploying from Git, give it a separate branch or repository that holds only built releases (the unpacked ZIPs), so that the source repository stays clean and every built file still comes from a tagged commit.</p>
+                </details>
+                <details>
+                    <summary>Something is broken on the live site right now. May I fix it there?</summary>
+                    <p>Fix it in Git, release a patch version (1.1.2), and deploy it: with a release script that takes a few minutes, which is rarely slower than editing carefully on a server. With <code>DISALLOW_FILE_EDIT</code> there is no editor anyway, and an edit made over SFTP disappears at the next deploy, along with the fix. If the site is down, roll back first: install the previous release's ZIP with <code>--force</code> (that is what the tags are for: rebuild the ZIP from the previous tag, or better, keep each release's ZIPs under a name with its version, as Lesson 9.1 does, so a rollback is one command), then fix calmly.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Automate the release build. Write a workflow for a continuous integration service (GitHub Actions is the common choice for code on GitHub) that runs on every pushed tag named <code>release-*</code>: check out the tag, run <code>composer lint</code> and the PHPUnit suite from Lesson 8.1 (the runners have Docker and Node, so <code>npx @wordpress/env start</code> works there), then the build of Step 1 (<code>composer install --no-dev --optimize-autoloader</code>, <code>npm ci</code>, <code>npm run build</code>, <code>npm run plugin-zip</code>, <code>git archive</code> for the theme), and attach both ZIPs to the run as artifacts. Which secrets would a second job need to upload the ZIPs to a real server, where would you store them, and what should it run after the upload? (Exercise 3 has one answer to the last question.)</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Imagine the live shop goes down at 9 p.m. on a Thursday, during the book club. Write down, step by step, what you would do in the first fifteen minutes: where you would look first, how you would roll back, which backup you would use, and whom you would tell. Which parts of today's rehearsal made that plan possible, and which part would you want to practice once more?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Code goes up (Git, a release build, a deploy), content comes down (the database moves once at launch, then only copies from live), configuration stays (written for each environment)</li>
+                        <li>Choose hosting by what the project needs: PHP and WordPress versions, SSH and WP-CLI, a real cron job, HTTPS, restorable off-server backups, staging</li>
+                        <li>Production: <code>WP_DEBUG</code> off and errors only in the log, <code>WP_ENVIRONMENT_TYPE</code> production, no <code>WP_DEVELOPMENT_MODE</code>, <code>DISALLOW_FILE_EDIT</code>, secrets on the server only; raise the theme's Version with each release (the pattern cache)</li>
+                        <li>Git tracks only your own source; a <code>.gitignore</code> that ignores everything and lets your folders back in keeps it that way; tag every release</li>
+                        <li>Build releases from a tag in a clean folder: <code>composer install --no-dev --optimize-autoloader</code>, <code>npm ci</code>, <code>npm run build</code>, <code>npm run plugin-zip</code>; never deploy the repository</li>
+                        <li><code>wp search-replace</code> handles serialized data; use <code>--all-tables-with-prefix</code>, <code>--skip-columns=guid</code>, <code>--dry-run</code> first and <code>--export</code> for a launch file; after importing a development database, reset passwords and remove application passwords and transients</li>
+                        <li><code>DISABLE_WP_CRON</code> plus a server cron job; daily backups kept elsewhere, proven by a restore; updates through staging; a least-privilege database account (with <code>LOCK TABLES</code> for backups); a maintenance checklist</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Your own code in Git</td><td>a <code>.gitignore</code> with <code>/*</code> and <code>!/themes/</code>, <code>/themes/*</code>, <code>!/themes/pagesco/</code>…; <code>git check-ignore -v file</code></td></tr>
+                            <tr><td>A clean copy of a release</td><td><code>git archive --format=tar --prefix=pagesco-books/ release-1:plugins/pagesco-books | tar -x -C ../release</code></td></tr>
+                            <tr><td>Production PHP dependencies</td><td><code>composer install --no-dev --optimize-autoloader</code></td></tr>
+                            <tr><td>Locked JavaScript tools, then the build</td><td><code>npm ci</code>, <code>npm run build</code>, <code>npm run plugin-zip</code></td></tr>
+                            <tr><td>See what a migration changes</td><td><code>wp search-replace OLD NEW --all-tables-with-prefix --skip-columns=guid --dry-run --report-changed-only</code></td></tr>
+                            <tr><td>The launch database as a file</td><td>the same with <code>--export=file.sql</code>; then <code>wp db import file.sql</code></td></tr>
+                            <tr><td>New passwords after an import</td><td><code>wp user reset-password admin maria devon --skip-email --show-password</code>; <code>wp user application-password delete maria --all</code></td></tr>
+                            <tr><td>Due events from a real scheduler</td><td><code>wp cron event run --due-now</code> (with <code>DISABLE_WP_CRON</code>)</td></tr>
+                            <tr><td>An update deploy</td><td><code>wp plugin install release.zip --force</code>, <code>wp theme install theme.zip --force</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You put the shop's code under version control, with exactly the right files in it, and tagged two releases</li>
+                        <li>You built release files from tags in a clean folder, with no development packages and a working autoloader</li>
+                        <li>You launched Pages &amp; Co. on a production-configured site: the database moved with the new address, the development passwords replaced, every setting checked</li>
+                        <li>You made a backup, deleted a book, and got it back</li>
+                        <li>You shipped a security fix as an update without touching the live database</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>Everything the course built now has a way to the world. In <a href="lesson_30.html"><strong>Lesson 9.1: Final Project: Launch the Pages &amp; Co. Website</strong></a> the shop asks for its first feature for real customers, Reserve &amp; Pick Up, and you build it through every layer of the course (a custom table, settings, rules, REST routes, form handlers, a staff screen, two blocks, live prices in the theme), then lint, test and measure it, release version 1.2.0 with today's process and deploy it to the rehearsal server as code only.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Run <code>git status</code> and <code>git tag -n</code> in <code>wordpress/wp-content</code>: a clean working copy and two tags</li>
+                    <li>Keep the rehearsal site or stop it with <code>docker compose stop</code> in <code>pagesco-live</code> (its files and database stay); if you have access to a real host, compare its offer with the "For Pages &amp; Co." list under Hosting Types</li>
+                    <li>Save the new passwords of the rehearsal site's accounts in your password manager, and keep <code>.env</code> out of any repository</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Launch day used to be the scariest day of a WordPress project: files dragged into an FTP window, a database search-and-replace in a text editor, and fingers crossed. You just did it as a routine: a tagged release, a clean build, one command for the database, a checklist, and a backup you know works because you restored it. The first time takes an afternoon; the tenth takes minutes, and it is the same process every time, which is the whole point. Calm, repeatable deploys are what clients pay professionals for, and you have rehearsed one from start to finish.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_28.html" class="prev-lesson">← Previous: Internationalization, Accessibility &amp; Distribution</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_30.html" class="next-lesson">Next: Final Project: Launch the Pages &amp; Co. Website →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

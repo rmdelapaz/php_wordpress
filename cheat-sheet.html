@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="WordPress developer cheat sheet: WP-CLI commands, the most used action and filter hooks, and the escaping and sanitizing functions, with real output from WordPress 7.1.">
+    <meta name="description" content="WordPress 7.1 developer cheat sheet: WP-CLI commands, common action and filter hooks with priorities, escaping, sanitizing, nonce and capability functions, theme.json and block.json keys, a REST route skeleton, Composer and npm scripts, and deployment commands.">
     <meta name="author" content="Ray de la Paz">
     <title>Cheat Sheet - PHP and WordPress Development</title>
     <script src="js/theme-init.js"></script>
@@ -43,15 +43,859 @@
         <div class="container">
             <header>
                 <h1>📋 Cheat Sheet</h1>
-                <p class="lead">WP-CLI commands, the hooks you will use most, and the escaping and sanitizing functions on one page. Output shown here comes from a real WordPress 7.1 site.</p>
+                <p class="lead">The commands, hooks and functions of PHP and WordPress Development on one page, for WordPress 7.1 on PHP 8.5: WP-CLI, hooks, escaping and nonces, theme.json and block.json, REST routes, Composer and npm scripts, and the deployment commands. Each section links to the lesson that teaches it.</p>
             </header>
 
-            <!-- STUB: the reference-pages agent fills this page (see SHELL_REFERENCE.md section 14). -->
-            <section class="lesson-section">
-                <div class="card card-info">
-                    <h4>💡 This page is being written</h4>
-                    <p>It fills in as the lessons are published. Until then, every lesson has its own Common Mistakes section and quick-reference summary.</p>
-                </div>
+<details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">On This Page</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#environment" class="toc-link">The Course Environment</a></li>
+                        <li><a href="#wp-cli" class="toc-link">WP-CLI: Everyday Commands</a></li>
+                        <li><a href="#wp-cli-content" class="toc-link">WP-CLI: Content, Users and Structure</a></li>
+                        <li><a href="#wp-cli-site" class="toc-link">WP-CLI: Themes, Plugins, Database and More</a></li>
+                        <li><a href="#hooks" class="toc-link">Hooks</a></li>
+                        <li><a href="#security" class="toc-link">Escaping, Sanitizing, Nonces and Capabilities</a></li>
+                        <li><a href="#i18n" class="toc-link">Translation Functions</a></li>
+                        <li><a href="#themes" class="toc-link">Themes: Headers, theme.json, Templates</a></li>
+                        <li><a href="#classic" class="toc-link">The Loop, Template Tags and WP_Query</a></li>
+                        <li><a href="#theme-functions" class="toc-link">functions.php: Supports, Assets, Menus, Widgets</a></li>
+                        <li><a href="#plugins" class="toc-link">Plugins: Header, Life Cycle, Data</a></li>
+                        <li><a href="#blocks" class="toc-link">Blocks: block.json, Build, Registration</a></li>
+                        <li><a href="#rest" class="toc-link">The REST API</a></li>
+                        <li><a href="#http-cron" class="toc-link">HTTP, Transients and WP-Cron</a></li>
+                        <li><a href="#tooling" class="toc-link">Composer, npm and Tests</a></li>
+                        <li><a href="#deploy" class="toc-link">Deployment</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <div class="card card-info">
+                <h4>💡 How to read this page</h4>
+                <p>Every name here is the one the course uses: the <code>pagesco</code> theme, the <code>pagesco-books</code> plugin with the namespace <code>PagesCo\Books</code>, the prefix <code>pagesco_</code>. Code is shortened to what you need to remember; the lesson linked in each section has the full, tested version. Commands starting with <code>wp</code> use the shortcut from Lesson 1.2; <code>curl</code>, <code>grep</code> and <code>ls</code> run in the WP-CLI container (<code>docker compose run --rm wpcli sh</code>). See also the <a href="glossary.html">Glossary</a>, <a href="common-errors.html">Common Errors</a> and <a href="troubleshooting.html">Troubleshooting</a>.</p>
+            </div>
+
+            <section id="environment" class="lesson-section">
+                <h2>🐳 The Course Environment</h2>
+                <p>Set up in <a href="lesson_02.html">Lesson 1.2</a>. Every command runs in your project folder, <code>~/pagesco-dev</code> (or any folder inside it).</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>You want to</th><th>Run</th></tr></thead>
+<tbody>
+<tr><td>Start the site (http://localhost:8080, Mailpit at http://localhost:8025)</td><td><code>docker compose up -d</code></td></tr>
+<tr><td>See what is running</td><td><code>docker compose ps</code></td></tr>
+<tr><td>Pause for the day / start again</td><td><code>docker compose stop</code> / <code>docker compose up -d</code></td></tr>
+<tr><td>Apply an edit to compose.yaml</td><td><code>docker compose up -d</code> (recreates what changed)</td></tr>
+<tr><td>Remove the containers, keep files and database</td><td><code>docker compose down</code></td></tr>
+<tr><td>Delete the database too (a blank site)</td><td><code>docker compose down -v</code>, then delete <code>wordpress/</code> and install again</td></tr>
+<tr><td>Apache's log (requests, startup problems)</td><td><code>docker compose logs wordpress</code> (<code>-f</code> to follow)</td></tr>
+<tr><td>A shell where the lessons' <code>ls</code>, <code>grep</code>, <code>curl</code> run</td><td><code>docker compose run --rm wpcli sh</code> (prompt <code>/var/www/html $</code>)</td></tr>
+<tr><td>Watch the debug log</td><td><code>tail -f wordpress/wp-content/debug.log</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>The <code>wp</code> shortcut, in <code>~/.bashrc</code> or <code>~/.zshrc</code> (bash/zsh) or your PowerShell profile:</p>
+<pre data-norun><code class="language-bash">alias wp='docker compose --progress quiet run --rm wpcli wp'</code></pre>
+<pre data-norun><code class="language-powershell">function wp { docker compose --progress quiet run --rm wpcli wp @args }</code></pre>
+<p>Inside the container the current folder is always the WordPress root, <code>/var/www/html</code>, which is your <code>wordpress/</code> folder: <code>wp eval-file check.php</code> runs <code>wordpress/check.php</code>. Install and permalinks, as Lesson 1.2 runs them:</p>
+<pre data-norun><code class="language-bash">docker compose run --rm wpcli wp core install --url=http://localhost:8080 --title="Pages &amp; Co." --admin_user=admin --admin_password=password --admin_email=wordpress@example.com --skip-email
+docker compose run --rm wpcli wp rewrite structure '/%postname%/'</code></pre>
+<p>Linux and WSL only, once, before the first start (so you and WordPress own the same files):</p>
+<pre data-norun><code class="language-bash">printf 'PAGESCO_UID=%s\nPAGESCO_GID=%s\n' "$(id -u)" "$(id -g)" &gt; .env
+cp config/compose.linux.yaml compose.override.yaml
+mkdir wordpress</code></pre>
+<p>The alternatives (always the scoped package name, never <code>npx wp-env</code>):</p>
+<pre data-norun><code class="language-bash">npx @wordpress/env start                    # wp-env: .wp-env.json in the folder, http://localhost:8888
+npx @wordpress/env run cli wp option get siteurl
+npx @wordpress/env stop                     # destroy removes it completely
+npx @wp-playground/cli@latest server --wp=7.1 --php=8.5 --auto-mount --login   # Playground: http://localhost:9400</code></pre>
+            </section>
+
+            <section id="wp-cli" class="lesson-section">
+                <h2>⌨️ WP-CLI: Everyday Commands</h2>
+                <p>Introduced in <a href="lesson_02.html#wp-cli">Lesson 1.2</a>; each later lesson adds a few. <code>wp help &lt;command&gt;</code> explains any of them. The output cards are from the course site.</p>
+<pre data-norun><code class="language-bash">wp core version --extra
+wp option get blogname</code></pre>
+<div class="card card-output">
+    <h4>Output</h4>
+    <pre><code>WordPress version: 7.1.3
+Database revision: 61833
+TinyMCE version:   4.9110 (49110-20250317)
+Package language:  en_US
+Pages &amp;amp; Co.</code></pre>
+</div>
+<p>The title is stored HTML-escaped, so code that reads it gets <code>Pages &amp;amp; Co.</code> (Lesson 1.2).</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Command</th><th>What it does</th><th>Lesson</th></tr></thead>
+<tbody>
+<tr><td><code>wp eval '…php…'</code></td><td>run PHP with WordPress loaded (as no user: add <code>--user=admin</code>)</td><td><a href="lesson_02.html#debugging">Lesson 1.2</a></td></tr>
+<tr><td><code>wp eval-file file.php</code></td><td>run a PHP file from the WordPress root with WordPress loaded</td><td><a href="lesson_02.html#project">Lesson 1.2</a></td></tr>
+<tr><td><code>wp option get|update|add|delete name [value]</code></td><td>read and write options; <code>--format=json</code> for arrays</td><td><a href="lesson_02.html#wp-cli">Lesson 1.2</a></td></tr>
+<tr><td><code>wp option patch update pagesco_books_settings events_limit 8</code></td><td>change one key of an array option, keep the rest</td><td><a href="lesson_17.html#mistakes">Lesson 5.4</a></td></tr>
+<tr><td><code>wp option list --search='pagesco_books*'</code></td><td>find options (transients are hidden here: use SQL)</td><td><a href="lesson_17.html">Lesson 5.4</a></td></tr>
+<tr><td><code>wp config get|set|delete NAME [value] [--raw]</code></td><td>read and edit <code>wp-config.php</code> constants (<code>--raw</code> for <code>true</code>/<code>false</code>)</td><td><a href="lesson_05.html#wp-config">Lesson 2.2</a></td></tr>
+<tr><td><code>wp config list --fields=name,type</code></td><td>every constant and variable in <code>wp-config.php</code></td><td><a href="lesson_05.html#wp-config">Lesson 2.2</a></td></tr>
+<tr><td><code>wp --skip-plugins=pagesco-crash plugin deactivate pagesco-crash</code></td><td>work on a site whose plugin causes a fatal error</td><td><a href="lesson_26.html#fatal">Lesson 8.1</a></td></tr>
+<tr><td><code>wp core verify-checksums</code></td><td>check that no core file was changed</td><td><a href="lesson_01.html#mistakes">Lesson 1.1</a></td></tr>
+<tr><td><code>wp cron test</code></td><td>check that WordPress can call itself (WP-Cron spawning)</td><td><a href="lesson_02.html#wp-cli">Lesson 1.2</a></td></tr>
+</tbody>
+</table>
+</div>
+<p>Global habits: <code>--porcelain</code> prints only the new ID, <code>--fields=ID,post_title</code> picks columns, <code>--field=ID</code> prints one value per line, <code>--format=count|json|csv</code> changes the output. <code>wp post list</code> lists every status (drafts too) unless you pass <code>--post_status=publish</code>; <code>wp post list --format=count</code> prints no trailing newline.</p>
+            </section>
+
+            <section id="wp-cli-content" class="lesson-section">
+                <h2>🗂️ WP-CLI: Content, Users and Structure</h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Command</th><th>What it does</th><th>Lesson</th></tr></thead>
+<tbody>
+<tr><td><code>wp post create file.html --post_type=page --post_title="About Us" --post_name=about --post_status=publish --user=maria --porcelain</code></td><td>create content from a file of block markup (drafts by default!)</td><td><a href="lesson_04.html#project">Lesson 2.1</a></td></tr>
+<tr><td><code>wp post list --post_type=book --orderby=ID --fields=ID,post_title,post_name</code></td><td>list posts of any type</td><td><a href="lesson_04.html#posts-pages">Lesson 2.1</a></td></tr>
+<tr><td><code>wp post get 30 --fields=post_status,post_name</code></td><td>one post's fields</td><td><a href="lesson_04.html#mistakes">Lesson 2.1</a></td></tr>
+<tr><td><code>wp post update 14 file.html</code> / <code>wp post delete 19 --force</code></td><td>change or delete (without <code>--force</code>: to the trash)</td><td><a href="lesson_04.html#revisions">Lesson 2.1</a></td></tr>
+<tr><td><code>wp post meta get|add|update|delete 30 pagesco_price [value]</code></td><td>post meta (<code>get</code> on an empty value exits with status 1)</td><td><a href="lesson_05.html#meta">Lesson 2.2</a></td></tr>
+<tr><td><code>wp post-type list</code> / <code>wp taxonomy list</code></td><td>registered types and taxonomies</td><td><a href="lesson_04.html#everything-is-a-post">Lesson 2.1</a></td></tr>
+<tr><td><code>wp term list genre --fields=term_id,name,slug,count</code> / <code>wp term create category News --slug=news</code></td><td>terms</td><td><a href="lesson_04.html#taxonomies">Lesson 2.1</a></td></tr>
+<tr><td><code>wp media import file.webp --title="…" --alt="…" --porcelain</code></td><td>add a file to the Media Library</td><td><a href="lesson_04.html#media">Lesson 2.1</a></td></tr>
+<tr><td><code>wp user create maria maria@example.com --role=editor --user_pass=maria-pass --display_name="Maria Lopez"</code></td><td>users; <code>wp user list --fields=ID,user_login,roles</code></td><td><a href="lesson_04.html#users">Lesson 2.1</a></td></tr>
+<tr><td><code>wp user delete 4 --reassign=2</code></td><td>delete a user and give their content to another</td><td><a href="lesson_04.html#exercises">Lesson 2.1</a></td></tr>
+<tr><td><code>wp role list</code> / <code>wp cap list author</code> / <code>wp role exists pagesco_bookseller</code></td><td>roles and their capabilities</td><td><a href="lesson_04.html#users">Lesson 2.1</a></td></tr>
+<tr><td><code>wp user application-password create maria "Inventory script" --porcelain</code></td><td>an application password; <code>list maria --name=… --field=uuid</code>, <code>delete maria UUID</code> or <code>--all</code></td><td><a href="lesson_23.html#auth">Lesson 7.1</a></td></tr>
+<tr><td><code>wp user reset-password admin maria devon --skip-email --show-password</code></td><td>new random passwords (after importing a development database)</td><td><a href="lesson_29.html#project">Lesson 8.4</a></td></tr>
+<tr><td><code>wp menu create "Main menu"</code>, <code>wp menu item add-post main-menu 12</code>, <code>wp menu location assign main-menu primary</code></td><td>classic menus</td><td><a href="lesson_13.html#menus">Lesson 4.3</a></td></tr>
+<tr><td><code>wp sidebar list</code>, <code>wp widget add block footer --content='…'</code>, <code>wp widget list footer</code></td><td>classic widget areas</td><td><a href="lesson_13.html#widgets">Lesson 4.3</a></td></tr>
+</tbody>
+</table>
+</div>
+            </section>
+
+            <section id="wp-cli-site" class="lesson-section">
+                <h2>🧰 WP-CLI: Themes, Plugins, Database and More</h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Command</th><th>What it does</th><th>Lesson</th></tr></thead>
+<tbody>
+<tr><td><code>wp theme list</code> / <code>wp theme activate pagesco</code> / <code>wp theme delete pagesco-bare</code></td><td>themes (status <code>parent</code> marks a child theme's parent)</td><td><a href="lesson_07.html#mistakes">Lesson 3.1</a></td></tr>
+<tr><td><code>wp theme install twentytwentyone</code> / <code>wp theme install pagesco.zip --force</code></td><td>install from WordPress.org or a ZIP (<code>--force</code> replaces)</td><td><a href="lesson_10.html">Lesson 3.4</a></td></tr>
+<tr><td><code>wp plugin list --fields=name,status,version</code> (<code>--status=must-use</code>)</td><td>plugins</td><td><a href="lesson_02.html#mailpit">Lesson 1.2</a></td></tr>
+<tr><td><code>wp plugin activate|deactivate pagesco-books</code></td><td>runs the activation or deactivation hook</td><td><a href="lesson_14.html#lifecycle">Lesson 5.1</a></td></tr>
+<tr><td><code>wp plugin uninstall pagesco-books --deactivate --skip-delete</code></td><td>run <code>uninstall.php</code> but keep the files (then activate again)</td><td><a href="lesson_14.html#lifecycle">Lesson 5.1</a></td></tr>
+<tr><td><code>wp plugin install pagesco-books.zip --force</code></td><td>deploy an update over an active plugin (activation hooks do not run)</td><td><a href="lesson_29.html#project">Lesson 8.4</a></td></tr>
+<tr><td><code>wp plugin auto-updates status --all</code></td><td>automatic updates per plugin</td><td><a href="lesson_29.html#running">Lesson 8.4</a></td></tr>
+<tr><td><code>wp rewrite structure '/%postname%/'</code> / <code>wp rewrite flush</code> / <code>wp rewrite list --match=/books/</code></td><td>permalinks and rewrite rules</td><td><a href="lesson_15.html#taxonomy">Lesson 5.2</a></td></tr>
+<tr><td><code>wp db query "SELECT …"</code></td><td>SQL in the site's database (tab-separated rows; <code>\G</code> for vertical)</td><td><a href="lesson_05.html#tables">Lesson 2.2</a></td></tr>
+<tr><td><code>wp db cli</code> / <code>wp db columns wp_postmeta</code></td><td>an interactive MySQL prompt (the MariaDB client) / a table's columns</td><td><a href="lesson_05.html#tables">Lesson 2.2</a></td></tr>
+<tr><td><code>wp db export file.sql</code> / <code>wp db import file.sql</code></td><td>back up and restore the whole database (outside the web root!)</td><td><a href="lesson_29.html#running">Lesson 8.4</a></td></tr>
+<tr><td><code>wp db tables --all-tables-with-prefix</code></td><td>all tables, plugin tables included (the default lists only core's)</td><td><a href="lesson_29.html#mistakes">Lesson 8.4</a></td></tr>
+<tr><td><code>wp search-replace OLD NEW --all-tables-with-prefix --skip-columns=guid --dry-run --report-changed-only</code></td><td>change an address everywhere, serialized data included; <code>--export=file.sql</code> writes a file instead</td><td><a href="lesson_29.html#database">Lesson 8.4</a></td></tr>
+<tr><td><code>wp transient set|get|delete name [value] [seconds]</code> / <code>wp transient delete --all</code></td><td>transients</td><td><a href="lesson_25.html#transients">Lesson 7.3</a></td></tr>
+<tr><td><code>wp cron event list --fields=hook,recurrence</code> / <code>wp cron schedule list</code></td><td>scheduled events and recurrences</td><td><a href="lesson_25.html#cron">Lesson 7.3</a></td></tr>
+<tr><td><code>wp cron event schedule HOOK now</code> / <code>wp cron event run --due-now</code></td><td>a one-off run / run what is due (the live site's cron job)</td><td><a href="lesson_29.html#running">Lesson 8.4</a></td></tr>
+<tr><td><code>wp eval 'do_action( "pagesco_books_daily_sync" );'</code></td><td>run a recurring job's code without rescheduling it (<code>wp cron event run HOOK</code> reschedules to now + interval)</td><td><a href="lesson_25.html#cron">Lesson 7.3</a></td></tr>
+<tr><td><code>wp cache flush</code></td><td>empty the object cache</td><td><a href="lesson_27.html#persistent">Lesson 8.2</a></td></tr>
+<tr><td><code>wp language core install es_ES</code> / <code>wp site switch-language es_ES</code></td><td>languages</td><td><a href="lesson_28.html#l10n">Lesson 8.3</a></td></tr>
+<tr><td><code>wp i18n make-pot . languages/pagesco-books.pot --exclude=src/blocks,tests</code></td><td>extract translatable strings</td><td><a href="lesson_28.html#i18n">Lesson 8.3</a></td></tr>
+<tr><td><code>wp i18n update-po</code>, <code>make-mo</code>, <code>make-php</code>, <code>make-json … --no-purge</code></td><td>build translation files from a PO</td><td><a href="lesson_28.html#l10n">Lesson 8.3</a></td></tr>
+<tr><td><code>wp plugin check pagesco-books</code></td><td>the plugin directory's checks (install the Plugin Check plugin first)</td><td><a href="lesson_28.html#distribution">Lesson 8.3</a></td></tr>
+<tr><td><code>wp core check-update</code></td><td>is a newer WordPress available?</td><td><a href="lesson_31.html#keeping-up">Lesson 9.2</a></td></tr>
+</tbody>
+</table>
+</div>
+            </section>
+
+            <section id="hooks" class="lesson-section">
+                <h2>🪝 Hooks</h2>
+                <p>Taught in <a href="lesson_06.html">Lesson 2.3</a>. An action runs code at a moment; a filter changes a value and must return it.</p>
+<pre data-norun><code class="language-php">add_action( 'wp_body_open', 'pagesco_render_store_notice' );            // priority 10, 1 argument
+add_filter( 'pagesco_store_notice', 'pagesco_notice_late_opening', 20 );  // runs after priority 10
+add_filter( 'the_title', 'pagesco_title_with_id', 10, 2 );               // ask for 2 arguments
+
+function pagesco_title_with_id( $title, $post_id ) {
+	return $title;                                                     // a filter always returns
+}
+
+remove_action( 'wp_head', 'wp_generator' );                              // same hook, callback and priority
+var_dump( has_filter( 'the_content', 'wpautop' ) );                       // the priority, or false
+
+// Your own hooks (prefixed, documented):
+$text = apply_filters( 'pagesco_store_notice', 'Free shipping on orders over $35.' );
+do_action( 'pagesco_before_store_notice' );</code></pre>
+<p>The actions of a front-end request, in order (logged with <code>current_action()</code> in Lesson 2.3), and where the course uses them:</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Action</th><th>When</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td><code>muplugins_loaded</code>, <code>plugins_loaded</code></td><td>after must-use plugins / all plugins are loaded</td><td>booting the plugin (<a href="lesson_14.html">Lesson 5.1</a>)</td></tr>
+<tr><td><code>after_setup_theme</code></td><td>after the theme's <code>functions.php</code></td><td>theme supports, removing parent hooks (<a href="lesson_13.html">Lesson 4.3</a>, <a href="lesson_10.html">Lesson 3.4</a>)</td></tr>
+<tr><td><code>init</code></td><td>WordPress is loaded, the user is known</td><td>post types, taxonomies, meta, shortcodes, blocks, settings (<a href="lesson_15.html">Lesson 5.2</a>)</td></tr>
+<tr><td><code>widgets_init</code></td><td>during <code>init</code> (priority 1)</td><td><code>register_sidebar()</code> (<a href="lesson_13.html">Lesson 4.3</a>)</td></tr>
+<tr><td><code>rest_api_init</code></td><td>when the REST server starts</td><td><code>register_rest_route()</code> (<a href="lesson_24.html">Lesson 7.2</a>)</td></tr>
+<tr><td><code>wp_loaded</code></td><td>everything loaded, before the query</td><td></td></tr>
+<tr><td><code>pre_get_posts</code></td><td>before every <code>WP_Query</code> runs</td><td>changing the main query (<a href="lesson_12.html">Lesson 4.2</a>)</td></tr>
+<tr><td><code>template_redirect</code></td><td>the query ran, before the template</td><td>redirects, conditional checks (<a href="lesson_11.html">Lesson 4.1</a>)</td></tr>
+<tr><td><code>wp_enqueue_scripts</code></td><td>inside <code>wp_head</code> (priority 1)</td><td>styles and scripts (<a href="lesson_13.html">Lesson 4.3</a>)</td></tr>
+<tr><td><code>wp_head</code>, <code>wp_body_open</code>, <code>wp_footer</code></td><td>in the page</td><td>the store notice on <code>wp_body_open</code> (<a href="lesson_06.html">Lesson 2.3</a>)</td></tr>
+<tr><td><code>shutdown</code></td><td>the very end of the request</td><td>query reports (<a href="lesson_27.html">Lesson 8.2</a>)</td></tr>
+</tbody>
+</table>
+</div>
+<p>Admin and other actions:</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Action</th><th>Lesson</th></tr></thead>
+<tbody>
+<tr><td><code>admin_menu</code> (add pages), <code>admin_init</code>, <code>admin_enqueue_scripts</code> (receives the hook suffix), <code>login_enqueue_scripts</code></td><td><a href="lesson_17.html">Lesson 5.4</a>, <a href="lesson_13.html">Lesson 4.3</a></td></tr>
+<tr><td><code>add_meta_boxes_{post_type}</code>, <code>save_post_{post_type}</code> (10, 2)</td><td><a href="lesson_15.html#admin">Lesson 5.2</a></td></tr>
+<tr><td><code>admin_post_{action}</code> / <code>admin_post_nopriv_{action}</code></td><td><a href="lesson_16.html#nonces">Lesson 5.3</a></td></tr>
+<tr><td><code>wp_dashboard_setup</code></td><td><a href="lesson_23.html#project">Lesson 7.1</a></td></tr>
+<tr><td><code>wp_abilities_api_categories_init</code>, <code>wp_abilities_api_init</code></td><td><a href="lesson_25.html#abilities">Lesson 7.3</a></td></tr>
+<tr><td><code>doing_it_wrong_run</code>, <code>http_api_debug</code></td><td><a href="lesson_26.html">Lesson 8.1</a>, <a href="lesson_25.html">Lesson 7.3</a></td></tr>
+</tbody>
+</table>
+</div>
+<p>Filters the course uses:</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Filter</th><th>Changes</th><th>Lesson</th></tr></thead>
+<tbody>
+<tr><td><code>the_title</code>, <code>the_content</code>, <code>excerpt_length</code>, <code>document_title_separator</code></td><td>what the template tags print; <code>the_content</code> runs <code>do_blocks</code> (9), <code>wpautop</code> (10), <code>do_shortcode</code> (11)</td><td><a href="lesson_06.html#filters">Lesson 2.3</a></td></tr>
+<tr><td><code>body_class</code>, <code>login_headerurl</code>, <code>login_headertext</code></td><td>body classes, the login logo link</td><td><a href="lesson_06.html#exercises">Lesson 2.3</a></td></tr>
+<tr><td><code>template_include</code>, <code>{$type}_template_hierarchy</code></td><td>the template WordPress picks</td><td><a href="lesson_07.html#hierarchy">Lesson 3.1</a></td></tr>
+<tr><td><code>manage_{post_type}_posts_columns</code> + the action <code>manage_{post_type}_posts_custom_column</code></td><td>admin list columns</td><td><a href="lesson_15.html#admin">Lesson 5.2</a></td></tr>
+<tr><td><code>post_row_actions</code>, <code>plugin_action_links_{plugin_file}</code></td><td>row links on the Books and Plugins screens</td><td><a href="lesson_16.html">Lesson 5.3</a>, <a href="lesson_17.html">Lesson 5.4</a></td></tr>
+<tr><td><code>shortcode_atts_{shortcode}</code></td><td>a shortcode's attributes</td><td><a href="lesson_18.html#attributes">Lesson 5.5</a></td></tr>
+<tr><td><code>render_block_{name}</code>, <code>register_block_type_args</code></td><td>a block's HTML / its registration</td><td><a href="lesson_20.html">Lesson 6.2</a>, <a href="lesson_27.html">Lesson 8.2</a></td></tr>
+<tr><td><code>cron_schedules</code></td><td>add a recurrence</td><td><a href="lesson_25.html#cron">Lesson 7.3</a></td></tr>
+<tr><td><code>pre_http_request</code></td><td>answer an HTTP request without the network (tests)</td><td><a href="lesson_26.html#testing">Lesson 8.1</a></td></tr>
+<tr><td><code>wp_preload_resources</code>, <code>styles_inline_size_limit</code></td><td>preload the hero image, the inline-CSS budget</td><td><a href="lesson_27.html#images">Lesson 8.2</a></td></tr>
+</tbody>
+</table>
+</div>
+            </section>
+
+            <section id="security" class="lesson-section">
+                <h2>🛡️ Escaping, Sanitizing, Nonces and Capabilities</h2>
+                <p>Introduced in <a href="lesson_03.html#sanitize-escape">Lesson 1.3</a>, made a habit in <a href="lesson_16.html">Lesson 5.3</a>. Sanitize early (when data arrives), escape late (when you print it), and check a nonce and a capability before every change.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Output goes into</th><th>Escape with</th></tr></thead>
+<tbody>
+<tr><td>text between tags</td><td><code>esc_html()</code>, <code>esc_html__()</code>, <code>esc_html_e()</code></td></tr>
+<tr><td>an attribute value</td><td><code>esc_attr()</code>, <code>esc_attr__()</code>, <code>esc_attr_e()</code></td></tr>
+<tr><td><code>href</code>, <code>src</code>, a redirect</td><td><code>esc_url()</code> (drops <code>javascript:</code>); <code>esc_url_raw()</code> for storage and HTTP requests</td></tr>
+<tr><td>HTML that may contain safe tags (post content)</td><td><code>wp_kses_post()</code></td></tr>
+<tr><td>JavaScript</td><td><code>wp_json_encode()</code> with <code>wp_add_inline_script()</code>; <code>esc_js()</code> for small inline values</td></tr>
+</tbody>
+</table>
+</div>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Input is</th><th>Sanitize or validate with</th></tr></thead>
+<tbody>
+<tr><td>one line of text</td><td><code>sanitize_text_field( wp_unslash( $_POST['x'] ) )</code></td></tr>
+<tr><td>several lines</td><td><code>sanitize_textarea_field()</code></td></tr>
+<tr><td>a whole number / an ID</td><td><code>absint()</code></td></tr>
+<tr><td>a slug or key</td><td><code>sanitize_key()</code>, <code>sanitize_title()</code></td></tr>
+<tr><td>an email address</td><td><code>sanitize_email()</code>; <code>is_email()</code> validates</td></tr>
+<tr><td>one of a few values</td><td><code>in_array( $value, $allowed, true )</code></td></tr>
+<tr><td>a price</td><td><code>max( 0, (float) $value )</code></td></tr>
+<tr><td>a date</td><td><code>DateTime::createFromFormat( 'Y-m-d', $value )</code>, then compare its <code>format()</code> with the input</td></tr>
+</tbody>
+</table>
+</div>
+<pre data-norun><code class="language-php">// A form: the nonce field, then in the handler the nonce, the capability, the work.
+wp_nonce_field( 'pagesco_books_save_details', 'pagesco_books_details_nonce' );
+
+if ( ! isset( $_POST['pagesco_books_details_nonce'] )
+	|| ! wp_verify_nonce( sanitize_key( wp_unslash( $_POST['pagesco_books_details_nonce'] ) ), 'pagesco_books_save_details' ) ) {
+	return;
+}
+if ( ! current_user_can( 'edit_post', $post_id ) ) {   // a meta capability: this post, this user
+	return;
+}
+
+// A link to admin-post.php, and its handler (Lesson 5.3's stock action):
+$url = wp_nonce_url( add_query_arg( array( 'action' =&gt; 'pagesco_books_toggle_stock', 'book' =&gt; 30 ), admin_url( 'admin-post.php' ) ), 'pagesco_books_toggle_stock_30' );
+
+add_action( 'admin_post_pagesco_books_toggle_stock', function () {
+	$book_id = isset( $_GET['book'] ) ? absint( $_GET['book'] ) : 0;
+	check_admin_referer( 'pagesco_books_toggle_stock_' . $book_id );   // 403 "The link you followed has expired."
+	if ( ! current_user_can( 'edit_post', $book_id ) ) {
+		wp_die( esc_html__( 'Sorry, you are not allowed to change this book.', 'pagesco-books' ), 403 );
+	}
+	// ... change it ...
+	wp_safe_redirect( admin_url( 'edit.php?post_type=book' ) );
+	exit;
+} );
+
+// SQL with a variable: always prepare(). %s string, %d integer, %f float, %i identifier (6.2+).
+global $wpdb;
+$count = $wpdb-&gt;get_var( $wpdb-&gt;prepare( 'SELECT COUNT(*) FROM %i WHERE location = %s', $wpdb-&gt;prefix . 'pagesco_events', $location ) );
+
+defined( 'ABSPATH' ) || exit;   // first line of every PHP file that can run on its own (Lesson 5.1)</code></pre>
+<p>Remember: functions such as <code>wp_insert_post()</code> and <code>update_post_meta()</code> never check permissions, and a nonce proves a request is genuine, not that the user is allowed.</p>
+            </section>
+
+            <section id="i18n" class="lesson-section">
+                <h2>🌍 Translation Functions</h2>
+                <p>Introduced in <a href="lesson_03.html#i18n">Lesson 1.3</a>, released in <a href="lesson_28.html">Lesson 8.3</a>. The text domain is always a literal string: <code>pagesco</code> (theme), <code>pagesco-books</code> (plugin).</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Function</th><th>Does</th></tr></thead>
+<tbody>
+<tr><td><code>__( 'Book details', 'pagesco-books' )</code></td><td>returns the translation</td></tr>
+<tr><td><code>_e()</code></td><td>echoes it (never inside a concatenation: it returns null)</td></tr>
+<tr><td><code>esc_html__()</code>, <code>esc_html_e()</code>, <code>esc_attr__()</code>, <code>esc_attr_e()</code></td><td>translate and escape in one step</td></tr>
+<tr><td><code>_n( '%s page', '%s pages', $pages, 'pagesco-books' )</code></td><td>singular or plural by number</td></tr>
+<tr><td><code>_x( 'Post', 'verb', 'pagesco-books' )</code></td><td>the same words with a context for translators</td></tr>
+<tr><td><code>number_format_i18n( $price, 2 )</code>, <code>wp_date()</code></td><td>numbers and dates in the site's locale</td></tr>
+<tr><td><code>wp_set_script_translations( $handle, 'pagesco-books' )</code></td><td>JavaScript strings (<code>__()</code> from <code>wp.i18n</code>)</td></tr>
+</tbody>
+</table>
+</div>
+<pre data-norun><code class="language-php">/* translators: 1: books shown, 2: books in the catalog. */
+printf( esc_html__( 'Showing %1$s of %2$s books', 'pagesco-books' ), $shown, $total );</code></pre>
+            </section>
+
+            <section id="themes" class="lesson-section">
+                <h2>🎨 Themes: Headers, theme.json, Templates</h2>
+                <p>Block themes in <a href="lesson_08.html">Lesson 3.2</a> and <a href="lesson_09.html">Lesson 3.3</a>, child themes in <a href="lesson_10.html">Lesson 3.4</a>, classic themes in Module 4.</p>
+<pre data-norun><code class="language-css">/*
+Theme Name: Pages &amp; Co.
+Requires at least: 6.6
+Tested up to: 7.1
+Requires PHP: 7.4
+Version: 1.1.1
+License: GNU General Public License v2 or later
+Text Domain: pagesco
+Update URI: false
+*/</code></pre>
+<p>A child theme adds <code>Template: twentytwentyfive</code>, the parent's <strong>folder</strong> name. The smallest block theme is <code>style.css</code> plus <code>templates/index.html</code>; a classic theme needs <code>index.php</code>.</p>
+<pre data-norun><code class="language-json">{
+	"$schema": "https://schemas.wp.org/wp/7.1/theme.json",
+	"version": 3,
+	"settings": {
+		"appearanceTools": true,
+		"color": { "defaultPalette": false, "palette": [ { "slug": "oxblood", "name": "Oxblood", "color": "#7a2e2e" } ] },
+		"layout": { "contentSize": "680px", "wideSize": "1180px" },
+		"spacing": { "spacingSizes": [ { "slug": "small", "name": "Small", "size": "1rem" } ] },
+		"typography": { "fluid": true, "fontFamilies": [ … ], "fontSizes": [ … ] }
+	},
+	"styles": {
+		"color": { "background": "var:preset|color|paper", "text": "var:preset|color|ink" },
+		"elements": { "link": { "color": { "text": "var:preset|color|oxblood" } } },
+		"blocks": { "core/post-date": { "color": { "text": "var:preset|color|slate" } } },
+		"css": ".pagesco-notice { … }"
+	},
+	"templateParts": [ { "name": "header", "title": "Header", "area": "header" } ]
+}</code></pre>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Key</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>settings</code></td><td>what people may choose: palette, gradients, font families and sizes, spacing sizes, layout widths; <code>default…</code> switches core's presets off</td></tr>
+<tr><td><code>styles</code></td><td>how things look: the site (<code>color</code>, <code>typography</code>, <code>spacing</code>), <code>elements</code> (link, heading, h1-h6, button), <code>blocks</code> (per block type), <code>css</code> (block themes only)</td></tr>
+<tr><td><code>var:preset|color|ink</code></td><td>shorthand for <code>var(--wp--preset--color--ink)</code>; every preset also gets a class such as <code>.has-ink-color</code></td></tr>
+<tr><td><code>fontFace</code></td><td>inside a font family: bundled font files, <code>"src": [ "file:./assets/fonts/…woff2" ]</code></td></tr>
+<tr><td><code>templateParts</code>, <code>customTemplates</code></td><td>part areas (header, footer) and extra page templates</td></tr>
+<tr><td><code>styles/*.json</code></td><td>style variations; with <code>blockTypes</code>, section styles (<code>is-style-section-sage</code>)</td></tr>
+</tbody>
+</table>
+</div>
+<p>Templates and parts in block markup (copy markup from the Site Editor's Code editor):</p>
+<pre data-norun><code class="language-html">&lt;!-- wp:template-part {"slug":"header","tagName":"header"} /--&gt;
+&lt;!-- wp:query {"queryId":1,"query":{"inherit":true}} --&gt;
+&lt;div class="wp-block-query"&gt;
+	&lt;!-- wp:post-template --&gt;
+		&lt;!-- wp:post-title {"isLink":true,"level":2} /--&gt;
+	&lt;!-- /wp:post-template --&gt;
+&lt;/div&gt;
+&lt;!-- /wp:query --&gt;
+&lt;!-- wp:pattern {"slug":"pagesco/hero"} /--&gt;</code></pre>
+<pre data-norun><code class="language-php">&lt;?php
+/**
+ * Title: Hero: welcome to the shop
+ * Slug: pagesco/hero
+ * Categories: pagesco, banner, featured
+ * Keywords: hero, welcome, intro
+ * Viewport Width: 1200
+ * Post Types: wp_template
+ * Template Types: front-page
+ *
+ * @package pagesco
+ */
+?&gt;</code></pre>
+<div class="table-wrap">
+<table>
+<thead><tr><th>URL</th><th>Templates tried (first found wins), ending at index</th></tr></thead>
+<tbody>
+<tr><td><code>/</code> (latest posts)</td><td><code>front-page</code>, <code>home</code>, <code>index</code></td></tr>
+<tr><td><code>/</code> (static front page)</td><td><code>front-page</code>, then the page chain: <code>page-about</code>, <code>page-12</code>, <code>page</code></td></tr>
+<tr><td><code>/hello-world/</code></td><td><code>single-post-hello-world</code>, <code>single-post</code>, <code>single</code>, <code>singular</code></td></tr>
+<tr><td><code>/books/dune/</code></td><td><code>single-book-dune</code>, <code>single-book</code>, <code>single</code>, <code>singular</code></td></tr>
+<tr><td><code>/category/news/</code></td><td><code>category-news</code>, <code>category-2</code>, <code>category</code>, <code>archive</code></td></tr>
+<tr><td><code>/books/</code>, <code>/genre/fantasy/</code></td><td><code>archive-book</code>, <code>archive</code> / <code>taxonomy-genre-fantasy</code>, <code>taxonomy-genre</code>, <code>taxonomy</code>, <code>archive</code></td></tr>
+<tr><td><code>/?s=dune</code>, a missing page</td><td><code>search</code> / <code>404</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Template hierarchy details: <a href="lesson_07.html#hierarchy">Lesson 3.1</a>. A classic theme calls <code>wp_head()</code> before <code>&lt;/head&gt;</code>, <code>wp_body_open()</code> right after <code>&lt;body&gt;</code> and <code>wp_footer()</code> before <code>&lt;/body&gt;</code>.</p>
+            </section>
+
+            <section id="classic" class="lesson-section">
+                <h2>🔁 The Loop, Template Tags and WP_Query</h2>
+                <p><a href="lesson_11.html">Lesson 4.1</a> and <a href="lesson_12.html">Lesson 4.2</a>.</p>
+<pre data-norun><code class="language-php">&lt;?php
+while ( have_posts() ) {
+	the_post();
+	the_title( '&lt;h2&gt;&lt;a href="' . esc_url( get_permalink() ) . '"&gt;', '&lt;/a&gt;&lt;/h2&gt;' );
+	the_excerpt();
+}
+the_posts_pagination();
+
+// A secondary Loop: its own WP_Query, then always wp_reset_postdata().
+$pagesco_news = new WP_Query(
+	array(
+		'category_name'       =&gt; 'news',      // a slug; 'cat' takes IDs
+		'posts_per_page'      =&gt; 3,
+		'ignore_sticky_posts' =&gt; true,
+		'no_found_rows'       =&gt; true,        // skip the count when you do not paginate
+	)
+);
+while ( $pagesco_news-&gt;have_posts() ) {
+	$pagesco_news-&gt;the_post();
+	get_template_part( 'template-parts/content', null, array( 'show_date' =&gt; true ) );   // no .php
+}
+wp_reset_postdata();
+
+// Changing the main query: pre_get_posts, with guards.
+function pagesco_classic_adjust_main_query( $query ) {
+	if ( is_admin() || ! $query-&gt;is_main_query() ) {
+		return;
+	}
+	if ( $query-&gt;is_home() ) {
+		$query-&gt;set( 'posts_per_page', 3 );
+	}
+}
+add_action( 'pre_get_posts', 'pagesco_classic_adjust_main_query' );</code></pre>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Argument</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>type and status</td><td><code>'post_type' =&gt; 'book'</code>, <code>'post_status' =&gt; 'publish'</code></td></tr>
+<tr><td>how many, which page</td><td><code>'posts_per_page' =&gt; 6</code>, <code>'paged' =&gt; 2</code></td></tr>
+<tr><td>terms</td><td><code>'tax_query' =&gt; array( array( 'taxonomy' =&gt; 'genre', 'field' =&gt; 'slug', 'terms' =&gt; 'fantasy' ) )</code></td></tr>
+<tr><td>meta</td><td><code>'meta_key' =&gt; 'pagesco_price', 'orderby' =&gt; 'meta_value_num'</code>; <code>'meta_query' =&gt; array( … )</code></td></tr>
+<tr><td>people and dates</td><td><code>'author_name' =&gt; 'devon'</code>, <code>'date_query' =&gt; array( array( 'year' =&gt; 2026, 'month' =&gt; 9 ) )</code></td></tr>
+<tr><td>search and lists</td><td><code>'s' =&gt; 'club'</code>, <code>'post__in'</code>, <code>'post__not_in'</code>, <code>'post_name__in'</code></td></tr>
+<tr><td>order</td><td><code>'orderby' =&gt; 'title', 'order' =&gt; 'ASC'</code> (never order pages that share a date by date)</td></tr>
+<tr><td>only IDs</td><td><code>'fields' =&gt; 'ids'</code> (then <code>update_postmeta_cache( $ids )</code> before reading meta)</td></tr>
+</tbody>
+</table>
+</div>
+<p>Results: <code>$q-&gt;post_count</code> (this page), <code>$q-&gt;found_posts</code> (all), <code>$q-&gt;max_num_pages</code>. <code>get_posts()</code> returns an array, defaults to 5 posts and needs no reset. Template tags come in pairs: <code>the_title()</code> prints, <code>get_the_title()</code> returns; only <code>the_content()</code> renders blocks and shortcodes.</p>
+            </section>
+
+            <section id="theme-functions" class="lesson-section">
+                <h2>🧰 functions.php: Supports, Assets, Menus, Widgets</h2>
+                <p><a href="lesson_13.html">Lesson 4.3</a>.</p>
+<pre data-norun><code class="language-php">add_action( 'after_setup_theme', function () {
+	add_theme_support( 'title-tag' );
+	add_theme_support( 'post-thumbnails' );
+	add_theme_support( 'html5', array( 'search-form', 'comment-form', 'comment-list', 'gallery', 'caption', 'navigation-widgets' ) );
+	register_nav_menus( array( 'primary' =&gt; __( 'Primary menu', 'pagesco-classic' ) ) );
+} );
+
+add_action( 'wp_enqueue_scripts', function () {
+	$version = wp_get_theme( get_template() )-&gt;get( 'Version' );   // changes with every release
+	wp_enqueue_style( 'pagesco-classic-style', get_stylesheet_uri(), array(), $version );
+	wp_enqueue_script( 'pagesco-classic-navigation', get_parent_theme_file_uri( 'assets/js/navigation.js' ), array(), $version, array( 'strategy' =&gt; 'defer', 'in_footer' =&gt; true ) );
+} );
+
+add_action( 'widgets_init', function () {
+	register_sidebar( array( 'id' =&gt; 'footer', 'name' =&gt; __( 'Footer', 'pagesco-classic' ) ) );   // always a fixed id
+} );
+
+// In the templates:
+if ( has_nav_menu( 'primary' ) ) {
+	wp_nav_menu( array( 'theme_location' =&gt; 'primary', 'container' =&gt; false, 'fallback_cb' =&gt; false ) );
+}
+if ( is_active_sidebar( 'footer' ) ) {
+	dynamic_sidebar( 'footer' );
+}</code></pre>
+<p>A child theme loads its own stylesheet with the parent's handle as a dependency (<code>array( 'twentytwentyfive-style' )</code>) and removes parent hooks on <code>after_setup_theme</code>, after the parent added them.</p>
+            </section>
+
+            <section id="plugins" class="lesson-section">
+                <h2>🔌 Plugins: Header, Life Cycle, Data</h2>
+                <p><a href="lesson_14.html">Lesson 5.1</a> to <a href="lesson_18.html">Lesson 5.5</a>. The course plugin's main file, <code>pagesco-books/pagesco-books.php</code> (version 1.1.1, Lesson 8.4):</p>
+<pre data-norun><code class="language-php">&lt;?php
+/**
+ * Plugin Name:       Pages &amp; Co. Books
+ * Description:       The bookstore features of the Pages &amp; Co. website: books, genres, events and the shop's blocks.
+ * Version:           1.1.1
+ * Requires at least: 6.9
+ * Requires PHP:      8.2
+ * Author:            Pages &amp; Co.
+ * License:           GPL-2.0-or-later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain:       pagesco-books
+ * Domain Path:       /languages
+ * Update URI:        false
+ *
+ * @package PagesCo\Books
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+define( 'PAGESCO_BOOKS_VERSION', '1.1.1' );
+define( 'PAGESCO_BOOKS_FILE', __FILE__ );
+define( 'PAGESCO_BOOKS_DIR', plugin_dir_path( __FILE__ ) );
+
+require PAGESCO_BOOKS_DIR . 'vendor/autoload.php';
+
+add_action( 'plugins_loaded', array( PagesCo\Books\Plugin::instance(), 'boot' ) );
+register_activation_hook( __FILE__, array( PagesCo\Books\Activator::class, 'activate' ) );
+register_deactivation_hook( __FILE__, array( PagesCo\Books\Activator::class, 'deactivate' ) );</code></pre>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Moment</th><th>Do</th><th>Never</th></tr></thead>
+<tbody>
+<tr><td>activation</td><td>add roles, create tables (<code>dbDelta()</code>), register the post type <em>then</em> <code>flush_rewrite_rules()</code>, schedule cron events</td><td>register the hook inside another hook's callback</td></tr>
+<tr><td>deactivation</td><td>flush rewrite rules, <code>wp_clear_scheduled_hook()</code></td><td>delete data</td></tr>
+<tr><td>uninstall (<code>uninstall.php</code>)</td><td>remove what is the plugin's own: role, options, tables, transients (register a taxonomy before you query it)</td><td>assume the plugin's classes or post types are loaded</td></tr>
+</tbody>
+</table>
+</div>
+<pre data-norun><code class="language-php">register_post_type( 'book', array(
+	'labels'       =&gt; array( 'name' =&gt; __( 'Books', 'pagesco-books' ), 'singular_name' =&gt; __( 'Book', 'pagesco-books' ) ),
+	'public'       =&gt; true,
+	'has_archive'  =&gt; 'books',
+	'rewrite'      =&gt; array( 'slug' =&gt; 'books' ),
+	'show_in_rest' =&gt; true,
+	'rest_base'    =&gt; 'books',
+	'menu_icon'    =&gt; 'dashicons-book',
+	'supports'     =&gt; array( 'title', 'editor', 'excerpt', 'thumbnail', 'custom-fields' ),   // custom-fields: meta in REST
+) );
+
+register_taxonomy( 'genre', array( 'book' ), array( 'hierarchical' =&gt; true, 'show_admin_column' =&gt; true, 'show_in_rest' =&gt; true, 'rest_base' =&gt; 'genres', 'rewrite' =&gt; array( 'slug' =&gt; 'genre' ) ) );
+
+register_post_meta( 'book', 'pagesco_price', array( 'type' =&gt; 'number', 'single' =&gt; true, 'show_in_rest' =&gt; true ) );   // no leading _ : REST and bindings can read it
+
+wp_set_object_terms( $book_id, array( 'Fiction', 'Fantasy' ), 'genre' );   // not tax_input: that needs a user who may assign terms</code></pre>
+<p>Settings (Lesson 5.4): one array option, registered on <code>init</code>, with a page under Settings.</p>
+<pre data-norun><code class="language-php">register_setting( 'pagesco_books', 'pagesco_books_settings', array(
+	'type'              =&gt; 'object',
+	'sanitize_callback' =&gt; array( $this, 'sanitize' ),
+	'default'           =&gt; self::defaults(),
+) );
+
+add_options_page( __( 'Pages &amp; Co. Books Settings', 'pagesco-books' ), __( 'Pages &amp; Co. Books', 'pagesco-books' ), 'manage_options', 'pagesco-books', array( $this, 'render' ) );
+add_settings_section( 'pagesco_books_notice', __( 'Store notice', 'pagesco-books' ), '__return_false', 'pagesco-books' );
+add_settings_field( 'notice_extra', __( 'Extra sentence', 'pagesco-books' ), array( $this, 'render_text_field' ), 'pagesco-books', 'pagesco_books_notice', array( 'label_for' =&gt; 'pagesco-notice-extra' ) );
+
+// In render(): the GROUP for settings_fields(), the page SLUG for do_settings_sections().
+echo '&lt;form action="options.php" method="post"&gt;';
+settings_fields( 'pagesco_books' );
+do_settings_sections( 'pagesco-books' );
+submit_button();
+echo '&lt;/form&gt;';</code></pre>
+<p>Shortcodes and a custom table (Lesson 5.5):</p>
+<pre data-norun><code class="language-php">add_shortcode( 'pagesco_book', function ( $atts ) {
+	$atts = shortcode_atts( array( 'id' =&gt; 0 ), $atts, 'pagesco_book' );
+	return '&lt;span class="pagesco-book"&gt;' . esc_html( get_the_title( absint( $atts['id'] ) ) ) . '&lt;/span&gt;';   // return, never echo
+} );
+
+require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+global $wpdb;
+dbDelta( "CREATE TABLE {$wpdb-&gt;prefix}pagesco_events (
+	id bigint unsigned NOT NULL AUTO_INCREMENT,
+	title varchar(200) NOT NULL,
+	starts_at datetime NOT NULL,
+	PRIMARY KEY  (id),
+	KEY starts_at (starts_at)
+) {$wpdb-&gt;get_charset_collate()};" );
+update_option( 'pagesco_books_db_version', 2 );   // raise DB_VERSION with every schema change
+
+$wpdb-&gt;insert( $wpdb-&gt;prefix . 'pagesco_events', array( 'title' =&gt; $title, 'starts_at' =&gt; $starts_at ), array( '%s', '%s' ) );
+$id   = $wpdb-&gt;insert_id;
+$rows = $wpdb-&gt;get_results( $wpdb-&gt;prepare( "SELECT id, title FROM {$wpdb-&gt;prefix}pagesco_events ORDER BY starts_at LIMIT %d", 5 ) );</code></pre>
+            </section>
+
+            <section id="blocks" class="lesson-section">
+                <h2>🧱 Blocks: block.json, Build, Registration</h2>
+                <p><a href="lesson_19.html">Lesson 6.1</a> to <a href="lesson_22.html">Lesson 6.4</a>. All commands run in <code>wordpress/wp-content/plugins/pagesco-books</code>, with Node 24.</p>
+<pre data-norun><code class="language-bash">npx @wordpress/create-block@latest book-card --no-plugin --target-dir=src/blocks/book-card --namespace=pagesco --textdomain=pagesco-books
+npx @wordpress/create-block@latest book-list --no-plugin --target-dir=src/blocks/book-list --namespace=pagesco --textdomain=pagesco-books --variant dynamic
+npx @wordpress/create-block@latest book-filter --no-plugin --target-dir=src/blocks/book-filter --namespace=pagesco --textdomain=pagesco-books --template @wordpress/create-block-interactive-template
+npm run build      # src/blocks/ -&gt; build/blocks/ (+ blocks-manifest.php)
+npm start          # rebuild on every save while you work (leaves .map files: build before a release)</code></pre>
+<p>Without Node installed: <code>docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD/wordpress:/var/www/html" -w /var/www/html/wp-content/plugins/pagesco-books node:24 npm run build</code> from the project folder.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>block.json key</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>"apiVersion": 3</code>, <code>"name": "pagesco/book-list"</code></td><td>the current API; the name never changes once content uses it</td></tr>
+<tr><td><code>title</code>, <code>category</code>, <code>icon</code>, <code>description</code>, <code>keywords</code>, <code>example</code></td><td>how the inserter shows it</td></tr>
+<tr><td><code>attributes</code></td><td><code>type</code>, <code>default</code>, <code>enum</code>; <code>source</code> + <code>selector</code> (+ <code>attribute</code>) to read from saved HTML</td></tr>
+<tr><td><code>supports</code></td><td><code>html: false</code>, <code>color</code>, <code>spacing</code>, <code>typography</code>, <code>align</code>, <code>anchor</code>, <code>interactivity</code></td></tr>
+<tr><td><code>textdomain</code></td><td>for the JavaScript and <code>block.json</code> strings</td></tr>
+<tr><td><code>editorScript</code>, <code>editorStyle</code>, <code>style</code></td><td><code>file:./index.js</code>, <code>file:./index.css</code>, <code>file:./style-index.css</code></td></tr>
+<tr><td><code>render</code></td><td><code>file:./render.php</code>: a dynamic block (copied into <code>build/</code>)</td></tr>
+<tr><td><code>variations</code></td><td><code>file:./variations.php</code>: ready-made versions</td></tr>
+<tr><td><code>viewScriptModule</code></td><td><code>file:./view.js</code>: an Interactivity API store (needs <code>--experimental-modules</code> in the build scripts)</td></tr>
+</tbody>
+</table>
+</div>
+<pre data-norun><code class="language-php">// One call registers every block in the manifest (src/Blocks.php, on init):
+wp_register_block_types_from_metadata_collection(
+	PAGESCO_BOOKS_DIR . 'build/blocks',
+	PAGESCO_BOOKS_DIR . 'build/blocks/blocks-manifest.php'
+);</code></pre>
+<pre data-norun><code class="language-php">&lt;?php
+// render.php: WordPress passes $attributes (defaults filled in), $content and $block.
+$count = isset( $attributes['count'] ) ? absint( $attributes['count'] ) : (int) Settings::get( 'books_per_page' );
+$books = get_posts( array( 'post_type' =&gt; 'book', 'posts_per_page' =&gt; $count ) );
+?&gt;
+&lt;ul &lt;?php echo get_block_wrapper_attributes(); ?&gt;&gt;
+	&lt;?php foreach ( $books as $book ) : ?&gt;
+		&lt;li&gt;&lt;?php echo esc_html( get_the_title( $book ) ); ?&gt;&lt;/li&gt;
+	&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;</code></pre>
+<p>Static blocks: <code>edit</code> uses <code>useBlockProps()</code>, <code>RichText</code>, <code>InspectorControls</code>; <code>save</code> uses <code>useBlockProps.save()</code> and <code>RichText.Content</code>, never <code>__()</code>, and any change to its output needs an entry in <code>deprecated</code> (<a href="lesson_20.html#deprecations">Lesson 6.2</a>).</p>
+<p>Block bindings (Lesson 6.3), in a template or post:</p>
+<pre data-norun><code class="language-html">&lt;!-- wp:paragraph {"metadata":{"bindings":{"content":{"source":"core/post-meta","args":{"key":"pagesco_author"}}}},"className":"pagesco-book-author"} --&gt;
+&lt;p class="pagesco-book-author"&gt;Author&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;
+&lt;!-- wp:paragraph {"metadata":{"bindings":{"content":{"source":"pagesco/book","args":{"field":"price"}}}},"fontSize":"large"} --&gt;</code></pre>
+<pre data-norun><code class="language-php">register_block_bindings_source( 'pagesco/book', array(
+	'label'              =&gt; __( 'Book details', 'pagesco-books' ),
+	'get_value_callback' =&gt; array( $this, 'get_value' ),   // ( $source_args, $block_instance ): a string, or null for the fallback
+	'uses_context'       =&gt; array( 'postId', 'postType' ),
+) );</code></pre>
+<p>The Interactivity API (Lesson 6.4): state and context from PHP, directives in the HTML, a store in <code>view.js</code>.</p>
+<pre data-norun><code class="language-php">wp_interactivity_state( 'pagesco/book-filter', array( 'genre' =&gt; $selected ) );
+?&gt;
+&lt;div &lt;?php echo get_block_wrapper_attributes(); ?&gt; data-wp-interactive="pagesco/book-filter"&gt;
+	&lt;a href="&lt;?php echo esc_url( add_query_arg( 'genre', 'fantasy' ) ); ?&gt;"
+		&lt;?php echo wp_interactivity_data_wp_context( array( 'slug' =&gt; 'fantasy' ) ); ?&gt;
+		data-wp-on--click="actions.selectGenre"
+		data-wp-bind--aria-current="state.isSelected"
+		data-wp-class--is-selected="state.isSelected"&gt;Fantasy&lt;/a&gt;
+	&lt;p aria-live="polite"&gt;Showing &lt;span data-wp-text="state.visibleCount"&gt;11&lt;/span&gt; of 11 books&lt;/p&gt;
+&lt;/div&gt;</code></pre>
+<pre data-norun><code class="language-js">import { store, getContext, withSyncEvent } from '@wordpress/interactivity';
+
+const { state } = store( 'pagesco/book-filter', {
+	state: {
+		get isSelected() {
+			return getContext().slug === state.genre;
+		},
+	},
+	actions: {
+		selectGenre: withSyncEvent( ( event ) =&gt; {   // withSyncEvent: the action uses the event
+			event.preventDefault();
+			state.genre = getContext().slug;
+		} ),
+	},
+} );</code></pre>
+            </section>
+
+            <section id="rest" class="lesson-section">
+                <h2>🌐 The REST API</h2>
+                <p>Using it in <a href="lesson_23.html">Lesson 7.1</a>, your own routes in <a href="lesson_24.html">Lesson 7.2</a>.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Request</th><th>Means</th></tr></thead>
+<tbody>
+<tr><td><code>GET /wp-json/</code></td><td>the index: name, namespaces, routes</td></tr>
+<tr><td><code>GET /wp-json/wp/v2/books?per_page=5&amp;page=2&amp;orderby=title&amp;order=asc</code></td><td>a page of a collection; headers <code>X-WP-Total</code>, <code>X-WP-TotalPages</code>, <code>Link</code></td></tr>
+<tr><td><code>?_fields=id,title,_links,_embedded&amp;_embed=wp:term</code></td><td>fewer fields; embedding needs <code>_links</code> and <code>_embedded</code> in the list</td></tr>
+<tr><td><code>?context=edit</code></td><td>raw values (needs a user who may edit)</td></tr>
+<tr><td><code>?rest_route=/wp/v2/books</code></td><td>the same without pretty permalinks</td></tr>
+<tr><td><code>POST /wp-json/wp/v2/books/30</code> with JSON <code>{"meta":{"pagesco_in_stock":false}}</code></td><td>update (also <code>PUT</code>/<code>PATCH</code>); <code>DELETE</code> to remove</td></tr>
+</tbody>
+</table>
+</div>
+<pre data-norun><code class="language-bash"># From the WP-CLI container, with an application password ($PASS) for Maria:
+curl -s --user "maria:$PASS" -X POST -H 'Content-Type: application/json' \
+	-d '{"title":"Book club: Pride and Prejudice","starts_at":"2027-12-16 19:00"}' \
+	http://localhost:8080/wp-json/pagesco/v1/events</code></pre>
+<pre data-norun><code class="language-js">// JavaScript in wp-admin: apiFetch adds the nonce (X-WP-Nonce) for the logged-in user.
+const books = await wp.apiFetch( { path: '/wp/v2/books?per_page=100&amp;context=edit&amp;_fields=id,title,meta' } );
+await wp.apiFetch( { path: '/wp/v2/books/30', method: 'POST', data: { meta: { pagesco_in_stock: false } } } );</code></pre>
+<p>Registering routes (Lesson 7.2's <code>EventsEndpoint</code>, shortened):</p>
+<pre data-norun><code class="language-php">add_action( 'rest_api_init', function () {
+	register_rest_route(
+		'pagesco/v1',
+		'/events',
+		array(
+			array(
+				'methods'             =&gt; WP_REST_Server::READABLE,     // GET
+				'callback'            =&gt; array( $this, 'get_events' ),
+				'permission_callback' =&gt; '__return_true',              // public on purpose
+				'args'                =&gt; array(
+					'limit' =&gt; array( 'type' =&gt; 'integer', 'default' =&gt; 5, 'minimum' =&gt; 1, 'maximum' =&gt; 50 ),
+				),
+			),
+			array(
+				'methods'             =&gt; WP_REST_Server::CREATABLE,    // POST
+				'callback'            =&gt; array( $this, 'create_event' ),
+				'permission_callback' =&gt; array( $this, 'can_manage_events' ),
+				'args'                =&gt; array(
+					'title' =&gt; array(
+						'type'              =&gt; 'string',
+						'required'          =&gt; true,
+						'maxLength'         =&gt; 200,
+						'sanitize_callback' =&gt; 'sanitize_text_field',
+						'validate_callback' =&gt; 'rest_validate_request_arg',   // keeps the schema check
+					),
+				),
+			),
+			'schema' =&gt; array( $this, 'get_schema' ),
+		)
+	);
+} );
+
+public function can_manage_events() {
+	if ( current_user_can( 'edit_others_posts' ) ) {
+		return true;
+	}
+	return new WP_Error( 'rest_forbidden', __( 'Sorry, you are not allowed to manage events.', 'pagesco-books' ), array( 'status' =&gt; rest_authorization_required_code() ) );   // 401 or 403
+}
+
+public function get_events( WP_REST_Request $request ) {
+	$response = rest_ensure_response( EventsTable::find( $request['limit'], $request['location'] ) );
+	return $response;   // or new WP_Error( 'pagesco_book_not_found', '…', array( 'status' =&gt; 404 ) )
+}
+
+public function create_event( WP_REST_Request $request ) {
+	// ... EventsTable::add( … ) ...
+	$response = rest_ensure_response( $event );
+	$response-&gt;set_status( 201 );   // and for lists: $response-&gt;header( 'X-WP-Total', (string) $query-&gt;found_posts );
+	return $response;
+}</code></pre>
+<p>Single items use a pattern in the route: <code>'/books/(?P&lt;id&gt;\d+)'</code>, read as <code>$request['id']</code>. Call a route from PHP without HTTP: <code>rest_do_request( new WP_REST_Request( 'GET', '/pagesco/v1/books' ) )</code>.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Status</th><th>Means</th><th>Typical code</th></tr></thead>
+<tbody>
+<tr><td>400</td><td>bad input</td><td><code>rest_invalid_param</code> (<code>rest_out_of_bounds</code>, <code>rest_not_in_enum</code>, <code>rest_invalid_type</code>)</td></tr>
+<tr><td>401</td><td>not logged in (no or wrong credentials)</td><td><code>rest_not_logged_in</code>, <code>rest_forbidden</code>, <code>rest_cannot_edit</code></td></tr>
+<tr><td>403</td><td>logged in, but not allowed / bad nonce</td><td><code>rest_cannot_edit</code>, <code>rest_forbidden</code>, <code>rest_cookie_invalid_nonce</code></td></tr>
+<tr><td>404</td><td>no such route or item</td><td><code>rest_no_route</code>, <code>rest_post_invalid_id</code></td></tr>
+<tr><td>500</td><td>a failure, or a <code>WP_Error</code> without a status</td><td></td></tr>
+</tbody>
+</table>
+</div>
+            </section>
+
+            <section id="http-cron" class="lesson-section">
+                <h2>📞 HTTP, Transients and WP-Cron</h2>
+                <p><a href="lesson_25.html">Lesson 7.3</a>.</p>
+<pre data-norun><code class="language-php">$response = wp_remote_get( $url, array( 'timeout' =&gt; 5, 'headers' =&gt; array( 'X-Api-Key' =&gt; PAGESCO_BOOKS_SUPPLIER_KEY ) ) );
+if ( is_wp_error( $response ) ) {                        // 1. no answer: DNS, refused, timeout
+	return $response;
+}
+$code = wp_remote_retrieve_response_code( $response );   // 2. an answer, but not 2xx
+$data = json_decode( wp_remote_retrieve_body( $response ), true );
+if ( $code &lt; 200 || $code &gt; 299 || ! is_array( $data ) ) {   // 3. not the data you expect
+	return new WP_Error( 'pagesco_supplier_http_error', '…' );
+}
+// wp_remote_post( $url, array( 'body' =&gt; wp_json_encode( $data ), 'headers' =&gt; … ) ); wp_safe_remote_get() for user-supplied URLs.
+
+// Read-through cache:
+$cached = get_transient( 'pagesco_books_supplier_availability' );
+if ( false === $cached ) {
+	$cached = $this-&gt;refresh();   // set_transient( $key, $value, 12 * HOUR_IN_SECONDS ), 5 minutes after a failure
+}
+
+// A daily job: schedule once (on activation), listen always, clear on deactivation.
+if ( ! wp_next_scheduled( 'pagesco_books_daily_sync' ) ) {
+	wp_schedule_event( ( new DateTimeImmutable( 'tomorrow 03:00', wp_timezone() ) )-&gt;getTimestamp(), 'daily', 'pagesco_books_daily_sync' );
+}
+add_action( 'pagesco_books_daily_sync', array( $this, 'run' ) );   // never inside is_admin()
+wp_clear_scheduled_hook( 'pagesco_books_daily_sync' );</code></pre>
+<p>Object cache (Lesson 8.2): <code>wp_cache_get( $key, $group )</code>, <code>wp_cache_set( $key, $value, $group, $expire )</code>, and a key that changes with the data: <code>wp_cache_get_last_changed( 'pagesco_events' )</code> / <code>wp_cache_set_last_changed( 'pagesco_events' )</code>.</p>
+            </section>
+
+            <section id="tooling" class="lesson-section">
+                <h2>📦 Composer, npm and Tests</h2>
+                <p>Composer in <a href="lesson_14.html">Lesson 5.1</a> and <a href="lesson_26.html">Lesson 8.1</a>, npm in <a href="lesson_19.html">Lesson 6.1</a> and <a href="lesson_28.html">Lesson 8.3</a>, tests in <a href="lesson_26.html#testing">Lesson 8.1</a>.</p>
+<pre data-norun><code class="language-bash">cd wordpress/wp-content/plugins/pagesco-books
+alias composer='docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD:/app" -w /app composer:2 composer'</code></pre>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Command</th><th>Runs</th><th>Defined in</th></tr></thead>
+<tbody>
+<tr><td><code>composer dump-autoload</code></td><td>regenerate the PSR-4 autoloader (only when <code>composer.json</code>'s autoload changes)</td><td><a href="lesson_14.html#structure">Lesson 5.1</a></td></tr>
+<tr><td><code>composer lint</code> / <code>composer lint:fix</code></td><td><code>phpcs</code> / <code>phpcbf</code> with <code>phpcs.xml.dist</code>; <code>composer lint -- --report=summary</code></td><td><a href="lesson_26.html#phpcs">Lesson 8.1</a></td></tr>
+<tr><td><code>composer test</code></td><td><code>phpunit</code> (run it inside the wp-env test site)</td><td><a href="lesson_26.html#testing">Lesson 8.1</a></td></tr>
+<tr><td><code>composer dump-autoload --no-dev</code></td><td>an autoloader without development packages (for a ZIP); <code>composer dump-autoload</code> restores it</td><td><a href="lesson_28.html#mistakes">Lesson 8.3</a></td></tr>
+<tr><td><code>composer install --no-dev --optimize-autoloader</code></td><td>production dependencies in a clean release copy</td><td><a href="lesson_29.html#builds">Lesson 8.4</a></td></tr>
+<tr><td><code>npm install</code> / <code>npm ci</code></td><td>install the build tools / exactly as <code>package-lock.json</code> says (releases)</td><td><a href="lesson_19.html">Lesson 6.1</a>, <a href="lesson_29.html">Lesson 8.4</a></td></tr>
+<tr><td><code>npm run build</code> / <code>npm start</code></td><td><code>wp-scripts build|start --webpack-src-dir=src/blocks --output-path=build/blocks --blocks-manifest --experimental-modules</code></td><td><a href="lesson_22.html#scaffold">Lesson 6.4</a></td></tr>
+<tr><td><code>npm run plugin-zip</code></td><td><code>wp-scripts plugin-zip</code>: <code>pagesco-books.zip</code> from the <code>"files"</code> list in <code>package.json</code></td><td><a href="lesson_28.html#distribution">Lesson 8.3</a></td></tr>
+<tr><td><code>npm pack --dry-run</code></td><td>list what the <code>"files"</code> list would pack, without writing anything</td><td><a href="lesson_30.html#mistakes">Lesson 9.1</a></td></tr>
+</tbody>
+</table>
+</div>
+<pre data-norun><code class="language-bash"># The test site (a tests-only .wp-env.json in the plugin folder, port 8889):
+npx @wordpress/env start
+npx @wordpress/env run cli --env-cwd=wp-content/plugins/pagesco-books vendor/bin/phpunit --testdox
+npx @wordpress/env stop</code></pre>
+            </section>
+
+            <section id="deploy" class="lesson-section">
+                <h2>🚀 Deployment</h2>
+                <p><a href="lesson_29.html">Lesson 8.4</a>, used again in <a href="lesson_30.html">Lesson 9.1</a>. Code goes up, content comes down, configuration stays.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Setting</th><th>Development</th><th>Production</th></tr></thead>
+<tbody>
+<tr><td><code>WP_DEBUG</code></td><td>true</td><td>false (errors to the server's log)</td></tr>
+<tr><td><code>WP_DEBUG_DISPLAY</code>, <code>SCRIPT_DEBUG</code></td><td>true</td><td>off / not defined</td></tr>
+<tr><td><code>WP_ENVIRONMENT_TYPE</code></td><td><code>local</code></td><td><code>production</code></td></tr>
+<tr><td><code>WP_DEVELOPMENT_MODE</code></td><td><code>theme</code> (since Lesson 3.3)</td><td>not defined; raise the theme's Version instead</td></tr>
+<tr><td><code>DISALLOW_FILE_EDIT</code></td><td>not defined</td><td>true</td></tr>
+<tr><td><code>DISABLE_WP_CRON</code></td><td>not defined</td><td>true, with a real cron job</td></tr>
+<tr><td>secrets (database, salts, supplier key)</td><td>in <code>wp-config.php</code></td><td>on the server only (its <code>wp-config.php</code> or environment variables)</td></tr>
+</tbody>
+</table>
+</div>
+<pre data-norun><code class="language-bash"># Release: in wordpress/wp-content (the Git repository)
+git add -A &amp;&amp; git commit -m "…" &amp;&amp; git tag -a release-2 -m "Plugin 1.1.1, theme 1.1.1"
+mkdir -p ../release
+git archive --format=tar --prefix=pagesco-books/ release-2:plugins/pagesco-books | tar -x -C ../release
+git archive --format=zip --prefix=pagesco/ -o ../release/pagesco.zip release-2:themes/pagesco
+git show release-2:mu-plugins/pagesco-site.php &gt; ../release/pagesco-site.php
+
+# In wordpress/release/pagesco-books:
+composer install --no-dev --optimize-autoloader
+npm ci --silent &amp;&amp; npm run build &gt; /dev/null &amp;&amp; npm run plugin-zip &gt; /dev/null
+
+# The launch database, written to a file (nothing changes on your site):
+wp search-replace 'http://localhost:8080' 'https://www.pagesco.example' --all-tables-with-prefix --skip-columns=guid --report-changed-only --export=release/pagesco-live.sql
+
+# On the server: code first, then the database, then the launch-day clean-up
+wp db import /deploy/pagesco-live.sql
+wp user reset-password admin maria devon --skip-email --show-password
+wp user application-password delete maria --all
+wp transient delete --all
+
+# Every later release: code only
+wp plugin install /deploy/pagesco-books.zip --force
+wp theme install /deploy/pagesco.zip --force
+
+# The server's crontab
+*/5 * * * * cd /var/www/pagesco &amp;&amp; wp cron event run --due-now --quiet</code></pre>
+<p>The <code>wp-content/.gitignore</code> ignores everything (<code>/*</code>) and lets the shop's folders back in (<code>!/themes/</code>, <code>/themes/*</code>, <code>!/themes/pagesco/</code> …); <code>git check-ignore -v file</code> names the rule that ignores a file. Never deploy the repository itself, a database dump or <code>debug.log</code> into the web root.</p>
             </section>
 
             <nav class="lesson-nav" aria-label="Page Navigation">

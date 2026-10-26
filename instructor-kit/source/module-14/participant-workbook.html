@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Workbook: Session 14</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Student workbook —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">write in it · bring it to every session</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Participant Workbook</div>
+    <h1>Session 14: Custom Endpoints, External APIs and Cron</h1>
+    <p class="sub">Your workbook for Session 14: a warm-up, the key ideas of Lessons 7.2 and 7.3, worked examples, the guided labs, predict-then-run practice, a self-check for each lesson, and your exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Lessons <b>7.2–7.3</b></span>
+      <span class="chip">Session <b>14</b> · 3 hours</span>
+      <span class="chip">Name: ____________________</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Session Goals</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Register routes with arguments, a schema, proper errors and a real permission_callback.</li>
+  <li>Say in which order WordPress validates, sanitizes, checks permission and calls your callback.</li>
+  <li>Call another server with wp_remote_get() and handle each way it can fail.</li>
+  <li>Cache answers in transients, failures included, and schedule work with WP-Cron exactly once.</li>
+  <li>Start the Events API and the Supplier Sync.</li>
+</ul>
+
+  <div class="sec"><h2>Warm-up: Lessons 6.4 and 7.1</h2><span class="rule"></span></div>
+<p>Answer from memory first; the class goes through them together.</p>
+<div class="q"><div class="qn">W1</div><div class="qt">curl asks /find-a-book/?genre=fantasy. How many books does the server send with the hidden attribute?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W2</div><div class="qt">Why does selectGenre need <code class="inline">withSyncEvent()</code>?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W3</div><div class="qt">A client gets 403 rest_cannot_edit. Fix the request, the credentials or the role?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W4</div><div class="qt">How does a client learn how many pages the catalog has at per_page=5, without reading the books?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W5</div><div class="qt">Why can the Stock at a glance widget POST to /wp/v2/books with plain apiFetch, and an outside script cannot?</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Lessons</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">7.2</span><h3>Custom REST Endpoints</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Register routes with register_rest_route() on rest_api_init, as a feature class of the plugin</li>
+  <li>Declare arguments with types, defaults, limits and enums, and add your own validate_callback and sanitize_callback without losing the built-in checks</li>
+  <li>Describe responses with a JSON Schema, and return WP_REST_Response objects with headers and status codes</li>
+  <li>Return errors as WP_Error with the right status, and know what WordPress does with one that has none</li>
+  <li>Write a real permission_callback for every route, and explain why __return_true is only for public reads</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b><code class="inline">register_rest_route( 'pagesco/v1', '/books', ... )</code></b> on <b>rest_api_init</b>; a route holds endpoints (methods, callback, permission_callback, args) and a schema. The namespace is vendor/version.</li>
+  <li><b>Arguments with a type</b> are validated and sanitized from their schema (minimum, maximum, enum, required, default). A sanitize_callback of your own replaces that: keep <code class="inline">'validate_callback' =&gt; 'rest_validate_request_arg'</code> next to it.</li>
+  <li><b>Order of work:</b> validate, sanitize, permission, callback. Your callback receives clean, typed values.</li>
+  <li><b>Return</b> data, a WP_REST_Response (status, headers such as X-WP-Total) or a <b>WP_Error with a prefixed code and an explicit status</b>; without one it is a 500. Do not leak what exists.</li>
+  <li><b>Every route has a permission_callback:</b> <code class="inline">__return_true</code> only for public reads; writes check a capability; <code class="inline">rest_authorization_required_code()</code> gives 401 or 403.</li>
+  <li><b>OPTIONS</b> shows the arguments and the schema; <b>rest_do_request()</b> calls routes from PHP without HTTP.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: a route from PHP, and its menu</div>
+<p>Code on the same site can call a route without HTTP: the same validation, permission and callback, at the speed of a function call (the site after Lesson 7.2):</p>
+<pre class="code">wp eval '$r = rest_do_request( new WP_REST_Request( "GET", "/pagesco/v1/books/30" ) ); echo $r-&gt;get_status(), " ", $r-&gt;get_data()["title"], " ", wp_json_encode( $r-&gt;get_data()["genres"] ), "\n";'</pre>
+<pre class="out">200 Dune ["fiction","science-fiction"]</pre><p>And the events route's menu: which methods each endpoint answers, as OPTIONS reports them:</p>
+<pre class="code">curl -s -X OPTIONS http://localhost:8080/wp-json/pagesco/v1/events | grep -o '"methods":\[[^]]*\]'</pre>
+<pre class="out">"methods":["GET","POST"]
+"methods":["GET"]
+"methods":["POST"]</pre><p>The route as a whole (GET and POST), then each endpoint: READABLE is GET, CREATABLE is POST. A client learns what it may send before it sends anything.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>From the project folder: <code class="inline">cp -r labs/module-14/l7_2-custom-endpoints/opening_hours_starter wordpress/wp-content/plugins/pagesco-opening-hours</code>, then <code class="inline">wp plugin activate pagesco-opening-hours</code>.</li>
+  <li><code class="inline">cp labs/module-14/l7_2-custom-endpoints/test_opening_hours.sh wordpress/</code>, then <code class="inline">docker compose run --rm wpcli sh test_opening_hours.sh</code>.</li>
+  <li>TODO 1: the day argument (type, enum, no default). TODOs 2 and 3: the helper and the two answers. Run the test after each.</li>
+</ul>
+<div class="write"></div>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>Which line of yours produced the 400 for funday?</td><td></td></tr>
+<tr><td>What does $request['day'] hold when no day is sent?</td><td></td></tr>
+<tr><td>Why is __return_true right here?</td><td></td></tr>
+</tbody>
+</table>
+<ul class="tick">
+  <li>Done when the test prints Saturday's hours, Sunday closed, a 400, seven days and the argument's description. Then deactivate and <code class="inline">rm -r</code> the plugin and the test.</li>
+  <li>Finished early? <code class="inline">schema_rules_starter.php</code>, then <code class="inline">debug_staff_picks_route.php</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Predict, then run</div>
+<p>Write your prediction on the line first, then run it (<code class="inline">wp ...</code> from the project folder, curl in the WP-CLI container shell). P1 and P2 need the site after Lesson 7.2; P3 and P4 after Lesson 7.3.</p>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it. (A page size of zero.)</div><pre class="code">curl -s 'http://localhost:8080/wp-json/pagesco/v1/books?per_page=0'; echo</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it. (A POST with no arguments and no user.)</div><pre class="code">wp eval '$r = rest_do_request( new WP_REST_Request( "POST", "/pagesco/v1/events" ) ); echo $r-&gt;get_status(), " ", $r-&gt;get_data()["code"], "\n";'</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>The Events API</b> (lesson page, "Project: The Events API"). In class: Steps 1 and 2. At home: Steps 3 and 4.</p>
+<ul class="tick">
+  <li>☐ Step 1: <code class="inline">src/Rest/EventsEndpoint.php</code>, the seventeenth feature</li>
+  <li>☐ Step 2: GET /pagesco/v1/events shows five events; <code class="inline">?location=Café</code> two</li>
+  <li>☐ Step 3: POST anonymously 401, as Devon 403, Maria's bad date 400 (only starts_at reported)</li>
+  <li>☐ Step 4: event 7 created (201, the tag stripped); the row in the table; four routes</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">A route registers <code class="inline">'methods' =&gt; WP_REST_Server::CREATABLE</code>. Which HTTP method does that endpoint answer?</div><div class="opts"><div class="opt">A) GET</div><div class="opt">B) POST</div><div class="opt">C) POST, PUT and PATCH</div><div class="opt">D) DELETE</div></div></div>
+<div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">On the course site after Lesson 7.2 (Books per list = 6, eleven books): what does this print?</div><pre class="code">wp eval '$r = rest_do_request( new WP_REST_Request( "GET", "/pagesco/v1/books" ) ); echo $r-&gt;get_status(), " ", count( $r-&gt;get_data() ), " ", $r-&gt;get_headers()["X-WP-TotalPages"], "\n";'</pre><div class="write"></div></div>
+<div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">An anonymous client POSTs to /pagesco/v1/events WITHOUT a title. Which answer does it get first?</div><div class="opts"><div class="opt">A) 400 rest_missing_callback_param: arguments are validated before the permission check</div><div class="opt">B) 401 rest_forbidden: the permission check comes first</div><div class="opt">C) 500: the callback fails on a missing title</div><div class="opt">D) 201: the event is created without a title</div></div></div>
+<div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">Maria sends a bad starts_at AND a negative capacity. The answer names only starts_at. Why?</div><div class="opts"><div class="opt">A) capacity is not validated</div><div class="opt">B) The schema stops at the first error it finds in alphabetical order</div><div class="opt">C) A negative capacity is turned into 0</div><div class="opt">D) validate_callbacks run first; the schema checks of the other arguments run in the sanitizing step, which a failed validation never reaches</div></div></div>
+<div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">Which permission_callback fits a route that DELETES events?</div><div class="opts"><div class="opt">A) '__return_true': the callback checks the ID</div><div class="opt">B) 'is_user_logged_in'</div><div class="opt">C) A check of <code class="inline">current_user_can( 'edit_others_posts' )</code> that returns a WP_Error with rest_authorization_required_code()</div><div class="opt">D) None: DELETE routes are protected by WordPress</div></div></div>
+<div class="q" data-sc="6" data-kind="short"><div class="qn">Q6</div><div class="qt"><code class="inline">GET /pagesco/v1/books/14</code> asks for the Events page (a page, not a book). Why does the answer say only "No book was found with that ID." and not "that is a page"?</div><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>Design an endpoint the shop does not have yet, for example "reserve a seat at an event" or "a customer's wish list". Write its route and method, every argument with its type and rule, the permission callback in one sentence, the success status and response, and three error responses with code and status. Which of your checks can the schema do, and which need a callback?</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">7.3</span><h3>External APIs, Transients &amp; WP-Cron</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Call an external API with wp_remote_get() and wp_remote_post(), and handle each way it can fail: no answer, an error status, or an answer that is not what you expected</li>
+  <li>Keep API keys in wp-config.php and choose wp_safe_remote_get() when a URL comes from a user</li>
+  <li>Cache answers in transients, explain where they are stored and how a persistent object cache changes that, and cache failures briefly too</li>
+  <li>Schedule recurring work with WP-Cron, start and stop it on activation and deactivation, and inspect and run it with WP-CLI</li>
+  <li>Register an ability with the Abilities API and run it over the REST API</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>wp_remote_get() / wp_remote_post()</b> with a timeout you can afford; read answers with <code class="inline">wp_remote_retrieve_response_code()</code>, <code class="inline">_body()</code>, <code class="inline">_header()</code>.</li>
+  <li><b>Three failures, in order:</b> a WP_Error (no answer, timeout), a status outside 2xx (still a normal response), a body that is not the data you expect.</li>
+  <li><b>Keys and URLs live in wp-config.php</b> (<code class="inline">wp config set</code>), not in code; <b>wp_safe_remote_*()</b> for URLs users supply (SSRF).</li>
+  <li><b>Transients</b> are options with an expiry (two non-autoloaded rows, or the object cache); they can vanish early: read through, cache failures briefly, never store false.</li>
+  <li><b>WP-Cron</b> runs due events on the next request, as actions, without a user: schedule once on activation with <code class="inline">wp_next_scheduled()</code>, clear on deactivation, add the callback on every request.</li>
+  <li><b>The Abilities API</b> describes units of work (input and output schemas, a permission check) that tools can discover and run, through PHP or /wp-json/wp-abilities/v1/.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: where the note lives, and how often the job runs</div>
+<p>Where does the supplier note live on this site? (The site after Lesson 7.3, no persistent object cache.)</p>
+<pre class="code">wp db query "SELECT option_name, autoload FROM wp_options WHERE option_name LIKE '%pagesco_books_supplier%'"</pre>
+<pre class="out">option_name	autoload
+_transient_timeout_pagesco_books_supplier_availability	off
+_transient_pagesco_books_supplier_availability	off</pre><p>Two rows, not autoloaded: the value and its expiry time. And how often the nightly job repeats:</p>
+<pre class="code">wp eval 'echo wp_get_schedule( "pagesco_books_daily_sync" ), "\n";'</pre>
+<pre class="out">daily</pre><p><code class="inline">wp_get_schedule()</code> names the recurrence of the next event of a hook; false would mean nothing is scheduled (the plugin deactivated, or the activation code never ran on this site).</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>From the project folder: <code class="inline">cp labs/module-14/l7_3-external-apis-cron/remote_answers_starter.php wordpress/</code>, then <code class="inline">wp eval-file --use-include remote_answers_starter.php</code>.</li>
+  <li>Write <code class="inline">pagesco_lab_ask()</code>: TODO 1 the request, TODOs 2 to 4 the three failures, in order. Run after each TODO.</li>
+</ul>
+<div class="write tall"></div>
+<ul class="tick">
+  <li>Done when your output matches "Expected when done". Then <code class="inline">rm wordpress/remote_answers_starter.php</code>.</li>
+  <li>Finished early? <code class="inline">events_cache_starter.php</code>, <code class="inline">cron_plan_starter.sh</code>, then <code class="inline">debug_event_counts.php</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Predict, then run</div>
+<p>Write your prediction on the line first, then run it (<code class="inline">wp ...</code> from the project folder, curl in the WP-CLI container shell). P1 and P2 need the site after Lesson 7.2; P3 and P4 after Lesson 7.3.</p>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it. (The sandbox without a key.)</div><pre class="code">wp eval 'var_dump( is_wp_error( wp_remote_get( "http://localhost:8080/supplier-sandbox/v1/availability" ) ) );'</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it. (A private address, the safe way.)</div><pre class="code">wp eval 'echo wp_safe_remote_get( "http://10.0.0.1/" )-&gt;get_error_message(), "\n";'</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>The Supplier Sync</b> (lesson page, "Project: The Supplier Sync"). In class: Steps 1 and 2. At home: Steps 3 and 4.</p>
+<ul class="tick">
+  <li>☐ Step 1: all eleven books have their ISBN</li>
+  <li>☐ Step 2: Supplier\Client and Supplier\Availability; the Supplier column on the Books screen; a simulated failure cached</li>
+  <li>☐ Step 3: DailySync, the new Activator, the uninstall line; one daily event at 03:00; the past event removed</li>
+  <li>☐ Step 4: pagesco/check-stock answers Maria over REST and refuses Devon; twenty features</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">The supplier's host does not resolve, and code calls <code class="inline">wp_remote_retrieve_body( $response )</code> on the WP_Error. What does it get?</div><div class="opts"><div class="opt">A) A fatal error</div><div class="opt">B) null and a Warning</div><div class="opt">C) The error message</div><div class="opt">D) An empty string</div></div></div>
+<div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt">What does this print, for a transient nobody ever set?</div><pre class="code">wp eval 'var_dump( get_transient( "pagesco_books_nothing_here" ) );'</pre><div class="write"></div></div>
+<div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">A plugin fetches a book cover from a URL an editor types into a field. Which function?</div><div class="opts"><div class="opt">A) <code class="inline">wp_safe_remote_get()</code>: it refuses private networks and odd ports</div><div class="opt">B) <code class="inline">wp_remote_get()</code> with a short timeout</div><div class="opt">C) <code class="inline">file_get_contents()</code></div><div class="opt">D) <code class="inline">wp_remote_head()</code></div></div></div>
+<div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">You want to run the daily sync now, while developing, without moving tomorrow's 03:00 run. What do you type?</div><div class="opts"><div class="opt">A) <code class="inline">wp cron event run pagesco_books_daily_sync</code></div><div class="opt">B) <code class="inline">wp eval 'do_action( "pagesco_books_daily_sync" );'</code></div><div class="opt">C) <code class="inline">wp cron test</code></div><div class="opt">D) <code class="inline">curl -s http://localhost:8080/wp-cron.php</code></div></div></div>
+<div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">Where does the supplier's API key belong?</div><div class="opts"><div class="opt">A) In the plugin's Client class, as a constant</div><div class="opt">B) In a transient, refreshed daily</div><div class="opt">C) In wp-config.php (or an environment variable it reads), on each site</div><div class="opt">D) In the REST API response, for the JavaScript</div></div></div>
+<div class="q" data-sc="12" data-kind="short"><div class="qn">Q12</div><div class="qt">On the course site after Lesson 7.3: what does this print?</div><pre class="code">wp cron event list --hook=pagesco_books_daily_sync --fields=hook,recurrence</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>Pick a real service a client of yours might want on their site (shipping rates, a newsletter list, weather for an outdoor event, exchange rates). Write down: its endpoint, how it authenticates and where the key will live, what you would cache and for how long, what the page shows when the service is down, and whether a cron job, a webhook or a page view should trigger the call.</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<p>Three questions, no notes.</p>
+<div class="q"><div class="qn">E1</div><div class="qt">Name the four desks a REST request passes, in order.</div><div class="write"></div></div>
+<div class="q"><div class="qn">E2</div><div class="qt">Name the three ways a call to another server can fail.</div><div class="write"></div></div>
+<div class="q"><div class="qn">E3</div><div class="qt">Where does a plugin schedule its daily job, and what guards it?</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Notes</h2><span class="rule"></span></div>
+<div class="notes-lines"></div>
+
+  <div class="sec"><h2>Homework Checklist</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ Finish the Events API (Steps 3 and 4) and the Supplier Sync (Steps 3 and 4)</li>
+  <li>☐ Lesson 7.2 Hands-on Exercises 1 and 2 (Exercise 3 is a stretch)</li>
+  <li>☐ Lesson 7.3 Hands-on Exercises 1 to 3 (Exercise 4 needs the internet)</li>
+  <li>☐ Both Quick Quizzes on the lesson pages</li>
+  <li>☐ Both journal entries</li>
+  <li>☐ Before the Next Lesson: the Supplier column, one daily event, no scratch files left; Node 22.13+ for Lesson 8.1</li>
+  <li>☐ Optional: <code class="inline">schema_rules_starter.php</code>, <code class="inline">events_cache_starter.php</code>, <code class="inline">cron_plan_starter.sh</code>, both debug handouts</li>
+  <li>☐ Bring to Session 15: a site at the end of Lesson 7.3, this workbook</li>
+</ul>
+
+  <div class="sec"><h2>Glossary</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code class="inline">register_rest_route()</code></td><td>Adds a route under a namespace, on rest_api_init</td></tr>
+<tr><td>argument schema</td><td>type, default, minimum, maximum, enum, required: what WordPress checks before your callback</td></tr>
+<tr><td>validate_callback / sanitize_callback</td><td>Your own check (true or a WP_Error) / your own cleaning of one argument</td></tr>
+<tr><td>permission_callback</td><td>Who may call the endpoint: true, false or a WP_Error</td></tr>
+<tr><td>WP_REST_Response</td><td>Data plus status and headers</td></tr>
+<tr><td><code class="inline">rest_do_request()</code></td><td>Runs a REST request inside PHP, without HTTP</td></tr>
+<tr><td>HTTP API</td><td><code class="inline">wp_remote_get()</code>, <code class="inline">wp_remote_post()</code>, <code class="inline">wp_remote_request()</code> and the <code class="inline">wp_remote_retrieve_*()</code> helpers</td></tr>
+<tr><td>SSRF</td><td>Server-side request forgery: making a server request internal addresses; <code class="inline">wp_safe_remote_*()</code> refuses them</td></tr>
+<tr><td>transient</td><td>An option with an expiry: <code class="inline">set_transient()</code>, <code class="inline">get_transient()</code> (false = missing), <code class="inline">delete_transient()</code></td></tr>
+<tr><td>read-through</td><td>Read the cache; on a miss, fetch, store, return</td></tr>
+<tr><td>WP-Cron</td><td>Scheduled events (hooks) run on the next request after their time</td></tr>
+<tr><td>ability</td><td>A described unit of work for tools and assistants (<code class="inline">wp_register_ability()</code>)</td></tr>
+</tbody>
+</table>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 14 · Participant Workbook · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

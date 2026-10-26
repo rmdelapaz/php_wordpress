@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Key: Session 5</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">answers &amp; solutions · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Answer Key</div>
+    <h1>Session 5: Patterns, Style Variations and Child Themes</h1>
+    <p class="sub">Answers and reasoning for every Session 5 item: the warm-up, both self-checks, the predict-then-run items, the lab reference outputs, the lesson pages' own quizzes and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Session <b>5</b></span>
+      <span class="chip"><b>12</b> self-check items</span>
+      <span class="chip">Confidential</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Start Here · Warm-up</h2><span class="rule"></span></div>
+<p>Session 4 retrieval, not graded. W5's output on a site ready for today:</p>
+<pre class="code">wp eval 'var_dump( wp_is_block_theme(), wp_theme_has_theme_json() );'
+wp post list --post_type=wp_template,wp_template_part,wp_global_styles --format=count</pre><pre class="out">bool(true)
+bool(true)
+0</pre><ol class="steps">
+  <li><b>W1</b> In theme.json, what is the difference between settings and styles? <b>Answer:</b> settings say what editors may choose (the palette, font sizes, layout widths); styles say what is applied (the page's colors, fonts, element and block styles). Presets in settings become custom properties and classes (Lesson 3.2).</li>
+  <li><b>W2</b> The front page shows the latest posts. In a block theme, which templates does WordPress look for, in order? <b>Answer:</b> front-page, then home, then index (Lesson 3.1). pagesco has only index.html so far; Lesson 3.3 adds front-page.html today.</li>
+  <li><b>W3</b> The manager changed the Single Posts template in the Site Editor. Where is that change, and which version does a visitor see? <b>Answer:</b> In the database, a wp_template post whose source is custom; it wins over templates/single.html until someone resets it (Lesson 3.2, Common Mistakes 3).</li>
+  <li><b>W4</b> A template part is included as {"slug":"heder"}. What do visitors see? And a logged-in administrator? <b>Answer:</b> Visitors: nothing, the header is just missing. Logged in: "Template part has been deleted or is unavailable: heder" (Lesson 3.2).</li>
+  <li><b>W5</b> Run the two commands on the slide. What should a site ready for today print? <b>Answer:</b> bool(true) twice (pagesco is a block theme with a theme.json), then 0: no Site Editor copies. A learner with copies resets them first (wp post delete ID --force), or today's outputs will not match.</li>
+</ol>
+
+  <div class="sec"><h2>3.3 · Patterns, Style Variations &amp; the Site Editor: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">The live site has no <code class="inline">WP_DEVELOPMENT_MODE</code>. You deploy pagesco with a new <code class="inline">patterns/gift-cards.php</code>, and the inserter does not show it for half an hour. What makes WordPress read the patterns folder again at once, as part of every release?</div><div class="opts"><div class="opt correct">A) Raise the theme's Version in style.css</div><div class="opt">B) Call <code class="inline">register_block_pattern()</code> for the file in functions.php</div><div class="opt">C) Run <code class="inline">wp cache flush</code></div><div class="opt">D) Rename <code class="inline">patterns/</code> and back</div></div><div class="why"><b>Why:</b> The list of pattern files is cached in a transient (<code class="inline">wp_theme_files_patterns-…</code>) for 30 minutes, and rebuilt early when the theme's Version changes or the theme is switched (Lesson 3.3). Bumping Version on every deploy is the habit Lesson 8.4 builds in; the transient holds the version it was built for.<br><b>B</b> is wrong: Files in patterns/ register themselves; registering the same pattern by hand is a second, different mechanism.<br><b>C</b> is wrong: Without a persistent object cache, transients live in the options table, which a cache flush does not touch.<br><b>D</b> is wrong: The cache is keyed on the theme, not on the folder's name; renaming does nothing reliable.</div></div>
+  <div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">On the site at the end of Lesson 3.3, what does this print, and what are the two numbers?</div><pre class="code">wp eval 'echo count( WP_Theme_JSON_Resolver::get_style_variations() ), " ", count( WP_Theme_JSON_Resolver::get_style_variations( "block" ) ), "\n";'</pre><div class="opts"><div class="opt correct"><code class="inline">1 2</code>: one site variation (Evening) and two section styles (Sage band, Ink band)</div></div><div class="why"><b>Why:</b> The resolver sorts every JSON file under styles/ by one key: a file with <code class="inline">blockTypes</code> is a section style (the second call), a file without it a style variation for the whole site (the first). The folder styles/sections/ is only for order.</div></div>
+  <div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">Which of these lines should never be written into a template file in a theme?</div><div class="opts"><div class="opt">A) <code class="inline">&lt;!-- wp:pattern {"slug":"pagesco/hero"} /--&gt;</code></div><div class="opt">B) <code class="inline">&lt;!-- wp:template-part {"slug":"footer"} /--&gt;</code></div><div class="opt correct">C) <code class="inline">&lt;!-- wp:block {"ref":20} /--&gt;</code></div><div class="opt">D) <code class="inline">&lt;!-- wp:query {"query":{"inherit":true}} --&gt;</code></div></div><div class="why"><b>Why:</b> A synced pattern is referenced by its post ID, and IDs differ on every site: on another copy of the site, post 20 is something else or nothing. Themes refer to patterns by slug and to parts by slug; synced patterns are the site owner's content (Lesson 3.3, "Synced patterns are content, not theme").<br><b>A</b> is wrong: A theme pattern by slug is exactly how templates use patterns.<br><b>B</b> is wrong: Template parts are included by slug from parts/.<br><b>D</b> is wrong: The Query Loop that inherits the main query is how lists are drawn in block templates.</div></div>
+  <div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">After the shop manager saved the front page in the Site Editor, the <code class="inline">wp_template</code> copy contains <code class="inline">"patternName":"pagesco/hero"</code> and <code class="inline">src="http://localhost:8080/..."</code>. What does that tell you?</div><div class="opts"><div class="opt">A) The copy still refers to hero.php, so changes to the file will show up</div><div class="opt">B) The Site Editor could not read the pattern file and left a placeholder</div><div class="opt">C) Nothing: patternName is only used for the inserter's preview</div><div class="opt correct">D) The pattern was expanded before saving: its PHP already ran, so the URL is hard-coded and the strings are frozen in English</div></div><div class="why"><b>Why:</b> When someone edits a template that uses wp:pattern, the editor replaces each reference with the pattern's blocks and records where they came from in metadata.patternName. Copying that template over the file would lose translation, theme URLs and escaping; move the actual change into the pattern file and reset the copy.<br><b>A</b> is wrong: No wp:pattern reference is left in the copy; it is ordinary blocks now.<br><b>B</b> is wrong: The content is complete; the metadata is a note, not a placeholder.<br><b>C</b> is wrong: It is a record of where the blocks came from; the important part is that the reference is gone.</div></div>
+  <div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">You move <code class="inline">section-ink.json</code> from <code class="inline">styles/sections/</code> up into <code class="inline">styles/</code>. What changes?</div><div class="opts"><div class="opt">A) It becomes a style variation for the whole site</div><div class="opt correct">B) Nothing: it is still a section style, because it has <code class="inline">blockTypes</code></div><div class="opt">C) WordPress ignores it: section styles must be in styles/sections/</div><div class="opt">D) It replaces <code class="inline">evening.json</code>, because both are in styles/ now</div></div><div class="why"><b>Why:</b> WordPress reads every JSON file under styles/, at any depth, and tells the two kinds apart by the <code class="inline">blockTypes</code> key alone. The subfolder exists only for people.<br><b>A</b> is wrong: A file becomes a site variation only when it has no blockTypes.<br><b>C</b> is wrong: There is no required folder name.<br><b>D</b> is wrong: Files replace each other by name only in a child theme (Lesson 3.4), and the names differ.</div></div>
+  <div class="q" data-sc="6" data-kind="short"><div class="qn">Q6</div><div class="qt">The page source announces Vollkorn in a @font-face rule, but every browser shows the fallback serif, and debug.log is empty. Where do you look first, and for what?</div><div class="opts"><div class="opt correct">The browser's developer tools, Network tab filtered by Font: the font request answers 404, so the src path after file:./ (or the folder name) is wrong</div></div><div class="why"><b>Why:</b> WordPress builds the @font-face URL from theme.json without checking that the file exists (Lesson 3.3, Common Mistakes 2). From the WP-CLI container, <code class="inline">curl -s -o /dev/null -w '%{http_code}' &lt;the font URL&gt;</code> shows the same 404.</div></div>
+
+  <div class="sec"><h2>3.3 · Patterns, Style Variations &amp; the Site Editor: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'var_dump( WP_Block_Patterns_Registry::get_instance()-&gt;get_registered( "pagesco/hero" )["postTypes"] );'</pre><div class="opts"><div class="opt correct"><pre class="out">array(1) {
+  [0]=&gt;
+  string(11) "wp_template"
+}</pre></div></div><div class="why"><b>Why:</b> The header line <code class="inline">Post Types: wp_template</code> becomes an array with one entry: WordPress offers the hero only when editing templates in the Site Editor, never in a page (where its <code class="inline">&lt;h1&gt;</code> would compete with the page title).</div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it.</div><pre class="code">curl -s http://localhost:8080/about/ | grep -c 'wp:block'</pre><div class="opts"><div class="opt correct"><pre class="out">0</pre></div></div><div class="why"><b>Why:</b> Nothing of the reference reaches the browser: the page stores <code class="inline">&lt;!-- wp:block {"ref":20} /--&gt;</code>, and WordPress renders the synced pattern's blocks in its place. <code class="inline">grep -c</code> counts 0 and exits with status 1. The same holds for <code class="inline">wp:pattern</code> in templates.</div></div>
+
+  <div class="sec"><h2>3.4 · Child Themes &amp; Customizing Existing Themes: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">A client uploads only your child theme (pagesco-tt5-child.zip) to a site where Twenty Twenty-Five has been deleted, and clicks Activate. What happens?</div><div class="opts"><div class="opt">A) WordPress uses its default theme as the parent instead</div><div class="opt correct">B) It refuses: the parent theme is missing, and the theme is listed under Broken Themes</div><div class="opt">C) The child activates, unstyled, until the parent is installed</div><div class="opt">D) WordPress downloads Twenty Twenty-Five automatically</div></div><div class="why"><b>Why:</b> A child is only meaningful on top of its parent. WP-CLI says <code class="inline">Error: The parent theme is missing. Please install the "twentytwentyfive" parent theme.</code>; the Themes screen lists the child under Broken Themes (Lesson 3.4, Common Mistakes 1, where a typo in Template: caused the same). Install the parent first.<br><b>A</b> is wrong: Template: names one folder; WordPress never guesses another parent.<br><b>C</b> is wrong: Without a parent there are no templates to draw a page with; activation is refused.<br><b>D</b> is wrong: Nothing is downloaded on activation; wp theme install or the Themes screen does that.</div></div>
+  <div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt">On the site at the end of Lesson 3.4: what do the two middle commands print?</div><pre class="code">wp theme activate pagesco-tt5-child
+wp option get stylesheet
+wp option get template
+wp theme activate pagesco</pre><div class="opts"><div class="opt correct"><code class="inline">pagesco-tt5-child</code>, then <code class="inline">twentytwentyfive</code></div></div><div class="why"><b>Why:</b> With a child theme active, the stylesheet option holds the child (the theme whose style.css header names the site's theme) and the template option holds the parent (where the templates and code come from). Without a child theme both hold the same folder name. The first and last lines switch the child on and back to pagesco.</div></div>
+  <div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">A colleague's child theme.json lists only the two colors they wanted to change, base and contrast. What happens to Twenty Twenty-Five's accent colors?</div><div class="opts"><div class="opt correct">A) They disappear: the child's palette replaces the parent's whole palette, and styles that use accent variables silently lose their colors</div><div class="opt">B) They stay: theme.json is merged key by key</div><div class="opt">C) WordPress prints a notice that the palette is incomplete</div><div class="opt">D) The child's two colors are added to the end of the parent's list</div></div><div class="why"><b>Why:</b> Single values merge key by key, but preset lists (palette, font sizes, spacing sizes) are replaced as a whole. The home page still uses <code class="inline">var(--wp--preset--color--accent-3)</code> and accent-4, now undefined, and CSS ignores an undefined variable without a message (Lesson 3.4, Common Mistakes 2). Repeat every slug, change only values.<br><b>B</b> is wrong: That is true for single values, not for preset lists.<br><b>C</b> is wrong: There is no message anywhere; that is what makes it dangerous.<br><b>D</b> is wrong: Lists are not appended; the child's list is the list.</div></div>
+  <div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">Why can a child of Twenty Twenty-Five replace <code class="inline">twentytwentyfive_post_format_setup()</code> by defining a function with that name in its own functions.php?</div><div class="opts"><div class="opt">A) Child functions always override parent functions of the same name</div><div class="opt">B) WordPress renames the parent's function when a child theme is active</div><div class="opt">C) The parent's function is registered on a hook, and hooks prefer the child</div><div class="opt correct">D) The child's functions.php loads first, and the parent defines that function only <code class="inline">if ( ! function_exists( ... ) )</code></div></div><div class="why"><b>Why:</b> Load order (Lesson 3.4: child, then parent) plus a pluggable function. For a parent function WITHOUT the function_exists() wrapper, defining the same name in the child is a fatal <code class="inline">Cannot redeclare</code> error; remove or replace its hook instead, on <code class="inline">after_setup_theme</code>.<br><b>A</b> is wrong: PHP does not allow two functions with one name; only the wrapper makes it possible.<br><b>B</b> is wrong: WordPress renames nothing.<br><b>C</b> is wrong: Hooks have priorities, not a preference for the child; and the replacement here is a function definition.</div></div>
+  <div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">Twenty Twenty-Four enqueues no stylesheet of its own. In a child of it you write wp_enqueue_style( 'my-child-style', get_stylesheet_uri(), $deps, $version ). What should $deps be?</div><div class="opts"><div class="opt">A) <code class="inline">array( 'twentytwentyfour-style' )</code></div><div class="opt">B) <code class="inline">array( 'wp-block-library' )</code></div><div class="opt correct">C) <code class="inline">array()</code></div><div class="opt">D) <code class="inline">get_template_directory_uri() . '/style.css'</code></div></div><div class="why"><b>Why:</b> There is no parent handle to wait for, so the child depends on nothing (the session's TT4 child lab does exactly this). Read the parent's functions.php before copying a tutorial's handle: on WordPress 7.1 a dependency that is not registered stops the stylesheet from printing at all, with a notice that it was <code class="inline">enqueued with dependencies that are not registered</code> (since 6.9.1).<br><b>A</b> is wrong: That handle does not exist: WordPress drops the child's stylesheet and notes it in debug.log.<br><b>B</b> is wrong: The child's CSS has nothing to do with the block library's; the dependency only delays it for no reason.<br><b>D</b> is wrong: That is a URL, not a list of handles, and it points at the parent's style.css header file.</div></div>
+  <div class="q" data-sc="12" data-kind="short"><div class="qn">Q12</div><div class="qt">The shop manager wants to try a darker link color for the holidays and switch it back in January, without calling you. Site Editor, child theme, or plugin? Why?</div><div class="opts"><div class="opt correct">The Site Editor's Styles: a visual choice the owner wants to change again; it is saved in the database (the user global styles) and needs no developer</div></div><div class="why"><b>Why:</b> The decision table of Lesson 3.4: who should change it later, and must it survive a theme switch? Lasting design work on a theme you did not write goes in a child theme, kept in Git; features go in plugins; owner-changeable looks belong to the Site Editor.</div></div>
+
+  <div class="sec"><h2>3.4 · Child Themes &amp; Customizing Existing Themes: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp theme activate pagesco-tt5-child
+wp eval 'echo get_theme_file_uri( "assets/images/book-image.webp" ), "\n";'
+wp theme activate pagesco</pre><div class="opts"><div class="opt correct"><pre class="out">Success: Switched to 'Pages &amp;amp; Co. TT5 Child' theme.
+http://localhost:8080/wp-content/themes/twentytwentyfive/assets/images/book-image.webp
+Success: Switched to 'Pages &amp;amp; Co.' theme.</pre></div></div><div class="why"><b>Why:</b> The child has no assets/ folder, so <code class="inline">get_theme_file_uri()</code> falls back to the parent's copy, and Twenty Twenty-Five happens to ship a book-image.webp of its own. That lookup is why the hero uses <code class="inline">get_theme_file_uri()</code>: a child of pagesco could replace the image by adding its own file.</div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp theme activate pagesco-tt5-child
+wp eval 'var_dump( function_exists( "twentytwentyfive_post_format_setup" ), get_theme_support( "post-formats" )[0] );'
+wp theme activate pagesco</pre><div class="opts"><div class="opt correct"><pre class="out">Success: Switched to 'Pages &amp;amp; Co. TT5 Child' theme.
+bool(true)
+array(2) {
+  [0]=&gt;
+  string(5) "aside"
+  [1]=&gt;
+  string(5) "quote"
+}
+Success: Switched to 'Pages &amp;amp; Co.' theme.</pre></div></div><div class="why"><b>Why:</b> <code class="inline">function_exists()</code> is true, and the post formats are the child's two: the child's functions.php loaded first and defined <code class="inline">twentytwentyfive_post_format_setup()</code>, so the parent skipped its own definition (a pluggable function).</div></div>
+
+  <div class="sec"><h2>Lab Reference Solutions</h2><span class="rule"></span></div>
+<p>Every output below is real: the lab files run exactly as <code class="inline">labs/check_labs.py</code> runs them, on a course site at the state each file declares (WordPress 7.1.3, PHP 8.5, MySQL 9.7, WP-CLI 2.12). Folder labs are installed as a theme and activated first (the first line of their output); paths show <code class="inline">/var/www/html/...</code>, the learner's <code class="inline">wordpress/</code> folder.</p>
+<div class="blk lab"><div class="h">Lab 3.3-A (guided): labs/module-05/l3_3-patterns-style-variations/hours_band_starter/ → hours_band_solution/ with test_hours_band.php</div>
+<p>The test with the starter's pattern:</p>
+<pre class="out">Success: Switched to 'Pages &amp;amp; Co. Lab: Hours Band' theme.
+Title:       Visit the shop: hours band
+Categories:  (none)
+Keywords:    (none)
+Description: (none)
+Heading:     Visit the shop
+Text:        12 Market Street, open late on Thursdays.
+Button:      Plan your visit -&gt; http://localhost:8080/contact/</pre><p>With the solution's:</p>
+<pre class="out">Success: Switched to 'Pages &amp;amp; Co. Lab: Hours Band' theme.
+Title:       Visit the shop: hours band
+Categories:  contact
+Keywords:    hours, address, visit
+Description: A sage band with the shop's address and a button to the Contact page.
+Heading:     VISIT THE SHOP
+Text:        12 MARKET STREET, OPEN LATE ON THURSDAYS.
+Button:      PLAN YOUR VISIT -&gt; https://pagesandco.example/contact/</pre><p>Reading it: the header fields arrive in the registry as arrays (Categories, Keywords) or strings; the content is the pattern file's output, produced the first time someone asks for it, which is why the test's two filters are in place in time. Lower case after the "translation" means a string without <code class="inline">esc_html_e()</code> in the child's text domain (<code class="inline">pagesco</code> would not change case: another theme's strings); localhost means a hard-coded URL. Common sticking points: <code class="inline">esc_html_e()</code> inside <code class="inline">echo</code> (it already prints), a missing <code class="inline">esc_url()</code> (the test cannot see it; ask for it anyway), <code class="inline">Categories: Contact</code> with a capital (category names are slugs).</p>
+</div>
+<div class="blk lab"><div class="h">Lab 3.3-B: labs/module-05/l3_3-patterns-style-variations/variation_contrast_starter.php → variation_contrast_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">Default   ink on paper      TODO
+Default   oxblood on paper  TODO
+Default   slate on paper    TODO</pre><p>The solution prints:</p>
+<pre class="out">Default   ink on paper      13.9:1  AA
+Default   oxblood on paper   8.8:1  AA
+Default   slate on paper     5.8:1  AA
+Default   ink on sage       12.0:1  AA
+Default   sage on paper      1.2:1  FAIL (needs 4.5)
+Evening   ink on paper      13.5:1  AA
+Evening   oxblood on paper   8.3:1  AA
+Evening   slate on paper     8.4:1  AA
+Evening   ink on sage        9.7:1  AA
+Evening   sage on paper      1.4:1  FAIL (needs 4.5)</pre><p>The numbers confirm the lesson (Evening: ink on paper 13.5:1, oxblood links 8.3:1) and add one it does not state: sage on paper is 1.2:1, which is why sage is a background color only (Lesson 3.2's handoff calls it that). The two traps: the variation's palette is in <code class="inline">['settings']['color']['palette']['theme']</code> (keyed by origin, the resolver's internal shape); and a variation is a LAYER, so its colors are merged over the theme's (<code class="inline">array_merge()</code>), exactly as WordPress merges them.</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-05/l3_3-patterns-style-variations/debug_pattern_files.sh (deliberately broken)</div>
+<p>As shipped:</p>
+<pre class="out">== what WordPress registered ==
+Notice: Function get_block_patterns was called &lt;strong&gt;incorrectly&lt;/strong&gt;. Could not register file "/var/www/html/wp-content/themes/pagesco/patterns/gift-cards.php" as a block pattern ("Slug" field missing) Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 6.0.0.) in /var/www/html/wp-includes/functions.php on line 6260
+pattern: pagesco/call-to-action
+pattern: pagesco/featured-books
+pattern: pagesco/hero
+Notice: wp_json_file_decode(): Error when decoding a JSON file at path /var/www/html/wp-content/themes/pagesco/styles/sepia.json: Syntax error in /var/www/html/wp-includes/functions.php on line 6260
+site variation: Evening
+site variation: sepia
+section style: Ink band
+section style: Sage band</pre><ol class="steps">
+  <li><b>doing_it_wrong notice, the pattern header (script line 22):</b> no <code class="inline">Slug:</code> line, so WordPress skips the file ("Slug" field missing). Add <code class="inline"> * Slug: pagesco/gift-cards</code>.</li>
+  <li><b>Notice, script line 45 (sepia.json):</b> a trailing comma after the last palette entry: <code class="inline">wp_json_file_decode()</code> reports a syntax error, and the file is still listed, under its FILE NAME (<code class="inline">sepia</code>) with no data. Remove the comma.</li>
+  <li><b>Silent, script line 40 (sepia.json):</b> <code class="inline">"blockTypes"</code> copied from a section style. With the comma fixed, Sepia is registered as a section style for Groups, not as a look for the whole site. Delete the line. (Bug 2 hides bug 3: say so when a learner "fixes" the comma and asks why Sepia is still not a site variation.)</li>
+</ol>
+<p>Fixed, the script prints:</p>
+<pre class="out">== what WordPress registered ==
+pattern: pagesco/call-to-action
+pattern: pagesco/featured-books
+pattern: pagesco/gift-cards
+pattern: pagesco/hero
+site variation: Evening
+site variation: Sepia
+section style: Ink band
+section style: Sage band</pre></div>
+<div class="blk lab"><div class="h">Lab 3.4-A (guided): labs/module-05/l3_4-child-themes/tt4_child_starter/ → tt4_child_solution/ with test_tt4_child.sh</div>
+<p>The test with the starter:</p>
+<pre class="out">Success: Switched to 'Pages &amp;amp; Co. Lab: TT4 Child' theme.
+template:    twentytwentyfour
+stylesheet:  pagesco-lab-tt4-child
+accent-3:    #d8613c
+palette:     10 theme colors
+child CSS:   0
+footer:      (not the shop's: still the parent's footer pattern)
+styles:      core/details arrow-icon-details, core/post-terms pill, core/list checkmark-list, core/navigation-link arrow-link, core/heading asterisk</pre><p>With the solution:</p>
+<pre class="out">Success: Switched to 'Pages &amp;amp; Co. Lab: TT4 Child' theme.
+template:    twentytwentyfour
+stylesheet:  pagesco-lab-tt4-child
+accent-3:    #7a2e2e
+palette:     10 theme colors
+child CSS:   1
+footer:      The reading corner at Pages &amp;amp; Co. · 12 Market Street
+styles:      core/list checkmark-list</pre><p>Reading it, line by line: template/stylesheet (the starter is already a working child); accent-3 is the child's only when the child's palette lists it, and <code class="inline">10 theme colors</code> stays 10 only when the child repeats every slug (a palette with one entry makes it 1); the child's CSS is loaded once enqueued, with <code class="inline">array()</code> as dependencies because Twenty Twenty-Four registers no stylesheet handle of its own (a copied <code class="inline">twentytwentyfour-style</code> makes WordPress drop the child's stylesheet and log that the dependency is not registered); the footer is the child's once the pattern has the parent's slug; and the pluggable <code class="inline">twentytwentyfour_block_styles()</code> replaced the parent's five styles with one.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 3.4-B: labs/module-05/l3_4-child-themes/merge_layers_starter.php → merge_layers_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">parent:  8 colors, accent-3 = #503AA8
+child:   TODO
+merged:  TODO
+link:    TODO
+body:    TODO
+h1 size: TODO
+partial: TODO</pre><p>The solution prints:</p>
+<pre class="out">parent:  8 colors, accent-3 = #503AA8
+child:   8 colors, accent-3 = #7a2e2e
+merged:  8 colors, accent-3 = #7a2e2e
+link:    var(--wp--preset--color--accent-3)  (from the child)
+body:    var(--wp--preset--font-family--manrope)  (from the parent)
+h1 size: var(--wp--preset--font-size--xx-large)  (from the parent)
+partial: 2 colors (base, contrast)</pre><p>The parent's accent-3 (#503AA8) is replaced by the child's oxblood; the link color comes from the child, the body font and the h1 size from the parent: the merge rule of Lesson 3.4 in four lines. Note that WP_Theme_JSON turned the files' <code class="inline">var:preset|color|accent-3</code> shorthand into the CSS custom property it prints. The partial palette keeps two colors: lists are replaced, never merged.</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-05/l3_4-child-themes/debug_child_theme.sh (deliberately broken)</div>
+<p>As shipped:</p>
+<pre class="out">Success: Switched to 'Pages &amp;amp; Co. Lab: Broken Child' theme.
+link:      currentColor
+child CSS: 1
+checkmark: Notice: Function wp_enqueue_style was called &lt;strong&gt;incorrectly&lt;/strong&gt;. Scripts and styles should not be registered or enqueued until the &lt;code&gt;wp_enqueue_scripts&lt;/code&gt;, &lt;code&gt;admin_enqueue_scripts&lt;/code&gt;, or &lt;code&gt;login_enqueue_scripts&lt;/code&gt; hooks. This notice was triggered by the &lt;code&gt;pagesco-lab-broken-style&lt;/code&gt; handle. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 3.3.0.) in /var/www/html/wp-includes/functions.php on line 6260
+yes
+== what the page request added to debug.log (time stamps and HTML removed) ==
+      2 PHP Notice:  Function wp_enqueue_style was called incorrectly. Scripts and styles should not be registered or enqueued until the wp_enqueue_scripts, admin_enqueue_scripts, or login_enqueue_scripts hooks. This notice was triggered by the pagesco-lab-broken-style handle. Please see Debugging in WordPress for more information. (This message was added in version 3.3.0.) in /var/www/html/wp-includes/functions.php on line 6260
+      1 PHP Notice:  wp_json_file_decode(): Error when decoding a JSON file at path /var/www/html/wp-content/themes/pagesco-lab-broken/theme.json: Syntax error in /var/www/html/wp-includes/functions.php on line 6260
+Notice: Function wp_enqueue_style was called &lt;strong&gt;incorrectly&lt;/strong&gt;. Scripts and styles should not be registered or enqueued until the &lt;code&gt;wp_enqueue_scripts&lt;/code&gt;, &lt;code&gt;admin_enqueue_scripts&lt;/code&gt;, or &lt;code&gt;login_enqueue_scripts&lt;/code&gt; hooks. This notice was triggered by the &lt;code&gt;pagesco-lab-broken-style&lt;/code&gt; handle. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 3.3.0.) in /var/www/html/wp-includes/functions.php on line 6260
+Success: Switched to 'Pages &amp;amp; Co.' theme.
+[new lines in wp-content/debug.log]
+[26-Oct-2026 13:27:20 UTC] PHP Notice:  Function wp_enqueue_style was called &lt;strong&gt;incorrectly&lt;/strong&gt;. Scripts and styles should not be registered or enqueued until the &lt;code&gt;wp_enqueue_scripts&lt;/code&gt;, &lt;code&gt;admin_enqueue_scripts&lt;/code&gt;, or &lt;code&gt;login_enqueue_scripts&lt;/code&gt; hooks. This notice was triggered by the &lt;code&gt;pagesco-lab-broken-style&lt;/code&gt; handle. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 3.3.0.) in /var/www/html/wp-includes/functions.php on line 6260
+[26-Oct-2026 13:27:20 UTC] PHP Notice:  wp_json_file_decode(): Error when decoding a JSON file at path /var/www/html/wp-content/themes/pagesco-lab-broken/theme.json: Syntax error in /var/www/html/wp-includes/functions.php on line 6260
+[26-Oct-2026 13:27:20 UTC] PHP Notice:  Function wp_enqueue_style was called &lt;strong&gt;incorrectly&lt;/strong&gt;. Scripts and styles should not be registered or enqueued until the &lt;code&gt;wp_enqueue_scripts&lt;/code&gt;, &lt;code&gt;admin_enqueue_scripts&lt;/code&gt;, or &lt;code&gt;login_enqueue_scripts&lt;/code&gt; hooks. This notice was triggered by the &lt;code&gt;pagesco-lab-broken-style&lt;/code&gt; handle. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 3.3.0.) in /var/www/html/wp-includes/functions.php on line 6260
+[26-Oct-2026 13:27:21 UTC] PHP Notice:  Function wp_enqueue_style was called &lt;strong&gt;incorrectly&lt;/strong&gt;. Scripts and styles should not be registered or enqueued until the &lt;code&gt;wp_enqueue_scripts&lt;/code&gt;, &lt;code&gt;admin_enqueue_scripts&lt;/code&gt;, or &lt;code&gt;login_enqueue_scripts&lt;/code&gt; hooks. This notice was triggered by the &lt;code&gt;pagesco-lab-broken-style&lt;/code&gt; handle. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 3.3.0.) in /var/www/html/wp-includes/functions.php on line 6260</pre><ol class="steps">
+  <li><b>Notice, script line 39 (theme.json):</b> a trailing comma, so <code class="inline">wp_json_file_decode()</code> fails and the child's whole theme.json is ignored: the link color is the parent's <code class="inline">currentColor</code>. Remove the comma.</li>
+  <li><b>doing_it_wrong notice, script line 54 (functions.php):</b> <code class="inline">wp_enqueue_style()</code> at the top level, before <code class="inline">wp_enqueue_scripts</code> ("Scripts and styles should not be registered or enqueued until..."). The stylesheet still loads, which is why people ignore it; wrap it in a function on <code class="inline">wp_enqueue_scripts</code>. (In a theme's functions.php you get this one notice; in a must-use plugin, Lesson 4.3 shows two more.)</li>
+  <li><b>Silent, script line 56 (functions.php):</b> <code class="inline">remove_action()</code> at the top level returns false (the parent has not added its hook yet): the checkmark style is still registered. Move it into a callback on <code class="inline">after_setup_theme</code>.</li>
+</ol>
+<p>Fixed, the script prints:</p>
+<pre class="out">Success: Switched to 'Pages &amp;amp; Co. Lab: Broken Child' theme.
+link:      #7a2e2e
+child CSS: 1
+checkmark: no
+== what the page request added to debug.log (time stamps and HTML removed) ==
+Success: Switched to 'Pages &amp;amp; Co.' theme.</pre></div>
+
+  <div class="sec"><h2>The Lesson Pages' Own Quick Quizzes</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Lesson 3.3 · Patterns, Style Variations &amp; the Site Editor</div>
+<ol class="steps" data-lesson-quiz="3.3">
+  <li><b>B</b> The cached list of the theme's pattern files is still the old one: WordPress caches the list of pattern files per theme version. Set WP_DEVELOPMENT_MODE to theme on a development site, or raise the theme Version when you deploy.</li>
+  <li><b>C</b> A synced pattern: A synced pattern is one wp_block post; every page references it, so editing it once updates all six.</li>
+  <li><b>A</b> One with "blockTypes": [ "core/group" ] and a styles section: The blockTypes key is what makes a file in styles/ a block style variation (section style) instead of a style variation for the whole site.</li>
+  <li><b>B</b> Find the actual change, put it into the right theme file (often a pattern), then reset the copy: The export has the patterns expanded, with hard-coded URLs and frozen text. Move the actual change into the file it belongs to, usually a pattern, then reset the database copy.</li>
+  <li><b>C</b> Check whether its license allows web use and redistribution in a theme: Desktop or print licenses usually forbid web embedding and redistribution. Check the license (or buy a web license); until then use an OFL font or a system stack.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Lesson 3.4 · Child Themes &amp; Customizing Existing Themes</div>
+<ol class="steps" data-lesson-quiz="3.4">
+  <li><b>B</b> twentytwentyfive: template holds the parent's folder (twentytwentyfive); stylesheet holds the child's. Without a child theme both are the same.</li>
+  <li><b>A</b> It stays: the child's file is merged over the parent's: Single values in theme.json are merged key by key, so everything the child does not set keeps the parent's value. Only preset lists such as the palette are replaced as a whole.</li>
+  <li><b>C</b> false, and the parent's stylesheet is still loaded: The child's functions.php runs before the parent's, so the action has not been added yet and there is nothing to remove. Do it from a callback on after_setup_theme.</li>
+  <li><b>B</b> A child pattern with the slug twentytwentyfive/footer: The parent's footer part only references the pattern twentytwentyfive/footer, and a child pattern with the same slug wins, so the part itself stays the parent's.</li>
+  <li><b>C</b> In a plugin: A form is a feature with data and security needs; it must survive a theme switch, so it belongs in a plugin (Module 5).</li>
+</ol>
+</div>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>Opening hours on four pages:</b> a synced pattern, edited once, shown everywhere it is referenced. <b>A hero for new landing pages:</b> a theme pattern, a starting point that is copied and then edited per page.</li>
+  <li><b>Site Editor storage:</b> <code class="inline">wp_template</code> (and <code class="inline">wp_template_part</code>) posts for templates and parts, the <code class="inline">wp_global_styles</code> post for styles; <code class="inline">wp post list --post_type=wp_template,wp_template_part,wp_global_styles</code> lists them. (Synced patterns are <code class="inline">wp_block</code> posts, created on purpose.)</li>
+  <li><b>Load order:</b> the child's functions.php first, then the parent's. A parent hook does not exist yet when the child's file runs, so remove it in a callback on <code class="inline">after_setup_theme</code>; a pluggable parent function can be replaced by defining it first.</li>
+</ol>
+
+  <div class="sec"><h2>Common Wrong Answers and What They Reveal</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li><b>Q1 B (register_block_pattern).</b> Thinks pattern files need registering. Show the registry before and after development mode: no code, only the cache.</li>
+  <li><b>Q3 A or B.</b> Thinks every block comment is risky in a template. The question is what the comment refers to: a slug travels, an ID does not.</li>
+  <li><b>Q4 A.</b> The most important miss of the session: the learner believes the copy still points at hero.php. Rerun the demo's <code class="inline">grep</code> on the copy.</li>
+  <li><b>Q5 A.</b> Believes the folder decides. Point at the resolver's one key: blockTypes.</li>
+  <li><b>Q9 B.</b> Knows "merged" from the lesson and applies it to lists. Run the partial-palette count.</li>
+  <li><b>Q10 A.</b> "Child wins" as a general rule. Ask what PHP does with two functions of the same name.</li>
+  <li><b>Q11 A.</b> Copied the lesson's handle. The TT4 lab is the cure: read the parent's functions.php.</li>
+</ul>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 5 · Answer Key · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

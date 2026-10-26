@@ -1,0 +1,1929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Internationalization, accessibility and distribution on WordPress 7.1: POT files with wp i18n make-pot, a Spanish translation for PHP and block JavaScript, contrast, keyboard and axe checks, readme.txt, versioning, Plugin Check, a release ZIP, and an opt-in to delete all data on uninstall. PHP and WordPress Development Lesson 8.3.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Internationalization, Accessibility &amp; Distribution - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 8: Professional Workflow</a></li>
+            <li aria-current="page">Lesson 8.3: Internationalization, Accessibility &amp; Distribution</li>
+        </ul>
+    </nav>
+
+    <main id="main-content" data-state="after:lesson_27">
+        <div class="container">
+            <header>
+                <h1>🌍 Lesson 8.3: Internationalization, Accessibility &amp; Distribution</h1>
+                <p class="lead">The Pages &amp; Co. plugin works, is tested and is fast. This lesson makes it ready for more people and for leaving your hands: for readers in other languages, for visitors who use a keyboard or a screen reader, and for the day the plugin is handed over as a ZIP file or published in the plugin directory. You will generate a translation template, translate the plugin and its block JavaScript into Spanish, audit the theme and blocks for accessibility and fix what the audit finds, release version 1.1.0 with a proper readme that passes Plugin Check, and keep a promise from Lesson 5.4: an opt-in to delete all of the shop's data on uninstall.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Generate a POT file with <code>wp i18n make-pot</code>, write translator-friendly strings, and produce <code>.mo</code>, <code>.l10n.php</code> and JavaScript <code>.json</code> translations with WP-CLI</li>
+                        <li>Explain how WordPress 7.1 finds a plugin's translations, for PHP (<code>Domain Path</code>) and for scripts (<code>wp_set_script_translations()</code> and block.json)</li>
+                        <li>Check a theme and its blocks for accessibility with contrast ratios, a keyboard walk and an automated axe audit, and say what automated checks miss</li>
+                        <li>Prepare a plugin for distribution: a valid <code>readme.txt</code>, version numbers, the directory guidelines, a release ZIP without development files, and a clean Plugin Check report</li>
+                        <li>Write an uninstall routine that removes content only when an administrator has opted in</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 150 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_27.html">Lesson 8.2: Performance &amp; Caching</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> an opt-in "delete all shop data" setting tested both ways, a Spanish translation of the plugin and its blocks, three accessibility fixes, and release 1.1.0 of the plugin: readme, ZIP, and a Plugin Check run with no errors</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (automatic loading of a plugin's own <code>languages</code> folder needs 6.8, <code>.l10n.php</code> translation files 6.5)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 8.2, the WP-CLI container, Docker for <code>composer:2</code> and <code>node:24</code>, a browser, and an internet connection for the Spanish language files and Plugin Check</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#readers" class="toc-link">More Readers, More Ways to Read</a></li>
+                        <li><a href="#i18n" class="toc-link">Internationalization: Strings to a POT File</a></li>
+                        <li><a href="#l10n" class="toc-link">How Translations Reach the Page</a></li>
+                        <li><a href="#a11y" class="toc-link">Accessibility Checks</a></li>
+                        <li><a href="#distribution" class="toc-link">Distribution</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Release 1.1.0</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="readers" class="lesson-section">
+                <h2>📖 More Readers, More Ways to Read</h2>
+                <p>A publisher who buys a novel does three things before it reaches every reader who wants it. The author's manuscript is prepared so that translators can work on it: names checked, idioms marked, nothing that only makes sense in English. Translators then produce the Spanish and German editions. And the publisher makes editions for readers who read differently: large print, an audiobook. Software has the same three jobs, with names you will meet everywhere:</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: manuscript, translations, editions for every reader</h4>
+                    <p><strong>Internationalization</strong> (i18n: i, 18 letters, n) is the developer's job: every text the user sees goes through a translation function with the plugin's text domain, in a form a translator can work with. <strong>Localization</strong> (l10n) is the translator's job: a translation file per language. <strong>Accessibility</strong> (a11y) makes the result usable by everyone: keyboard users, screen reader users, people with low vision or color blindness. The first is code you write once; the second is files that can come later, from anyone; the third is a quality of every page.</p>
+                </div>
+                <p>Lesson 1.3 introduced the translation functions (<code>__()</code>, <code>esc_html__()</code> and their family), and every string in the plugin has used them since, with the text domain <code>pagesco-books</code>, which PHPCS has checked since Lesson 8.1. Lesson 4.3 loaded a Spanish translation for the classic theme. This lesson finishes the job for the plugin: its PHP, its block editor JavaScript and its Dashboard widget.</p>
+            </section>
+
+            <section id="i18n" class="lesson-section">
+                <h2>🔤 Internationalization: Strings to a POT File</h2>
+                <p>A translator never reads your code. They get a <strong>POT file</strong> (Portable Object Template): every translatable string of the project, with where it is used and any comment you left for them. WP-CLI's <code>wp i18n make-pot</code> scans PHP, JavaScript and <code>block.json</code> files and writes one. A first look, into <code>/tmp</code> (from the WP-CLI container, as always):</p>
+                <pre data-cli><code class="language-bash">wp i18n make-pot wp-content/plugins/pagesco-books /tmp/pagesco-books.pot --exclude=src/blocks,tests
+grep -c '^msgid ' /tmp/pagesco-books.pot
+grep -B3 -A4 '^msgid "%d seat"' /tmp/pagesco-books.pot</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Plugin file detected.
+Success: POT file successfully generated.
+132
+#. translators: %d: number of seats.
+#: src/Shortcodes/EventsShortcode.php:65
+#, php-format
+msgid "%d seat"
+msgid_plural "%d seats"
+msgstr[0] ""
+msgstr[1] ""</code></pre>
+                </div>
+                <p>The entry for the events' seat count from Lesson 5.5 shows everything a translator needs: the comment you wrote after <code>/* translators: */</code>, the file and line, <code>php-format</code> (the string contains a <code>printf</code> placeholder, so the translation must keep it), and two forms, singular and plural, because <code>_n()</code> was used. Languages have different numbers of plural forms (Polish has three, Arabic six), and the translation file says how to choose. About the options:</p>
+                <ul>
+                    <li><strong>What it scans.</strong> PHP files (<code>__()</code>, <code>_e()</code>, <code>_x()</code>, <code>_n()</code>, <code>esc_html__()</code>…), JavaScript (<code>__()</code> from <code>@wordpress/i18n</code> or <code>wp.i18n</code>), <code>block.json</code> (title, description, keywords: the <code>textdomain</code> field says whose they are), and the plugin header (name, description). <code>vendor</code> and <code>node_modules</code> are always skipped.</li>
+                    <li><strong><code>--exclude=src/blocks,tests</code>.</strong> The blocks' sources and their build copies contain the same strings. JavaScript translations are matched to the script file the browser loads, <code>build/blocks/…/index.js</code>, so the POT should point there, not at <code>src/blocks/…/edit.js</code>. (<code>render.php</code> and <code>block.json</code> are in <code>build/</code> too.) Tests have no user-facing strings.</li>
+                    <li><strong>Only strings with the plugin's text domain</strong> (from the <code>Text Domain</code> header) are collected. A string with the theme's domain in the plugin would be left out, which is why PHPCS checks domains.</li>
+                </ul>
+                <p>Strings translate well when you follow a few rules, which also make PHPCS and <code>make-pot</code> happy (Common Mistake 1 breaks them):</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Rule</th><th>Write</th><th>Not</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Whole sentences, placeholders for the variable parts</td><td><code>sprintf( __( 'Books in %s', 'pagesco-books' ), $genre )</code></td><td><code>__( 'Books in ', … ) . $genre</code></td></tr>
+                            <tr><td>Numbered placeholders when there are several, so the order can change</td><td><code>'Showing %1$s of %2$s books'</code></td><td><code>'Showing %s of %s books'</code></td></tr>
+                            <tr><td>A comment for every placeholder</td><td><code>/* translators: %s: genre name, such as Fantasy. */</code> on the line before</td><td>nothing</td></tr>
+                            <tr><td>Plural forms for counts</td><td><code>_n( '%d seat', '%d seats', $count, … )</code></td><td><code>__( '%d seats', … )</code></td></tr>
+                            <tr><td>Context for short ambiguous words</td><td><code>_x( 'Order', 'sort order', 'pagesco-books' )</code></td><td><code>__( 'Order', … )</code> for both "sort order" and "purchase order"</td></tr>
+                            <tr><td>Literal strings only</td><td><code>__( 'Fantasy Books', … )</code></td><td><code>__( $label, … )</code>: no tool can extract a variable</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>And escape the translation like any other output: <code>esc_html__()</code>, <code>esc_attr__()</code>. A translation is text from someone else, and a translator's <code>&lt;script&gt;</code> must stay text (Lesson 5.3).</p>
+            </section>
+
+            <section id="l10n" class="lesson-section">
+                <h2>🌐 How Translations Reach the Page</h2>
+                <p>From the POT, a translator makes a <strong>PO file</strong> per language (<code>pagesco-books-es_ES.po</code>: the same entries with <code>msgstr</code> filled in), with a desktop editor such as Poedit, a plugin such as Loco Translate, or the web tool behind translate.wordpress.org. From the PO, WP-CLI builds the files WordPress reads:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>File</th><th>Made with</th><th>Read by</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>pagesco-books-es_ES.po</code></td><td>a translator</td><td>people and tools: the source of the translation</td></tr>
+                            <tr><td><code>pagesco-books-es_ES.mo</code></td><td><code>wp i18n make-mo</code></td><td>PHP: the classic compiled format</td></tr>
+                            <tr><td><code>pagesco-books-es_ES.l10n.php</code></td><td><code>wp i18n make-php</code></td><td>PHP, WordPress 6.5+: a PHP array that OPcache keeps in memory, loaded instead of the <code>.mo</code> when both exist</td></tr>
+                            <tr><td><code>pagesco-books-es_ES-&lt;md5&gt;.json</code></td><td><code>wp i18n make-json</code></td><td>JavaScript: one file per script, named after the MD5 hash of the script's path in the plugin</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The whole path, from your code to the page:</p>
+                <div class="mermaid">
+graph TD
+    A["strings in your code"] --> B["wp i18n make-pot"]
+    B --> C["POT file"]
+    C --> D["translator: a PO per language"]
+    D --> E["make-mo, make-php"]
+    D --> F["make-json"]
+    E --> G["PHP: __()"]
+    F --> H["JavaScript: wp.i18n"]
+                </div>
+                <p><strong>PHP strings</strong> load by themselves. Since WordPress 6.8, the active plugin's <code>Text Domain</code> and <code>Domain Path</code> headers tell WordPress where to look, and the translations load just in time, the first time a string of that domain is translated (Lesson 4.3's version note: <code>load_plugin_textdomain()</code> is only needed for 6.7 and older). Plugins from the directory get their translations as language packs in <code>wp-content/languages/plugins/</code>, found without any header; a plugin that ships its own files needs <code>Domain Path: /languages</code>, which the project adds.</p>
+                <p><strong>JavaScript strings</strong> need two things: the script must be told which domain it uses, and a JSON file for exactly that script must exist. For the Dashboard widget, Lesson 7.1 already wrote <code>wp_set_script_translations( 'pagesco-stock-widget', 'pagesco-books' )</code>; for blocks, <code>register_block_type</code> does it for every script that <code>block.json</code> names, because <code>block.json</code> has <code>"textdomain": "pagesco-books"</code>. When the page prints the script, WordPress looks for the JSON whose name contains the hash of the script's path relative to the plugin, and prints its strings in an inline script before it (<code>wp.i18n.setLocaleData()</code>). The hashes your files will need:</p>
+                <pre data-cli><code class="language-bash">for script in assets/js/stock-widget.js build/blocks/book-list/index.js; do
+  echo "$(printf '%s' "$script" | md5sum | cut -d' ' -f1)  $script"
+done</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>cfe2bc3ef2a0800531dc26491d4caca6  assets/js/stock-widget.js
+1ef6e759fb00b1b9d64a64056a083f27  build/blocks/book-list/index.js</code></pre>
+                </div>
+                <p><code>wp i18n make-json</code> computes these names from the references in the PO file (the <code>#: build/blocks/book-list/index.js:1</code> lines), which is why the POT must point at the built file.</p>
+                <div class="card card-warning">
+                    <h4>⚠️ make-json removes JavaScript strings from the PO file</h4>
+                    <p>By default, <code>wp i18n make-json</code> moves the JavaScript strings out of the PO file into the JSON files ("purges" them), on the assumption that the PO is only used to build the <code>.mo</code>. Strings used in both PHP and JavaScript (the plugin's "Mark sold out" is one) then go missing from the next <code>.mo</code>, and your source PO loses entries. Pass <code>--no-purge</code> to keep the PO whole, as the project does.</p>
+                </div>
+            </section>
+
+            <section id="a11y" class="lesson-section">
+                <h2>♿ Accessibility Checks</h2>
+                <p>The standard is <strong>WCAG 2.2</strong> (Web Content Accessibility Guidelines), level <strong>AA</strong>: what most laws and contracts mean by "accessible", and what WordPress core commits to. Its principles: content must be perceivable (text alternatives, enough contrast), operable (everything works with a keyboard, focus is visible), understandable (labels, consistent navigation) and robust (correct HTML that assistive technology can read). A practical check of a theme and its blocks has three parts.</p>
+
+                <h3>1. Contrast, computed</h3>
+                <p>Normal text needs a contrast ratio of at least 4.5:1 with its background (3:1 for large text and for the outlines of controls). Lesson 3.2 chose the palette with that in mind; check the pairs the theme actually uses with a script that reads the palette from <code>theme.json</code> and applies WCAG's formula. Create <code>wordpress/pagesco-contrast.php</code>:</p>
+                <pre data-file="pagesco-contrast.php" data-wp><code class="language-php">&lt;?php
+/**
+ * Checks the WCAG contrast of the color pairs the pagesco theme uses. Usage: wp eval-file pagesco-contrast.php
+ */
+
+/**
+ * The relative luminance of a #rrggbb color, as WCAG 2 defines it.
+ *
+ * @param string $hex A color such as #1f2a2e.
+ */
+function pagesco_luminance( string $hex ): float {
+	$channels = array_map( fn( $pair ) =&gt; hexdec( $pair ) / 255, str_split( ltrim( $hex, '#' ), 2 ) );
+	$linear   = array_map( fn( $c ) =&gt; $c &lt;= 0.04045 ? $c / 12.92 : ( ( $c + 0.055 ) / 1.055 ) ** 2.4, $channels );
+
+	return 0.2126 * $linear[0] + 0.7152 * $linear[1] + 0.0722 * $linear[2];
+}
+
+/**
+ * The contrast ratio of two colors, from 1 (none) to 21 (black on white).
+ *
+ * @param string $text       Text color.
+ * @param string $background Background color.
+ */
+function pagesco_contrast( string $text, string $background ): float {
+	$lighter = max( pagesco_luminance( $text ), pagesco_luminance( $background ) );
+	$darker  = min( pagesco_luminance( $text ), pagesco_luminance( $background ) );
+
+	return ( $lighter + 0.05 ) / ( $darker + 0.05 );
+}
+
+// The theme's palette, by slug, from theme.json (Lesson 3.2).
+$pagesco_palette = wp_list_pluck( wp_get_global_settings( array( 'color', 'palette', 'theme' ) ), 'color', 'slug' );
+
+// Text color =&gt; background color, as the theme combines them.
+$pagesco_pairs = array(
+	array( 'ink', 'paper', 'body text' ),
+	array( 'oxblood', 'paper', 'links' ),
+	array( 'slate', 'paper', 'dates, small text' ),
+	array( 'ink', 'sage', 'header band' ),
+	array( 'paper', 'ink', 'notice bar, footer' ),
+	array( 'paper', 'oxblood', 'buttons' ),
+);
+
+foreach ( $pagesco_pairs as list( $pagesco_text, $pagesco_background, $pagesco_where ) ) {
+	$pagesco_ratio = pagesco_contrast( $pagesco_palette[ $pagesco_text ], $pagesco_palette[ $pagesco_background ] );
+	printf(
+		"%-8s on %-8s %5.1f:1  %-4s  %s\n",
+		$pagesco_text,
+		$pagesco_background,
+		$pagesco_ratio,
+		$pagesco_ratio &gt;= 7 ? 'AAA' : ( $pagesco_ratio &gt;= 4.5 ? 'AA' : 'FAIL' ),
+		$pagesco_where
+	);
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>ink      on paper     13.9:1  AAA   body text
+oxblood  on paper      8.8:1  AAA   links
+slate    on paper      5.8:1  AA    dates, small text
+ink      on sage      12.0:1  AAA   header band
+paper    on ink       13.9:1  AAA   notice bar, footer
+paper    on oxblood    8.8:1  AAA   buttons</code></pre>
+                </div>
+                <p>Every pair passes AA, all but the small gray text even AAA (7:1). The theme's choices are safe; Exercise 2 looks at the pairs an editor could still pick in a block's color settings. Keep the script for now: the project removes it.</p>
+
+                <h3>2. The keyboard walk</h3>
+                <p>Put the mouse away, open a page, and press <kbd>Tab</kbd> again and again. Every link and control must be reached in a sensible order, and you must always see where you are. Recorded on Find a Book with the Fantasy genre selected (<code>?genre=fantasy</code>), with the focused element and its outline after each press:</p>
+                <div class="card card-output">
+                    <h4>Output (recorded in Chromium)</h4>
+                    <pre><code>Tab  1: See events       browser focus ring
+Tab  2: Skip to content  browser focus ring
+Tab  3: Pages &amp; Co.      browser focus ring
+Tab  4: About Us         browser focus ring
+Tab  5: Contact          browser focus ring
+Tab  6: Events           browser focus ring
+Tab  7: Find a Book      browser focus ring
+Tab  8: Sample Page      browser focus ring
+Tab  9: All books        browser focus ring
+Tab 10: Classic          browser focus ring
+Tab 11: Dystopian        browser focus ring
+Tab 12: Fantasy          outline solid 2px offset 1px
+Without focus: Fantasy    outline solid 2px</code></pre>
+                </div>
+                <p>Two findings. <strong>First, the order:</strong> the store notice's "See events" link comes before WordPress's "Skip to content" link. Since 7.0, core inserts the skip link at the start of the block template, and the notice is printed before the template, on <code>wp_body_open</code> (Lesson 2.3). A keyboard user presses <kbd>Tab</kbd> twice instead of once to skip the header: a small cost, kept for now and taken up in Going Further. <strong>Second, the Fantasy link</strong>, the selected genre, shows the same 2-pixel outline whether it has keyboard focus or not (focus only moves it by one pixel), because Lesson 6.4's style draws the selection with <code>outline</code>, which replaces the browser's focus ring. A keyboard user who tabs onto it cannot tell. WCAG 2.4.7 (Focus Visible) fails, and the project fixes it.</p>
+
+                <h3>3. An automated audit with axe</h3>
+                <p><a href="https://github.com/dequelabs/axe-core" target="_blank" rel="noopener">axe-core</a> is the open-source rule engine behind many accessibility tools, including the axe DevTools browser extension and Lighthouse's accessibility audit. Run the extension (or Lighthouse) on each kind of page. Recorded with axe-core 4.14 on four pages of the shop, WCAG 2.0 to 2.2 A and AA rules plus axe's best practices:</p>
+                <div class="card card-output">
+                    <h4>Output (recorded with axe-core 4.14)</h4>
+                    <pre><code>/: 2 violations, 36 rules passed
+  list (serious): &lt;ul&gt; and &lt;ol&gt; must only directly contain &lt;li&gt;, &lt;script&gt; or &lt;template&gt; elements
+    .wp-block-navigation__container
+  region (moderate): All page content should be contained by landmarks
+    .pagesco-notice
+    #wp-skip-link
+/books/dune/: 2 violations, 28 rules passed
+  list (serious): &lt;ul&gt; and &lt;ol&gt; must only directly contain &lt;li&gt;, &lt;script&gt; or &lt;template&gt; elements
+    .wp-block-navigation__container
+  region (moderate): All page content should be contained by landmarks
+    .pagesco-notice
+    #wp-skip-link
+/find-a-book/: 2 violations, 33 rules passed
+  list (serious): &lt;ul&gt; and &lt;ol&gt; must only directly contain &lt;li&gt;, &lt;script&gt; or &lt;template&gt; elements
+    .wp-block-navigation__container
+  region (moderate): All page content should be contained by landmarks
+    .pagesco-notice
+    #wp-skip-link
+/events/: 2 violations, 34 rules passed
+  list (serious): &lt;ul&gt; and &lt;ol&gt; must only directly contain &lt;li&gt;, &lt;script&gt; or &lt;template&gt; elements
+    .wp-block-navigation__container
+  region (moderate): All page content should be contained by landmarks
+    .pagesco-notice</code></pre>
+                </div>
+                <ul>
+                    <li><strong><code>list</code> (serious):</strong> in the header's Navigation, the <code>&lt;ul&gt;</code> contains another <code>&lt;ul&gt;</code> directly, not inside an <code>&lt;li&gt;</code>. The navigation (Lesson 3.2) shows a Page List block, and core renders the Page List's own list inside the Navigation's list. Screen readers then announce a list with one odd item. The fix is content, not code: replace the Page List with one link per page, which the Site Editor does when you click the Page List and choose <strong>Edit</strong>, and which also lets the shop drop WordPress's default "Sample Page" from its menu.</li>
+                    <li><strong><code>region</code> (moderate, a best practice):</strong> content outside any landmark. The store notice is a <code>&lt;div&gt;</code> before the <code>&lt;header&gt;</code>, so screen reader users who move from landmark to landmark never meet it; giving it <code>role="region"</code> and a name makes it one. The other node is core's own skip link, which sits before the landmarks by design: nothing to fix in the theme.</li>
+                </ul>
+                <p>Everything else passed, including the plugin's blocks: the Book Filter's labeled <code>nav</code>, <code>aria-current</code> and <code>aria-live</code> count from Lesson 6.4, the Book List's links, the events list. That is the good news, and the limit: automated tools find perhaps a third of real accessibility problems. They cannot tell whether alternative text describes the image, whether the reading order makes sense, whether a screen reader announces the Book Filter's new count helpfully, or whether the focus outline is visible enough (the keyboard walk found that one, axe did not). Test with a screen reader too: NVDA on Windows and VoiceOver on macOS are free.</p>
+                <div class="card card-info">
+                    <h4>💡 Themes in the directory: the accessibility-ready tag</h4>
+                    <p>A theme in the WordPress.org directory may use the <code>accessibility-ready</code> tag only after a review against a published list: a skip link, keyboard-reachable menus with visible focus, contrast, headings, form labels, no information by color alone. Block themes get much of it from core (the skip link, the Navigation block's keyboard support), and the rest is the theme's choices, like the ones checked here.</p>
+                </div>
+            </section>
+
+            <section id="distribution" class="lesson-section">
+                <h2>📦 Distribution</h2>
+                <p>Pages &amp; Co. Books is a client plugin: it will be installed on one site, and nobody will download it from WordPress.org. It will still be distributed, to a staging site, to the live site, to the next developer, as a ZIP file with a version number, and building it to the directory's standard is the professional baseline either way. Three pieces make a plugin distributable.</p>
+
+                <h3>The readme.txt</h3>
+                <p>The directory builds a plugin's page from <code>readme.txt</code>, a Markdown-like file with a fixed header. Clients read it too, and so does Plugin Check:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Header</th><th>Means</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>=== Plugin Name ===</code></td><td>the first line</td></tr>
+                            <tr><td><code>Contributors</code></td><td>WordPress.org user names of the authors</td></tr>
+                            <tr><td><code>Tags</code></td><td>up to five, for directory search</td></tr>
+                            <tr><td><code>Requires at least</code>, <code>Requires PHP</code></td><td>the same minimums as the plugin header (activation checks the header, Lesson 5.1)</td></tr>
+                            <tr><td><code>Tested up to</code></td><td>the newest WordPress version you tested, major and minor only: <code>7.1</code></td></tr>
+                            <tr><td><code>Stable tag</code></td><td>the version users should get; must match the plugin header's <code>Version</code></td></tr>
+                            <tr><td><code>License</code>, <code>License URI</code></td><td>GPL-compatible, as the directory requires</td></tr>
+                            <tr><td>the line after the header</td><td>a short description, at most 150 characters</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Then sections: <code>== Description ==</code>, <code>== Installation ==</code>, <code>== Frequently Asked Questions ==</code>, <code>== Changelog ==</code> and <code>== Upgrade Notice ==</code> (shown to users before they update).</p>
+
+                <h3>Versions</h3>
+                <p>The plugin's version appears in the header (<code>Version</code>), in the constant <code>PAGESCO_BOOKS_VERSION</code> (which also busts browser caches: it is the <code>?ver=</code> of the Stock widget's script, Lesson 7.1), in <code>readme.txt</code>'s <code>Stable tag</code> and changelog, and in <code>package.json</code>. Most WordPress plugins follow <strong>semantic versioning</strong>: MAJOR.MINOR.PATCH, where a patch fixes bugs, a minor version adds features that do not break anything, and a major version may break things (a removed hook, a changed REST response). This lesson's release adds features and raises a requirement, so it is <strong>1.1.0</strong>. Raising "Requires at least" is a minor change for users on recent WordPress and a hard stop for the rest: WordPress refuses to install or activate the plugin on older versions, and the directory does not offer them the update.</p>
+
+                <h3>The directory's guidelines, and Plugin Check</h3>
+                <p>Plugins in the WordPress.org directory must follow its <a href="https://developer.wordpress.org/plugins/wordpress-org/detailed-plugin-guidelines/" target="_blank" rel="noopener">detailed guidelines</a>. The ones that most often matter for code like ours:</p>
+                <ul>
+                    <li><strong>GPL-compatible</strong> code and assets, and <strong>human-readable</strong> code (no obfuscation; minified build files are fine when the sources are available).</li>
+                    <li><strong>No tracking without consent</strong>, and every external service documented in the readme: what is sent, when, and links to the service's terms and privacy policy. The supplier client of Lesson 7.3 is exactly such a service.</li>
+                    <li><strong>No code from elsewhere at run time</strong>: no remote scripts or updates outside WordPress.org, everything shipped in the ZIP.</li>
+                    <li><strong>Unique prefixes</strong> for everything global (Lesson 1.3), no hijacking of the admin with nags, and no "powered by" links on the site without the user's consent.</li>
+                    <li><strong>Trademarks</strong>: a plugin may not start its name with someone else's brand ("WordPress …" is out; "… for WordPress" is fine).</li>
+                </ul>
+                <p><strong>Plugin Check</strong> is the WordPress.org review team's own tool, a free plugin with a WP-CLI command: it runs a PHPCS ruleset similar to Lesson 8.1's plus checks of headers, the readme, file types, and functions that need a newer WordPress than the plugin requires. Like Query Monitor, it is a development tool: install it, use it, remove it.</p>
+                <pre data-cli><code class="language-bash">wp plugin install plugin-check --activate</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your version number may differ)</h4>
+                    <pre><code>Installing Plugin Check (PCP) (2.1.0)
+Downloading installation package from https://downloads.wordpress.org/plugin/plugin-check.2.1.0.zip...
+Unpacking the package...
+Installing the plugin...
+Plugin installed successfully.
+Activating 'plugin-check'...
+Plugin 'plugin-check' activated.
+Success: Installed 1 of 1 plugins.</code></pre>
+                </div>
+                <p>Run it on the plugin as it is now, and count the findings by type and code (the full report, without <code>--format=csv</code>, lists every file and line):</p>
+                <pre data-cli><code class="language-bash">wp plugin check pagesco-books --format=csv --fields=type,code | grep -e ERROR -e WARNING | sort | uniq -c | sort -rn</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>     60 WARNING,WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
+      7 ERROR,missing_direct_file_access_protection
+      4 WARNING,WordPress.DB.DirectDatabaseQuery.DirectQuery
+      3 WARNING,WordPress.DB.SlowDBQuery.slow_db_query_tax_query
+      3 WARNING,WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+      2 WARNING,WordPress.DB.DirectDatabaseQuery.NoCaching
+      2 ERROR,wp_function_not_compatible_with_requires_wp
+      2 ERROR,application_detected
+      1 WARNING,WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+      1 WARNING,WordPress.DB.DirectDatabaseQuery.SchemaChange
+      1 ERROR,plugin_header_invalid_plugin_uri_domain
+      1 ERROR,plugin_header_invalid_author_uri_domain
+      1 ERROR,no_plugin_readme
+      1 ERROR,hidden_files</code></pre>
+                </div>
+                <p>The errors are a release checklist:</p>
+                <ul>
+                    <li><code>missing_direct_file_access_protection</code>: the blocks' <code>render.php</code> and <code>variations.php</code> (in <code>src</code> and <code>build</code>) and <code>tests/bootstrap.php</code> run code when loaded, and have no <code>ABSPATH</code> guard (Lesson 5.1). The class files are not listed: a file that only declares a class does nothing when requested directly.</li>
+                    <li><code>wp_function_not_compatible_with_requires_wp</code>: Lesson 7.3's Abilities feature calls functions from WordPress 6.9 while the header says 6.8. The code never runs on 6.8 (its actions never fire there), but the honest fix is the header: the plugin needs 6.9.</li>
+                    <li><code>no_plugin_readme</code>, and the <code>Plugin URI</code> and <code>Author URI</code> headers point to <code>example.com</code>, a placeholder domain the directory rejects. A client plugin without a public homepage can leave both optional headers out.</li>
+                    <li><code>hidden_files</code> and <code>application_detected</code>: <code>.wp-env.json</code>, <code>phpcs.xml.dist</code> and <code>phpunit.xml.dist</code> are development files that must not ship. They stay in the project (and in Git, Lesson 8.4); the release ZIP leaves them out.</li>
+                </ul>
+                <p>The warnings are the ones Lesson 8.1 documented in the ruleset (direct queries in the events table's query layer, meta and taxonomy queries that Lesson 8.2 measured) plus variables in the blocks' <code>render.php</code> files, which WordPress includes inside a function. The project works through the errors and builds the ZIP.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <h3>1. Strings a translator cannot translate</h3>
+                <p>A quick scratch file with four typical mistakes, in a folder of its own (<code>wordpress/pagesco-strings-test/strings.php</code>), scanned by <code>make-pot</code>:</p>
+                <pre data-file="pagesco-strings-test/strings.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Strings Test
+ * Text Domain: pagesco-books
+ */
+
+$shown = 3;
+$total = 11;
+$genre = 'Fantasy';
+
+echo sprintf( __( 'Showing %s of %s books', 'pagesco-books' ), $shown, $total );
+echo __( 'Books in ', 'pagesco-books' ) . $genre;
+echo sprintf( __( '%d books', 'pagesco-books' ), $shown );
+echo __( $genre, 'pagesco-books' );</code></pre>
+                <pre data-cli data-raises="Warning"><code class="language-bash">wp i18n make-pot pagesco-strings-test /tmp/strings.pot
+grep '^msgid' /tmp/strings.pot</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Plugin file detected.
+Warning: The string "Showing %s of %s books" contains placeholders but has no "translators:" comment to clarify their meaning. (strings.php:11)
+Warning: Multiple placeholders should be ordered. (strings.php:11)
+Warning: The string "%d books" contains placeholders but has no "translators:" comment to clarify their meaning. (strings.php:13)
+Success: POT file successfully generated.
+msgid ""
+msgid "Strings Test"
+msgid "Showing %s of %s books"
+msgid "Books in "
+msgid "%d books"</code></pre>
+                </div>
+                <p><strong>What it means:</strong> <code>make-pot</code> warns about two of the four, still writes the file, and exits successfully, so warnings scroll by unnoticed in a build. The two it accepts silently are worse: <code>"Books in "</code> arrives as a fragment (a translator cannot know what follows, and in many languages the genre must come first), and <code>__( $genre )</code> produced no entry at all, because no tool can know what a variable will hold. And <code>"%d books"</code> has no singular, so "1 books" in English, and wrong forms in every language with other plural rules. <strong>Fix:</strong> the rules from the table above: <code>/* translators: 1: books shown, 2: books in the catalog. */</code> with <code>%1$s</code> and <code>%2$s</code>, <code>sprintf( __( 'Books in %s' ), $genre )</code>, <code>_n()</code>, and translate data such as genre names where they are stored (the genre terms), not in code. PHPCS flags the missing comment and the variable too (<code>WordPress.WP.I18n</code>). Remove the folder:</p>
+                <pre data-cli><code class="language-bash">rm -r pagesco-strings-test /tmp/strings.pot</code></pre>
+
+                <h3>2. An uninstall that cannot find the genres</h3>
+                <p>When WordPress runs <code>uninstall.php</code>, the plugin is not loaded: its features never booted, so the <code>book</code> post type and the <code>genre</code> taxonomy are not registered. Code written as if they were fails. The same situation, reproduced with <code>--skip-plugins</code> (Lesson 8.1):</p>
+                <pre data-cli><code class="language-bash">wp --skip-plugins=pagesco-books eval '$genres = get_terms( array( "taxonomy" =&gt; "genre", "hide_empty" =&gt; false ) ); echo is_wp_error( $genres ) ? $genres-&gt;get_error_code() . ": " . $genres-&gt;get_error_message() : count( $genres ) . " genres", "\n";'
+wp --skip-plugins=pagesco-books eval 'echo count( get_posts( array( "post_type" =&gt; "book", "numberposts" =&gt; -1 ) ) ), " books\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>invalid_taxonomy: Invalid taxonomy.
+11 books</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the books are found (<code>WP_Query</code> just compares the <code>post_type</code> column, registered or not), but <code>get_terms()</code> returns a <code>WP_Error</code> for the unregistered taxonomy. An uninstall that loops over the result deletes nothing, without a message, and leaves five orphaned genres behind. <strong>Fix:</strong> in <code>uninstall.php</code>, register what you need before you use it: <code>register_taxonomy( 'genre', 'book' );</code>, as the project's version does.</p>
+
+                <h3>3. A release ZIP with the development autoloader</h3>
+                <p>The release ZIP should contain the plugin's own code and Composer's autoloader (<code>vendor/autoload.php</code> and <code>vendor/composer/</code>), but not PHPUnit and the coding standards. Copy exactly that much, as a careful ZIP would, and load the autoloader as WordPress would:</p>
+                <pre data-cli data-raises="Warning,Fatal error"><code class="language-bash">mkdir -p /tmp/zip-test/vendor
+cp -r wp-content/plugins/pagesco-books/vendor/autoload.php wp-content/plugins/pagesco-books/vendor/composer /tmp/zip-test/vendor/
+php -r 'require "/tmp/zip-test/vendor/autoload.php";'</code></pre>
+                <div class="card card-output">
+                    <h4>Error</h4>
+                    <pre><code>[26-Oct-2026 05:57:40 UTC] PHP Warning:  require(/tmp/zip-test/vendor/composer/../myclabs/deep-copy/src/DeepCopy/deep_copy.php): Failed to open stream: No such file or directory in /tmp/zip-test/vendor/composer/autoload_real.php on line 41
+[26-Oct-2026 05:57:40 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/tmp/zip-test/vendor/composer/../myclabs/deep-copy/src/DeepCopy/deep_copy.php' (include_path='.:/usr/local/lib/php') in /tmp/zip-test/vendor/composer/autoload_real.php:41
+Stack trace:
+...
+#2 Command line code(1): require('/tmp/zip-test/v...')
+#3 {main}
+  thrown in /tmp/zip-test/vendor/composer/autoload_real.php on line 41</code></pre>
+                </div>
+                <p>(The <code>...</code> line stands for two stack frames with a class name that Composer generates differently for every installation.) <strong>What it means:</strong> since Lesson 8.1 installed the development packages, Composer's autoloader <em>requires</em> some of their files on every load (<code>vendor/composer/autoload_files.php</code> lists them: PHPUnit's assertion functions, a helper of its object copier, the polyfills). Without those packages in the ZIP, the plugin dies with a fatal error on activation, on the client's site. <strong>Fix:</strong> regenerate the autoloader without development packages before packaging, <code>composer dump-autoload --no-dev</code>, and restore it afterwards with <code>composer dump-autoload</code> (or install with <code>composer install --no-dev</code> in a clean copy, Lesson 8.4). Remove the test folder:</p>
+                <pre data-cli><code class="language-bash">rm -r /tmp/zip-test</code></pre>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Release 1.1.0</h2>
+                <p>Five steps: the uninstall opt-in and its test, the Spanish translation, the accessibility fixes, and the release itself. Allow about 70 minutes. Commands run from the WordPress folder, in the WP-CLI container, unless they say otherwise; run Step 2 in one container shell (<code>docker compose run --rm wpcli sh</code>, Lesson 1.2), because its backup lives in the container's <code>/tmp</code>.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: The "delete all shop data" setting <span class="step-time">(15 min)</span></h3>
+                    <p>Lesson 5.4 decided that deleting the plugin keeps the shop's books, genres and book details, and named the professional pattern for the day the shop really closes: an opt-in. It belongs in the settings, off by default. Replace <code>src/Settings.php</code> (new: the <code>delete_data</code> default and its line in <code>sanitize()</code>):</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/Settings.php"><code class="language-php">&lt;?php
+/**
+ * The shop's settings: one option, an array of values with defaults.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books;
+
+/**
+ * Registers the pagesco_books_settings option and reads it for the rest of the plugin.
+ */
+final class Settings implements Feature {
+
+	/**
+	 * The option's name in wp_options.
+	 */
+	public const OPTION = 'pagesco_books_settings';
+
+	/**
+	 * The option group the settings form posts (settings_fields() prints it).
+	 */
+	public const GROUP = 'pagesco_books';
+
+	/**
+	 * Registers the setting on init, so its sanitizing and default apply everywhere, not only in wp-admin.
+	 */
+	public function register(): void {
+		add_action( 'init', array( $this, 'register_setting' ) );
+	}
+
+	/**
+	 * Every setting with its default value.
+	 *
+	 * @return array{notice_extra: string, show_events_link: bool, books_per_page: int, events_limit: int, delete_data: bool}
+	 */
+	public static function defaults(): array {
+		return array(
+			'notice_extra'     =&gt; __( 'Open until 9 p.m. on Thursdays.', 'pagesco-books' ),
+			'show_events_link' =&gt; true,
+			'books_per_page'   =&gt; 6,
+			'events_limit'     =&gt; 5,
+			'delete_data'      =&gt; false,
+		);
+	}
+
+	/**
+	 * Returns one setting: the saved value, or its default when nothing is saved yet.
+	 *
+	 * @param string $key A key of defaults().
+	 * @return mixed
+	 */
+	public static function get( string $key ) {
+		$settings = wp_parse_args( get_option( self::OPTION, array() ), self::defaults() );
+
+		return $settings[ $key ] ?? null;
+	}
+
+	/**
+	 * Tells WordPress about the option: its group, type, sanitize callback and default.
+	 */
+	public function register_setting(): void {
+		register_setting(
+			self::GROUP,
+			self::OPTION,
+			array(
+				'type'              =&gt; 'object',
+				'sanitize_callback' =&gt; array( $this, 'sanitize' ),
+				'default'           =&gt; self::defaults(),
+			)
+		);
+	}
+
+	/**
+	 * Cleans the submitted values before WordPress stores them. Out-of-range numbers keep the saved value.
+	 *
+	 * @param mixed $input The submitted settings.
+	 * @return array
+	 */
+	public function sanitize( $input ): array {
+		$input = is_array( $input ) ? $input : array();
+		$saved = wp_parse_args( get_option( self::OPTION, array() ), self::defaults() );
+
+		$clean = array(
+			'notice_extra'     =&gt; sanitize_text_field( $input['notice_extra'] ?? '' ),
+			'show_events_link' =&gt; ! empty( $input['show_events_link'] ),
+			'books_per_page'   =&gt; absint( $input['books_per_page'] ?? $saved['books_per_page'] ),
+			'events_limit'     =&gt; absint( $input['events_limit'] ?? $saved['events_limit'] ),
+			'delete_data'      =&gt; ! empty( $input['delete_data'] ),
+		);
+
+		if ( $clean['books_per_page'] &lt; 1 || $clean['books_per_page'] &gt; 24 ) {
+			add_settings_error( self::OPTION, 'books_per_page', __( 'Books per list must be between 1 and 24.', 'pagesco-books' ) );
+			$clean['books_per_page'] = $saved['books_per_page'];
+		}
+		if ( $clean['events_limit'] &lt; 1 || $clean['events_limit'] &gt; 20 ) {
+			add_settings_error( self::OPTION, 'events_limit', __( 'Events to show must be between 1 and 20.', 'pagesco-books' ) );
+			$clean['events_limit'] = $saved['events_limit'];
+		}
+
+		return $clean;
+	}
+}</code></pre>
+                    <p>Replace <code>src/Admin/SettingsPage.php</code> (new: the Uninstall section with its checkbox at the end of <code>add_fields()</code>, and a description under a checkbox when the field has one):</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/Admin/SettingsPage.php"><code class="language-php">&lt;?php
+/**
+ * The Settings &gt; Pages &amp; Co. Books screen.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books\Admin;
+
+use PagesCo\Books\Feature;
+use PagesCo\Books\Settings;
+
+/**
+ * Adds the settings page and builds its form with the Settings API.
+ */
+final class SettingsPage implements Feature {
+
+	/**
+	 * The page's slug: options-general.php?page=pagesco-books.
+	 */
+	public const SLUG = 'pagesco-books';
+
+	/**
+	 * Hooks the menu item, the sections and fields, and the Plugins screen link.
+	 */
+	public function register(): void {
+		add_action( 'admin_menu', array( $this, 'add_page' ) );
+		add_action( 'admin_init', array( $this, 'add_fields' ) );
+		add_filter( 'plugin_action_links_' . plugin_basename( PAGESCO_BOOKS_FILE ), array( $this, 'add_settings_link' ) );
+	}
+
+	/**
+	 * Adds the page under Settings, for users who can manage options.
+	 */
+	public function add_page(): void {
+		add_options_page(
+			__( 'Pages &amp; Co. Books Settings', 'pagesco-books' ),
+			__( 'Pages &amp; Co. Books', 'pagesco-books' ),
+			'manage_options',
+			self::SLUG,
+			array( $this, 'render' )
+		);
+	}
+
+	/**
+	 * Describes the form: three sections, five fields.
+	 */
+	public function add_fields(): void {
+		add_settings_section(
+			'pagesco_books_notice',
+			__( 'Store notice', 'pagesco-books' ),
+			array( $this, 'render_notice_intro' ),
+			self::SLUG
+		);
+		add_settings_field(
+			'notice_extra',
+			__( 'Notice addition', 'pagesco-books' ),
+			array( $this, 'render_text_field' ),
+			self::SLUG,
+			'pagesco_books_notice',
+			array(
+				'key'         =&gt; 'notice_extra',
+				'label_for'   =&gt; 'pagesco-notice-extra',
+				'description' =&gt; __( 'Added after the free-shipping text. Leave empty to show only that text.', 'pagesco-books' ),
+			)
+		);
+		add_settings_field(
+			'show_events_link',
+			__( 'Events link', 'pagesco-books' ),
+			array( $this, 'render_checkbox_field' ),
+			self::SLUG,
+			'pagesco_books_notice',
+			array(
+				'key'       =&gt; 'show_events_link',
+				'label_for' =&gt; 'pagesco-show-events-link',
+				'label'     =&gt; __( 'Show a "See events" link in the notice', 'pagesco-books' ),
+			)
+		);
+
+		add_settings_section(
+			'pagesco_books_lists',
+			__( 'Catalog and events', 'pagesco-books' ),
+			'__return_false',
+			self::SLUG
+		);
+		add_settings_field(
+			'books_per_page',
+			__( 'Books per list', 'pagesco-books' ),
+			array( $this, 'render_number_field' ),
+			self::SLUG,
+			'pagesco_books_lists',
+			array(
+				'key'       =&gt; 'books_per_page',
+				'label_for' =&gt; 'pagesco-books-per-page',
+				'max'       =&gt; 24,
+			)
+		);
+		add_settings_field(
+			'events_limit',
+			__( 'Events to show', 'pagesco-books' ),
+			array( $this, 'render_number_field' ),
+			self::SLUG,
+			'pagesco_books_lists',
+			array(
+				'key'       =&gt; 'events_limit',
+				'label_for' =&gt; 'pagesco-events-limit',
+				'max'       =&gt; 20,
+			)
+		);
+
+		add_settings_section(
+			'pagesco_books_uninstall',
+			__( 'Uninstall', 'pagesco-books' ),
+			'__return_false',
+			self::SLUG
+		);
+		add_settings_field(
+			'delete_data',
+			__( 'Shop data', 'pagesco-books' ),
+			array( $this, 'render_checkbox_field' ),
+			self::SLUG,
+			'pagesco_books_uninstall',
+			array(
+				'key'         =&gt; 'delete_data',
+				'label_for'   =&gt; 'pagesco-delete-data',
+				'label'       =&gt; __( 'Delete all books, genres and book details when the plugin is deleted', 'pagesco-books' ),
+				'description' =&gt; __( 'Leave this off unless the shop is closing for good: deleted books cannot be restored. Settings, the events and the Bookseller role are always removed.', 'pagesco-books' ),
+			)
+		);
+	}
+
+	/**
+	 * Prints the page: the form posts to options.php, which checks the nonce and saves the option.
+	 */
+	public function render(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		?&gt;
+		&lt;div class="wrap"&gt;
+			&lt;h1&gt;&lt;?php echo esc_html( get_admin_page_title() ); ?&gt;&lt;/h1&gt;
+			&lt;form action="options.php" method="post"&gt;
+				&lt;?php
+				settings_fields( Settings::GROUP );
+				do_settings_sections( self::SLUG );
+				submit_button();
+				?&gt;
+			&lt;/form&gt;
+		&lt;/div&gt;
+		&lt;?php
+	}
+
+	/**
+	 * Prints the text under the Store notice heading.
+	 */
+	public function render_notice_intro(): void {
+		echo '&lt;p&gt;' . esc_html__( 'The bar at the top of every page of the shop.', 'pagesco-books' ) . '&lt;/p&gt;';
+	}
+
+	/**
+	 * Prints a text input for one setting.
+	 *
+	 * @param array $args The field's arguments from add_settings_field().
+	 */
+	public function render_text_field( $args ): void {
+		printf(
+			'&lt;input type="text" id="%1$s" name="%2$s[%3$s]" value="%4$s" class="regular-text"&gt;&lt;p class="description"&gt;%5$s&lt;/p&gt;',
+			esc_attr( $args['label_for'] ),
+			esc_attr( Settings::OPTION ),
+			esc_attr( $args['key'] ),
+			esc_attr( Settings::get( $args['key'] ) ),
+			esc_html( $args['description'] )
+		);
+	}
+
+	/**
+	 * Prints a checkbox for one setting.
+	 *
+	 * @param array $args The field's arguments from add_settings_field().
+	 */
+	public function render_checkbox_field( $args ): void {
+		printf(
+			'&lt;label&gt;&lt;input type="checkbox" id="%1$s" name="%2$s[%3$s]" value="1"%4$s&gt; %5$s&lt;/label&gt;',
+			esc_attr( $args['label_for'] ),
+			esc_attr( Settings::OPTION ),
+			esc_attr( $args['key'] ),
+			checked( Settings::get( $args['key'] ), true, false ),
+			esc_html( $args['label'] )
+		);
+
+		if ( ! empty( $args['description'] ) ) {
+			printf( '&lt;p class="description"&gt;%s&lt;/p&gt;', esc_html( $args['description'] ) );
+		}
+	}
+
+	/**
+	 * Prints a number input for one setting.
+	 *
+	 * @param array $args The field's arguments from add_settings_field().
+	 */
+	public function render_number_field( $args ): void {
+		printf(
+			'&lt;input type="number" id="%1$s" name="%2$s[%3$s]" value="%4$s" min="1" max="%5$d" step="1" class="small-text"&gt;',
+			esc_attr( $args['label_for'] ),
+			esc_attr( Settings::OPTION ),
+			esc_attr( $args['key'] ),
+			esc_attr( Settings::get( $args['key'] ) ),
+			absint( $args['max'] )
+		);
+	}
+
+	/**
+	 * Adds a Settings link next to Deactivate on the Plugins screen.
+	 *
+	 * @param string[] $links The plugin's action links.
+	 * @return string[]
+	 */
+	public function add_settings_link( $links ) {
+		$url = admin_url( 'options-general.php?page=' . self::SLUG );
+		array_unshift( $links, sprintf( '&lt;a href="%s"&gt;%s&lt;/a&gt;', esc_url( $url ), esc_html__( 'Settings', 'pagesco-books' ) ) );
+
+		return $links;
+	}
+}</code></pre>
+                    <p>And <code>uninstall.php</code>, which reads the choice before it deletes the settings:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/uninstall.php"><code class="language-php">&lt;?php
+/**
+ * Removes the plugin's data when an administrator deletes the plugin.
+ *
+ * Always: the role, the settings, the events table and the supplier transient (Lessons 5.4, 5.5, 7.3).
+ * Only when an administrator turned on "Delete all books, genres and book details": the shop's content too (Lesson 8.3).
+ *
+ * @package PagesCo\Books
+ */
+
+defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
+
+global $wpdb;
+
+// Read the choice before the settings are deleted below. The plugin is not loaded: no Settings class here.
+$pagesco_books_settings = get_option( 'pagesco_books_settings', array() );
+
+if ( is_array( $pagesco_books_settings ) &amp;&amp; ! empty( $pagesco_books_settings['delete_data'] ) ) {
+	// Every book in every status, trash included. wp_delete_post() also deletes its meta and term links.
+	$pagesco_books_ids = get_posts(
+		array(
+			'post_type'   =&gt; 'book',
+			'post_status' =&gt; array_keys( get_post_stati() ),
+			'numberposts' =&gt; -1,
+			'fields'      =&gt; 'ids',
+		)
+	);
+	foreach ( $pagesco_books_ids as $pagesco_books_id ) {
+		wp_delete_post( $pagesco_books_id, true );
+	}
+
+	// The taxonomy is not registered while the plugin is uninstalled: register it, or get_terms() fails.
+	register_taxonomy( 'genre', 'book' );
+	$pagesco_books_terms = get_terms(
+		array(
+			'taxonomy'   =&gt; 'genre',
+			'hide_empty' =&gt; false,
+			'fields'     =&gt; 'ids',
+		)
+	);
+	foreach ( is_array( $pagesco_books_terms ) ? $pagesco_books_terms : array() as $pagesco_books_term ) {
+		wp_delete_term( $pagesco_books_term, 'genre' );
+	}
+}
+
+remove_role( 'pagesco_bookseller' );
+delete_option( 'pagesco_books_settings' );
+delete_option( 'pagesco_books_db_version' );
+
+$wpdb-&gt;query( $wpdb-&gt;prepare( 'DROP TABLE IF EXISTS %i', $wpdb-&gt;prefix . 'pagesco_events' ) );
+
+delete_transient( 'pagesco_books_supplier_availability' );</code></pre>
+                    <ul>
+                        <li><strong>The setting is read with <code>get_option()</code></strong>, not <code>Settings::get()</code>: during uninstall the plugin's classes are not loaded. With nothing saved (the empty row of Lesson 8.2), <code>delete_data</code> is missing, which means off.</li>
+                        <li><strong>Every status</strong>: <code>get_post_stati()</code> lists them all, so drafts, private books and the trash go too. <code>wp_delete_post( $id, true )</code> deletes each book for good with its meta, its genre links and its revisions, the cleanup Lesson 2.2 warned that raw SQL skips.</li>
+                        <li><strong><code>register_taxonomy()</code></strong> before <code>get_terms()</code>: Common Mistake 2.</li>
+                    </ul>
+                    <p>The settings screen now has three sections, and the setting is off:</p>
+                    <pre data-web="/wp-admin/options-general.php?page=pagesco-books" data-login="admin" data-select-all="form h2" data-text><code class="language-text">http://localhost:8080/wp-admin/options-general.php?page=pagesco-books   (the section headings)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Store notice
+Catalog and events
+Uninstall</code></pre>
+                    </div>
+                    <pre data-cli><code class="language-bash">wp eval 'var_dump( PagesCo\Books\Settings::get( "delete_data" ) );'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>bool(false)</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: Test both ways, with a backup <span class="step-time">(10 min)</span></h3>
+                    <p>Testing an uninstall routine means running it, and this one can delete the catalog. So first a backup, outside the web root, then the test, then the restore. A small helper counts what is at stake (create <code>wordpress/pagesco-count.sh</code>):</p>
+                    <pre data-file="pagesco-count.sh"><code class="language-bash"># Counts the shop data an uninstall could delete: books, genres, book meta, and whether the events table exists.
+wp db query "SELECT (SELECT COUNT(*) FROM wp_posts WHERE post_type = 'book') AS books, (SELECT COUNT(*) FROM wp_term_taxonomy WHERE taxonomy = 'genre') AS genres, (SELECT COUNT(*) FROM wp_postmeta WHERE meta_key LIKE 'pagesco\_%') AS book_meta, (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'wp_pagesco_events') AS events_table"</code></pre>
+                    <p>The default first: the setting is off.</p>
+                    <pre data-cli><code class="language-bash">sh pagesco-count.sh
+wp db export /tmp/before-uninstall.sql
+wp plugin uninstall pagesco-books --deactivate --skip-delete
+sh pagesco-count.sh
+wp db import /tmp/before-uninstall.sql</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>books	genres	book_meta	events_table
+11	5	66	1
+
+Success: Exported to '/tmp/before-uninstall.sql'.
+Deactivating 'pagesco-books'...
+Plugin 'pagesco-books' deactivated.
+Ran uninstall procedure for 'pagesco-books' plugin without deleting.
+Success: Uninstalled 1 of 1 plugins.
+books	genres	book_meta	events_table
+11	5	66	0
+
+Success: Imported from '/tmp/before-uninstall.sql'.</code></pre>
+                    </div>
+                    <p>Eleven books, five genres and their 66 meta values stayed; the events table went, as in Lesson 5.5; the import brought everything back, the plugin active as before. Now as an administrator who ticked the box and saved the form (here the whole settings array the form would send, with WP-CLI):</p>
+                    <pre data-cli><code class="language-bash">wp option update pagesco_books_settings '{"notice_extra":"Open until 9 p.m. on Thursdays.","show_events_link":true,"books_per_page":6,"events_limit":5,"delete_data":true}' --format=json
+wp plugin uninstall pagesco-books --deactivate --skip-delete
+sh pagesco-count.sh
+wp db import /tmp/before-uninstall.sql
+sh pagesco-count.sh
+rm /tmp/before-uninstall.sql pagesco-count.sh</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Success: Updated 'pagesco_books_settings' option.
+Deactivating 'pagesco-books'...
+Plugin 'pagesco-books' deactivated.
+Ran uninstall procedure for 'pagesco-books' plugin without deleting.
+Success: Uninstalled 1 of 1 plugins.
+books	genres	book_meta	events_table
+0	0	0	0
+
+Success: Imported from '/tmp/before-uninstall.sql'.
+books	genres	book_meta	events_table
+11	5	66	1</code></pre>
+                    </div>
+                    <p>Zero books, zero genres, zero book meta: the opt-in deletes everything it promises, and nothing was left orphaned. And the backup restored the shop, including the settings row exactly as it was. In <code>readme.txt</code> (Step 5) the FAQ explains the choice to users.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: A Spanish translation <span class="step-time">(15 min)</span></h3>
+                    <p>Tell WordPress where the plugin's own translations live: add a <code>Domain Path</code> line after <code>Text Domain</code> in the header of <code>pagesco-books.php</code> (here with <code>sed</code>). Then generate the real POT, now including Step 1's new strings, in the plugin's new <code>languages</code> folder:</p>
+                    <pre data-cli><code class="language-bash">sed -i 's|^ \* Text Domain:       pagesco-books$|&amp;\n * Domain Path:       /languages|' wp-content/plugins/pagesco-books/pagesco-books.php
+grep -A1 'Text Domain' wp-content/plugins/pagesco-books/pagesco-books.php
+wp i18n make-pot wp-content/plugins/pagesco-books wp-content/plugins/pagesco-books/languages/pagesco-books.pot --exclude=src/blocks,tests</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code> * Text Domain:       pagesco-books
+ * Domain Path:       /languages
+Plugin file detected.
+Success: POT file successfully generated.</code></pre>
+                    </div>
+                    <p>A translator would now fill in the PO file for Spanish. Yours translates the strings a visitor and a bookseller see first (a real translation would cover all of them, and gaps simply stay in English). Create <code>wordpress/wp-content/plugins/pagesco-books/languages/pagesco-books-es_ES.po</code>:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/languages/pagesco-books-es_ES.po"><code class="language-text"># Spanish translation of Pages &amp; Co. Books.
+# This file is distributed under the GPL-2.0-or-later.
+msgid ""
+msgstr ""
+"Project-Id-Version: Pages &amp; Co. Books 1.1.0\n"
+"Language: es_ES\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Domain: pagesco-books\n"
+
+msgid "Open until 9 p.m. on Thursdays."
+msgstr "Abierto hasta las 21:00 los jueves."
+
+msgid "See events"
+msgstr "Ver eventos"
+
+msgid "by %s"
+msgstr "de %s"
+
+msgid "In stock"
+msgstr "Disponible"
+
+msgid "Sold out"
+msgstr "Agotado"
+
+msgid "%d seat"
+msgid_plural "%d seats"
+msgstr[0] "%d plaza"
+msgstr[1] "%d plazas"
+
+msgid "open to all"
+msgstr "entrada libre"
+
+msgid "All books"
+msgstr "Todos los libros"
+
+msgid "Filter by genre"
+msgstr "Filtrar por género"
+
+msgid "Showing %1$s of %2$s books"
+msgstr "Mostrando %1$s de %2$s libros"
+
+msgid "Books"
+msgstr "Libros"
+
+msgid "Stock at a glance"
+msgstr "Existencias de un vistazo"
+
+msgid "Loading the catalog…"
+msgstr "Cargando el catálogo…"
+
+msgid "%s: in stock"
+msgstr "%s: disponible"
+
+msgid "%s: sold out"
+msgstr "%s: agotado"
+
+msgid "Mark sold out"
+msgstr "Marcar como agotado"
+
+msgid "Mark in stock"
+msgstr "Marcar como disponible"
+
+msgid "Book List"
+msgstr "Lista de libros"
+
+msgid "Books from the Pages &amp; Co. catalog, always up to date."
+msgstr "Libros del catálogo de Pages &amp; Co., siempre al día."
+
+msgid "List settings"
+msgstr "Ajustes de la lista"
+
+msgid "Number of books"
+msgstr "Número de libros"
+
+msgid "Price, low to high"
+msgstr "Precio, de menor a mayor"</code></pre>
+                    <p>Written by hand, the PO has translations but no references. <code>wp i18n update-po</code> merges the POT into it: every entry gets its <code>#:</code> lines and comments, and the untranslated strings are added, empty. Then build the three formats, the JSON files without purging:</p>
+                    <pre data-cli><code class="language-bash">cd wp-content/plugins/pagesco-books/languages
+wp i18n update-po pagesco-books.pot pagesco-books-es_ES.po
+wp i18n make-mo pagesco-books-es_ES.po
+wp i18n make-php pagesco-books-es_ES.po
+wp i18n make-json pagesco-books-es_ES.po --no-purge
+ls</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Success: Updated 1 file.
+Success: Created 1 file.
+Success: Created 1 file.
+Success: Created 3 files.
+pagesco-books-es_ES-1ef6e759fb00b1b9d64a64056a083f27.json  pagesco-books-es_ES.l10n.php                               pagesco-books.pot
+pagesco-books-es_ES-cfe2bc3ef2a0800531dc26491d4caca6.json  pagesco-books-es_ES.mo
+pagesco-books-es_ES-f9065c2ff2c4d291b5b56d1be2a45f3f.json  pagesco-books-es_ES.po</code></pre>
+                    </div>
+                    <p>Three JSON files, one per script with translated or translatable strings: the hashes from the table above (the Stock widget and the Book List's editor script) and the Book Card's. WordPress shows a locale only when its core translation is installed, so install Spanish (it does not change the site's language):</p>
+                    <pre data-cli><code class="language-bash">wp language core install es_ES</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Downloading translation from https://downloads.wordpress.org/translation/core/7.1.3/es_ES.zip...
+Unpacking the update...
+Installing the latest version...
+Removing the old version of the translation...
+Translation updated successfully.
+Language 'es_ES' installed.
+Success: Installed 1 of 1 languages.</code></pre>
+                    </div>
+                    <p>A visitor's view: switch the whole site to Spanish for a moment and look at the store notice, then switch back:</p>
+                    <pre data-cli><code class="language-bash">wp site switch-language es_ES
+curl -s http://localhost:8080/events/ | grep -o -e '&lt;html lang="[^"]*"' -e '&lt;div class="pagesco-notice"&gt;.*&lt;/div&gt;' -e '&lt;span class="pagesco-event__where"&gt;[^&lt;]*' | head -4
+wp site switch-language en_US</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Success: Language activated.
+&lt;html lang="es"
+&lt;div class="pagesco-notice"&gt;Free shipping on orders over $35. Abierto hasta las 21:00 los jueves. &lt;a href="http://localhost:8080/events/"&gt;Ver eventos&lt;/a&gt;&lt;/div&gt;
+&lt;span class="pagesco-event__where"&gt;Reading corner, 20 plazas
+&lt;span class="pagesco-event__where"&gt;Children&amp;#039;s corner, 15 plazas
+Success: Language activated.</code></pre>
+                    </div>
+                    <p>The page says it is Spanish (<code>lang="es"</code>), and so does the plugin: "Abierto hasta las 21:00 los jueves.", "Ver eventos", "20 plazas" (the plural form chosen by Spanish's rule). Two things did not change. "Free shipping on orders over $35." comes from the must-use plugin of Lesson 2.3, which has no translations (Exercise 3 adds them). And the event titles are content, which a translation file never touches; multilingual content is the job of plugins such as Polylang or WPML. The notice's second sentence is translated because Lesson 8.2 stored an <em>empty</em> settings row, so the default is translated whenever it is read.</p>
+                    <p>A bookseller's view: Maria prefers Spanish. A user's language (Profile, Language) applies to wp-admin only. Set it, log in as Maria with <code>curl</code> (as in Lesson 5.4), and look at the Dashboard's Stock widget: its heading comes from PHP, its buttons from JavaScript:</p>
+                    <pre data-cli><code class="language-bash">wp user meta update maria locale es_ES
+curl -s -c /tmp/maria -b 'wordpress_test_cookie=WP%20Cookie%20check' -d 'log=maria&amp;pwd=maria-pass&amp;testcookie=1' -o /dev/null http://localhost:8080/wp-login.php
+curl -s -b /tmp/maria http://localhost:8080/wp-admin/ | grep -o -e 'id="pagesco-stock-widget-title"&gt;[^&lt;]*' -e 'id="pagesco-stock-widget-js-translations"' -e '"Mark sold out":\["[^"]*"\]'
+wp user meta delete maria locale
+rm /tmp/maria</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Success: Updated custom field 'locale'.
+id="pagesco-stock-widget-title"&gt;Existencias de un vistazo
+id="pagesco-stock-widget-js-translations"
+"Mark sold out":["Marcar como agotado"]
+Success: Deleted custom field.</code></pre>
+                    </div>
+                    <p>The heading is Spanish, and the page carries an inline script with the widget's JSON translations, printed just before the widget's own script, which <code>wp.i18n</code> uses when it builds its buttons ("Marcar como agotado"). The block editor gets the Book List's JSON the same way: in the editor, Maria sees "Ajustes de la lista" and "Número de libros" in the block's sidebar.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 4: Three accessibility fixes <span class="step-time">(10 min)</span></h3>
+                    <p><strong>The store notice becomes a landmark.</strong> In <code>wp-content/mu-plugins/pagesco-site.php</code>, give the notice's <code>&lt;div&gt;</code> a role and a name, and raise the file's version:</p>
+                    <pre data-cli><code class="language-bash">sed -i 's|&lt;div class="pagesco-notice"&gt;|&lt;div class="pagesco-notice" role="region" aria-label="Store notice"&gt;|; s|^ \* Version:     1.1.0$| * Version:     1.2.0|' wp-content/mu-plugins/pagesco-site.php
+curl -s http://localhost:8080/ | grep -o '&lt;div class="pagesco-notice"[^&gt;]*&gt;'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;div class="pagesco-notice" role="region" aria-label="Store notice"&gt;</code></pre>
+                    </div>
+                    <p><strong>The navigation becomes a list of links.</strong> In the Site Editor: Navigation, open the menu, select the Page List block, choose <strong>Edit</strong> to turn it into links, remove "Sample Page", save. Or with a script that writes the same block markup (create <code>wordpress/pagesco-nav-links.php</code>):</p>
+                    <pre data-file="pagesco-nav-links.php" data-wp><code class="language-php">&lt;?php
+/**
+ * Replaces the Page List in the header navigation with links to the shop's pages. Usage: wp eval-file pagesco-nav-links.php
+ */
+
+$pagesco_links  = '';
+$pagesco_labels = array();
+foreach ( array( 'about', 'contact', 'events', 'find-a-book' ) as $pagesco_slug ) {
+	$pagesco_page = get_page_by_path( $pagesco_slug );
+
+	$pagesco_links   .= get_comment_delimited_block_content(
+		'core/navigation-link',
+		array(
+			'label' =&gt; $pagesco_page-&gt;post_title,
+			'type'  =&gt; 'page',
+			'id'    =&gt; $pagesco_page-&gt;ID,
+			'url'   =&gt; get_permalink( $pagesco_page ),
+			'kind'  =&gt; 'post-type',
+		),
+		''
+	) . "\n";
+	$pagesco_labels[] = $pagesco_page-&gt;post_title;
+}
+
+// The header's Navigation block shows the newest wp_navigation post (Lesson 3.2).
+$pagesco_navigation = get_posts(
+	array(
+		'post_type'   =&gt; 'wp_navigation',
+		'numberposts' =&gt; 1,
+	)
+);
+wp_update_post(
+	array(
+		'ID'           =&gt; $pagesco_navigation[0]-&gt;ID,
+		'post_content' =&gt; $pagesco_links,
+	)
+);
+
+echo 'Header navigation: ', implode( ', ', $pagesco_labels ), "\n";</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Header navigation: About Us, Contact, Events, Find a Book</code></pre>
+                    </div>
+                    <pre data-cli><code class="language-bash">rm pagesco-nav-links.php pagesco-contrast.php
+curl -s http://localhost:8080/events/ | grep -o '&lt;ul class="wp-block-navigation__container[^&gt;]*&gt;&lt;[a-z]*'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;ul class="wp-block-navigation__container is-responsive items-justified-right wp-block-navigation"&gt;&lt;li</code></pre>
+                    </div>
+                    <p>The Navigation's list now starts with an <code>&lt;li&gt;</code>. (The links store their addresses, <code>http://localhost:8080/…</code>, in the block markup; Lesson 8.4's search-replace updates them on the live site, as it does for every stored URL.)</p>
+                    <p><strong>A visible focus on the selected genre.</strong> The selection gets a thicker ring <em>inside</em> the pill (<code>box-shadow</code>), and keyboard focus a ring <em>outside</em> it (<code>:focus-visible</code> with <code>outline-offset</code>), so the two can never look the same. Replace <code>src/blocks/book-filter/style.scss</code> and rebuild (in the plugin's folder):</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-filter/style.scss"><code class="language-css">.wp-block-pagesco-book-filter__genres {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.wp-block-pagesco-book-filter__genres a {
+	padding: 0.25rem 0.75rem;
+	border: 1px solid currentColor;
+	border-radius: 999px;
+	text-decoration: none;
+}
+
+/* The selected genre: a thicker ring inside the pill (aria-current tells screen readers). */
+.wp-block-pagesco-book-filter__genres a.is-selected {
+	box-shadow: inset 0 0 0 2px currentColor;
+	font-weight: 700;
+}
+
+/* Keyboard focus: a ring outside the pill, so it never looks like the selection (Lesson 8.3). */
+.wp-block-pagesco-book-filter__genres a:focus-visible {
+	outline: 2px solid currentColor;
+	outline-offset: 3px;
+}
+
+.wp-block-pagesco-book-filter__books {
+	list-style: none;
+	padding-left: 0;
+}
+
+.wp-block-pagesco-book-filter__books li {
+	padding: 0.5rem 0;
+	border-bottom: 1px solid currentColor;
+}</code></pre>
+                    <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null
+grep -o 'a:focus-visible{[^}]*}' build/blocks/book-filter/style-index.css</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>a:focus-visible{outline:2px solid currentColor;outline-offset:3px}</code></pre>
+                    </div>
+                    <p>The keyboard walk and axe again, recorded the same way:</p>
+                    <figure>
+                        <img src="images/lesson_28_focus.png" alt="The genre links of the Book Filter, four times. Before the fix, the selected Fantasy link looks the same with and without keyboard focus: a dark outline around the pill. After the fix, the selected link has a thick inner ring, and with keyboard focus a second ring around it, a few pixels outside." width="720" height="366" loading="lazy">
+                        <figcaption>The selected genre (Fantasy) without and with keyboard focus, before and after the fix.</figcaption>
+                    </figure>
+                    <div class="card card-output">
+                        <h4>Output (recorded in Chromium, with axe-core 4.14)</h4>
+                        <pre><code>Tab  1: See events       browser focus ring
+Tab  2: Skip to content  browser focus ring
+Tab  3: Pages &amp; Co.      browser focus ring
+Tab  4: About Us         browser focus ring
+Tab  5: Contact          browser focus ring
+Tab  6: Events           browser focus ring
+Tab  7: Find a Book      browser focus ring
+Tab  8: All books        outline solid 2px offset 3px
+Tab  9: Classic          outline solid 2px offset 3px
+Tab 10: Dystopian        outline solid 2px offset 3px
+Tab 11: Fantasy          outline solid 2px offset 3px, inner ring (box-shadow)
+Without focus: Fantasy    no outline, inner ring (box-shadow)
+
+/: 1 violations, 40 rules passed
+  region (moderate): All page content should be contained by landmarks
+    #wp-skip-link
+/books/dune/: 1 violations, 37 rules passed
+  region (moderate): All page content should be contained by landmarks
+    #wp-skip-link
+/find-a-book/: 1 violations, 37 rules passed
+  region (moderate): All page content should be contained by landmarks
+    #wp-skip-link
+/events/: 0 violations, 38 rules passed</code></pre>
+                    </div>
+                    <p>Every genre link now shows focus as a ring a few pixels outside the pill, the selected one keeps its inner ring as well, and "Sample Page" has left the tab order. In the audit the <code>list</code> violation is gone, and the only <code>region</code> node left is core's skip link.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 5: Version 1.1.0, the readme, the ZIP and Plugin Check <span class="step-time">(20 min)</span></h3>
+                    <p><strong>Direct-access guards.</strong> Add <code>defined( 'ABSPATH' ) || exit;</code> after the opening comment of the three block PHP files in <code>src/blocks/</code>, by hand or with this script (create <code>wordpress/pagesco-guard.php</code>), and rebuild so that <code>build/</code> gets them too:</p>
+                    <pre data-file="pagesco-guard.php" data-wp><code class="language-php">&lt;?php
+/**
+ * Adds the direct-access guard after the opening comment of the blocks' PHP files. Usage: wp eval-file pagesco-guard.php
+ */
+
+foreach ( glob( WP_PLUGIN_DIR . '/pagesco-books/src/blocks/*/*.php' ) as $pagesco_file ) {
+	$pagesco_code = file_get_contents( $pagesco_file );
+
+	if ( ! str_contains( $pagesco_code, "defined( 'ABSPATH' )" ) ) {
+		$pagesco_code = preg_replace( '~^ \*/$~m', " */\n\ndefined( 'ABSPATH' ) || exit;", $pagesco_code, 1 );
+		file_put_contents( $pagesco_file, $pagesco_code );
+		echo 'Added the guard to ', basename( dirname( $pagesco_file ) ), '/', basename( $pagesco_file ), "\n";
+	}
+}</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Added the guard to book-filter/render.php
+Added the guard to book-list/render.php
+Added the guard to book-list/variations.php</code></pre>
+                    </div>
+                    <pre data-cli><code class="language-bash">rm pagesco-guard.php</code></pre>
+                    <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null
+grep -c "defined( 'ABSPATH' )" build/blocks/book-filter/render.php build/blocks/book-list/render.php build/blocks/book-list/variations.php</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>build/blocks/book-filter/render.php:1
+build/blocks/book-list/render.php:1
+build/blocks/book-list/variations.php:1</code></pre>
+                    </div>
+                    <p><strong>The header.</strong> Replace <code>pagesco-books.php</code>: version 1.1.0 in the header and the constant, <code>Requires at least: 6.9</code>, no placeholder URIs, and the <code>Domain Path</code> from Step 3:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/pagesco-books.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name:       Pages &amp; Co. Books
+ * Description:       The bookstore features of the Pages &amp; Co. website: books, genres, events and the shop's blocks.
+ * Version:           1.1.0
+ * Requires at least: 6.9
+ * Requires PHP:      8.2
+ * Author:            Pages &amp; Co.
+ * License:           GPL-2.0-or-later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain:       pagesco-books
+ * Domain Path:       /languages
+ *
+ * @package PagesCo\Books
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+define( 'PAGESCO_BOOKS_VERSION', '1.1.0' );
+define( 'PAGESCO_BOOKS_FILE', __FILE__ );
+define( 'PAGESCO_BOOKS_DIR', plugin_dir_path( __FILE__ ) );
+
+require PAGESCO_BOOKS_DIR . 'vendor/autoload.php';
+
+add_action( 'plugins_loaded', array( PagesCo\Books\Plugin::instance(), 'boot' ) );
+
+register_activation_hook( __FILE__, array( PagesCo\Books\Activator::class, 'activate' ) );
+register_deactivation_hook( __FILE__, array( PagesCo\Books\Activator::class, 'deactivate' ) );</code></pre>
+                    <p><strong>The readme.</strong> Create <code>readme.txt</code> in the plugin's folder. Note the External services section for the supplier (the addresses are the fictional supplier's; a real one has real pages):</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/readme.txt"><code class="language-text">=== Pages &amp; Co. Books ===
+Contributors: pagesco
+Tags: books, bookstore, catalog, events, blocks
+Requires at least: 6.9
+Tested up to: 7.1
+Requires PHP: 8.2
+Stable tag: 1.1.0
+License: GPL-2.0-or-later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
+
+The catalog, events and blocks of the Pages &amp; Co. bookstore: books with prices and stock, genres, a book filter and a REST API.
+
+== Description ==
+
+Pages &amp; Co. Books runs the bookstore features of the Pages &amp; Co. website:
+
+* A Book post type with author, price, pages, publication date, stock and ISBN, and a Genre taxonomy.
+* Blocks: Book Card, Book List (always up to date) and Book Filter (filters the catalog instantly, and works without JavaScript).
+* Events in their own table, shown with the `[pagesco_events]` shortcode and in the REST API.
+* A REST API under `pagesco/v1`, and the `pagesco/check-stock` ability for assistants and automation tools.
+* A Stock at a glance widget on the Dashboard, and a Supplier column on the Books screen.
+
+The plugin is translation-ready and ships with a Spanish translation.
+
+= External services =
+
+To show how many copies the book distributor has, the plugin connects to the distributor's API (Riverside Books). It sends the ISBNs of the shop's published books, and the API key you configure, once a day and when the Books screen needs fresh numbers. Nothing about visitors or customers is sent. The service is only used when `PAGESCO_BOOKS_SUPPLIER_URL` and `PAGESCO_BOOKS_SUPPLIER_KEY` are defined in `wp-config.php`.
+Terms of service: https://riverside.example/terms
+Privacy policy: https://riverside.example/privacy
+
+== Installation ==
+
+1. Upload the `pagesco-books` folder to `/wp-content/plugins/`, or install the ZIP file under Plugins &gt; Add Plugin &gt; Upload Plugin.
+2. Activate the plugin on the Plugins screen.
+3. To show the distributor's stock, add `PAGESCO_BOOKS_SUPPLIER_URL` and `PAGESCO_BOOKS_SUPPLIER_KEY` to `wp-config.php`.
+4. Adjust the store notice and list sizes under Settings &gt; Pages &amp; Co. Books.
+
+== Frequently Asked Questions ==
+
+= What happens to my books when I delete the plugin? =
+
+They stay. Deleting the plugin removes its settings, its events table and the Bookseller role, and keeps your books, genres and book details. To remove those too, turn on "Delete all books, genres and book details when the plugin is deleted" under Settings &gt; Pages &amp; Co. Books before you delete the plugin.
+
+= Which blocks does the plugin add? =
+
+Book Card, Book List and Book Filter, in the Widgets category of the block inserter.
+
+== Changelog ==
+
+= 1.1.0 =
+* New: an option to delete all books, genres and book details when the plugin is deleted (off by default).
+* New: Spanish translation, including the blocks and the Stock at a glance widget.
+* Improved: fewer database queries (cached events, autoloaded settings, one query for the supplier's ISBN list).
+* Fixed: the keyboard focus on the selected genre in the Book Filter is visible again.
+* Changed: requires WordPress 6.9 or later (the Abilities API).
+
+= 1.0.0 =
+* First release.
+
+== Upgrade Notice ==
+
+= 1.1.0 =
+Requires WordPress 6.9. Adds a Spanish translation and an opt-in to delete all shop data on uninstall.</code></pre>
+                    <p><strong>The ruleset and the POT follow.</strong> PHPCS must now check against WordPress 6.9, and leave the generated <code>languages/</code> files alone (Composer's PHPCS would otherwise report 88 layout errors in <code>pagesco-books-es_ES.l10n.php</code>, a file nobody edits by hand). The POT is regenerated at every release, so that its header names the new version:</p>
+                    <pre data-cli><code class="language-bash">cd wp-content/plugins/pagesco-books
+sed -i 's|&lt;config name="minimum_wp_version" value="6.8"/&gt;|&lt;config name="minimum_wp_version" value="6.9"/&gt;|; s|^\t&lt;exclude-pattern&gt;/build/\*&lt;/exclude-pattern&gt;$|&amp;\n\t&lt;exclude-pattern&gt;/languages/*&lt;/exclude-pattern&gt;|' phpcs.xml.dist
+grep -e minimum_wp_version -e exclude-pattern phpcs.xml.dist | head -5
+wp i18n make-pot . languages/pagesco-books.pot --exclude=src/blocks,tests
+grep 'Project-Id-Version' languages/pagesco-books.pot</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>	&lt;exclude-pattern&gt;/vendor/*&lt;/exclude-pattern&gt;
+	&lt;exclude-pattern&gt;/node_modules/*&lt;/exclude-pattern&gt;
+	&lt;exclude-pattern&gt;/build/*&lt;/exclude-pattern&gt;
+	&lt;exclude-pattern&gt;/languages/*&lt;/exclude-pattern&gt;
+	&lt;config name="minimum_wp_version" value="6.9"/&gt;
+Plugin file detected.
+Success: POT file successfully generated.
+"Project-Id-Version: Pages &amp; Co. Books 1.1.0\n"</code></pre>
+                    </div>
+                    <p><strong>The ZIP.</strong> <code>@wordpress/scripts</code> has a <code>plugin-zip</code> command that packs the files listed under <code>files</code> in <code>package.json</code> into <code>pagesco-books.zip</code>, inside a <code>pagesco-books/</code> folder, as WordPress expects. List what the plugin needs, and nothing else (no tests, no rulesets, no <code>src/blocks</code> sources, no development packages). Replace <code>package.json</code>:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/package.json"><code class="language-json">{
+	"name": "pagesco-books",
+	"version": "1.1.0",
+	"private": true,
+	"description": "The blocks of the Pages &amp; Co. Books plugin.",
+	"license": "GPL-2.0-or-later",
+	"scripts": {
+		"build": "wp-scripts build --webpack-src-dir=src/blocks --output-path=build/blocks --blocks-manifest --experimental-modules",
+		"start": "wp-scripts start --webpack-src-dir=src/blocks --output-path=build/blocks --blocks-manifest --experimental-modules",
+		"plugin-zip": "wp-scripts plugin-zip"
+	},
+	"devDependencies": {
+		"@wordpress/scripts": "^37.0.0"
+	},
+	"files": [
+		"pagesco-books.php",
+		"uninstall.php",
+		"readme.txt",
+		"composer.json",
+		"assets",
+		"build",
+		"languages",
+		"src/*.php",
+		"src/Admin",
+		"src/Rest",
+		"src/Shortcodes",
+		"src/Supplier",
+		"vendor/autoload.php",
+		"vendor/composer"
+	]
+}</code></pre>
+                    <p>Then, in the plugin's folder: the production autoloader (Common Mistake 3), the ZIP, and the development autoloader back:</p>
+                    <pre data-composer="wp-content/plugins/pagesco-books"><code class="language-bash">composer dump-autoload --no-dev</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Composer could not detect the root package (pagesco/pagesco-books) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version
+...
+Generating autoload files
+Generated autoload files</code></pre>
+                    </div>
+                    <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run plugin-zip &gt; /dev/null
+ls pagesco-books.zip</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>pagesco-books.zip</code></pre>
+                    </div>
+                    <pre data-composer="wp-content/plugins/pagesco-books"><code class="language-bash">composer dump-autoload</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Composer could not detect the root package (pagesco/pagesco-books) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version
+...
+Generating autoload files
+Generated autoload files</code></pre>
+                    </div>
+                    <p><strong>Check what ships.</strong> Unpack the ZIP into a second plugin folder, exactly as a client's WordPress would get it, and run Plugin Check on that copy (<code>--slug</code> tells it the real slug, for the text domain checks). The copy stays inactive; WordPress lists it, but two active copies of the same plugin would collide:</p>
+                    <pre data-cli><code class="language-bash">unzip -l wp-content/plugins/pagesco-books/pagesco-books.zip | tail -1
+unzip -q wp-content/plugins/pagesco-books/pagesco-books.zip -d /tmp/release
+mv /tmp/release/pagesco-books wp-content/plugins/pagesco-books-release
+wp plugin check pagesco-books-release --slug=pagesco-books --ignore-warnings
+wp plugin check pagesco-books-release --slug=pagesco-books --format=csv --fields=type,code | grep -e ERROR -e WARNING | sort | uniq -c | sort -rn
+rm -r wp-content/plugins/pagesco-books-release /tmp/release
+wp plugin uninstall plugin-check --deactivate</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>   280261                     72 files
+Success: Checks complete. No errors found.
+     30 WARNING,WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
+      4 WARNING,WordPress.DB.DirectDatabaseQuery.DirectQuery
+      2 WARNING,WordPress.DB.SlowDBQuery.slow_db_query_tax_query
+      2 WARNING,WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+      2 WARNING,WordPress.DB.DirectDatabaseQuery.NoCaching
+      1 WARNING,WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+      1 WARNING,WordPress.DB.DirectDatabaseQuery.SchemaChange
+Deactivating 'plugin-check'...
+Plugin 'plugin-check' deactivated.
+Uninstalled and deleted 'plugin-check' plugin.
+Success: Uninstalled 1 of 1 plugins.</code></pre>
+                    </div>
+                    <p>(In the Composer cards, the <code>...</code> line stands for a warning about Composer's cache folder that the course's container sometimes prints.) No errors in what ships: the development files never got into the ZIP, the guards and the header are fixed, the readme is valid. The warnings are the documented ones from Lesson 8.1's ruleset. Plugin Check is removed again. Last, Lesson 8.1's rule, on the whole project:</p>
+                    <pre data-composer="wp-content/plugins/pagesco-books" data-checkpoint><code class="language-bash">composer lint; echo "exit status $?"</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Composer could not detect the root package (pagesco/pagesco-books) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version
+...
+exit status 0</code></pre>
+                    </div>
+                    <p>In <code>pagesco-plan.txt</code>, under a new heading "Release", note: "1.1.0: delete-all opt-in (Settings, uninstall.php), es_ES (languages/, Domain Path; make-pot --exclude=src/blocks,tests, update-po, make-mo, make-php, make-json --no-purge), a11y fixes (notice region, nav links, focus ring), readme.txt, Requires at least 6.9. Release: composer dump-autoload --no-dev, npm run plugin-zip, composer dump-autoload, Plugin Check on the unpacked ZIP."</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li>Settings &gt; Pages &amp; Co. Books has an Uninstall section with the "delete all" checkbox, off by default</li>
+                        <li>You tested the uninstall both ways, from a database backup: books kept by default, everything deleted with the opt-in</li>
+                        <li><code>languages/</code> has the POT, the Spanish PO, MO, <code>.l10n.php</code> and three JSON files, and you saw the plugin in Spanish on the front end and in Maria's Dashboard</li>
+                        <li>The store notice is a named region, the header navigation is a list of links, and the selected genre shows keyboard focus</li>
+                        <li>The plugin is version 1.1.0 with a valid <code>readme.txt</code>, requires WordPress 6.9, and its blocks' PHP files have <code>ABSPATH</code> guards</li>
+                        <li><code>pagesco-books.zip</code> passes Plugin Check without errors, and <code>composer lint</code> exits with 0</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: One Book, Many Books</h3>
+                    <p>The Stock widget prints "11 books in the catalog." with <code>sprintf( __( '%d books in the catalog.' ), … )</code>: with one book it would say "1 books", and Spanish cannot choose a form either. Change it to <code>_n()</code> in <code>assets/js/stock-widget.js</code>, update the POT and the PO, translate both forms ("%d libro en el catálogo." and "%d libros en el catálogo."), and rebuild the JSON files. Show that the widget's JSON file now has both forms.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>In JavaScript <code>_n()</code> comes from <code>wp.i18n</code> like <code>__()</code>: add it to the destructuring on the script's first line. <code>wp i18n update-po</code> adds the new entry with empty <code>msgstr[0]</code> and <code>msgstr[1]</code> (and marks the old one obsolete); fill them in your editor.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>The script with both edits (the second one, at the end, is the only real change: <code>_n()</code> with both forms, the count, and the comment moved to where <code>make-pot</code> looks for it, just before the call). Replace <code>assets/js/stock-widget.js</code>:</p>
+                        <pre data-file="wp-content/plugins/pagesco-books/assets/js/stock-widget.js"><code class="language-js">/**
+ * Stock at a glance: lists the books and switches their stock, through the REST API.
+ *
+ * Plain JavaScript, no build step: wp.apiFetch and wp.i18n come from WordPress
+ * (the script's dependencies), and apiFetch sends the REST nonce for the logged-in user.
+ */
+( function () {
+	const { __, _n, sprintf } = wp.i18n;
+	const widget = document.getElementById( 'pagesco-stock-widget' );
+
+	if ( ! widget ) {
+		return;
+	}
+
+	const status = widget.querySelector( '.pagesco-stock-widget__status' );
+	const list = widget.querySelector( '.pagesco-stock-widget__books' );
+
+	// One line per book: its title and stock, and a button that switches the stock.
+	function bookItem( book ) {
+		const item = document.createElement( 'li' );
+		const label = document.createElement( 'span' );
+		const button = document.createElement( 'button' );
+
+		label.textContent = book.meta.pagesco_in_stock
+			? /* translators: %s: book title. */ sprintf( __( '%s: in stock', 'pagesco-books' ), book.title.raw )
+			: /* translators: %s: book title. */ sprintf( __( '%s: sold out', 'pagesco-books' ), book.title.raw );
+
+		button.type = 'button';
+		button.className = 'button button-small';
+		button.textContent = book.meta.pagesco_in_stock
+			? __( 'Mark sold out', 'pagesco-books' )
+			: __( 'Mark in stock', 'pagesco-books' );
+		button.addEventListener( 'click', () =&gt; switchStock( book, item, button ) );
+
+		item.append( label, ' ', button );
+		return item;
+	}
+
+	// POST /wp/v2/books/&lt;id&gt; with the opposite stock; the answer is the updated book.
+	async function switchStock( book, item, button ) {
+		button.disabled = true;
+		try {
+			const updated = await wp.apiFetch( {
+				path: `/wp/v2/books/${ book.id }?context=edit&amp;_fields=id,title,meta`,
+				method: 'POST',
+				data: { meta: { pagesco_in_stock: ! book.meta.pagesco_in_stock } },
+			} );
+			item.replaceWith( bookItem( updated ) );
+			/* translators: %s: book title. */
+			status.textContent = sprintf( __( 'Saved: %s', 'pagesco-books' ), updated.title.raw );
+		} catch ( error ) {
+			status.textContent = error.message;
+			button.disabled = false;
+		}
+	}
+
+	// GET the catalog, sorted by title, with only the fields the widget needs.
+	wp.apiFetch( {
+		path: '/wp/v2/books?per_page=100&amp;orderby=title&amp;order=asc&amp;context=edit&amp;_fields=id,title,meta',
+	} )
+		.then( ( books ) =&gt; {
+			list.replaceChildren( ...books.map( bookItem ) );
+			status.textContent = sprintf(
+				/* translators: %d: number of books. */
+				_n( '%d book in the catalog.', '%d books in the catalog.', books.length, 'pagesco-books' ),
+				books.length
+			);
+		} )
+		.catch( ( error ) =&gt; {
+			status.textContent = error.message;
+		} );
+} )();</code></pre>
+                        <p>Then the translation chain (the <code>sed</code> command stands for filling in the two forms in your editor):</p>
+                        <pre data-cli><code class="language-bash">cd wp-content/plugins/pagesco-books
+wp i18n make-pot . languages/pagesco-books.pot --exclude=src/blocks,tests
+cd languages
+wp i18n update-po pagesco-books.pot pagesco-books-es_ES.po
+sed -i '/^msgid_plural "%d books in the catalog."$/{n;s/""/"%d libro en el catálogo."/;n;s/""/"%d libros en el catálogo."/}' pagesco-books-es_ES.po
+wp i18n make-json pagesco-books-es_ES.po --no-purge
+grep -o '"%d book in the catalog.":\[[^]]*\]' pagesco-books-es_ES-cfe2bc3ef2a0800531dc26491d4caca6.json</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Plugin file detected.
+Success: POT file successfully generated.
+Success: Updated 1 file.
+Success: Created 3 files.
+"%d book in the catalog.":["%d libro en el cat\u00e1logo.","%d libros en el cat\u00e1logo."]</code></pre>
+                        </div>
+                        <p>In JSON translations the key is the singular, and the value lists one translation per plural form of the language; <code>wp.i18n</code> picks one with the PO's <code>Plural-Forms</code> rule. Keep the change: it is a real fix, and the next release regenerates the files anyway.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Pairs an Editor Could Choose</h3>
+                    <p>The theme's own pairs all pass, but blocks with color supports (the Book Card from Lesson 6.2, Group, Paragraph) let an editor combine any palette color with any other. Which text-on-background combinations of the palette fail AA? Write <code>pagesco-contrast-all.php</code>, which tries every pair.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Two nested <code>foreach</code> loops over the palette, skipping a color on itself, printing only ratios below 4.5. Copy the luminance function from the contrast script of the Accessibility Checks section.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="pagesco-contrast-all.php" data-wp><code class="language-php">&lt;?php
+/**
+ * Lists the pairs of palette colors that fail WCAG AA as text on a background. Usage: wp eval-file pagesco-contrast-all.php
+ */
+
+/**
+ * The relative luminance of a #rrggbb color, as WCAG 2 defines it.
+ *
+ * @param string $hex A color such as #1f2a2e.
+ */
+function pagesco_luminance( string $hex ): float {
+	$channels = array_map( fn( $pair ) =&gt; hexdec( $pair ) / 255, str_split( ltrim( $hex, '#' ), 2 ) );
+	$linear   = array_map( fn( $c ) =&gt; $c &lt;= 0.04045 ? $c / 12.92 : ( ( $c + 0.055 ) / 1.055 ) ** 2.4, $channels );
+
+	return 0.2126 * $linear[0] + 0.7152 * $linear[1] + 0.0722 * $linear[2];
+}
+
+$pagesco_palette = wp_list_pluck( wp_get_global_settings( array( 'color', 'palette', 'theme' ) ), 'color', 'slug' );
+
+foreach ( $pagesco_palette as $pagesco_text =&gt; $pagesco_text_color ) {
+	foreach ( $pagesco_palette as $pagesco_background =&gt; $pagesco_background_color ) {
+		$pagesco_l1    = pagesco_luminance( $pagesco_text_color );
+		$pagesco_l2    = pagesco_luminance( $pagesco_background_color );
+		$pagesco_ratio = ( max( $pagesco_l1, $pagesco_l2 ) + 0.05 ) / ( min( $pagesco_l1, $pagesco_l2 ) + 0.05 );
+
+		if ( $pagesco_text !== $pagesco_background &amp;&amp; $pagesco_ratio &lt; 4.5 ) {
+			printf( "%-8s on %-8s %4.1f:1\n", $pagesco_text, $pagesco_background, $pagesco_ratio );
+		}
+	}
+}</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>paper    on sage      1.2:1
+ink      on oxblood   1.6:1
+ink      on slate     2.4:1
+oxblood  on ink       1.6:1
+oxblood  on slate     1.5:1
+sage     on paper     1.2:1
+slate    on ink       2.4:1
+slate    on oxblood   1.5:1</code></pre>
+                        </div>
+                        <pre data-cli><code class="language-bash">rm pagesco-contrast-all.php</code></pre>
+                        <p>Eight of the twenty combinations fail, all of them pairs of two light or two dark colors (sage on paper is barely visible at 1.2:1). <code>theme.json</code> cannot forbid them, but the block editor warns: when a block's text and background colors contrast too little, the color panel shows "This color combination may be hard for people to read." Themes can also keep such pairs out of reach: fewer palette colors, or <code>"color": { "custom": false }</code> so that editors pick only from the palette. In short: ink text works on paper and sage, paper text on ink, oxblood and slate, slate text on paper and sage.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: Translate the Must-Use Plugin (Stretch)</h3>
+                    <p>The notice's first sentence, from <code>mu-plugins/pagesco-site.php</code>, stayed English on the Spanish site. Make the must-use plugin translatable with its own text domain, <code>pagesco-site</code>: its two strings (the sentence and the notice's <code>aria-label</code>), a Spanish translation in <code>mu-plugins/languages/</code>, and whatever loading it needs. Check the result with <code>switch_to_locale()</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Automatic translation loading covers active plugins and themes, not must-use plugins. <code>load_muplugin_textdomain( 'pagesco-site', 'languages' )</code> registers <code>mu-plugins/languages/</code> for the domain (and, since 6.7, loads just in time too). For the attribute, <code>esc_attr__()</code> inside a <code>printf()</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>The must-use plugin, version 1.3.0:</p>
+                        <pre data-file="wp-content/mu-plugins/pagesco-site.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Pages &amp; Co. Site
+ * Description: Site-wide features of the Pages &amp; Co. bookstore: the store notice bar.
+ * Version:     1.3.0
+ * Text Domain: pagesco-site
+ * Author:      Pages &amp; Co.
+ */
+
+/**
+ * Prints the store notice at the top of every front-end page.
+ */
+function pagesco_render_store_notice() {
+	/**
+	 * Filters the text of the store notice.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param string $text Plain text; it is escaped when printed. Return '' to hide the notice.
+	 */
+	$text = apply_filters( 'pagesco_store_notice', __( 'Free shipping on orders over $35.', 'pagesco-site' ) );
+
+	if ( '' === $text ) {
+		return;
+	}
+
+	/**
+	 * Fires before the store notice bar is printed.
+	 *
+	 * @since 1.0.0
+	 */
+	do_action( 'pagesco_before_store_notice' );
+
+	printf( '&lt;div class="pagesco-notice" role="region" aria-label="%s"&gt;', esc_attr__( 'Store notice', 'pagesco-site' ) );
+	echo esc_html( $text );
+
+	/**
+	 * Fires inside the store notice bar, after the text.
+	 *
+	 * @since 1.0.0
+	 */
+	do_action( 'pagesco_store_notice_end' );
+
+	echo '&lt;/div&gt;';
+}
+add_action( 'wp_body_open', 'pagesco_render_store_notice' );
+
+remove_action( 'wp_head', 'wp_generator' );
+
+// Must-use plugins are not covered by automatic translation loading: name the folder (Lesson 8.3).
+load_muplugin_textdomain( 'pagesco-site', 'languages' );</code></pre>
+                        <p>The translation, in <code>wp-content/mu-plugins/languages/pagesco-site-es_ES.po</code> (the folder is not a plugin: must-use plugins are only the PHP files directly in <code>mu-plugins</code>):</p>
+                        <pre data-file="wp-content/mu-plugins/languages/pagesco-site-es_ES.po"><code class="language-text">msgid ""
+msgstr ""
+"Language: es_ES\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Domain: pagesco-site\n"
+
+msgid "Free shipping on orders over $35."
+msgstr "Envío gratis en pedidos de más de 35 $."
+
+msgid "Store notice"
+msgstr "Aviso de la tienda"</code></pre>
+                        <pre data-cli><code class="language-bash">wp i18n make-php wp-content/mu-plugins/languages/pagesco-site-es_ES.po
+wp eval 'switch_to_locale( "es_ES" ); pagesco_render_store_notice(); echo "\n";'
+wp eval 'pagesco_render_store_notice(); echo "\n";'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Success: Created 1 file.
+&lt;div class="pagesco-notice" role="region" aria-label="Aviso de la tienda"&gt;Envío gratis en pedidos de más de 35 $. Abierto hasta las 21:00 los jueves. &lt;a href="http://localhost:8080/events/"&gt;Ver eventos&lt;/a&gt;&lt;/div&gt;
+&lt;div class="pagesco-notice" role="region" aria-label="Store notice"&gt;Free shipping on orders over $35. Open until 9 p.m. on Thursdays. &lt;a href="http://localhost:8080/events/"&gt;See events&lt;/a&gt;&lt;/div&gt;</code></pre>
+                        </div>
+                        <p>The whole notice in Spanish, with a Spanish landmark name for screen readers, and unchanged in English. A <code>.l10n.php</code> file is enough on WordPress 6.5 and later; add a <code>.mo</code> (<code>wp i18n make-mo</code>) for older versions. Keep it, if you like: nothing later depends on either version.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> Which string can a translator translate well?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="A fragment and a variable joined in code: where would the genre go in a language that puts it first?">
+                                A) __( 'Books in ', 'pagesco-books' ) . $genre
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="make-pot warned about this one twice. What do the two placeholders lack?">
+                                B) __( 'Showing %s of %s books', 'pagesco-books' ) with no comment
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="A whole sentence with numbered placeholders and a translators comment: the translator sees what each part is and may change the order.">
+                                C) 'Showing %1$s of %2$s books' with a translators comment naming both numbers
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> You built <code>pagesco-books-es_ES-cfe2bc3ef2a0800531dc26491d4caca6.json</code>. What does the long part of the name stand for?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="WordPress hashes the path of the script it is about to print, relative to the plugin, and looks for a JSON file with that hash; make-json takes the paths from the PO references.">
+                                A) The MD5 hash of the script's path in the plugin, assets/js/stock-widget.js
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The file name would change at every release then. What does WordPress know about a script when it prints it?">
+                                B) The plugin's version number, hashed
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="A checksum of the content would change with every edit of the translation. Which path did the md5sum loop hash?">
+                                C) A checksum of the translations inside the file
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> axe reports no violations on a page. What do you know?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Did axe notice that the selected genre hid the keyboard focus? Who did?">
+                                A) The page is accessible
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Automated rules catch a part of the problems, such as markup and contrast; focus visibility, meaningful alternative text, reading order and screen reader experience need people to test.">
+                                B) The page passed the rules a machine can check; keyboard and screen reader tests are still needed
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="axe tests WCAG rules, and many of them. Which kinds of problems can only a person judge?">
+                                C) Nothing: axe does not test WCAG
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> In <code>uninstall.php</code>, <code>get_terms( array( 'taxonomy' =&gt; 'genre' ) )</code> returns a <code>WP_Error</code>. Why?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The plugin deletes the settings near the end of the file. What was missing before the call?">
+                                A) Because the settings were already deleted
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The genres are still in wp_term_taxonomy until something deletes them. What does get_terms() check first?">
+                                B) Because WordPress removes the terms before uninstall.php runs
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="During uninstall the plugin is not loaded, so its taxonomy is not registered, and get_terms() rejects unregistered taxonomies with invalid_taxonomy; register it in uninstall.php first.">
+                                C) Because the plugin is not loaded, so the genre taxonomy is not registered
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> Why does the release run <code>composer dump-autoload --no-dev</code> before <code>npm run plugin-zip</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The ZIP's size changes a little, but Common Mistake 3 showed something worse. What happened when the autoloader was required?">
+                                A) To make the ZIP smaller
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="With development packages installed, the autoloader requires some of their files on every load; the ZIP does not contain them, so the plugin would die with a fatal error on the client's site.">
+                                B) Because the development autoloader requires files from packages the ZIP does not contain
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Plugin Check never ran Composer. What did php -r show in Common Mistake 3?">
+                                C) Because Plugin Check refuses plugins that use Composer
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Who translates a plugin in the directory?</summary>
+                    <p>Volunteers, on translate.wordpress.org. As soon as a plugin is in the directory, its strings appear there; translators for each language translate them, editors approve them, and WordPress delivers the result to sites as language packs in <code>wp-content/languages/plugins/</code>, updated automatically. Those packs win over files shipped in the plugin. For a client plugin like this one, you or the client's translator maintain the files in <code>languages/</code>.</p>
+                </details>
+                <details>
+                    <summary>What about right-to-left languages?</summary>
+                    <p>Arabic, Hebrew and Persian read right to left. WordPress sets <code>dir="rtl"</code> on the page, <code>is_rtl()</code> tells PHP, and stylesheets get mirrored versions: the build already made <code>style-index-rtl.css</code> for each block (Lesson 6.1), and WordPress loads it automatically for RTL locales. CSS logical properties (<code>margin-inline-start</code> instead of <code>margin-left</code>) make one stylesheet work both ways.</p>
+                </details>
+                <details>
+                    <summary>Should I submit Pages &amp; Co. Books to the directory?</summary>
+                    <p>No: it is one shop's custom plugin, and the directory is for plugins that are useful to many sites. But a general part of it could be (a book catalog with blocks, for example), and then everything in this lesson is the submission checklist: a review team member checks the guidelines by hand, then you get access to a Subversion repository, where <code>trunk/</code> holds the development version and <code>tags/1.1.0/</code> each release, and the readme's <code>Stable tag</code> tells the directory which tag to ship.</p>
+                </details>
+                <details>
+                    <summary>How does a client get updates of a plugin that is not in the directory?</summary>
+                    <p>For one site, the release ZIP and a deployment (Lesson 8.4) are enough. For several sites, agencies use a private update server (WordPress asks it through the <code>pre_set_site_transient_update_plugins</code> filter) or tools that deploy from Git. Since WordPress 5.5, uploading a ZIP of a newer version on Plugins &gt; Add Plugin offers "Replace current with uploaded", which is the simplest manual update.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Make the skip link the first stop again. The notice comes first because it is printed on <code>wp_body_open</code>, before the block template. Move it <em>into</em> the header template part: in the must-use plugin, stop printing on <code>wp_body_open</code> when the theme is a block theme (<code>wp_is_block_theme()</code>), and instead add the notice's HTML at the start of the rendered header with the <code>render_block_core/template-part</code> filter (check <code>$block['attrs']['slug']</code>), keeping <code>wp_body_open</code> for classic themes. Then repeat the keyboard walk: "Skip to content" first, then the notice inside the banner landmark. Which of the theme's CSS rules, and which earlier lessons' assumptions about where the notice sits, would you have to check?</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Try one site you use every day with the keyboard only for five minutes: can you always see where you are, and reach everything? Write down what surprised you. Then think of a client who sells abroad: which parts of their site would a translation file cover, and which would need a multilingual content plugin?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>i18n is the developer's job (translation functions, one text domain, whole sentences, numbered placeholders, translators comments, <code>_n()</code>); l10n is translation files; a11y makes the result usable by everyone</li>
+                        <li><code>wp i18n make-pot</code> extracts strings from PHP, JavaScript and <code>block.json</code>; <code>update-po</code>, <code>make-mo</code>, <code>make-php</code> and <code>make-json --no-purge</code> turn a translation into the files WordPress reads</li>
+                        <li>Since 6.8, <code>Text Domain</code> and <code>Domain Path</code> are enough for PHP strings; scripts need <code>wp_set_script_translations()</code> (block.json's <code>textdomain</code> does it for blocks) and a JSON file named after the script path's MD5</li>
+                        <li>Accessibility checks: computed contrast (4.5:1), a keyboard walk (order and visible focus), axe or Lighthouse for markup rules; then a screen reader, because tools find only part of the problems</li>
+                        <li>A distributable plugin has a valid <code>readme.txt</code>, consistent versions (semantic versioning), honest requirements, guards on PHP files that run code, documented external services, and passes Plugin Check</li>
+                        <li>Release ZIPs leave out development files and are built with a production autoloader (<code>composer dump-autoload --no-dev</code>)</li>
+                        <li>Uninstall deletes content only on the administrator's opt-in, and registers what it needs, because the plugin is not loaded</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>A POT file</td><td><code>wp i18n make-pot . languages/pagesco-books.pot --exclude=src/blocks,tests</code></td></tr>
+                            <tr><td>Merge new strings into a PO</td><td><code>wp i18n update-po languages/pagesco-books.pot languages/pagesco-books-es_ES.po</code></td></tr>
+                            <tr><td>Files WordPress reads</td><td><code>wp i18n make-mo</code>, <code>wp i18n make-php</code>, <code>wp i18n make-json … --no-purge</code></td></tr>
+                            <tr><td>A language for WordPress</td><td><code>wp language core install es_ES</code>; site: <code>wp site switch-language es_ES</code>; user: Profile &gt; Language</td></tr>
+                            <tr><td>Translations for a script</td><td><code>wp_set_script_translations( $handle, 'pagesco-books' )</code> (blocks: block.json <code>textdomain</code>)</td></tr>
+                            <tr><td>Check the plugin</td><td><code>wp plugin check pagesco-books [--ignore-warnings] [--format=csv]</code></td></tr>
+                            <tr><td>A release ZIP</td><td><code>composer dump-autoload --no-dev</code>, <code>npm run plugin-zip</code>, <code>composer dump-autoload</code></td></tr>
+                            <tr><td>Test an uninstall safely</td><td><code>wp db export /tmp/x.sql</code>, <code>wp plugin uninstall … --deactivate --skip-delete</code>, <code>wp db import /tmp/x.sql</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You kept Lesson 5.4's promise: shop data is deleted on uninstall only when an administrator asks for it, and you proved both paths</li>
+                        <li>You translated the plugin into Spanish, PHP and JavaScript, and watched a visitor and a bookseller get it</li>
+                        <li>You audited the theme and blocks three ways and fixed a focus problem no automated tool reported</li>
+                        <li>You released version 1.1.0 as a ZIP that a reviewer's tool accepts without errors</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>The plugin has a release ZIP; the site has none of that yet. In <a href="lesson_29.html"><strong>Lesson 8.4: Deployment &amp; Maintenance</strong></a> you take the whole Pages &amp; Co. site live: hosting types, Git and <code>.gitignore</code> for the theme and plugin, deploying with <code>composer install --no-dev</code> and built blocks, moving the database with WP-CLI's search-replace (which also fixes the navigation's stored addresses), production settings for debugging and WP-Cron, backups, updates and hardening.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Run <code>composer lint</code> once more, and check that <code>wp plugin list</code> shows <code>pagesco-books</code> at version 1.1.0 and no Plugin Check</li>
+                    <li>Open the front page in a browser and walk it with the keyboard; switch your own profile language to Español for a minute to see the admin and the Stock widget in Spanish</li>
+                    <li>If you use Git already, look at which files of the plugin you would commit and which you would not; Lesson 8.4 writes the <code>.gitignore</code></li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Translation files, contrast ratios and readme headers can feel like paperwork after the excitement of blocks and APIs. They are what turns code that works for you into a product that works for everyone, including the bookseller who prefers Spanish and the customer who never touches a mouse. Today you also learned the most honest sentence in accessibility: "the tool found nothing" is the beginning of a test, not the end. Keep walking your pages with the keyboard; it takes five minutes and it will make you a better developer than any checker.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_27.html" class="prev-lesson">← Previous: Performance &amp; Caching</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_29.html" class="next-lesson">Next: Deployment &amp; Maintenance →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

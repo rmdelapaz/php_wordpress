@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Workbook: Session 13</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Student workbook —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">write in it · bring it to every session</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Participant Workbook</div>
+    <h1>Session 13: The Interactivity API and Using the REST API</h1>
+    <p class="sub">Your workbook for Session 13: a warm-up, the key ideas of Lessons 6.4 and 7.1, worked examples, the guided labs, predict-then-run practice, a self-check for each lesson, Checkpoint 2 and your exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Lessons <b>6.4–7.1</b></span>
+      <span class="chip">Session <b>13</b> · 3 hours</span>
+      <span class="chip">Name: ____________________</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Session Goals</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Explain the Interactivity API's split: the server renders HTML with directives (and evaluates them), a store in a script module takes over.</li>
+  <li>Design an interactive feature as state, derived state and context, and write the PHP half with wp_interactivity_state() and wp_interactivity_data_wp_context().</li>
+  <li>Read the catalog through the REST API: routes, _fields, filters, pages and their headers.</li>
+  <li>Authenticate the right way (cookie plus nonce, application passwords) and read 400, 401, 403 and 404.</li>
+  <li>Show what you can do in Modules 5 and 6 in Checkpoint 2.</li>
+</ul>
+
+  <div class="sec"><h2>Warm-up: Lessons 6.2 and 6.3</h2><span class="rule"></span></div>
+<p>Answer from memory first; the class goes through them together.</p>
+<div class="q"><div class="qn">W1</div><div class="qt">The Hobbit card on the Staff picks post: which of its attributes does PHP's parse_blocks() see?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W2</div><div class="qt">You changed the card's save(). When do you need a deprecated entry, and when not?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W3</div><div class="qt">The Book List stores only <code class="inline">&lt;!-- wp:pagesco/book-list /--&gt;</code>. Who decides how many books it shows?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W4</div><div class="qt">Which line makes WordPress pass the book's ID to a paragraph bound to pagesco/book?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W5</div><div class="qt">What does the Hobbit's page show as its price, and where does the value come from?</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Lessons</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">6.4</span><h3>The Interactivity API</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Explain how the Interactivity API splits the work: server-rendered HTML with directives, then hydration by a store in a script module</li>
+  <li>Scaffold an interactive block into the plugin, and build its viewScriptModule with --experimental-modules</li>
+  <li>Set state and per-element context in PHP with wp_interactivity_state() and wp_interactivity_data_wp_context(), including derived state the server can compute</li>
+  <li>Write a store with store(), state getters, getContext() and actions, and connect it with data-wp-on, bind, class and text</li>
+  <li>Build interactive features that stay accessible and keep working without JavaScript</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>Server first:</b> render.php prints the finished HTML with <code class="inline">data-wp-*</code> directives; WordPress <b>evaluates bind, class, style, text, context and each on the server</b>, so the page is right before any JavaScript.</li>
+  <li><b><code class="inline">"interactivity": true</code></b> and a <b>viewScriptModule</b>, built with <code class="inline">--experimental-modules</code> (silently skipped without it); the module loads only where the block is.</li>
+  <li><b>State</b> is shared by the store (<code class="inline">wp_interactivity_state()</code>), <b>context</b> belongs to one element (<code class="inline">wp_interactivity_data_wp_context()</code>), <b>derived state</b> is computed: PHP closures for the server, getters in view.js for the browser, with the same answers.</li>
+  <li><b>The store:</b> <code class="inline">store( namespace, { state, actions } )</code>, <code class="inline">getContext()</code>; actions change state and every directive follows. Actions that use the event synchronously need <code class="inline">withSyncEvent()</code>.</li>
+  <li><b>Progressive enhancement:</b> real links, state from the address, validated input: the feature works without JavaScript and for assistive technology (aria-current, aria-live, hidden).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: what the server already decided</div>
+<p>The server evaluates the Book Filter's directives for any address, so curl (no JavaScript at all) can check every filter. How many books does the server hide for Classic and for Fantasy (the site after Lesson 6.4)?</p>
+<pre class="code">for genre in classic fantasy; do curl -s "http://localhost:8080/find-a-book/?genre=$genre" | grep -c '&lt;li hidden'; done</pre>
+<pre class="out">5
+9</pre><p>Eleven books in the HTML each time: five hidden for Classic (six classics), nine for Fantasy (two fantasy books). And the links: which one is current?</p>
+<pre class="code">curl -s 'http://localhost:8080/find-a-book/?genre=fantasy' | grep -o 'aria-current="[a-z]*"' | sort | uniq -c</pre>
+<pre class="out">      5 aria-current="false"
+      1 aria-current="page"
+      1 aria-current="true"</pre><p>One link says aria-current="true" (Fantasy), the other five "false": aria- attributes get the words, so a screen reader hears which filter is active before any JavaScript runs.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>From the project folder: <code class="inline">cp labs/module-13/l6_4-interactivity-api/open_today_starter.php wordpress/</code>, then <code class="inline">wp eval-file --use-include open_today_starter.php</code>.</li>
+  <li>TODOs 1 and 2: the two derived-state closures (isToday, isHidden). TODOs 3 and 4: the directives on the paragraph and on each day.</li>
+  <li>Before each run, predict: which &lt;li&gt; gets hidden? aria-current? the class?</li>
+</ul>
+<div class="write"></div>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>Which directive in the HTML did the server leave untouched, and why?</td><td></td></tr>
+<tr><td>Why does Friday say aria-current="false" instead of nothing?</td><td></td></tr>
+<tr><td>What would view.js need for the button to work?</td><td></td></tr>
+</tbody>
+</table>
+<ul class="tick">
+  <li>Done when your output matches "Expected when done". Then <code class="inline">rm wordpress/open_today_starter.php</code>.</li>
+  <li>Finished early? <code class="inline">event_list_starter.php</code> (data-wp-each), then <code class="inline">debug_stock_badges.php</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Predict, then run</div>
+<p>Write your prediction on the line first, then run it in the WP-CLI container shell (<code class="inline">docker compose run --rm wpcli sh</code>) on the site after Lesson 6.4.</p>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it. (A genre the shop does not have.)</div><pre class="code">curl -s 'http://localhost:8080/find-a-book/?genre=romance' | grep -o 'visibleCount"&gt;[0-9]*'</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it. (A directive whose state does not exist.)</div><pre class="code">wp eval 'echo wp_interactivity_process_directives( "&lt;div data-wp-interactive=\"pagesco/x\"&gt;&lt;b data-wp-text=\"state.missing\"&gt;old text&lt;/b&gt;&lt;/div&gt;" ), "\n";'</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>A Find a Book Page</b> (lesson page, "Project: A Find a Book Page"). In class: Step 1. At home: Steps 2 and 3.</p>
+<ul class="tick">
+  <li>☐ Step 1: the page "Find a Book" with the paragraph and the Book Filter; <code class="inline">?genre=dystopian</code> shows "Showing 3 of 11 books"</li>
+  <li>☐ Step 2: every genre without a reload and with an empty Console; a reload on ?genre=classic; the keyboard; JavaScript off</li>
+  <li>☐ Step 3: Filter test deleted; the menu shows Find a Book; package.json has --experimental-modules twice; 14 features</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">A visitor opens /find-a-book/?genre=fantasy. Where does the browser's store get state.genre's starting value from?</div><div class="opts"><div class="opt">A) From the address bar, read by view.js</div><div class="opt">B) From the state JSON that render.php's wp_interactivity_state() put into the page</div><div class="opt">C) From localStorage</div><div class="opt">D) From a REST request the store sends on load</div></div></div>
+<div class="q" data-sc="2"><div class="qn">Q2</div><div class="qt">Which of these directives does the SERVER not evaluate when it renders the block?</div><div class="opts"><div class="opt">A) <code class="inline">data-wp-bind--hidden="!state.isVisible"</code></div><div class="opt">B) <code class="inline">data-wp-text="state.visibleCount"</code></div><div class="opt">C) <code class="inline">data-wp-class--is-selected="state.isSelected"</code></div><div class="opt">D) <code class="inline">data-wp-on--click="actions.selectGenre"</code></div></div></div>
+<div class="q" data-sc="3" data-kind="short"><div class="qn">Q3</div><div class="qt">On the course site after Lesson 6.4 (three Dystopian books of eleven): what does this print?</div><pre class="code">curl -s 'http://localhost:8080/find-a-book/?genre=dystopian' | grep -c '&lt;li hidden'</pre><div class="write"></div></div>
+<div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">Each genre link must know its own slug. Where does that slug belong?</div><div class="opts"><div class="opt">A) In the element's context, <code class="inline">wp_interactivity_data_wp_context( array( 'slug' =&gt; $slug ) )</code></div><div class="opt">B) In the state, as one key per genre</div><div class="opt">C) In a global JavaScript variable</div><div class="opt">D) In the link's class name</div></div></div>
+<div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">An action calls event.preventDefault() to stop a link. What does WordPress 6.8 and later require for it?</div><div class="opts"><div class="opt">A) Nothing: actions always run synchronously</div><div class="opt">B) data-wp-on-async--click instead of data-wp-on--click</div><div class="opt">C) Wrapping the action in withSyncEvent()</div><div class="opt">D) Returning false from the action</div></div></div>
+<div class="q" data-sc="6" data-kind="short"><div class="qn">Q6</div><div class="qt">A visitor's browser blocks the Book Filter's script module, and she clicks Fantasy. What happens, and why?</div><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>For the Book Filter, write three short lists: the state, the derived state, and the context, and say for each item why it belongs in that list. Then pick an interactive feature you have seen on another site (an accordion, a "load more" button, a size picker) and design it the same way: what is the one piece of state, what is derived, what does each element need to know about itself, and how would it work without JavaScript?</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">7.1</span><h3>Using the REST API</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Explain routes, endpoints, methods, JSON responses and status codes, and list the routes your site offers</li>
+  <li>Read the catalog from core endpoints and shape the answer with _fields, _embed, context, filters and the pagination headers</li>
+  <li>Authenticate the right way: cookie plus nonce for logged-in JavaScript, application passwords for other programs</li>
+  <li>Call the REST API from JavaScript with apiFetch, and handle its errors</li>
+  <li>Read REST errors (400, 401, 403, 404) and tell "who are you?" from "you may not"</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>The REST API</b> serves the site's data as JSON at <code class="inline">/wp-json/</code> (or <code class="inline">?rest_route=</code>): namespaces (<code class="inline">wp/v2</code>), routes, endpoints (route + method). Core builds routes for every type registered with show_in_rest.</li>
+  <li><b>Shape the answer:</b> <code class="inline">_fields</code> (keep <code class="inline">_links</code> and <code class="inline">_embedded</code> when embedding), <code class="inline">_embed</code>, <code class="inline">context</code>, filters such as <code class="inline">genres</code> (IDs) and <code class="inline">search</code>; page with <code class="inline">per_page</code>/<code class="inline">page</code> and the headers <b>X-WP-Total</b>, <b>X-WP-TotalPages</b>, Link.</li>
+  <li><b>Cookie + nonce</b> for the site's own JavaScript: without the X-WP-Nonce the request is anonymous, with a wrong one it is refused (CSRF protection).</li>
+  <li><b>Application passwords</b> for programs: one per program, Basic authentication over HTTPS (or locally), the smallest role that works, revocable; never the account password.</li>
+  <li><b>apiFetch</b> adds the root URL, the nonce and the locale, sends data as JSON and rejects with the server's error object.</li>
+  <li><b>Errors</b> are <code class="inline">{ code, message, data.status }</code>: <b>400</b> the request, <b>401</b> who are you?, <b>403</b> you may not, <b>404</b> no such route or item.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: two questions a client asks first</div>
+<p>A client that needs to know how big the catalog is never downloads it: it asks for the headers only. With pages of five:</p>
+<pre class="code">curl -s -I 'http://localhost:8080/wp-json/wp/v2/books?per_page=5' | grep -i '^X-WP-Total'</pre>
+<pre class="out">X-WP-Total: 11
+X-WP-TotalPages: 3</pre><p>Eleven books, three pages of five. And a client that knows a book's slug (from a ?genre= link, a URL) asks for exactly the fields it needs:</p>
+<pre class="code">curl -s 'http://localhost:8080/wp-json/wp/v2/books?slug=the-hobbit&amp;_fields=id,link'; echo</pre>
+<pre class="out">[{"id":35,"link":"http:\/\/localhost:8080\/books\/the-hobbit\/"}]</pre><p>The REST API escapes slashes in JSON strings (<code class="inline">\/</code>); any JSON parser turns them back. A slug filter returns a LIST, even for one book.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>From the project folder: <code class="inline">cp labs/module-13/l7_1-rest-api/catalog_queries_starter.sh wordpress/</code>, then <code class="inline">docker compose run --rm wpcli sh catalog_queries_starter.sh</code>.</li>
+  <li>For each TODO, try the request alone in a container shell first, then put it in the script. Quote every URL that contains <code class="inline">&amp;</code>.</li>
+  <li>TODO 2 needs the ID TODO 1 found: the genres filter does not take slugs.</li>
+</ul>
+<div class="write tall"></div>
+<ul class="tick">
+  <li>Done when your output matches "Expected when done". Then <code class="inline">rm wordpress/catalog_queries_starter.sh</code>.</li>
+  <li>Finished early? <code class="inline">who_may_starter.sh</code> (predict the whole table first), then <code class="inline">debug_stock_list.php</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Predict, then run</div>
+<p>Write your prediction on the line first, then run it in the WP-CLI container shell (<code class="inline">docker compose run --rm wpcli sh</code>) on the site after Lesson 6.4.</p>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it. (Books whose text contains "the", one per page.)</div><pre class="code">curl -s 'http://localhost:8080/wp-json/wp/v2/books?search=the&amp;per_page=1&amp;_fields=id' -D - -o /dev/null | grep -i '^X-WP-TotalPages'</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it. (One genre, two fields.)</div><pre class="code">curl -s 'http://localhost:8080/wp-json/wp/v2/genres/8?_fields=name,count'; echo</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>Stock at a Glance</b> (lesson page, "Project: Stock at a Glance"). In class: Step 1. At home: Steps 2 to 4.</p>
+<ul class="tick">
+  <li>☐ Step 1: the inventory script marks Fahrenheit 451 sold out and back in stock with Maria's "Inventory script" password; the book page follows</li>
+  <li>☐ Step 2: <code class="inline">src/Admin/StockWidget.php</code>, the fifteenth feature</li>
+  <li>☐ Step 3: <code class="inline">assets/js/stock-widget.js</code> (wp.apiFetch, textContent, aria-live)</li>
+  <li>☐ Step 4: Maria's Dashboard shows all eleven books; each button switches the stock without a page load; Gatsby and Catcher sold out again</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">Anonymously, <code class="inline">GET /wp-json/wp/v2/books/30?context=edit</code>. What comes back?</div><div class="opts"><div class="opt">A) 200 with the raw title and the content as block markup</div><div class="opt">B) 404 rest_no_route</div><div class="opt">C) 401 rest_forbidden_context</div><div class="opt">D) 403 rest_cannot_edit</div></div></div>
+<div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt">On the course site (six Classic books, genre ID 7): what does this print?</div><pre class="code">curl -s 'http://localhost:8080/wp-json/wp/v2/books?genres=7&amp;per_page=4&amp;_fields=id' -D - -o /dev/null | grep -i '^X-WP-TotalPages'</pre><div class="write"></div></div>
+<div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">A Dashboard page sends Maria's cookie and an X-WP-Nonce header with an old, made-up value. What does the REST API answer?</div><div class="opts"><div class="opt">A) 403 rest_cookie_invalid_nonce: the page must fetch a fresh nonce</div><div class="opt">B) 200: the cookie is enough</div><div class="opt">C) 401 rest_not_logged_in, as if no cookie had been sent</div><div class="opt">D) 500: the nonce check crashed</div></div></div>
+<div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt"><code class="inline">/wp/v2/books/30?_embed=wp:term&amp;_fields=id,title</code> answers without any genres. Why?</div><div class="opts"><div class="opt">A) The book has no genres</div><div class="opt">B) _embed works only for authenticated requests</div><div class="opt">C) wp:term is not an embeddable relation</div><div class="opt">D) _fields removed _links, so there was nothing to follow, and _embedded is cut off too</div></div></div>
+<div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">Why can you create application passwords on the course site although it runs on plain http://localhost:8080?</div><div class="opts"><div class="opt">A) Application passwords never need HTTPS</div><div class="opt">B) WP_ENVIRONMENT_TYPE is local; elsewhere WordPress offers them only on HTTPS</div><div class="opt">C) Docker encrypts the traffic</div><div class="opt">D) Because the administrator created them</div></div></div>
+<div class="q" data-sc="12" data-kind="short"><div class="qn">Q12</div><div class="qt">Name two things wp.apiFetch() adds to a request that a plain fetch() on the Dashboard does not.</div><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>List every program that might want to talk to the Pages &amp; Co. site (the inventory system, a phone app, a newsletter tool, a partner bookstore...). For each one write: what it reads, what it changes, how it should authenticate, and which WordPress user and role it should run as. Which of them need no authentication at all?</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Checkpoint 2: Modules 5 and 6</h2><span class="rule"></span></div>
+<p>25 minutes, on your own, open notes (the lesson pages, your own plugin, pagesco-plan.txt). Your instructor hands out <code class="inline">labs/module-13/checkpoint-2/checkpoint_starter.php</code> at 2:20. Copy it into wordpress/ as <code class="inline">checkpoint_YOURNAME.php</code>, write the bodies of the four functions, and run it with <code class="inline">wp eval-file --use-include checkpoint_YOURNAME.php</code> until it prints four lines without a message. Do not change the main section; the script must change nothing on your site.</p>
+<div class="blk"><div class="h">Parts A to C: the Weekly Picks report (in the file)</div>
+<ul class="tick">
+  <li><b>Part A (Lessons 5.2, 5.3):</b> <code class="inline">pagesco_cp_cheap_books( float $max )</code>: the books in stock that cost at most $max, cheapest first, as "Title ($8.49)": one get_posts() with a meta_query (price as a number, stock '1') and orderby meta_value_num.</li>
+  <li><b>Part B (Lesson 5.5):</b> <code class="inline">pagesco_cp_events_at( string $location )</code>: how many events take place at a location: one COUNT query on the events table through <code class="inline">$wpdb-&gt;prepare()</code> (the main section tries a hostile location).</li>
+  <li><b>Part C (Lessons 6.2, 6.3):</b> <code class="inline">pagesco_cp_list_titles( string $genre )</code>: render a Book List block for the genre, cheapest first, with do_blocks() and return its titles; <code class="inline">pagesco_cp_cards_in( string $slug )</code>: how many Book Cards a post stores and the first one's comment attributes.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Part D: three written answers</div>
+<div class="q"><div class="qn">D1</div><div class="qt">A bookseller writes a review of one book for the newsletter archive; the front page shows "the three cheapest fantasy books right now". Static block or dynamic block for each, and why?</div><div class="write"></div></div>
+<div class="q"><div class="qn">D2</div><div class="qt">A settings form in the admin checks <code class="inline">current_user_can( 'manage_options' )</code> before saving. Lesson 5.3 says that is not enough. What is missing, and which attack does it stop?</div><div class="write"></div></div>
+<div class="q"><div class="qn">D3</div><div class="qt">The Book Filter still filters when its script module fails to load. Name the two things in render.php that make that work.</div><div class="write"></div></div>
+</div>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<p>Three questions, no notes, right after the checkpoint.</p>
+<div class="q"><div class="qn">E1</div><div class="qt">In the Book Filter, name the state and one piece of derived state.</div><div class="write"></div></div>
+<div class="q"><div class="qn">E2</div><div class="qt">401 or 403: which one means "who are you?"</div><div class="write"></div></div>
+<div class="q"><div class="qn">E3</div><div class="qt">Which credential does a partner's nightly price script use?</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Notes</h2><span class="rule"></span></div>
+<div class="notes-lines"></div>
+
+  <div class="sec"><h2>Homework Checklist</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ Finish the Find a Book page (Steps 2 and 3) and Stock at a Glance (Steps 2 to 4)</li>
+  <li>☐ Lesson 6.4 Hands-on Exercises 1 and 2 (Exercise 3 is a stretch)</li>
+  <li>☐ Lesson 7.1 Hands-on Exercises 1 and 2 (Exercises 3 and 4 are stretches)</li>
+  <li>☐ Both Quick Quizzes on the lesson pages</li>
+  <li>☐ Both journal entries</li>
+  <li>☐ Before the Next Lesson: the widget works for Maria; "Inventory script" kept safe (not in wordpress/); Devon's "Test" password created; Lessons 5.3 and 5.5 reread</li>
+  <li>☐ Optional: <code class="inline">event_list_starter.php</code>, <code class="inline">who_may_starter.sh</code>, both debug handouts</li>
+  <li>☐ Bring to Session 14: a site at the end of Lesson 7.1, both application passwords, this workbook</li>
+</ul>
+
+  <div class="sec"><h2>Glossary</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>directive</td><td>A <code class="inline">data-wp-*</code> attribute that ties an element to the store (<code class="inline">data-wp-text</code>, <code class="inline">data-wp-bind--hidden</code>, <code class="inline">data-wp-on--click</code>)</td></tr>
+<tr><td>state / derived state</td><td>The store's data, shared by all its elements / values computed from it (PHP closures, JS getters)</td></tr>
+<tr><td>context</td><td>Data attached to one element and the directives inside it (<code class="inline">wp_interactivity_data_wp_context()</code>, <code class="inline">getContext()</code>)</td></tr>
+<tr><td>store</td><td><code class="inline">store( namespace, { state, actions } )</code> in view.js: the browser half</td></tr>
+<tr><td>script module</td><td>A native JavaScript module (<code class="inline">&lt;script type="module"&gt;</code>) loaded with an import map; built with <code class="inline">--experimental-modules</code></td></tr>
+<tr><td>hydration</td><td>The browser's store taking over the HTML the server rendered</td></tr>
+<tr><td>route / endpoint</td><td>A path pattern under /wp-json/ / a route plus a method</td></tr>
+<tr><td><code class="inline">_fields</code>, <code class="inline">_embed</code></td><td>Which fields to return / include linked resources in <code class="inline">_embedded</code></td></tr>
+<tr><td>X-WP-Total, X-WP-TotalPages</td><td>Headers with the number of matching items and of pages</td></tr>
+<tr><td>nonce (<code class="inline">wp_rest</code>)</td><td>The token that proves a cookie request comes from the site's own page (X-WP-Nonce)</td></tr>
+<tr><td>application password</td><td>A per-program password for REST requests (Basic authentication), revocable, never for wp-login.php</td></tr>
+<tr><td>apiFetch</td><td>WordPress's fetch wrapper: root URL, nonce, JSON, errors (<code class="inline">wp.apiFetch</code>, dependency wp-api-fetch)</td></tr>
+</tbody>
+</table>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 13 · Participant Workbook · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

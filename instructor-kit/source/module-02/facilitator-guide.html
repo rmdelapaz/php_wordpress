@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facilitator Guide: Session 2</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">contains answers &amp; timing · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Facilitator Guide</div>
+    <h1>Session 2: PHP the WordPress Way and the Content Model</h1>
+    <p class="sub">How to teach the session where learners start writing WordPress code and stock the site with content: the house rules of WordPress PHP (coding standards checked by PHPCS, prefixes, sanitize early and escape late, translatable strings, callbacks, arrays of arguments, WP_Error), then the content model seen from WP-CLI and PHP, ending with the Pages &amp; Co. staff, pages and News posts that every later lesson starts from.</p>
+    <div class="meta-row">
+      <span class="chip"><b>2</b> lessons</span>
+      <span class="chip"><b>3 hrs</b> session</span>
+      <span class="chip">Lessons <b>1.3–2.1</b></span>
+      <span class="chip">Session <b>2</b> of 18 · Part 1</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>How to Use This Guide</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Same rhythm for both lessons: frame (the goal and one mental model) → live demo (you type, they type along) → guided lab (a kit lab, new practice on the lesson's ideas) → start the lesson's own project. The lesson exercises, quiz and journal are homework.</li>
+  <li>Type, do not paste (the block-markup files of the 2.1 project are the one exception: learners copy them from the lesson page). Every command below was run to produce the output printed under it, on WordPress 7.1.3, PHP 8.5, MySQL 9.7 and WP-CLI 2.12: a fresh course site, exactly what a learner has at the end of Session 1. Ask for a prediction before every run.</li>
+  <li>The lessons are the reference. Keep <code class="inline">lesson_03.html</code> and <code class="inline">lesson_04.html</code> open in browser tabs for the bridge table, the WPCS rules table, the escaping table and the Settings-to-options table. Labs live in <code class="inline">labs/module-02/</code> (learners keep the folder in their project folder): <code class="inline">_starter</code> files are handouts, <code class="inline">_solution</code> files are yours.</li>
+  <li>Session 2 is where the course site starts to hold real content. Lesson 1.3 leaves the site as it found it; Lesson 2.1's project creates the staff accounts, pages and News posts that <b>every later lesson starts from</b>, with fixed IDs (users 2 and 3, pages 12 to 14, posts 15 to 17). Protect that project's start above everything else in the session.</li>
+  <li>Part 1, "Themes" (Sessions 1 to 8), can run on its own; nothing here depends on Part 2. Teal blocks are hands-on, amber blocks are watch-outs.</li>
+</ul>
+<div class="note warn"><div class="t">The #1 risk of Session 2: the IDs drift</div>
+<p>Lesson 2.1's project prints IDs 12 to 17 because every earlier block of the lesson used one up: attachment 5, the revision demo's post 6 and its revisions 7 and 8, the Gift Cards draft 9, the duplicate Sample Page 10 and its trash revision 11. A learner who watched the demo instead of typing it along gets pages 5 to 7 and posts 8 to 10, and every later lesson that names an ID (2.2 adds meta to post 15, Session 3's site check lists 12 to 17) stops matching. <b>So:</b> in the 2.1 demo everybody types along, and before the project every machine runs the next-ID check below. It must print 12. If it prints less, the catch-up line uses up the missing IDs on drafts it deletes again. Run the check AFTER the guided lab: the lab only reads.</p>
+</div>
+
+  <div class="sec"><h2>Before the Session</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ <b>Read Session 1's exit tickets</b> and the list of NOT READY machines: anyone who is still not ready pairs with a neighbor today and gets the install clinic's plan checked in the warm-up.</li>
+  <li>☐ <b>Network:</b> Lesson 1.3 downloads the WordPress coding standards with Composer (the <code class="inline">composer:2</code> image, about 70 MB once, which Session 1's bring list asked learners to pull at home, and about 3 MB of packages) and a Spanish translation (about 1 MB). Test the venue Wi-Fi with both the day before. Without it: show the lesson's output cards for the PHPCS and es_ES steps, and PHPCS moves to homework.</li>
+  <li>☐ <b>Files to hand out:</b> the <code class="inline">labs/</code> folder <b>without</b> the <code class="inline">*_solution.*</code> files (learners who copied the whole folder in Session 1 already have it); the workbook.</li>
+  <li>☐ <b>Run the kit check once:</b> <code class="inline">python3 labs/check_labs.py module-02</code> from this kit's folder (every line PASS; 10 results in about a minute). With your own course project at the end of Session 1: <code class="inline">WP_LABS_COMPOSE=~/pagesco-dev python3 labs/check_labs.py module-02</code>.</li>
+  <li>☐ <b>Projector machine:</b> the course site exactly as Session 1 left it (only mailpit-smtp.php in mu-plugins, no content beyond the install: run the warm-up's site check), the <code class="inline">composer:2</code> image pulled, VS Code on <code class="inline">pagesco-dev</code> at a large font, two terminals in the project folder (one for commands, one for <code class="inline">tail -f wordpress/wp-content/debug.log</code>), <code class="inline">lesson_03.html</code> and <code class="inline">lesson_04.html</code> in tabs, http://localhost:8080/wp-admin/ logged in as admin.</li>
+  <li>☐ <b>Board, before learners arrive:</b> the escaping table (text → <code class="inline">esc_html()</code>, attribute → <code class="inline">esc_attr()</code>, href/src → <code class="inline">esc_url()</code>, post HTML → <code class="inline">wp_kses_post()</code>); "sanitize early, escape late"; the next-ID check command; a box labeled <b>one filing cabinet: wp_posts</b>.</li>
+</ul>
+<div class="blk warn"><div class="h">Known traps today</div>
+<table class="timing">
+<thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td>Composer shell: <code class="inline">Permission denied</code> writing composer.json (Linux, WSL)</td><td>The practice folder was created by a container (root) or <code class="inline">--user</code> was left out</td><td><code class="inline">mkdir wordpress/pagesco-practice</code> as yourself first, then the lesson's <code class="inline">docker run --rm -it --user "$(id -u):$(id -g)" ...</code> line exactly.</td></tr>
+<tr><td>PowerShell: <code class="inline">docker run ... $PWD/wordpress</code> mounts nothing</td><td>PowerShell writes the variable differently</td><td>Lesson 1.3's note: leave <code class="inline">--user</code> out and write <code class="inline">${PWD}</code>; better, use the Ubuntu terminal like every other command.</td></tr>
+<tr><td><code class="inline">Cannot create cache directory /composer-cache/...</code></td><td>Composer's cache is not writable for your user in the container</td><td>Harmless: Composer proceeds without a cache.</td></tr>
+<tr><td><code class="inline">vendor/bin/phpcs: not found</code></td><td>PHPCS runs outside the Composer shell, or in the wrong folder</td><td>In the Composer shell, in <code class="inline">/var/www/html/pagesco-practice</code> (the prompt shows it).</td></tr>
+<tr><td><code class="inline">wp eval-file pagesco-practice/escape.php</code>: <code class="inline">Error: 'pagesco-practice/escape.php' does not exist.</code></td><td>The file was saved in the project folder, not in <code class="inline">wordpress/pagesco-practice/</code></td><td>Save it in VS Code under <code class="inline">wordpress/pagesco-practice/</code>; <code class="inline">wp</code> runs in the WordPress root.</td></tr>
+<tr><td>The es_ES install hangs or fails</td><td>No internet or translate.wordpress.org blocked</td><td>Show the lesson's output card; nothing later depends on it (the language is uninstalled again).</td></tr>
+<tr><td>Project 2.1: <code class="inline">Error: Invalid category 'news'</code> or the posts land in Uncategorized</td><td>Step 3's <code class="inline">wp term create category News --slug=news</code> skipped</td><td>Create the term, then <code class="inline">wp post term set &lt;ID&gt; category news</code> for each post (or delete and recreate the posts).</td></tr>
+<tr><td>Project 2.1: About Us is page 5 (or 8), not 12</td><td>The learner did not type along the 2.1 demo</td><td>Delete the new content (<code class="inline">wp post delete &lt;IDs&gt; --force</code>, <code class="inline">wp user delete maria devon --yes</code>... and recreate after the catch-up line). Better: run the next-ID check before Step 2.</td></tr>
+<tr><td><code class="inline">wp post create pagesco-content/about.html</code>: <code class="inline">Error: Unable to read content from 'pagesco-content/about.html'</code></td><td>The folder is in the project folder, not in <code class="inline">wordpress/</code></td><td><code class="inline">mkdir wordpress/pagesco-content</code>; the files go there.</td></tr>
+</tbody>
+</table>
+</div>
+
+  <div class="sec"><h2>Session 2 Agenda (3 hours)</h2><span class="rule"></span></div>
+  <table class="timing">
+    <thead><tr><th>Clock</th><th>Minutes</th><th>Segment</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="t">0:00</td><td class="t">10</td><td>Warm-up</td><td>Five retrieval questions on Session 1, the site check, homework check (the health check, the plan, the composer:2 image).</td></tr>
+      <tr><td class="t">0:10</td><td class="t">10</td><td><b>1.3</b> Frame and mental model</td><td>The shared house; the bridge table from PHP Foundations; core still runs on PHP 7.4, your code above its own minimum.</td></tr>
+      <tr><td class="t">0:20</td><td class="t">25</td><td><b>1.3</b> Live demo</td><td>PHPCS on PHP Foundations code and on the WordPress version, escaping per context, the added slashes, core in Spanish, seven callbacks, WP_Error, the silent _e().</td></tr>
+      <tr><td class="t">0:45</td><td class="t">20</td><td><b>1.3</b> Guided lab</td><td><code class="inline">labs/module-02/l1_3-php-the-wordpress-way/signup_form_starter.php</code> in pairs: sanitize a slashed form, then escape each value for its place.</td></tr>
+      <tr><td class="t">1:05</td><td class="t">15</td><td><b>1.3</b> Start the lesson project</td><td>The Book Card Helper, Step 1 typed and run (Step 2 if time); the break test, PHPCS and the clean-up go home.</td></tr>
+      <tr><td class="t">1:20</td><td class="t">10</td><td>Break</td><td>Write "one filing cabinet, many labels" on the board for after the break, and the next-ID check.</td></tr>
+      <tr><td class="t">1:30</td><td class="t">10</td><td><b>2.1</b> Frame and mental model</td><td>One filing cabinet; posts and pages; terms; roles bundle capabilities; settings are options; block markup is text.</td></tr>
+      <tr><td class="t">1:40</td><td class="t">20</td><td><b>2.1</b> Live demo</td><td>The lesson's blocks in order, typed along: post types, WP_Post, statuses, terms, an attachment, revisions, capabilities, options, parse_blocks(), two silent mistakes, then the next-ID check (12).</td></tr>
+      <tr><td class="t">2:00</td><td class="t">15</td><td><b>2.1</b> Guided lab</td><td><code class="inline">labs/module-02/l2_1-content-model/content_census_starter.sh</code>: the site counted the way the lesson sees it, one WP-CLI command per line.</td></tr>
+      <tr><td class="t">2:15</td><td class="t">35</td><td><b>2.1</b> Start the lesson project</td><td>Stock the Pages &amp; Co. site, Steps 1 to 3: Maria and Devon, the three pages, the News category and three posts. Step 4 goes home.</td></tr>
+      <tr><td class="t">2:50</td><td class="t">10</td><td>Wrap-up</td><td>Exit ticket (3 questions), homework, bring list for Session 3 (the site at the end of Lesson 2.1).</td></tr>
+      <tr><td class="t"><b>Total</b></td><td class="t"><b>180</b></td><td></td><td>Ends at 3:00.</td></tr>
+    </tbody>
+  </table>
+<p><b>In the room.</b> The lesson pages estimate 130 + 120 = 250 minutes for a learner working alone; after the warm-up, the break and the wrap-up the room has 150 (70 for 1.3, 80 for 2.1). Lesson 1.3 keeps model, demo and lab; its project starts with Step 1 (typing the helper is where the habits meet). Lesson 2.1's demo runs the lesson's blocks in order, typed along, and its project gets the longest segment of the day because Session 3 starts from it. <b>Not in the room:</b> 1.3's i18n.php, args.php, price.php and globals.php examples and its Common Mistakes 1, 2 and 4 (the escape.php demo covers 1; 2 and 4 take the whole site down and are best read with the lesson's output cards); the strict-types box and the FAQ; 2.1's image sizes and srcset (<code class="inline">wp_get_attachment_metadata</code>, <code class="inline">wp_get_attachment_image</code>), the roles table, the user meta behind roles, Mistakes 3 and 4 (a role checked instead of a capability: self-check Q9 and the debug handout; HTML without block comments) and the version note.</p>
+<p><b>Goes home (about 2 to 3 hours).</b> 1.3: project Steps 2 to 4 (render three books, the break test, PHPCS until it is silent, then delete the practice folder); 2.1: project Step 4 (Maria's edit and its revision, Devon refused, <code class="inline">rm -r pagesco-content</code>, the final list); each lesson's Hands-on Exercises; both Quick Quizzes; both journal entries; both "Before the Next Lesson" lists.</p>
+<p><b>Protect, in this order:</b> the 2.1 project Steps 1 to 3 on every machine, with the right IDs; the 2.1 demo's ID-using steps (the attachment, the revisions, the two mistakes); the 1.3 PHPCS and escaping steps; the 1.3 guided lab. <b>Cut first:</b> the 1.3 es_ES and callbacks steps (6 minutes; both are in the lesson), then the 1.3 project start (send Step 1 home: 15 minutes), then the 2.1 guided lab (15 minutes: at home its counts are those of the stocked site, which the README lists).</p>
+
+  <div class="sec"><h2>Opening Segment</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">0:00</span><h3>Warm-up: Session 1 Revisited</h3><span class="dur">10 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Timing</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">5m</td><td>Five retrieval questions, no notes (workbook Warm-up box), then answers by show of hands</td></tr>
+<tr><td class="t">3m</td><td>Site check: two WP-CLI commands on every machine, the same answer as the projector</td></tr>
+<tr><td class="t">2m</td><td>Homework check: the health check, the plan, the composer:2 image</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Retrieval questions and answers</div>
+<ol class="steps">
+  <li>Which folder of the WordPress root is yours, and why is nothing else? <b>Answer:</b> <code class="inline">wp-content/</code> (themes, plugins, mu-plugins, uploads), plus your settings in <code class="inline">wp-config.php</code>. Everything else is core and every update replaces it.</li>
+  <li>Put them in order: the main query, <code class="inline">init</code>, the template. <b>Answer:</b> <code class="inline">init</code> (the end of loading: core, mu-plugins, plugins, the theme), then <code class="inline">wp()</code> runs the main query, then the template loader draws the page: load, query, template.</li>
+  <li><code class="inline">docker compose down</code> and <code class="inline">docker compose down -v</code>: what survives each? <b>Answer:</b> <code class="inline">down</code> keeps the files and the database (the volume); <code class="inline">-v</code> deletes the database volume too.</li>
+  <li>A page says "There has been a critical error on this website." Where do you look first? <b>Answer:</b> The end of <code class="inline">wordpress/wp-content/debug.log</code> (<code class="inline">tail -n 20 wordpress/wp-content/debug.log</code>, or <code class="inline">tail -f</code> while reloading).</li>
+  <li>What does <code class="inline">wp option get blogname</code> print on the course site, and why? <b>Answer:</b> <code class="inline">Pages &amp;amp; Co.</code>: WordPress stored the title HTML-escaped when it was saved. Today's first lesson explains when to escape yourself.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Site check (on the projector, then every machine)</div>
+<p>Say: "Both lessons today start from the site Session 1 left. Check yours is the same." From the project folder:</p>
+<pre class="code">wp core version
+wp plugin list --status=must-use --fields=name,status</pre><pre class="out">7.1.3
++--------------+----------+
+| name         | status   |
++--------------+----------+
+| mailpit-smtp | must-use |
++--------------+----------+</pre><ul class="tick">
+  <li><b>Same answer:</b> ready. A learner who already did Lesson 2.1 at home (users maria and devon exist) is ahead: they repeat nothing today and help in the 2.1 project.</li>
+  <li><b>Another must-use plugin listed</b> (pagesco-hours, pagesco-debug-demo): a Session 1 lab or demo was not removed. <code class="inline">rm wordpress/wp-content/mu-plugins/&lt;file&gt;</code> now.</li>
+  <li><b><code class="inline">wp</code> not found or <code class="inline">no configuration file provided</code>:</b> the shortcut or the folder (Session 1). Still NOT READY from Session 1: pair with a neighbor, check the clinic plan in the break.</li>
+  <li><b>Homework check (two minutes):</b> hands up for "All checks passed." from the health check and for <code class="inline">pagesco-plan.txt</code> (Lesson 2.1's journal reopens it). <code class="inline">docker image ls composer:2</code> on every machine: the image Lesson 1.3 needs in 15 minutes. Missing: <code class="inline">docker pull composer:2</code> now, it downloads during the frame.</li>
+</ul>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Lesson Plans</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">1.3</span><h3>PHP the WordPress Way</h3><span class="dur">70 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Write PHP that follows the WordPress coding standards, and check it with PHPCS and the WordPress ruleset</li>
+  <li>Choose the right escaping function for each output context (esc_html, esc_attr, esc_url, wp_kses_post) and the right sanitizing function for each input</li>
+  <li>Make strings translatable with __(), esc_html__(), _n() and sprintf(), with a text domain and translator comments</li>
+  <li>Pass callbacks in every form WordPress accepts, and write functions that take an array of arguments merged with wp_parse_args()</li>
+  <li>Handle WP_Error results, and use core's globals ($wpdb, $post, $wp_query) and classes without fighting them</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing in the room</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame: the shared house; the bridge table; core on PHP 7.4, your code above its own minimum</td></tr>
+<tr><td class="t">25m</td><td>Live demo: PHPCS before and after, escaping per context, slashes, core in Spanish, callbacks, WP_Error, the silent _e()</td></tr>
+<tr><td class="t">20m</td><td>Guided lab: <code class="inline">signup_form_starter.php</code> in pairs</td></tr>
+<tr><td class="t">15m</td><td>Start the lesson project: the Book Card Helper, Step 1</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Mental model to say</div>
+<p>"In PHP Foundations your code was the whole application. In WordPress it is a guest. Moving from your own apartment into a shared house: you label your food (prefixes), you use the shared kitchen tools the way everyone does (core's functions instead of your own helpers), you leave notes others can read (coding standards and DocBlocks), and you do not rearrange the living room (globals). None of the rules is hard. Ignoring them is what causes the fights."</p>
+<p>Then the lesson's bridge table, four rows on the board: <b>htmlspecialchars() → esc_html() and friends · filter_input() → wp_unslash() + sanitize_*() · exceptions → WP_Error · PDO → $wpdb</b>. And one sentence on versions: "WordPress 7.1 still runs on PHP 7.4, so core looks old-fashioned. Your plugin declares its own minimum (Lesson 5.1) and may use modern PHP above it. You are learning conventions, not going back in time."</p>
+</div>
+<div class="blk"><div class="h">Live demo (you type, they follow)</div>
+<p>From the project folder on the projector, with the <code class="inline">wp</code> shortcut; the Composer shell is a second terminal. Files are saved in VS Code under <code class="inline">wordpress/pagesco-practice/</code>, exactly as the lesson names them (the lesson page has each one).</p>
+<ol class="steps">
+  <li><b>PHPCS on PHP Foundations code (6m).</b> "You already write good PHP. Let a tool tell us what WordPress thinks of it." Create the practice folder, save the lesson's two versions of one function (<code class="inline">style-before.php</code> and <code class="inline">style-after.php</code>) in VS Code, and open the Composer shell from the project folder:
+<pre class="code">mkdir wordpress/pagesco-practice
+docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD/wordpress:/var/www/html" -w /var/www/html/pagesco-practice composer:2 sh</pre>
+In that shell, the three lines that install the WordPress rules (about 20 seconds on good Wi-Fi; the download lines differ on every machine):
+<pre class="code">composer init --name=pagesco/practice --no-interaction
+composer config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+composer require --dev wp-coding-standards/wpcs:^3</pre>
+<pre class="out">Writing ./composer.json
+...
+Lock file operations: 5 installs, 0 updates, 0 removals
+  - Locking dealerdirect/phpcodesniffer-composer-installer (v1.2.1)
+  - Locking phpcsstandards/phpcsextra (1.5.1)
+  - Locking phpcsstandards/phpcsutils (1.2.3)
+  - Locking squizlabs/php_codesniffer (3.13.6)
+  - Locking wp-coding-standards/wpcs (3.4.1)
+PHP CodeSniffer Config installed_paths set to ../../phpcsstandards/phpcsextra,../../phpcsstandards/phpcsutils,../../wp-coding-standards/wpcs
+No security vulnerability advisories found.</pre>
+Then the PHP Foundations version:
+<pre class="code">vendor/bin/phpcs --standard=WordPress style-before.php</pre>
+<pre class="out">FILE: /var/www/html/pagesco-practice/style-before.php
+--------------------------------------------------------------------------------
+FOUND 20 ERRORS AND 1 WARNING AFFECTING 9 LINES
+--------------------------------------------------------------------------------
+ 1 | ERROR   | [ ] Missing file doc comment
+ 2 | ERROR   | [ ] Function name "bookTitle" is not in snake case format, try
+   |         |     "book_title"
+ 2 | ERROR   | [ ] Missing doc comment for function bookTitle()
+ 2 | ERROR   | [x] Expected 1 spaces after opening parenthesis; 0 found
+ 2 | ERROR   | [x] Expected 1 spaces before closing parenthesis; 0 found
+ 3 | ERROR   | [x] Opening brace should be on the same line as the declaration
+ 4 | ERROR   | [x] Tabs must be used to indent lines; spaces are not allowed
+ 4 | ERROR   | [x] No space after opening parenthesis is prohibited
+ 4 | WARNING | [x] Loose comparisons are not allowed. Expected: "==="; Found:
+   |         |     "=="
+ 4 | ERROR   | [ ] Use Yoda Condition checks, you must.
+ 4 | ERROR   | [x] String "" does not require double quotes; use single quotes
+   |         |     instead
+ 4 | ERROR   | [x] No space before closing parenthesis is prohibited
+ 5 | ERROR   | [x] Tabs must be used to indent lines; spaces are not allowed
+ 5 | ERROR   | [x] String "Untitled" does not require double quotes; use single
+   |         |     quotes instead
+ 6 | ERROR   | [x] Tabs must be used to indent lines; spaces are not allowed
+ 7 | ERROR   | [x] Tabs must be used to indent lines; spaces are not allowed
+ 7 | ERROR   | [x] String "&lt;h2&gt;" does not require double quotes; use single
+   |         |     quotes instead
+ 7 | ERROR   | [x] String "&lt;/h2&gt;" does not require double quotes; use single
+   |         |     quotes instead
+ 8 | ERROR   | [x] Tabs must be used to indent lines; spaces are not allowed
+ 8 | ERROR   | [ ] All output should be run through an escaping function (see
+   |         |     the Security sections in the WordPress Developer Handbooks),
+   |         |     found '$out'.
+ 9 | ERROR   | [x] Tabs must be used to indent lines; spaces are not allowed
+--------------------------------------------------------------------------------
+PHPCBF CAN FIX THE 16 MARKED SNIFF VIOLATIONS AUTOMATICALLY
+--------------------------------------------------------------------------------</pre>
+Read three lines from the left: line, ERROR or WARNING, <code class="inline">[x]</code> when phpcbf can fix it. 20 errors and 1 warning, 16 of them mechanical. Stop on line 8: "All output should be run through an escaping function". PHPCS just found a cross-site scripting hole. That is the real reason professionals run it. Then the WordPress version:
+<pre class="code">vendor/bin/phpcs --standard=WordPress style-after.php &amp;&amp; echo "No problems found."</pre>
+<pre class="out">No problems found.</pre>
+Show <code class="inline">style-after.php</code> side by side for one minute: tabs, spaces inside parentheses, the Yoda condition, single quotes, the DocBlocks, <code class="inline">esc_html()</code> at the echo, and the one <code class="inline">// phpcs:ignore</code> with a reason. Learners type <code class="inline">exit</code> to leave the Composer shell; keep it in the terminal history for the project's Step 4.</li>
+  <li><b>One value, four contexts (4m).</b> "Escape late, for the exact place the value goes." Save the lesson's <code class="inline">escape.php</code> in the practice folder and run it from the project folder:
+<pre class="code">wp eval-file pagesco-practice/escape.php</pre>
+<pre class="out">esc_html:    Dune &amp;lt;script&amp;gt;alert(&amp;quot;hi&amp;quot;)&amp;lt;/script&amp;gt; &amp;amp; &amp;quot;Friends&amp;quot;
+esc_attr:    Pages &amp;amp; Co. &amp;quot;staff pick&amp;quot;
+esc_url:     https://example.com/search?q=dune&amp;#038;page=2
+esc_url:     (empty)
+wp_kses_post: &lt;p&gt;A &lt;strong&gt;classic&lt;/strong&gt;alert(1) &lt;a href="https://example.com"&gt;link&lt;/a&gt;&lt;/p&gt;
+twice:       Pages &amp;amp; Co.</pre>
+Line by line: text between tags (<code class="inline">esc_html()</code>), an attribute (<code class="inline">esc_attr()</code>), a URL whose <code class="inline">&amp;</code> becomes <code class="inline">&amp;#038;</code> and whose <code class="inline">javascript:</code> disappears (<code class="inline">esc_url()</code>), user HTML kept but defanged (<code class="inline">wp_kses_post()</code>), and the kindness on the last line: no double-encoding.</li>
+  <li><b>WordPress adds slashes to your input (3m).</b> "One surprise for PHP developers." Save the lesson's <code class="inline">pagesco-slashes.php</code> in <code class="inline">wordpress/wp-content/mu-plugins/</code>, open the address in the browser (View Source, search for pagesco-q), or with curl in the container:
+<pre class="code">curl -s 'http://localhost:8080/?pagesco_q=O%27Reilly%20%3Cb%3Ebooks%3C%2Fb%3E' | grep -o '&lt;p class="pagesco-q"&gt;.*&lt;/p&gt;'</pre>
+<pre class="out">&lt;p class="pagesco-q"&gt;raw: O\&amp;#039;Reilly &amp;lt;b&amp;gt;books&amp;lt;/b&amp;gt; | clean: O&amp;#039;Reilly books&lt;/p&gt;</pre>
+Raw: <code class="inline">O\'Reilly</code> (the backslash from <code class="inline">wp_magic_quotes()</code>, the quote escaped for printing). Clean: unslashed, then sanitized: quote kept, tags gone. "Save a raw value and every apostrophe in your database grows a backslash." Delete the demo: <code class="inline">rm wp-content/mu-plugins/pagesco-slashes.php</code> in the container.</li>
+  <li><b>Core speaks Spanish (3m).</b> "Every visible string goes through a translation function." Install Spanish, ask core for two of its strings, uninstall again (it needs the internet; if the venue blocks it, show the lesson's output card):
+<pre class="code">wp language core install es_ES
+wp eval 'switch_to_locale( "es_ES" ); echo __( "Posts" ), " / ", _n( "%s comment", "%s comments", 3 ), "\n"; restore_previous_locale(); echo __( "Posts" ), "\n";'
+wp language core uninstall es_ES</pre>
+<pre class="out">Downloading translation from https://downloads.wordpress.org/translation/core/7.1.3/es_ES.zip...
+Unpacking the update...
+Installing the latest version...
+Removing the old version of the translation...
+Translation updated successfully.
+Language 'es_ES' installed.
+Success: Installed 1 of 1 languages.
+Entradas / %s comentarios
+Posts
+Success: Language uninstalled.</pre>
+<code class="inline">__( 'Posts' )</code> found "Entradas" in Spanish and returns the English string otherwise. Your theme adds a text domain, its folder slug: <code class="inline">pagesco</code>. On the board: <b><code class="inline">__()</code> returns, <code class="inline">_e()</code> echoes, <code class="inline">esc_html__()</code> is the everyday choice, <code class="inline">_n()</code> for plurals, <code class="inline">sprintf()</code> with a translators comment for variables</b>.</li>
+  <li><b>Seven shapes of a callback (3m).</b> "WordPress asks for callbacks everywhere: every hook, shortcode, REST route." Save <code class="inline">callbacks.php</code> from the lesson and run it:
+<pre class="code">wp eval-file pagesco-practice/callbacks.php</pre>
+<pre class="out">function name   DUNE!
+closure         Dune
+arrow function  enud
+object method   dune (staff pick)
+static method   "dune"
+static, string  "dune"
+first-class     DUNE!</pre>
+Point at the column of names. Ask: "which of these can another plugin unhook later?" (The named function and the methods; never the closure or the arrow function: Lesson 2.3.)</li>
+  <li><b>Errors come back as values (3m).</b> "Core predates exceptions." Save <code class="inline">errors.php</code> and run it:
+<pre class="code">wp eval-file pagesco-practice/errors.php</pre>
+<pre class="out">Code:    existing_user_login
+Message: Sorry, that username already exists!
+int(0)
+Content, title, and excerpt are empty.</pre>
+<code class="inline">wp_insert_user()</code> returns a WP_Error; <code class="inline">wp_insert_post()</code> returns 0 unless you pass <code class="inline">true</code>. "Read the Return line of the Code Reference before you trust a result." Nothing was created: both calls failed before the database.</li>
+  <li><b>Mistake 3: _e() in an expression (silent) (2m).</b> "One last trap, and it makes no noise." Save <code class="inline">mistake-e.php</code> and run it:
+<pre class="code">wp eval-file pagesco-practice/mistake-e.php</pre>
+<pre class="out">New arrivals
+&lt;h2&gt;&lt;/h2&gt;
+New arrivalsNULL</pre>
+The text printed before the heading was even built, and the heading is empty. <code class="inline">_e</code> echoes, the others return. Leave the practice folder in place: the project uses it (and its PHPCS) next; Mistakes 2 and 4 (a name already taken, strict types) take the whole site down and go home, with the lesson's output cards.</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b>The wrong escaper, or one for everything.</b> <code class="inline">esc_html()</code> around an href, or <code class="inline">esc_attr()</code> everywhere. Coach with the board's table and one question: "Where does this value land: between tags, in an attribute, in a URL?" (Self-check Q1, lesson quiz Q1, the guided lab's TODOs 6 and 7.)</li>
+  <li><b>Sanitizing on output, escaping on input.</b> <code class="inline">$nick = esc_html( $_POST['nickname'] )</code>. Coach: "Sanitize is for the way in, escape for the way out; the database should hold the clean value, not HTML entities." (Lesson quiz Q5.)</li>
+  <li><b>Forgetting <code class="inline">wp_unslash()</code>.</b> The apostrophe in O'Neil grows a backslash. Coach: "WordPress added it on the way in; take it off before you clean." (The slashes demo, the guided lab's TODO 1.)</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<p><b>File:</b> learners copy <code class="inline">labs/module-02/l1_3-php-the-wordpress-way/signup_form_starter.php</code> into wordpress/ and run it with <code class="inline">wp eval-file --use-include signup_form_starter.php</code>; your reference is <code class="inline">labs/module-02/l1_3-php-the-wordpress-way/signup_form_solution.php</code>. It practices both halves of the rule on data nobody has seen: a book club sign-up with the backslashes WordPress adds, a name with tags, a shouting email address, a negative seat count, a shelf that is not on the list, and a <code class="inline">javascript:</code> website.</p>
+<ul class="tick">
+  <li><b>Run it as shipped (2m).</b> Every value prints <code class="inline">TODO</code>, and the two HTML lines show where escaping is missing.</li>
+  <li><b>TODOs 1 to 4 in pairs (10m): sanitize early.</b> Circulate for <code class="inline">wp_unslash()</code> missing (the name keeps <code class="inline">O\'Neil</code>), and for TODO 4 written as a sanitize call: the shelf must be VALIDATED against the three allowed values with <code class="inline">in_array( ..., true )</code>.</li>
+  <li><b>TODOs 5 to 7 (5m): escape late.</b> <code class="inline">esc_attr()</code> in the value attribute, <code class="inline">esc_url()</code> around the unslashed website (it comes back empty), <code class="inline">esc_html()</code> for the link text.</li>
+  <li><b>Expected when done:</b></li>
+</ul>
+<pre class="out">name:  string(18) "Siobhan O'Neil VIP"
+email: Siobhan.ONeil@Example.COM (valid: yes)
+seats: 3
+shelf: fiction
+field: &lt;input name="name" value="Siobhan O&amp;#039;Neil VIP"&gt;
+link:  &lt;a href=""&gt;Siobhan O&amp;#039;Neil VIP&lt;/a&gt;</pre><ul class="tick">
+  <li><b>Debrief (3m):</b> "Why did the name keep VIP?" (<code class="inline">sanitize_text_field()</code> strips the tags, not the text between them.) "Seats: -3 became 3. Is that right?" (No: <code class="inline">absint()</code> flips the sign; a real form should REJECT a negative, the lesson's point about validating.) "Why is the href empty?" (<code class="inline">esc_url()</code> drops a <code class="inline">javascript:</code> URL.)</li>
+  <li><b>Fast finishers:</b> <code class="inline">labs/module-02/l1_3-php-the-wordpress-way/event_line_starter.php</code> (an events list with an array of arguments, <code class="inline">_n()</code> and <code class="inline">sprintf()</code> with translator comments, a sort callback and a WP_Error), then <code class="inline">labs/module-02/l1_3-php-the-wordpress-way/debug_book_badge.php</code> (two loud bugs and a silent one in a badge helper).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Start the lesson project</div>
+<p>The lesson project is <b>The Book Card Helper</b>: <code class="inline">pagesco_book_card( $book, $args )</code> in <code class="inline">wordpress/pagesco-practice/book-card.php</code>, using every habit of the lesson, with a clean PHPCS report at the end. In the room: Step 1 (15 minutes).</p>
+<ul class="tick">
+  <li>Step 1: type <code class="inline">book-card.php</code> from the lesson, reading each comment aloud with a neighbor: it names the rule the line follows (the DocBlock with <code class="inline">@type</code> keys, <code class="inline">wp_parse_args()</code>, the heading level validated, <code class="inline">esc_attr()</code> / <code class="inline">esc_url()</code> / <code class="inline">esc_html()</code>, <code class="inline">__()</code> and <code class="inline">_n()</code> with translators comments).</li>
+  <li>If there is time: Step 2's <code class="inline">render-cards.php</code> and <code class="inline">wp eval-file pagesco-practice/render-cards.php</code>. Three cards, "1,178 pages".</li>
+  <li><b>Done in the room</b> = book-card.php saved and loading without a message (Step 2 prints three cards when it runs). <b>Goes home:</b> Steps 2 to 4: the break test (a <code class="inline">javascript:</code> link, quotes in the class, a heading level of 99), PHPCS until "no coding standards problems", then <code class="inline">rm -r pagesco-practice</code> and <code class="inline">ls wp-content/mu-plugins</code> (only mailpit-smtp.php). Keep a copy of book-card.php in the course notes: Lesson 6.2 compares it with a block, and Session 3's warm-up asks whether it passed PHPCS.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<p>Ask these out loud during the demo and the lab (cold-call gently, or think-pair-share):</p>
+<ul class="tick">
+  <li>Which escaper for a link's href, for its title attribute, and for its text? <b>Answer:</b> <code class="inline">esc_url()</code>, <code class="inline">esc_attr()</code>, <code class="inline">esc_html()</code>.</li>
+  <li>Why does every function in the course theme start with <code class="inline">pagesco_</code>? <b>Answer:</b> one global namespace per request, shared by core and every plugin; two functions with one name are a fatal error.</li>
+  <li>What do <code class="inline">__()</code> and <code class="inline">_e()</code> do differently? <b>Answer:</b> <code class="inline">__()</code> returns the translation, <code class="inline">_e()</code> echoes it (and returns null).</li>
+  <li>A WordPress function failed. Exception, false, or something else? <b>Answer:</b> usually a WP_Error (check with <code class="inline">is_wp_error()</code>); some return 0 or false unless you ask for the error: read the Return line.</li>
+</ul>
+<p>Workbook self-check, items Q1 to Q6 (learners do them at the end of the block or at home).</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q1</b> <span data-sc="1">B) <code class="inline">esc_attr()</code></span>; <b>Q2</b> <span data-sc="2"><code class="inline">Tom &amp;amp; Jerry</code></span>; <b>Q3</b> <span data-sc="3">C) "Staff picks" first, then an empty <code class="inline">&lt;h2&gt;&lt;/h2&gt;</code></span>; <b>Q4</b> <span data-sc="4">A) A class inside the namespace <code class="inline">PagesCo\Books</code>, such as <code class="inline">PagesCo\Books\Plugin</code></span>; <b>Q5</b> <span data-sc="5"><pre class="out">int(7)
+string(10) "staffpicks"</pre></span>; <b>Q6</b> <span data-sc="6">D) <code class="inline">0</code>: pass <code class="inline">true</code> as the second argument to get a WP_Error with the message</span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> learners who are slow in the Composer shell watch the PHPCS step on the projector and set it up at home (the project's Step 4 needs it). For the lab, a card with the four sanitizers and the four escapers, each with one example input and output, from the demo.</p>
+<p><b>Stretch:</b> <code class="inline">event_line_starter.php</code> and <code class="inline">debug_book_badge.php</code>; the lesson's Exercise 1 (make PHPCS happy with <code class="inline">phpcbf</code>), Exercise 4 (<code class="inline">wp_list_filter()</code> and friends) and the Bonus Challenge (PHPCS on Hello Dolly and Twenty Twenty-Five, with the three rule sets).</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">2.1</span><h3>The Content Model</h3><span class="dur">80 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Explain why posts, pages, media, revisions, templates and navigation menus are all posts with a different post_type, and read a WP_Post object</li>
+  <li>Choose between posts and pages, use post statuses, and organize content with categories, tags and terms</li>
+  <li>Describe how roles, capabilities and users fit together, and check capabilities rather than roles in code</li>
+  <li>Find the option behind a Settings screen, and read the block markup the editor stores in post_content with parse_blocks()</li>
+  <li>Create users, pages and posts from the command line, with authors, categories, dates and revisions</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing in the room</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame: one filing cabinet; posts and pages; terms; roles and capabilities; options; block markup</td></tr>
+<tr><td class="t">20m</td><td>Live demo: the lesson's blocks in order, typed along, then the next-ID check</td></tr>
+<tr><td class="t">15m</td><td>Guided lab: <code class="inline">content_census_starter.sh</code></td></tr>
+<tr><td class="t">35m</td><td>Start the lesson project: Stock the Pages &amp; Co. site, Steps 1 to 3</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Mental model to say</div>
+<p>Draw a filing cabinet with one drawer labeled <b>wp_posts</b>: "Every document goes into the same kind of folder with the same fields: title, content, author, date, status. A colored label says what it is: blog post, page, image, old version, template, menu. Code that works on 'a folder' (saving, revisions, permissions, the REST API) works on every label at once. That is why a custom post type, Lesson 5.2's book, gets all of it for free."</p>
+<p>Then the rest of the picture around the cabinet: <b>terms</b> (colored tabs: categories, tags, later genre), <b>users</b> (who may open which drawer: roles are bundles of capabilities, and code checks the capability), <b>options</b> (the settings on the wall: every Settings field is one), and <b>block markup</b> (what is written on the paper: HTML wrapped in comments). "Every feature you meet later, in core or in a plugin, is one of these in disguise."</p>
+</div>
+<div class="blk"><div class="h">Live demo (you type, they follow)</div>
+<p>The lesson's own commands, in the lesson's order, from the project folder with the <code class="inline">wp</code> shortcut. <b>Everyone types along</b>: the attachment, the revision demo and the two mistakes each use up post IDs that the project's IDs (12 to 17) count on. Keep the commands on the projector for the slow typists; skip nothing that creates a post.</p>
+<ol class="steps">
+  <li><b>Sixteen types, one table (2m).</b> "Everything in the admin is a post with a label." Everyone types along from here on, in the project folder: the lesson's IDs depend on it (the box below).
+<pre class="code">wp post-type list --fields=name,label,hierarchical,public</pre>
+<pre class="out">+---------------------+-----------------------+--------------+--------+
+| name                | label                 | hierarchical | public |
++---------------------+-----------------------+--------------+--------+
+| post                | Posts                 |              | 1      |
+| page                | Pages                 | 1            | 1      |
+| attachment          | Media                 |              | 1      |
+| revision            | Revisions             |              |        |
+| nav_menu_item       | Navigation Menu Items |              |        |
+| custom_css          | Custom CSS            |              |        |
+| customize_changeset | Changesets            |              |        |
+| oembed_cache        | oEmbed Responses      |              |        |
+| user_request        | User Requests         |              |        |
+| wp_block            | Patterns              |              |        |
+| wp_template         | Templates             |              |        |
+| wp_template_part    | Template Parts        |              |        |
+| wp_global_styles    | Global Styles         |              |        |
+| wp_navigation       | Navigation Menus      |              |        |
+| wp_font_family      | Font Families         |              |        |
+| wp_font_face        | Font Faces            |              |        |
++---------------------+-----------------------+--------------+--------+</pre>
+16 types; five of them are what an editor calls content. Point at <code class="inline">wp_template</code>, <code class="inline">wp_navigation</code> and <code class="inline">wp_global_styles</code>: "block themes keep their templates, menus and styles in this same table. Module 3 lives here."</li>
+  <li><b>A post as PHP sees it (2m).</b> "One row, one WP_Post object."
+<pre class="code">wp post get 1 --fields=ID,post_type,post_status,post_name,post_title,post_author,post_parent,comment_status</pre>
+<pre class="out">+----------------+--------------+
+| Field          | Value        |
++----------------+--------------+
+| ID             | 1            |
+| post_author    | 1            |
+| post_title     | Hello world! |
+| post_status    | publish      |
+| comment_status | open         |
+| post_name      | hello-world  |
+| post_parent    | 0            |
+| post_type      | post         |
++----------------+--------------+</pre>
+<code class="inline">post_name</code> is the slug, <code class="inline">post_author</code> a user ID, <code class="inline">post_parent</code> a post ID. A book's price will NOT be a column: it goes to post meta (Lessons 2.2 and 5.2).</li>
+  <li><b>Posts, pages and statuses (2m).</b> "Two tools, two defaults."
+<pre class="code">wp post list --post_type=page --orderby=ID --order=ASC --fields=ID,post_title,post_name,post_status
+wp eval 'foreach ( get_posts( array( "post_type" =&gt; "page" ) ) as $page ) { echo $page-&gt;ID, " ", $page-&gt;post_title, " ", $page-&gt;post_status, "\n"; }'</pre>
+<pre class="out">+----+----------------+----------------+-------------+
+| ID | post_title     | post_name      | post_status |
++----+----------------+----------------+-------------+
+| 2  | Sample Page    | sample-page    | publish     |
+| 3  | Privacy Policy | privacy-policy | draft       |
++----+----------------+----------------+-------------+
+2 Sample Page publish</pre>
+WP-CLI lists every status; <code class="inline">get_posts()</code> and WP_Query default to publish, like the front end. That one line explains half of all "my page does not show" questions.</li>
+  <li><b>Terms (1m).</b> "Categories and tags are two taxonomies of seven."
+<pre class="code">wp taxonomy list --fields=name,label,hierarchical,public
+wp term list category --fields=term_id,name,slug,count</pre>
+<pre class="out">+-----------------------+---------------------+--------------+--------+
+| name                  | label               | hierarchical | public |
++-----------------------+---------------------+--------------+--------+
+| category              | Categories          | 1            | 1      |
+| post_tag              | Tags                |              | 1      |
+| nav_menu              | Navigation Menus    |              |        |
+| post_format           | Formats             |              | 1      |
+| wp_theme              | Themes              |              |        |
+| wp_template_part_area | Template Part Areas |              |        |
+| wp_pattern_category   | Pattern Categories  |              |        |
++-----------------------+---------------------+--------------+--------+
++---------+---------------+---------------+-------+
+| term_id | name          | slug          | count |
++---------+---------------+---------------+-------+
+| 1       | Uncategorized | uncategorized | 1     |
++---------+---------------+---------------+-------+</pre>
+Every post must have a category: the <code class="inline">default_category</code> option names Uncategorized. The News category arrives in the project.</li>
+  <li><b>An attachment is a post too (3m).</b> "An upload is a file AND a post." The lesson switches the year/month folders off so the paths match:
+<pre class="code">wp option update uploads_use_yearmonth_folders 0
+wp media import wp-content/themes/twentytwentyfive/assets/images/book-image.webp --title="The Stories Book cover" --alt="Cover of The Stories Book: a plaster bust on a black background"
+wp post get 5 --fields=ID,post_type,post_status,post_title,post_mime_type,post_parent
+wp post meta get 5 _wp_attachment_image_alt
+find wp-content/uploads -name '*.webp' | sort</pre>
+<pre class="out">Success: Updated 'uploads_use_yearmonth_folders' option.
+Imported file 'wp-content/themes/twentytwentyfive/assets/images/book-image.webp' as attachment ID 5.
+Success: Imported 1 of 1 images.
++----------------+------------------------+
+| Field          | Value                  |
++----------------+------------------------+
+| ID             | 5                      |
+| post_title     | The Stories Book cover |
+| post_status    | inherit                |
+| post_parent    | 0                      |
+| post_type      | attachment             |
+| post_mime_type | image/webp             |
++----------------+------------------------+
+Cover of The Stories Book: a plaster bust on a black background
+wp-content/uploads/book-image-150x150.webp
+wp-content/uploads/book-image-214x300.webp
+wp-content/uploads/book-image-730x1024.webp
+wp-content/uploads/book-image-768x1077.webp
+wp-content/uploads/book-image.webp</pre>
+Status <code class="inline">inherit</code>, a MIME type, the alt text in post meta, four generated sizes on disk. Delete it again (with <code class="inline">--force</code> WordPress deletes the files too):
+<pre class="code">wp post delete 5 --force
+wp option update uploads_use_yearmonth_folders 1
+find wp-content/uploads -name '*.webp'</pre>
+<pre class="out">Success: Deleted post 5.
+Success: Updated 'uploads_use_yearmonth_folders' option.</pre></li>
+  <li><b>Every update is a revision (3m).</b> "Predict: three versions, how many revisions?"
+<pre class="code">wp post create --post_title="Revision demo" --post_content="Version one." --post_status=draft --porcelain
+wp post update 6 --post_content="Version two."
+wp post update 6 --post_content="Version three."
+wp post list --post_type=revision --post_parent=6 --orderby=ID --order=ASC --fields=ID,post_name,post_content,post_status</pre>
+<pre class="out">6
+Success: Updated post 6.
+Success: Updated post 6.
++----+---------------+----------------+-------------+
+| ID | post_name     | post_content   | post_status |
++----+---------------+----------------+-------------+
+| 7  | 6-revision-v1 | Version two.   | inherit     |
+| 8  | 6-revision-v1 | Version three. | inherit     |
++----+---------------+----------------+-------------+</pre>
+Two, and the newest equals the current post: "every update is a revision, and the most recent revision always matches the current post". Then the constants and the clean-up:
+<pre class="code">wp eval 'var_dump( WP_POST_REVISIONS, wp_revisions_to_keep( get_post( 6 ) ), AUTOSAVE_INTERVAL, EMPTY_TRASH_DAYS );'</pre>
+<pre class="out">bool(true)
+int(-1)
+int(60)
+int(30)</pre>
+<pre class="code">wp post delete 6 --force
+wp post list --post_type=revision --format=count</pre>
+<pre class="out">Success: Deleted post 6.
+0</pre></li>
+  <li><b>Roles bundle capabilities (2m).</b> "Code asks: may this user do X? Never: is this user an editor?"
+<pre class="code">wp eval 'var_dump( user_can( 1, "manage_options" ), user_can( 1, "edit_post", 1 ), current_user_can( "edit_posts" ) );'
+wp eval 'var_dump( current_user_can( "edit_posts" ) );' --user=admin</pre>
+<pre class="out">bool(true)
+bool(true)
+bool(false)
+bool(true)</pre>
+The last two lines differ only by <code class="inline">--user=admin</code>: WP-CLI runs as nobody unless you name a user, and so does code that runs too early or from cron.</li>
+  <li><b>Settings are options, all strings (1m).</b> "Every Settings field is a row in wp_options."
+<pre class="code">wp eval 'foreach ( array( "show_on_front", "posts_per_page", "date_format", "timezone_string", "gmt_offset", "default_role", "default_category", "wp_page_for_privacy_policy" ) as $name ) { printf( "%-27s %s\n", $name, var_export( get_option( $name ), true ) ); }'</pre>
+<pre class="out">show_on_front               'posts'
+posts_per_page              '10'
+date_format                 'F j, Y'
+timezone_string             ''
+gmt_offset                  '0'
+default_role                'subscriber'
+default_category            '1'
+wp_page_for_privacy_policy  '3'</pre>
+<code class="inline">'10'</code> with quotes: the strict-types trap of Lesson 1.3, from the other side.</li>
+  <li><b>Block markup is text (2m).</b> "What the editor stores in post_content."
+<pre class="code">wp post get 1 --field=post_content</pre>
+<pre class="out">&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;Welcome to WordPress. This is your first post. Edit or delete it, then start writing!&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;</pre>
+Then the lesson's <code class="inline">blocks-demo.php</code> (saved in <code class="inline">wordpress/</code>), which parses and renders three blocks:
+<pre class="code">wp eval-file blocks-demo.php
+rm blocks-demo.php</pre>
+<pre class="out">core/heading       attrs={"level":3} inner=0
+core/list          attrs=[] inner=1
+core/latest-posts  attrs={"postsToShow":1} inner=0
+
+
+&lt;h3 class="wp-block-heading"&gt;Opening hours&lt;/h3&gt;
+
+
+
+&lt;ul class="wp-block-list"&gt;
+&lt;li&gt;Thursday: 9 a.m. to 9 p.m.&lt;/li&gt;
+&lt;/ul&gt;
+
+
+&lt;ul class="wp-block-latest-posts__list wp-block-latest-posts is-layout-flow wp-block-latest-posts-is-layout-flow"&gt;&lt;li&gt;&lt;a class="wp-block-latest-posts__post-title" href="http://localhost:8080/hello-world/"&gt;Hello world!&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;</pre>
+The heading's level is in the comment, not only the HTML; the dynamic Latest Posts block has no saved HTML, and PHP rendered a link that was never in the markup. On the front end that is the <code class="inline">the_content</code> filter at work (Lesson 2.3).</li>
+  <li><b>Two silent mistakes (2m).</b> "No PHP error in either: WordPress does exactly what you asked." Mistake 1, a page created as a draft:
+<pre class="code">wp post create --post_type=page --post_title="Gift Cards" --porcelain
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/gift-cards/
+wp post get 9 --fields=post_status,post_name</pre>
+<pre class="out">9
+404
++-------------+-------+
+| Field       | Value |
++-------------+-------+
+| post_status | draft |
+| post_name   |       |
++-------------+-------+</pre>
+A draft has no slug and no URL: 404. Mistake 2, a slug that is taken:
+<pre class="code">wp post create --post_type=page --post_title="Sample Page" --post_status=publish --porcelain
+wp post list --post_type=page --orderby=ID --order=ASC --fields=ID,post_title,post_name
+wp post delete 10
+wp post list --post_type=page --post_status=trash --fields=ID,post_name</pre>
+<pre class="out">10
++----+----------------+----------------+
+| ID | post_title     | post_name      |
++----+----------------+----------------+
+| 2  | Sample Page    | sample-page    |
+| 3  | Privacy Policy | privacy-policy |
+| 10 | Sample Page    | sample-page-2  |
++----+----------------+----------------+
+Success: Trashed post 10.
++----+------------------------+
+| ID | post_name              |
++----+------------------------+
+| 10 | sample-page-2__trashed |
++----+------------------------+</pre>
+<code class="inline">sample-page-2</code>, then <code class="inline">__trashed</code> in the trash. Delete both for good (<code class="inline">wp post delete 9 --force</code>, <code class="inline">wp post delete 10 --force</code>).</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Before the project: the next-ID check (everyone)</div>
+<p>One read-only query: the ID the next post will get. It must print 12.</p>
+<pre class="code">wp db query "SET SESSION information_schema_stats_expiry = 0; SELECT AUTO_INCREMENT AS next_id FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'wp_posts'"</pre><pre class="out">next_id
+12</pre><ul class="tick">
+  <li><b>12:</b> start Step 1.</li>
+  <li><b>Less than 12</b> (a learner skipped demo steps: a site that ran none of them says 5): run the catch-up line in the WP-CLI container shell (<code class="inline">docker compose run --rm wpcli sh</code>), with as many numbers in the list as IDs are missing (seven from 5), then the check again. It creates drafts and deletes each at once, so only the IDs are used up:</li>
+</ul>
+<pre class="code">for i in 1 2 3 4 5 6 7; do wp post delete $(wp post create --post_title=filler --porcelain) --force; done</pre><pre class="out">Success: Deleted post 5.
+Success: Deleted post 6.
+Success: Deleted post 7.
+Success: Deleted post 8.
+Success: Deleted post 9.
+Success: Deleted post 10.
+Success: Deleted post 11.
+(the check again) next_id
+12</pre><p><b>More than 12:</b> the learner experimented (fine): their IDs are higher throughout, and later lessons that name an ID need their own number. Note it on a sticky note on their laptop lid.</p>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b>"My page is not there."</b> A draft (the default of <code class="inline">wp post create</code> and <code class="inline">wp_insert_post()</code>) or a PHP list that only shows published content. Coach: "Which status? Which default does this tool have?" (Mistake 1, self-check Q8.)</li>
+  <li><b>Checking a role.</b> <code class="inline">in_array( 'editor', $user-&gt;roles )</code> for "may edit others' posts" locks out the administrator. Coach: "Which capability does the feature need?" (Lesson Mistake 3, self-check Q9, the debug handout.)</li>
+  <li><b>Copying block markup by hand and changing it.</b> A missing <code class="inline">wp-block-heading</code> class: fine on the front end, "invalid block" in the editor. Coach: "Copy it from the Code editor or the lesson, never retype the HTML." (The lesson's warning box; in the project, learners copy the files from the page.)</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<p><b>File:</b> <code class="inline">labs/module-02/l2_1-content-model/content_census_starter.sh</code>; your reference is <code class="inline">labs/module-02/l2_1-content-model/content_census_solution.sh</code>. Each TODO is one WP-CLI command inside <code class="inline">$( )</code> that counts or names part of the content model (posts by status, pages, terms, an option, a role's capabilities, the blocks of a post). It only reads, so it is safe right before the project, and its counts are those of the site Session 1 left (the demo deleted everything it created).</p>
+<ul class="tick">
+  <li><b>Run it as shipped (2m).</b> <code class="inline">cp labs/module-02/l2_1-content-model/content_census_starter.sh wordpress/</code> then <code class="inline">docker compose run --rm wpcli sh content_census_starter.sh</code>: the post-type count works, the rest say TODO.</li>
+  <li><b>TODOs 1 to 7 in pairs (10m).</b> Try each command alone first. Circulate for <code class="inline">--format=count</code> (WP-CLI counts for you), TODO 2 with a <code class="inline">--post_status</code> (any status means leaving it out), and TODO 7's pipe (<code class="inline">--field=post_content</code>, then grep).</li>
+  <li><b>Expected when done</b> (the course site before the project):</li>
+</ul>
+<pre class="out">== Pages &amp; Co. content census ==
+Post types: 16
+Published posts: 1
+Pages, any status: 2
+Draft pages: 1
+Categories: Uncategorized
+Home page shows: posts
+Editor capabilities: 34
+Blocks in post 1:
+      1 &lt;!-- wp:paragraph</pre><ul class="tick">
+  <li><b>Debrief (3m):</b> "Two pages, one of them a draft: which?" (the Privacy Policy WordPress made for you to finish). "34 capabilities for an editor: why do roles exist at all?" (So nobody hands out 34 permissions one by one; code still checks one capability at a time.)</li>
+  <li><b>Fast finishers:</b> <code class="inline">labs/module-02/l2_1-content-model/post_report_starter.php</code> (one row of wp_posts seen through the whole model: the type object, the author's capability, terms, revisions, blocks, the address, for five IDs including the navigation menu), then <code class="inline">labs/module-02/l2_1-content-model/debug_page_report.php</code> (two loud bugs and a silent one about what posts and pages have). Both only read; run them before the project too, or accept different counts after it.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Start the lesson project</div>
+<p>The lesson project is **Stock the Pages &amp; Co. Site**: two staff accounts, three pages and a News category with three posts, created with WP-CLI from files of block markup. It is the content every later lesson starts from: names, slugs, dates and IDs exactly as the lesson prints them. In the room: Steps 1 to 3 (35 minutes).</p>
+<ul class="tick">
+  <li>Step 1 (8m): <code class="inline">wp user create maria ...</code> and <code class="inline">wp user create devon ...</code> exactly as in the lesson (the course passwords <code class="inline">maria-pass</code>, <code class="inline">devon-pass</code> matter: later lessons log in as them). Maria is user 2, Devon user 3.</li>
+  <li>Step 2 (12m): <code class="inline">mkdir wordpress/pagesco-content</code>, the three page files COPIED from the lesson page into it (typing block markup invites invalid blocks), then the three <code class="inline">wp post create ... --user=maria</code> lines. They must print 12, 13 and 14; open http://localhost:8080/about/ and watch the header menu list the new pages.</li>
+  <li>Step 3 (12m): <code class="inline">wp term create category News --slug=news ...</code> (prints 2), the three post files, the three <code class="inline">wp post create ... --post_date=...</code> lines (15, 16, 17), and http://localhost:8080/category/news/ lists them newest first.</li>
+  <li><b>Done in the room</b> = pages 12 to 14 and posts 15 to 17 exist, by the right authors. Check two machines with the last command of the lesson's Step 4 (<code class="inline">wp post list --post_type=page,post --orderby=ID --order=ASC ...</code>).</li>
+  <li><b>Goes home:</b> Step 4: Maria's edit of About Us (revision 18), Devon refused on the Pages screen, <code class="inline">rm -r pagesco-content</code>, the final list. Session 3 starts from exactly that site.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<p>Ask these out loud during the demo, the lab and the project:</p>
+<ul class="tick">
+  <li>Where are a page, an uploaded image and an old version of a post stored? <b>Answer:</b> all three in wp_posts, with post_type page, attachment and revision.</li>
+  <li><code class="inline">wp post list</code> shows the Privacy Policy; <code class="inline">get_posts()</code> does not. Why? <b>Answer:</b> different defaults: WP-CLI lists every status, <code class="inline">get_posts()</code> only published content.</li>
+  <li>Code must let "people who can edit everyone's posts" see a tool. What does it check? <b>Answer:</b> <code class="inline">current_user_can( 'edit_others_posts' )</code>, never the role.</li>
+  <li>Where is "Blog pages show at most" stored? <b>Answer:</b> the option <code class="inline">posts_per_page</code> (a string, '10').</li>
+</ul>
+<p>Workbook self-check, items Q7 to Q12 (learners do them at the end of the block or at home).</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q7</b> <span data-sc="7">D) <code class="inline">wp_navigation</code></span>; <b>Q8</b> <span data-sc="8"><code class="inline">1 1</code>: one published page for <code class="inline">get_posts()</code> (it defaults to publish), and one draft page counted by <code class="inline">wp_count_posts()</code> (the Privacy Policy)</span>; <b>Q9</b> <span data-sc="9">A) false: <code class="inline">edit_post</code> is a meta capability that maps to <code class="inline">edit_others_posts</code> here, which authors lack</span>; <b>Q10</b> <span data-sc="10"><code class="inline">core/separator</code></span>; <b>Q11</b> <span data-sc="11">B) Two: the newest is identical to the current post</span>; <b>Q12</b> <span data-sc="12">C) <code class="inline">home</code></span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> in the project, pair a fast typist with a learner who struggles; the second reads each command aloud before the first runs it, and both check the printed ID against the lesson. A learner who falls behind in the demo copies its commands from the lesson page: the IDs only need the commands to RUN, in order.</p>
+<p><b>Stretch:</b> <code class="inline">post_report_starter.php</code> and <code class="inline">debug_page_report.php</code> (before the project); after it, the lesson's Exercise 1 (who may do what) and Exercise 2 (the block outline of Staff picks); the Bonus Challenge (a child page of Events, the revisions screen, the wp_navigation post) at home.</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Closing</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Exit ticket (3 questions, no notes, 4 minutes)</div>
+<p>Put the three questions on the slide. Learners answer in the workbook's Exit Ticket box or on a sticky note and leave it on the way out. Sort the notes before Session 3: question 1's pile tells you how much of Session 3's warm-up goes back to escaping.</p>
+<ol class="steps">
+  <li>Which escaping function for text between tags, for an attribute value, and for an href? <b>Answer:</b> <code class="inline">esc_html()</code>, <code class="inline">esc_attr()</code>, <code class="inline">esc_url()</code> (and <code class="inline">wp_kses_post()</code> for HTML a post may contain).</li>
+  <li>Why does every global name in your theme and plugin start with <code class="inline">pagesco_</code>? <b>Answer:</b> WordPress, the theme and every plugin share one PHP process (and one options table): two functions with the same name are a fatal error, and you cannot know which plugins the client installs next year.</li>
+  <li>Posts, pages, uploaded images, revisions and block-theme menus: where are they stored, and what tells them apart? <b>Answer:</b> all are rows of wp_posts; the post_type column (post, page, attachment, revision, wp_navigation).</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Homework (about 2 to 3 hours)</div>
+<ul class="tick">
+  <li><b>Finish both lesson projects.</b> 1.3: Steps 2 to 4 (render three cards, the break test, PHPCS with the WordPress standard until it says "no coding standards problems", then <code class="inline">rm -r pagesco-practice</code>; keep a copy of book-card.php in your notes). 2.1: Step 4 (Maria's edit and revision 18, Devon refused, <code class="inline">rm -r pagesco-content</code>) and the final list, which must match the lesson: users 2 and 3, pages 12 to 14, posts 15 to 17.</li>
+  <li><b>Lesson exercises.</b> 1.3: Exercises 1 to 3 (PHPCS on a sale badge, one link in three contexts, a sale option for the price); Exercise 4 (list helpers) is a stretch. 2.1: Exercises 1 to 3 (who may do what, the block outline, a static front page, put back afterwards); Exercise 4 (deleting a user safely) is a stretch. Each exercise undoes itself.</li>
+  <li><b>Both Quick Quizzes</b> on the lesson pages (five questions each; answers in the Answer Key).</li>
+  <li><b>Journal:</b> both entries (1.3: habits you keep and habits you change; 2.1: your <code class="inline">pagesco-plan.txt</code> sorted into the content model).</li>
+  <li><b>Before the Next Lesson</b> (both lists): pagesco-practice/ deleted and mu-plugins/ holding only mailpit-smtp.php; the final list of 2.1 checked; no user sam, Settings &gt; Reading back on "Your latest posts"; log in as Maria once.</li>
+  <li><b>Optional:</b> <code class="inline">labs/module-02/l1_3-php-the-wordpress-way/event_line_starter.php</code>, <code class="inline">labs/module-02/l1_3-php-the-wordpress-way/debug_book_badge.php</code>, <code class="inline">labs/module-02/l2_1-content-model/post_report_starter.php</code> and <code class="inline">labs/module-02/l2_1-content-model/debug_page_report.php</code> for anyone who did not reach them (the two 2.1 files print other counts once the content exists: their README says which).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Bring list for Session 3</div>
+<ul class="tick">
+  <li>The course site at the end of Lesson 2.1 (Session 3's two lessons start from it): users maria (2) and devon (3), pages About Us, Contact and Events (12 to 14), the News posts 15 to 17, revision 18 of About Us, <code class="inline">pagesco-content/</code> deleted. Check: <code class="inline">wp post list --post_type=page,post --orderby=ID --order=asc --fields=ID,post_type,post_name,post_author</code>.</li>
+  <li>Your copy of book-card.php, PHPCS-clean (Session 3's warm-up asks), and <code class="inline">pagesco-plan.txt</code> sorted into the content model.</li>
+  <li>The project folder with <code class="inline">labs/</code>; VS Code; the journal and the workbook. Session 3 reads the database with SQL (<code class="inline">wp db query</code>, <code class="inline">wp db cli</code>): your MySQL Foundations notes help.</li>
+</ul>
+</div>
+
+  <div class="sec"><h2>If You Run Long or Short</h2><span class="rule"></span></div>
+<div class="blk warn"><div class="h">Running long: what to protect and what to cut first</div>
+<ul class="tick">
+  <li><b>Protect:</b> the 2.1 project Steps 1 to 3 with the right IDs; the ID-using steps of the 2.1 demo; the 1.3 PHPCS and escaping steps; the 1.3 guided lab.</li>
+  <li><b>Cut first (saves 6m):</b> the 1.3 es_ES and callbacks steps (the lesson has both outputs).</li>
+  <li><b>Cut second (saves 15m):</b> the 1.3 project start: show book-card.php on the projector, send Steps 1 to 4 home, give the time to the 2.1 project.</li>
+  <li><b>Cut third (saves 15m):</b> the 2.1 guided lab: learners do it at home, after the project, so their counts are those of the stocked site (the README lists them). Never cut the 2.1 demo's ID-using steps: run them without discussion instead.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Running short: what to add</div>
+<ul class="tick">
+  <li>Lesson 1.3's Exercise 1 live: PHPCS on the sale badge, <code class="inline">phpcbf</code> for the mechanical fixes, the rest by hand. Ask which problems a tool cannot fix, and why.</li>
+  <li>Lesson 2.1's Exercise 1 together after Step 3 (who may do what: admin, maria, devon), predicted first on the board.</li>
+  <li><code class="inline">debug_book_badge.php</code> for everyone, one bug per volunteer, starting from the messages and ending with the silent one.</li>
+</ul>
+</div>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 2 · Facilitator Guide · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

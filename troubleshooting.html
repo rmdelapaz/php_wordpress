@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Troubleshooting the PHP and WordPress Development environment: Docker Compose, database connections, permalinks, file permissions, WP-CLI, Node and wp-env.">
+    <meta name="description" content="Troubleshooting the PHP and WordPress Development environment: Docker Compose, Linux and WSL file permissions, WP-CLI, MySQL, debug.log, permalinks and 404s, the Site Editor, Node and block builds, REST 401 and 403, WP-Cron, Mailpit, wp-env and deployment.">
     <meta name="author" content="Ray de la Paz">
     <title>Troubleshooting - PHP and WordPress Development</title>
     <script src="js/theme-init.js"></script>
@@ -43,15 +43,517 @@
         <div class="container">
             <header>
                 <h1>🔧 Troubleshooting</h1>
-                <p class="lead">Fixes for environment problems: Docker Compose, the database connection, permalinks, file permissions, WP-CLI, Node and wp-env.</p>
+                <p class="lead">Fixes for the environment around your code: Docker Compose and the Linux and WSL file owner, WP-CLI, the database, missing error messages, permalinks and 404s, the Site Editor, Node and block builds, REST 401 and 403, WP-Cron, Mailpit, the test site and deployment. The setup itself is in <a href="lesson_02.html">Lesson 1.2</a> and the production rehearsal in <a href="lesson_29.html">Lesson 8.4</a>; error messages in your code are on the <a href="common-errors.html">Common Errors</a> page.</p>
             </header>
 
-            <!-- STUB: the reference-pages agent fills this page (see SHELL_REFERENCE.md section 14). -->
-            <section class="lesson-section">
-                <div class="card card-info">
-                    <h4>💡 This page is being written</h4>
-                    <p>It fills in as the lessons are published. Until then, every lesson has its own Common Mistakes section and quick-reference summary.</p>
+<details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">On This Page</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#first" class="toc-link">Start Here: Is Everything Running?</a></li>
+                        <li><a href="#docker" class="toc-link">Docker and Docker Compose</a></li>
+                        <li><a href="#linux" class="toc-link">Linux and WSL: File Ownership</a></li>
+                        <li><a href="#wp-cli" class="toc-link">WP-CLI and the wp Shortcut</a></li>
+                        <li><a href="#database" class="toc-link">The Database</a></li>
+                        <li><a href="#debugging" class="toc-link">Errors Do Not Show Up</a></li>
+                        <li><a href="#permalinks" class="toc-link">Permalinks and 404s</a></li>
+                        <li><a href="#themes" class="toc-link">Themes and the Site Editor</a></li>
+                        <li><a href="#blocks" class="toc-link">Node, Builds and the Block Editor</a></li>
+                        <li><a href="#rest" class="toc-link">REST API: 401 and 403</a></li>
+                        <li><a href="#cron" class="toc-link">WP-Cron</a></li>
+                        <li><a href="#mail" class="toc-link">Email and Mailpit</a></li>
+                        <li><a href="#tests" class="toc-link">Composer, PHPCS and the Test Site</a></li>
+                        <li><a href="#deploy" class="toc-link">Deployment and the Rehearsal Site</a></li>
+                        <li><a href="#checklist" class="toc-link">The Debugging Checklist</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="first" class="lesson-section">
+                <h2>🩺 Start Here: Is Everything Running?</h2>
+                <p>Most problems are one of three things: a container is not running, a command ran in the wrong place, or the site's settings are not what the lessons expect. In your project folder (<code>~/pagesco-dev</code>, from <a href="lesson_02.html">Lesson 1.2</a>):</p>
+<pre data-norun><code class="language-bash">docker compose ps                 # db (healthy), wordpress and mailpit: Up
+wp core version                   # 7.1.3 through the shortcut
+wp eval 'var_dump( WP_DEBUG, WP_DEBUG_LOG, WP_DEBUG_DISPLAY, SCRIPT_DEBUG, wp_get_environment_type() );'
+wp cron test                      # WordPress can call itself</code></pre>
+<div class="card card-output">
+    <h4>Output (the last two commands, on a healthy course site)</h4>
+    <pre><code>bool(true)
+bool(true)
+bool(true)
+bool(true)
+string(5) "local"
+Success: WP-Cron spawning is working as expected.</code></pre>
+</div>
+<p>Lesson 1.2's project, <code>pagesco-check.php</code>, checks the whole setup in one go (WordPress 7.1, PHP 8.5, the site address, pretty permalinks, the environment, debugging, a writable <code>wp-content</code>, the mail plugin and a test email): recreate it from <a href="lesson_02.html#project">Lesson 1.2</a> and run <code>wp eval-file pagesco-check.php</code>. Every line should say <code>OK</code>; the label of a <code>FAILED</code> line tells you which section below to read. Two logs answer most other questions:</p>
+<pre data-norun><code class="language-bash">tail -f wordpress/wp-content/debug.log      # PHP errors, from every request (Ctrl+C stops)
+docker compose logs wordpress               # Apache: requests, startup problems; -f to follow</code></pre>
+<p>Error messages are explained one by one on the <a href="common-errors.html">Common Errors</a> page; this page is about the environment around your code.</p>
+            </section>
+
+            <section id="docker" class="lesson-section">
+                <h2>🐳 Docker and Docker Compose</h2>
+                <div class="card card-warning">
+                    <h3>🔹 <code>docker compose</code> is not found, or a tutorial says <code>docker-compose</code></h3>
+                    <p>The course needs Compose version 2 or newer, written with a space: <code>docker compose version</code> must print a version. The separate <code>docker-compose</code> program and the <code>version: '3.8'</code> line at the top of old files are from before Compose 2 (<a href="lesson_02.html#docker">Lesson 1.2</a>).</p>
+                    <ul>
+                        <li>Windows: install Docker Desktop with the WSL 2 backend and switch on your Ubuntu distribution under Settings &gt; Resources &gt; WSL integration; run every command in the Ubuntu app.</li>
+                        <li>macOS: start Docker Desktop once and wait until it says it is running.</li>
+                        <li>Linux: Docker Engine and the Compose plugin from Docker's own repository, then <code>sudo usermod -aG docker "$USER"</code> and log out and back in.</li>
+                        <li><code>docker run --rm hello-world</code> proves the installation works.</li>
+                    </ul>
                 </div>
+                <div class="card card-warning">
+                    <h3>🔹 "Bind for 0.0.0.0:8080 failed: port is already allocated"</h3>
+                    <p>Another program or container already uses port 8080 (or 8025 for Mailpit).</p>
+                    <ul>
+                        <li><code>docker ps</code> and look at the PORTS column: stop the other project (<code>docker compose stop</code> in its folder) or the other server.</li>
+                        <li>One project per site: to try something unrelated, unpack the starter again under another folder name with other ports, or use wp-env or Playground.</li>
+                        <li>Changing the course port means three places (<code>"8080:8080"</code>, the <code>Listen</code> line in <code>config/apache-8080.conf</code>, the site URL) and every URL in the lessons: free the port instead.</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 "no configuration file provided: not found"</h3>
+                    <p>You are not in the project folder. Compose looks for <code>compose.yaml</code> in the current folder and its parents.</p>
+                    <ul>
+                        <li><code>cd ~/pagesco-dev</code> (or any folder inside it), then try again.</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 I edited <code>compose.yaml</code> (or <code>.env</code>) and nothing changed</h3>
+                    <p>Containers keep the settings they were created with.</p>
+                    <ul>
+                        <li><code>docker compose up -d</code> recreates exactly what changed; your files and database stay.</li>
+                        <li>The <code>wpcli</code> service (and on the rehearsal site, <code>cron</code>) shares the <code>wordpress</code> container's network, so do not use <code>docker compose restart wordpress</code> alone: <code>up -d</code> recreates the dependent containers too (the rehearsal site's <code>compose.yaml</code> says so in its comments).</li>
+                        <li><code>docker compose down</code> removes the containers but keeps <code>wordpress/</code> and the <code>db_data</code> volume; only <code>down -v</code> deletes the database.</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 The site is slow, or Docker Desktop uses a lot of memory</h3>
+                    <p>Both are usually about where the files live and how much the virtual machine may use (<a href="lesson_02.html#faq">Lesson 1.2</a>).</p>
+                    <ul>
+                        <li>Windows: keep the project in the Linux file system (your Linux home, <code>~</code>), not under <code>/mnt/c/</code>: there every page load crosses from Linux to Windows and WordPress becomes many times slower.</li>
+                        <li>The course site runs comfortably in 2 to 3 GB; Docker Desktop's Settings &gt; Resources has the memory slider. <code>docker compose stop</code> when you are not working.</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 The first <code>wp</code> command takes a minute and prints build lines</h3>
+                    <p>Normal, once: Compose builds the course's WP-CLI image from <code>config/wpcli.Dockerfile</code> (the official <code>wordpress:cli-php8.5</code> plus fixes for MySQL 9.7 and PHP 8.5). Later commands take a second or two, because each one starts a fresh container.</p>
+                </div>
+            </section>
+
+            <section id="linux" class="lesson-section">
+                <h2>🐧 Linux and WSL: File Ownership</h2>
+                <p>On Linux, and inside WSL, the files in <code>wordpress/</code> belong to whichever user the containers run as. Without the course fix that is user 33 (www-data), and your editor cannot save. The fix and the repair are in <a href="lesson_02.html#linux-owner">Lesson 1.2</a>.</p>
+                <div class="card card-warning">
+                    <h3>🔹 "Permission denied" when you save or create a file in <code>wordpress/wp-content/</code></h3>
+                    <p><code>ls -ln wordpress/wp-content</code> shows <code>33 33</code> as owner and group.</p>
+                    <ul>
+                        <li>Before the first start: the three commands below (your numbers go into <code>.env</code>; <code>compose.override.yaml</code> runs <code>wordpress</code> and <code>wpcli</code> as you).</li>
+                        <li>Already started without it: the repair, also below. It needs no <code>sudo</code>; your site and content stay.</li>
+                        <li>Not <code>sudo</code> in front of your editor (root-owned files) and not <code>chmod -R 777</code> (every user may write every file).</li>
+                    </ul>
+<pre data-norun><code class="language-bash"># Once, in the project folder, before the first "docker compose up -d":
+printf 'PAGESCO_UID=%s\nPAGESCO_GID=%s\n' "$(id -u)" "$(id -g)" &gt; .env
+cp config/compose.linux.yaml compose.override.yaml
+mkdir wordpress
+
+# Repair, if the site already ran as user 33:
+docker compose run --rm --user root wpcli chown -R "$(id -u):$(id -g)" /var/www/html
+printf 'PAGESCO_UID=%s\nPAGESCO_GID=%s\n' "$(id -u)" "$(id -g)" &gt; .env
+cp config/compose.linux.yaml compose.override.yaml
+docker compose up -d</code></pre>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 The first start fails with <code>tar: ./index.php: Cannot open: Permission denied</code> in <code>docker compose logs wordpress</code></h3>
+                    <p>Docker created the <code>wordpress/</code> folder itself, as root, and the image (now running as you) cannot unpack WordPress into it.</p>
+                    <ul>
+                        <li><code>mkdir wordpress</code> as yourself before the first <code>docker compose up -d</code>. If the root-owned folder is already there, give it to yourself with the repair's first command (the <code>chown</code> above), then <code>docker compose up -d</code>.</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 "required variable PAGESCO_UID is missing a value"</h3>
+                    <p><code>compose.override.yaml</code> is there, <code>.env</code> is not (or was deleted with a reset).</p>
+                    <ul>
+                        <li>Create <code>.env</code> again with the <code>printf</code> line above. Keep <code>.env</code> and <code>compose.override.yaml</code> when you start over with <code>docker compose down -v</code>, and recreate <code>wordpress/</code> with <code>mkdir</code>.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="wp-cli" class="lesson-section">
+                <h2>⌨️ WP-CLI and the wp Shortcut</h2>
+                <p>The shortcut and the container shell are set up in <a href="lesson_02.html#wp-cli">Lesson 1.2</a>.</p>
+                <div class="card card-warning">
+                    <h3>🔹 <code>wp: command not found</code> in a new terminal</h3>
+                    <p>The alias exists only in the terminal where you typed it.</p>
+                    <ul>
+                        <li>Add <code>alias wp='docker compose --progress quiet run --rm wpcli wp'</code> to the end of <code>~/.bashrc</code> (Linux, WSL) or <code>~/.zshrc</code> (macOS) and open a new terminal.</li>
+                        <li>PowerShell (only if you run the project from Windows): <code>function wp { docker compose --progress quiet run --rm wpcli wp @args }</code> in <code>notepad $PROFILE</code>.</li>
+                        <li>wp-env users type <code>npx @wordpress/env run cli wp …</code> where the lessons say <code>wp …</code>.</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 <code>wp eval-file</code> cannot find my file</h3>
+                    <p>Inside the container the current folder is always the WordPress root, <code>/var/www/html</code>, your <code>wordpress/</code> folder, wherever you typed the command.</p>
+                    <ul>
+                        <li><code>wp eval-file pagesco-check.php</code> means <code>wordpress/pagesco-check.php</code>; put the file there, or give the path relative to it (<code>wp eval-file pagesco-seed/seed-books.php</code>).</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 A command says "Deprecated: Using null as an array offset … Colors.php on line 95"</h3>
+                    <p>WP-CLI 2.12's own code on PHP 8.5 (not yours). The course image hides it; a natively installed WP-CLI shows it after each Success or Error line. It does not appear on PHP 8.4.</p>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 A lesson's <code>grep</code>, <code>ls</code> or <code>curl</code> does not work in my terminal</h3>
+                    <p>Commands shown "from the WP-CLI container" run inside it, where <code>http://localhost:8080</code> reaches the site and paths start at the WordPress root.</p>
+                    <ul>
+                        <li><code>docker compose run --rm wpcli sh</code> opens that shell (prompt <code>/var/www/html $</code>); <code>exit</code> leaves it.</li>
+                        <li>Its <code>grep</code> is BusyBox: no <code>--include</code> option. <code>grep -c</code> that finds nothing prints 0 and exits with status 1, which is not a failure.</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 A command behaves as if nobody is logged in</h3>
+                    <p>WP-CLI runs as no user: capability checks fail, and <code>tax_input</code> in <code>wp_insert_post()</code> is silently dropped (Lesson 5.2).</p>
+                    <ul>
+                        <li>Add <code>--user=admin</code> (or <code>--user=maria</code>) to the command, or <code>wp_set_current_user()</code> in a script.</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 A plugin's fatal error stops every WP-CLI command</h3>
+                    <p>WP-CLI loads WordPress, and with it the broken plugin (<a href="lesson_26.html#fatal">Lesson 8.1</a>).</p>
+                    <ul>
+                        <li><code>wp --skip-plugins=pagesco-crash plugin deactivate pagesco-crash</code>, or <code>--skip-plugins</code> without a name to skip all plugins for that command.</li>
+                        <li>A must-use plugin cannot be skipped this way: fix or move the file in <code>wordpress/wp-content/mu-plugins/</code>.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="database" class="lesson-section">
+                <h2>🗄️ The Database</h2>
+                <p>MySQL 9.7 in the <code>db</code> service; WordPress's tables and how to query them are in <a href="lesson_05.html">Lesson 2.2</a>.</p>
+                <div class="card card-warning">
+                    <h3>🔹 "Error establishing a database connection"</h3>
+                    <p>WordPress cannot log in to MySQL.</p>
+                    <ul>
+                        <li>Is <code>db</code> healthy in <code>docker compose ps</code>? The <code>wordpress</code> service waits for it on start, but a stopped or crashed <code>db</code> gives this page.</li>
+                        <li>Did you change the password in <code>compose.yaml</code> after the first start? MySQL keeps the one it was created with: put the old one back and <code>docker compose up -d</code> (Common Mistake 4 of Lesson 1.2), or start over with <code>docker compose down -v</code>.</li>
+                        <li>On the rehearsal site, the passwords come from its <code>.env</code>; the database account is created only when the volume is first created.</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 <code>wp db query</code> fails with "TLS/SSL error: self-signed certificate in certificate chain"</h3>
+                    <p>You are using the official <code>wordpress:cli</code> image (or another WP-CLI) against MySQL 9.7. Its database client refuses the development certificate.</p>
+                    <ul>
+                        <li>Use the course's <code>wpcli</code> service: its image adds a MariaDB client wrapper that accepts the certificate (<code>config/mariadb-local.sh</code>). Against MariaDB (wp-env) the official image works.</li>
+                    </ul>
+<div class="card card-output">
+    <h4>Error (official wordpress:cli-php8.5 image, reproduced)</h4>
+    <pre><code>Error: Failed to get current SQL modes. Reason: ERROR 2026 (HY000): TLS/SSL error: self-signed certificate in certificate chain</code></pre>
+</div>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 Query output is hard to read</h3>
+                    <p><code>wp db query</code> prints tab-separated rows (even in a terminal).</p>
+                    <ul>
+                        <li>End the query with <code>\G</code> for one column per line: <code>wp db query "EXPLAIN SELECT … \G"</code>.</li>
+                        <li><code>wp db cli</code> opens an interactive prompt with the familiar <code>+----+</code> tables (it greets you as "the MariaDB monitor": the course image's client).</li>
+                        <li>A graphical tool: publish the port with <code>ports: ["3306:3306"]</code> under <code>db</code> in <code>compose.override.yaml</code> and connect as <code>wordpress</code> / <code>wordpress-dev-only</code> to <code>127.0.0.1</code> (another host port if a MySQL server already runs on your computer). There is no phpMyAdmin.</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 An option "does not exist" although it is in the table</h3>
+                    <p>Its serialized value is broken: a SQL <code>REPLACE()</code> changed a string without fixing its recorded length.</p>
+                    <ul>
+                        <li>Delete it and set it again through WordPress (<code>wp option update</code>, <code>wp option patch update</code>). For addresses across the database, <code>wp search-replace</code> (Lesson 8.4).</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 I want to try something risky</h3>
+                    <p>Back up first, and keep the file outside <code>wordpress/</code>, which the web server serves.</p>
+                    <ul>
+                        <li><code>wp db export /tmp/before.sql</code> and <code>wp db import /tmp/before.sql</code> (Lesson 8.3 uses exactly this around its uninstall test), or copy a dump out of the container shell.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="debugging" class="lesson-section">
+                <h2>🐞 Errors Do Not Show Up</h2>
+                <p>The course site shows every PHP message in the page and in <code>wp-content/debug.log</code> (<a href="lesson_02.html#debugging">Lesson 1.2</a>).</p>
+                <div class="card card-warning">
+                    <h3>🔹 A page is broken but shows no error</h3>
+                    <p>Many WordPress mistakes print nothing at all; the <a href="common-errors.html#silent">Silent Failures</a> table lists the ones in the course.</p>
+                    <ul>
+                        <li>Check that debugging is on with the <code>wp eval</code> line in "Start Here": four times true and "local".</li>
+                        <li>Read <code>debug.log</code>, not just the page: the editor's background requests, WP-Cron and REST calls log there without showing anything.</li>
+                        <li>For a REST route, look at the response headers: "called incorrectly" notices travel in <code>X-WP-DoingItWrong</code>.</li>
+                        <li>The page says "There has been a critical error on this website."? The details are in <code>debug.log</code>.</li>
+                        <li>Query Monitor shows queries, hooks, HTTP calls and errors of one page (Lesson 8.1); remove it afterwards.</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 Notices appear above <code>&lt;!DOCTYPE html&gt;</code></h3>
+                    <p>Expected in a block theme: it renders the whole template before printing <code>&lt;head&gt;</code>, so anything your code prints (a notice, an echoing shortcode) lands at the very top. Fix the cause; the position is a clue, not the bug.</p>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 The block editor breaks after a notice appears</h3>
+                    <p>With <code>WP_DEBUG_DISPLAY</code> on, any notice printed into an admin or REST response breaks the editor's JavaScript. In the course this happened with a missing <code>build/</code> folder (<a href="lesson_19.html#mistakes">Lesson 6.1</a>).</p>
+                    <ul>
+                        <li>Read <code>debug.log</code> and the browser's developer tools (Console, and the Network panel's failed requests); fix the first notice and reload.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="permalinks" class="lesson-section">
+                <h2>🔗 Permalinks and 404s</h2>
+                <div class="card card-warning">
+                    <h3>🔹 Every page except the home page is a 404</h3>
+                    <p>Pretty permalinks are off or the rewrite rules are missing. A WP-CLI install leaves the plain <code>/?p=1</code> style.</p>
+                    <ul>
+                        <li><code>wp option get permalink_structure</code> should print <code>/%postname%/</code>; if not, <code>wp rewrite structure '/%postname%/'</code> (it flushes the rules too).</li>
+                        <li>The course site serves <code>.htaccess</code> from <code>wordpress/</code>: it must contain WordPress's rewrite block.</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 <code>/books/</code> or <code>/books/dune/</code> is a 404</h3>
+                    <p>The rewrite rules do not know the post type yet (<a href="lesson_15.html#mistakes">Lesson 5.2</a>).</p>
+                    <ul>
+                        <li>Is <code>pagesco-books</code> active? Deactivating it unregisters the type and flushes, so its URLs 404 on purpose.</li>
+                        <li><code>wp rewrite flush</code> with the plugin active; <code>wp rewrite list --match=/books/</code> shows the rules.</li>
+                        <li>In your own plugin: flush on activation only, after registering the type and taxonomy in the activator (on the activation request the plugin's own <code>init</code> has not run yet).</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 A new page answers 404, or its URL ends in <code>-2</code></h3>
+                    <p>New content is a draft by default (no slug, no URL), and a taken slug gets <code>-2</code> (<a href="lesson_04.html#mistakes">Lesson 2.1</a>).</p>
+                    <ul>
+                        <li><code>wp post get ID --fields=post_status,post_name</code>; create with <code>--post_status=publish --post_name=…</code>; empty the trash of pages you replaced.</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 Page 2 of a list is a 404</h3>
+                    <p>The main query decides how many pages exist before any template runs (<a href="lesson_12.html#mistakes">Lesson 4.2</a>): change it with <code>pre_get_posts</code>, not with a custom query in the template.</p>
+                </div>
+            </section>
+
+            <section id="themes" class="lesson-section">
+                <h2>🎨 Themes and the Site Editor</h2>
+                <div class="card card-warning">
+                    <h3>🔹 The design is suddenly plain (no palette, fonts or colors)</h3>
+                    <p><code>theme.json</code> could not be parsed, so WordPress uses none of it. With debugging on, a notice "Error when decoding a JSON file at path …/theme.json: Syntax error" is at the top of every page.</p>
+                    <ul>
+                        <li>Look for a trailing comma, single quotes or a comment; VS Code underlines errors when the file has its <code>$schema</code> line.</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 My change to a template file does not appear</h3>
+                    <p>Someone saved that template in the Site Editor: the database copy (<code>wp_template</code>, source <code>custom</code>) wins over the file (<a href="lesson_08.html#mistakes">Lesson 3.2</a>).</p>
+                    <ul>
+                        <li><code>wp post list --post_type=wp_template,wp_template_part --fields=ID,post_name</code> shows the copies.</li>
+                        <li>Keep the owner's change: export it into the theme first (Lesson 3.3). Then Reset in the Site Editor, or <code>wp post delete ID --force</code>.</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 A new pattern does not show up</h3>
+                    <p>Check the file header first (a missing <code>Slug</code> is skipped, with a notice), then the cache: without <code>WP_DEVELOPMENT_MODE</code> <code>theme</code>, the list of pattern files is cached for 30 minutes per theme Version (<a href="lesson_09.html#patterns">Lesson 3.3</a>, <a href="lesson_29.html#configuration">Lesson 8.4</a>).</p>
+                    <ul>
+                        <li>The course site has <code>define( 'WP_DEVELOPMENT_MODE', 'theme' );</code> since Lesson 3.3: <code>wp config get WP_DEVELOPMENT_MODE</code>.</li>
+                        <li>On a live site, raise the theme's <code>Version</code> with every release.</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 The store notice has no dark band in the classic theme</h3>
+                    <p>Classic and hybrid themes ignore <code>styles.css</code> in <code>theme.json</code> (it is printed for block themes only); <code>pagesco-classic</code> gets the rules from its enqueued <code>style.css</code> in <a href="lesson_13.html#assets">Lesson 4.3</a>.</p>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 Appearance &gt; Menus says "Your theme does not support navigation menus or widgets."</h3>
+                    <p>A block theme is active. Menus are Navigation blocks there, edited in the Site Editor; the classic screens open with a classic theme that registers menu locations and widget areas.</p>
+                </div>
+            </section>
+
+            <section id="blocks" class="lesson-section">
+                <h2>🧱 Node, Builds and the Block Editor</h2>
+                <p>All npm commands run in <code>wordpress/wp-content/plugins/pagesco-books</code> (<a href="lesson_19.html#node">Lesson 6.1</a>).</p>
+                <div class="card card-warning">
+                    <h3>🔹 Which Node do I need?</h3>
+                    <p>Node.js 24 LTS for the block build (<code>node --version</code> prints <code>v24…</code>); wp-env (Lesson 8.1) needs at least 22.13. On Windows, install Node inside your WSL distribution, where the project lives.</p>
+                    <ul>
+                        <li>Without Node: <code>docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD/wordpress:/var/www/html" -w /var/www/html/wp-content/plugins/pagesco-books node:24 npm run build</code> from the project folder (PowerShell: leave out <code>--user</code>, write <code>${PWD}</code>).</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 <code>npm install</code> prints warnings and "vulnerabilities"</h3>
+                    <p>Expected: "deprecated" lines are about packages deep inside the build tools, the audit counts issues in tools that run only on your machine, and the <code>npm warn install-scripts</code> lines come from npm 11, which no longer runs dependencies' install scripts unless you approve them. The build works without them: leave them unapproved.</p>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 My change does not appear in the editor or on the page</h3>
+                    <p>WordPress reads <code>build/</code>, never <code>src/</code>.</p>
+                    <ul>
+                        <li>Run <code>npm run build</code> after every change, or keep <code>npm start</code> running while you work; then reload the editor.</li>
+                        <li>Never edit files in <code>build/</code>: the next build replaces them (render.php included).</li>
+                        <li>A new block needs no PHP: the Blocks feature registers everything in <code>build/blocks/blocks-manifest.php</code>. Not in the inserter? Check that its folder is in <code>build/blocks/</code>.</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 Notices about a missing manifest, and a broken editor</h3>
+                    <p>"The specified manifest file does not exist." means <code>build/</code> is missing (a fresh checkout, a deleted folder). Run <code>npm install</code> and <code>npm run build</code>.</p>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 The interactive block renders but every click reloads the page</h3>
+                    <p>Either <code>view.js</code> was not built (the build scripts need <code>--experimental-modules</code>; check <code>ls build/blocks/book-filter</code> for <code>view.js</code> and <code>view.asset.php</code>), or the store namespace in <code>view.js</code> does not match <code>data-wp-interactive</code> (<a href="lesson_22.html#mistakes">Lesson 6.4</a>). Watch the Network panel's Doc filter: a reload is a new document.</p>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 "Block contains unexpected or invalid content"</h3>
+                    <p>The saved HTML of a static block no longer matches its <code>save()</code> (<a href="lesson_20.html#deprecations">Lesson 6.2</a>).</p>
+                    <ul>
+                        <li>Open the browser console: "Block validation: …" says what differs.</li>
+                        <li>You changed <code>save()</code>: add the previous version to <code>deprecated</code>; you changed a <code>source</code> selector: make sure it selects only its own element; you used <code>__()</code> in <code>save()</code>: use literal text.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="rest" class="lesson-section">
+                <h2>🌐 REST API: 401 and 403</h2>
+                <p>Authentication in <a href="lesson_23.html#auth">Lesson 7.1</a>, permissions in <a href="lesson_24.html#permissions">Lesson 7.2</a>.</p>
+                <div class="card card-warning">
+                    <h3>🔹 401 <code>rest_not_logged_in</code> while I am logged in</h3>
+                    <p>A cookie alone does not authenticate a REST request: without a valid nonce WordPress treats it as anonymous.</p>
+                    <ul>
+                        <li>In wp-admin JavaScript use <code>wp.apiFetch</code>, which sends <code>X-WP-Nonce</code>; with <code>fetch()</code>, send the header yourself.</li>
+                        <li>Front-end script modules have no apiFetch module in 7.1: they use <code>fetch()</code>, which is fine for public routes such as <code>GET /pagesco/v1/books</code> (Lesson 7.2).</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 401 with <code>curl --user</code></h3>
+                    <p>Basic authentication takes application passwords only; a wrong, revoked or truncated one gets the same anonymous answer, by design.</p>
+                    <ul>
+                        <li>Create one: <code>wp user application-password create maria "Inventory script" --porcelain</code>; Users &gt; Profile shows when each was last used.</li>
+                        <li>Application passwords exist only over HTTPS or on a site whose environment type is <code>local</code>: the rehearsal site (production, HTTP) has none.</li>
+                        <li>Works locally, not on a host: some hosts (PHP as CGI or FastCGI, some proxies, nginx) do not pass the <code>Authorization</code> header to PHP; WordPress's <code>.htaccess</code> has a line for Apache, nginx needs server configuration.</li>
+                        <li>Square brackets in a curl URL are a pattern to curl: write <code>input%5Bslug%5D</code> for <code>input[slug]</code>.</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 403 <code>rest_cannot_edit</code> or <code>rest_forbidden</code></h3>
+                    <p>You are authenticated, but this user may not do this: Devon (author) cannot edit Maria's books; editing events needs <code>edit_others_posts</code>. Use an account with the capability. A 403 <code>rest_cookie_invalid_nonce</code> means a stale nonce: reload the page.</p>
+                </div>
+            </section>
+
+            <section id="cron" class="lesson-section">
+                <h2>⏰ WP-Cron</h2>
+                <p>Scheduled events in <a href="lesson_25.html#cron">Lesson 7.3</a>; the live setup in <a href="lesson_29.html#running">Lesson 8.4</a>.</p>
+                <div class="card card-warning">
+                    <h3>🔹 A scheduled job did not run</h3>
+                    <p>WP-Cron runs due events only when a request comes in and WordPress can call its own <code>wp-cron.php</code>.</p>
+                    <ul>
+                        <li><code>wp cron test</code> on the course site: "Success: WP-Cron spawning is working as expected." The port-8080-inside-the-container setup of Lesson 1.2 is what makes this work; a <code>8080:80</code> mapping breaks it.</li>
+                        <li><code>wp cron event list --fields=hook,recurrence</code> (or <code>--hook=pagesco_books_daily_sync</code>) shows what is scheduled and when.</li>
+                        <li>Is the callback added on every request? Inside <code>is_admin()</code> it never runs from <code>wp-cron.php</code>.</li>
+                        <li>To run the job's code now without moving its schedule: <code>wp eval 'do_action( "pagesco_books_daily_sync" );'</code> (<code>wp cron event run HOOK</code> reschedules a recurring event to now plus its interval).</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 The same event is scheduled many times</h3>
+                    <p>Scheduling on <code>init</code> without <code>wp_next_scheduled()</code> adds one per request. Clean up with <code>wp eval 'echo wp_clear_scheduled_hook( "HOOK" ), "\n";'</code> and schedule once, on activation.</p>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 "The DISABLE_WP_CRON constant is set to true. WP-Cron spawning is disabled."</h3>
+                    <p>Expected on the rehearsal (production) site: a scheduler runs <code>wp cron event run --due-now</code> instead. <code>docker compose logs cron</code> in <code>pagesco-live</code> shows what it ran; on a real server, check the crontab line.</p>
+                </div>
+            </section>
+
+            <section id="mail" class="lesson-section">
+                <h2>📬 Email and Mailpit</h2>
+                <p>Mailpit catches every email at <code>http://localhost:8025</code> (<a href="lesson_02.html#mailpit">Lesson 1.2</a>).</p>
+                <div class="card card-warning">
+                    <h3>🔹 No email arrives in Mailpit</h3>
+                    <p><code>wp_mail()</code> returns true only when the message was handed over.</p>
+                    <ul>
+                        <li>Is <code>mailpit-smtp.php</code> in <code>wordpress/wp-content/mu-plugins/</code>? <code>wp plugin list --status=must-use</code> should list <code>mailpit-smtp</code>. Without it, the sender <code>wordpress@localhost</code> is rejected: "Invalid address: (From): wordpress@localhost".</li>
+                        <li>Is the <code>mailpit</code> container up (<code>docker compose ps</code>)? The health check's "Test email sent" line fails while it is stopped.</li>
+                        <li>The plugin sends to Mailpit only when the environment type is <code>local</code>.</li>
+                        <li>Listen for the reason: <code>wp eval 'add_action( "wp_mail_failed", function ( $error ) { echo $error-&gt;get_error_message(), "\n"; } ); var_dump( wp_mail( "admin@example.com", "Test", "Hello" ) );'</code></li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 wp-env or the rehearsal site sends no email</h3>
+                    <p>wp-env includes no Mailpit (and has the same <code>wordpress@localhost</code> problem); the rehearsal site has no mail server, so <code>wp_mail()</code> returns false there. A real site needs an SMTP plugin with the host's mail settings, its password in the server's configuration. Never copy <code>mailpit-smtp.php</code> to a live site: the <code>.gitignore</code> of Lesson 8.4 keeps it out.</p>
+                </div>
+            </section>
+
+            <section id="tests" class="lesson-section">
+                <h2>🧪 Composer, PHPCS and the Test Site</h2>
+                <p>Set up in <a href="lesson_26.html">Lesson 8.1</a>.</p>
+                <div class="card card-warning">
+                    <h3>🔹 Composer commands</h3>
+                    <p>The course runs Composer in the official <code>composer:2</code> image, in the plugin folder:</p>
+                    <ul>
+                        <li><code>alias composer='docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD:/app" -w /app composer:2 composer'</code> in <code>wordpress/wp-content/plugins/pagesco-books</code>.</li>
+                        <li>"Composer could not detect the root package … version" is a harmless note; it disappears once <code>wp-content</code> is a Git repository (Lesson 8.4).</li>
+                        <li><code>composer lint</code> exits with status 0 and prints nothing when the code is clean.</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 wp-env will not start, or warns</h3>
+                    <p>wp-env 12 needs Node 22.13 or newer. The course's <code>.wp-env.json</code> in the plugin folder is a tests-only site on port 8889 with <code>"testsEnvironment": false</code> (without it wp-env prints a deprecation warning). Always the scoped package: <code>npx @wordpress/env start</code>.</p>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 PHPUnit errors "inside PHPUnit", or the test site is empty afterwards</h3>
+                    <p>Bare <code>phpunit</code> in the container is a different, incompatible version: run <code>npx @wordpress/env run cli --env-cwd=wp-content/plugins/pagesco-books vendor/bin/phpunit</code>. The test library reinstalls its database ("Installing…") on every run, which is why the tests get their own site: never point them at a database you care about.</p>
+                </div>
+            </section>
+
+            <section id="deploy" class="lesson-section">
+                <h2>🚀 Deployment and the Rehearsal Site</h2>
+                <p>The rehearsal server <code>pagesco-live</code> runs next to your development site at <code>http://localhost:8081</code>, configured like production (<a href="lesson_29.html#project">Lesson 8.4</a>).</p>
+                <div class="card card-warning">
+                    <h3>🔹 The rehearsal site will not start: "copy .env.example to .env and fill it in first"</h3>
+                    <p>Its <code>compose.yaml</code> reads every secret from <code>.env</code>.</p>
+                    <ul>
+                        <li>In <code>~/pagesco-live</code>: <code>cp .env.example .env</code>, replace the two passwords with long random ones, <code>mkdir wordpress deploy backups</code>, and on Linux and WSL add the two <code>PAGESCO_UID</code>/<code>PAGESCO_GID</code> lines and <code>compose.override.yaml</code> as in Lesson 1.2.</li>
+                        <li>Run its <code>wp</code> commands from its own folder: the shortcut always means the site whose folder you are in.</li>
+                    </ul>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 <code>wp db export</code> fails with "when using LOCK TABLES", and leaves a small file</h3>
+                    <p>The least-privilege account <code>pagesco_app</code> may not lock tables. Grant exactly that, as root (its password is in <code>.env</code>): <code>docker compose exec db mysql -uroot -p -e "GRANT LOCK TABLES ON pagesco.* TO 'pagesco_app'@'%';"</code>. Delete the 831-byte header-only file: it is not a backup.</p>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 After the launch the Events page says "No events are scheduled right now."</h3>
+                    <p>The launch database was exported without <code>--all-tables-with-prefix</code>, so <code>wp_pagesco_events</code> is missing (the server log says "Table … doesn't exist"). Export again with the option and check the file: <code>grep -c '^CREATE TABLE' file.sql</code> should print 13.</p>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 Links on the live site still point to localhost:8080</h3>
+                    <p>The navigation and the Staff picks post store full addresses. Make the launch file with <code>wp search-replace 'http://localhost:8080' 'NEW-ADDRESS' --all-tables-with-prefix --skip-columns=guid --export=file.sql</code> (try <code>--dry-run --report-changed-only</code> first). <code>WP_HOME</code> and <code>WP_SITEURL</code> fix only the two options, for emergencies.</p>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 After a deploy every page says "There has been a critical error"</h3>
+                    <p>Read the server log (<code>docker compose logs wordpress</code> on the rehearsal site). In <a href="lesson_30.html#mistakes">Lesson 9.1</a> the cause was a ZIP without a new folder of <code>src/</code>. Roll back to the previous release while skipping the broken plugin: <code>wp --skip-plugins plugin install /deploy/pagesco-books-1.1.1.zip --force</code>; then check <code>npm pack --dry-run</code> before building again.</p>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 A new pattern or a theme change is not live</h3>
+                    <p>Production has no development mode, so the list of pattern files is cached (30 minutes, for one theme <code>Version</code>): raise the Version in <code>style.css</code> with every release. Changes made in the Site Editor on the live site are content and stay in its database.</p>
+                </div>
+                <div class="card card-warning">
+                    <h3>🔹 Application passwords are missing on the live site</h3>
+                    <p><code>wp_is_application_passwords_available()</code> is false on a production site without HTTPS. On a real host with a certificate they work: create a new one there (development passwords were deleted at launch).</p>
+                </div>
+            </section>
+
+            <section id="checklist" class="lesson-section">
+                <h2>✅ The Debugging Checklist</h2>
+                <ol>
+                    <li>Read the whole message: level, sentence, file, line, and the first frames of the stack trace. Search the <a href="common-errors.html">Common Errors</a> page for a few words of it.</li>
+                    <li>Is it your code? Paths in <code>wp-content/</code> are; a notice in <code>wp-includes/</code> usually means your code handed core a bad value.</li>
+                    <li>Look in <code>wordpress/wp-content/debug.log</code> and <code>docker compose logs wordpress</code>, not just the page.</li>
+                    <li>Check the basics: <code>docker compose ps</code>, the right folder, <code>wp core version</code>, the plugin and theme active (<code>wp plugin list</code>, <code>wp theme list</code>).</li>
+                    <li>Rebuild and flush what caches: <code>npm run build</code>, <code>wp rewrite flush</code>, <code>wp cache flush</code>, the theme Version for patterns.</li>
+                    <li>Make the problem small: a scratch must-use plugin, a <code>wp eval</code> line, one <code>curl</code> request from the WP-CLI container.</li>
+                    <li>Undo what you tried before you try the next thing, and write down what fixed it in your journal.</li>
+                </ol>
             </section>
 
             <nav class="lesson-nav" aria-label="Page Navigation">

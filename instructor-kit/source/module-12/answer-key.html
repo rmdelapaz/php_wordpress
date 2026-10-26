@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Key: Session 12</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">answers &amp; solutions · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Answer Key</div>
+    <h1>Session 12: Static and Dynamic Blocks</h1>
+    <p class="sub">Answers and reasoning for every Session 12 item: the warm-up, both self-checks, the predict-then-run items, the lab reference outputs, the lesson pages' own quizzes and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Session <b>12</b></span>
+      <span class="chip"><b>12</b> self-check items</span>
+      <span class="chip">Confidential</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Warm-up: Lessons 5.5 and 6.1</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>W1.</b> The HTML appears at the top of the content (wherever the filter runs), not where the shortcode is: shortcodes RETURN their output. The [pagesco_events] callback returns it.</li>
+  <li><b>W2.</b> Because the location comes from shortcode attributes, REST arguments (Lesson 7.2) and anyone who edits a post: every value goes through placeholders, every time.</li>
+  <li><b>W3.</b> Into build/blocks/ (<code class="inline">blocks-manifest.php</code> and <code class="inline">book-card</code> on the projector site), and build/blocks/blocks-manifest.php, read by wp_register_block_types_from_metadata_collection() in the Blocks feature.</li>
+  <li><b>W4.</b> None: the manifest lists every built block and the Blocks feature registers them all. Today's Book List proves it.</li>
+  <li><b>W5.</b> Did you build? The editor loads build/blocks/book-card/index.js. <code class="inline">npm start</code> rebuilds on every save while you work.</li>
+</ol>
+<p>The projector site's build folder (W3), and what <code class="inline">[pagesco_events]</code> returns, which proves it RETURNS its HTML (W1):</p>
+<pre class="code">ls wp-content/plugins/pagesco-books/build/blocks</pre><pre class="out">blocks-manifest.php  book-card</pre><pre class="code">wp eval 'echo do_shortcode( "[pagesco_events limit=\"1\"]" ), "\n";'</pre><pre class="out">&lt;ul class="pagesco-events"&gt;&lt;li class="pagesco-event"&gt;&lt;strong&gt;Book club: Dune&lt;/strong&gt; &lt;time datetime="2027-11-04T19:00"&gt;Thursday, November 4, 7:00 pm&lt;/time&gt; &lt;span class="pagesco-event__where"&gt;Reading corner, 20 seats&lt;/span&gt;&lt;/li&gt;&lt;/ul&gt;</pre>
+  <div class="sec"><h2>6.2 · Static Blocks: Attributes, Controls &amp; Supports: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">A block attribute is declared <code class="inline">"url": { "type": "string", "source": "attribute", "selector": "a", "attribute": "href" }</code>. Where is the URL stored once the post is saved?</div><div class="opts"><div class="opt">A) In the block comment, as JSON</div><div class="opt">B) In post meta, under the key url</div><div class="opt correct">C) In the saved HTML: the <code class="inline">href</code> of the first <code class="inline">&lt;a&gt;</code> inside the block</div><div class="opt">D) Nowhere: the editor asks for it again</div></div><div class="why"><b>Why:</b> An attribute with a source lives in the HTML that save() wrote, and the editor finds it again through the selector. Only attributes without a source go into the comment (and only when they differ from their default).<br><b>A</b> is wrong: Only source-less attributes such as headingLevel go into the comment.<br><b>B</b> is wrong: Post meta needs a binding or code of your own; "source": "meta" is the deprecated old way.<br><b>D</b> is wrong: Then every saved card would lose its link.</div></div>
+  <div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">On the course site after Lesson 6.2: what does this print?</div><pre class="code">wp eval 'echo wp_json_encode( parse_blocks( "&lt;!-- wp:pagesco/book-card {\"showBadge\":false} --&gt;&lt;div class=\"wp-block-pagesco-book-card\"&gt;&lt;h3 class=\"wp-block-pagesco-book-card__title\"&gt;Emma&lt;/h3&gt;&lt;/div&gt;&lt;!-- /wp:pagesco/book-card --&gt;" )[0]["attrs"] ), "\n";'</pre><div class="opts"><div class="opt correct"><code class="inline">{"showBadge":false}</code></div></div><div class="why"><b>Why:</b> parse_blocks() returns the comment's JSON only. The title Emma is sourced from the HTML, so it is not in <code class="inline">attrs</code>; showBadge is there because false differs from its default, true. A card with the badge on would print <code class="inline">[]</code>.</div></div>
+  <div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">Cards are already on the site. Which change to the Book Card needs a new deprecated entry?</div><div class="opts"><div class="opt">A) A new rule in style.scss that rounds the corners more</div><div class="opt">B) A new sidebar control in edit.js only</div><div class="opt correct">C) Wrapping the author in a <code class="inline">&lt;cite&gt;</code> in save()</div><div class="opt">D) A new attribute whose default makes save() print nothing new</div></div><div class="why"><b>Why:</b> Validation compares the stored HTML with what the CURRENT save() returns for the same attributes. A new element changes that HTML, so every stored card turns invalid until a deprecation describes the old save().<br><b>A</b> is wrong: CSS is not part of the stored HTML.<br><b>B</b> is wrong: edit is never compared with anything.<br><b>D</b> is wrong: Lesson 6.2's url and headingLevel were exactly that: no deprecation needed.</div></div>
+  <div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">A designer wants the card's heading level in the toolbar that floats above the selected block, like core's Heading block. Where does the control go?</div><div class="opts"><div class="opt correct">A) Inside <code class="inline">&lt;BlockControls&gt;</code> in edit</div><div class="opt">B) Inside <code class="inline">&lt;InspectorControls&gt;</code> in save</div><div class="opt">C) Inside <code class="inline">&lt;InspectorControls&gt;</code> in edit</div><div class="opt">D) In block.json under supports</div></div><div class="why"><b>Why:</b> BlockControls fills the block toolbar, InspectorControls the sidebar's Settings tab; both belong in edit, which is the editor's interface. save never renders controls.<br><b>B</b> is wrong: save returns the stored HTML; controls there would be saved into the post.<br><b>C</b> is wrong: That puts it in the sidebar, where the lesson's Card settings panel is.<br><b>D</b> is wrong: supports switch on core's own features (colors, spacing); there is no support for a custom control.</div></div>
+  <div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">An editor picks the theme's Sage background for a card. What does the post store?</div><div class="opts"><div class="opt">A) The hex color in an inline style</div><div class="opt correct">B) The class <code class="inline">has-sage-background-color</code> in the HTML and <code class="inline">"backgroundColor":"sage"</code> in the comment</div><div class="opt">C) A row in wp_options</div><div class="opt">D) Nothing: the theme decides at view time</div></div><div class="why"><b>Why:</b> Preset choices are saved as a slug and a class; the theme's global styles define .has-sage-background-color. Change Sage's hex value in theme.json and every sage card follows, which is why supports beat hand-made color attributes.<br><b>A</b> is wrong: Inline styles are for values that are not presets, such as a custom padding per side.<br><b>C</b> is wrong: Block settings are content: they live in post_content.<br><b>D</b> is wrong: The choice is the editor's, so it has to be stored with the card.</div></div>
+  <div class="q" data-sc="6" data-kind="short"><div class="qn">Q6</div><div class="qt">Why does the course write the badge text <code class="inline">Staff pick</code> as a plain string in save() instead of <code class="inline">__( 'Staff pick', 'pagesco-books' )</code>?</div><div class="opts"><div class="opt correct">save() must return the same HTML for the same attributes in every language: a translated string makes cards invalid as soon as someone edits in another locale</div></div><div class="why"><b>Why:</b> Validation re-runs save() in the editor of whoever opens the post. Text in save is content: a literal, or an attribute. Translate edit's labels and placeholders freely (Common Mistake 3).</div></div>
+
+  <div class="sec"><h2>6.2 · Static Blocks: Attributes, Controls &amp; Supports: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'echo wp_json_encode( parse_blocks( "&lt;!-- wp:heading --&gt;&lt;h2 class=\"wp-block-heading\"&gt;New this week&lt;/h2&gt;&lt;!-- /wp:heading --&gt;" )[0]["attrs"] ), "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">[]</pre></div></div><div class="why"><b>Why:</b> A heading at its default level 2 stores nothing in the comment, and its text is rich-text sourced from the h2: <code class="inline">[]</code> (an empty array as JSON). Save the same heading as an h3 and you would get <code class="inline">{"level":3}</code>.</div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'echo wp_json_encode( WP_Block_Type_Registry::get_instance()-&gt;get_registered( "core/paragraph" )-&gt;attributes["content"] ), "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">{"type":"rich-text","source":"rich-text","selector":"p","role":"content"}</pre></div></div><div class="why"><b>Why:</b> Core declares the paragraph's text with the source <code class="inline">rich-text</code> and the selector <code class="inline">p</code>: it lives in the HTML. <code class="inline">role: content</code> marks it as the block's content (the editor's content-only editing and pattern overrides use it).</div></div>
+
+  <div class="sec"><h2>6.3 · Dynamic Blocks &amp; Block Bindings: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">The Book List already sits on twenty pages. You change render.php so every item gets a second line. What else must you do?</div><div class="opts"><div class="opt">A) Add a deprecated entry to the block</div><div class="opt">B) Open and update each of the twenty pages</div><div class="opt correct">C) Run <code class="inline">npm run build</code> (render.php is copied into build/), then nothing: every page follows on its next view</div><div class="opt">D) Bump the block's version so caches notice</div></div><div class="why"><b>Why:</b> A dynamic block stores only its comment, so there is no stored HTML to validate. The build copies render.php into build/blocks/book-list/, the file WordPress runs; after that, the next view of every page uses it.<br><b>A</b> is wrong: Deprecations describe old save() output; a dynamic block saves none.<br><b>B</b> is wrong: Nothing in the pages changed: they hold only the comment.<br><b>D</b> is wrong: The version only changes the ?ver= of the block's CSS and JS.</div></div>
+  <div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt">On the course site after Lesson 6.3 (six Classic books): what does this print?</div><pre class="code">wp eval 'echo substr_count( do_blocks( "&lt;!-- wp:pagesco/book-list {\"genre\":\"classic\",\"count\":4} /--&gt;" ), "&lt;li class=" ), "\n";'</pre><div class="opts"><div class="opt correct"><code class="inline">4</code></div></div><div class="why"><b>Why:</b> do_blocks() runs render.php with the comment's attributes, exactly as a page view does. count 4 is inside the 1 to 24 clamp, and the genre filter is a tax_query on the slug, so four of the six Classic books.</div></div>
+  <div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">In render.php the wrapper is <code class="inline">&lt;ul &lt;?php echo get_block_wrapper_attributes(); ?&gt;&gt;</code>, with no escaping function around it. Why is that safe?</div><div class="opts"><div class="opt">A) It is not: wrap it in esc_html()</div><div class="opt">B) Block attributes are always numbers</div><div class="opt">C) Only administrators can add blocks</div><div class="opt correct">D) get_block_wrapper_attributes() returns attributes that are already escaped (class and style from the supports)</div></div><div class="why"><b>Why:</b> It is the PHP twin of useBlockProps.save(): it builds the class and style attributes and escapes them itself. Core's own blocks print it the same way. Everything else render.php prints is escaped where it is printed.<br><b>A</b> is wrong: esc_html() would turn the quotes into entities and break the markup.<br><b>B</b> is wrong: Attributes can be strings typed by anyone who can edit posts (genre, for example).<br><b>C</b> is wrong: Any editor or author can insert blocks; escaping is about the data, not the person.</div></div>
+  <div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">A list item is bound to <code class="inline">core/post-meta</code> with the key <code class="inline">pagesco_in_stock</code>. What does it show on The Great Gatsby's page (sold out)?</div><div class="opts"><div class="opt">A) Sold out</div><div class="opt">B) The fallback text of the list item</div><div class="opt">C) false</div><div class="opt correct">D) Nothing: an empty list item</div></div><div class="why"><b>Why:</b> core/post-meta returns the raw stored value: false arrives as an empty string, so the list item is empty (Dune's would say 1). Binding is not formatting; that is why the shop writes its own source, pagesco/book.<br><b>A</b> is wrong: That wording comes from the shop's own source, not from core/post-meta.<br><b>B</b> is wrong: The fallback shows only when the source returns null (an unknown or protected key).<br><b>C</b> is wrong: PHP's false becomes an empty string when it is printed.</div></div>
+  <div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">You register a binding source without <code class="inline">uses_context</code>. What does a bound paragraph in single-book.html show?</div><div class="opts"><div class="opt correct">A) Its fallback text, with no error</div><div class="opt">B) A PHP warning about the missing context</div><div class="opt">C) The value for the first book in the catalog</div><div class="opt">D) The value for the post being shown, as usual</div></div><div class="why"><b>Why:</b> A paragraph never asks for postId on its own. uses_context makes WordPress hand postId and postType to every block bound to the source; without it the callback sees no post, returns null, and the fallback stays: silently.<br><b>B</b> is wrong: Bindings fail silently by design.<br><b>C</b> is wrong: The callback has no post ID at all.<br><b>D</b> is wrong: Only with uses_context.</div></div>
+  <div class="q" data-sc="12" data-kind="short"><div class="qn">Q12</div><div class="qt">On the course site after Lesson 6.3: what does this print (book 40 is Animal Farm, published 1945-08-17)?</div><pre class="code"><span class="k">&lt;?php</span>
+<span class="v">$parsed</span> = parse_blocks( <span class="s">'&lt;!-- wp:paragraph {"metadata":{"bindings":{"content":{"source":"pagesco/book","args":{"field":"year"}}}}} --&gt;&lt;p&gt;First published&lt;/p&gt;&lt;!-- /wp:paragraph --&gt;'</span> )[<span class="s">0</span>];
+<span class="v">$block</span>  = <span class="k">new</span> WP_Block( <span class="v">$parsed</span>, <span class="k">array</span>( <span class="s">'postId'</span> =&gt; <span class="s">40</span>, <span class="s">'postType'</span> =&gt; <span class="s">'book'</span> ) );
+
+<span class="k">echo</span> wp_strip_all_tags( <span class="v">$block</span>-&gt;render() ), <span class="s">"\n"</span>;</pre><div class="opts"><div class="opt correct"><code class="inline">First published in 1945</code></div></div><div class="why"><b>Why:</b> new WP_Block( $parsed, $context ) renders the paragraph with a made-up context, so pagesco/book's year field runs for book 40 and replaces the fallback. It is Lesson 6.3's Exercise 1 technique, the way a PHPUnit test would check a source (Lesson 8.1).</div></div>
+
+  <div class="sec"><h2>6.3 · Dynamic Blocks &amp; Block Bindings: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'echo substr_count( do_blocks( "&lt;!-- wp:pagesco/book-list {\"count\":30} /--&gt;" ), "&lt;li class=" ), "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">11</pre></div></div><div class="why"><b>Why:</b> render.php clamps count to 1 to 24, and the catalog has eleven books, so all eleven print. The clamp protects the query from a huge number typed into a comment by hand.</div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'echo get_post_meta( 37, "pagesco_in_stock", true ) === "" ? "empty string" : "something else", "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">empty string</pre></div></div><div class="why"><b>Why:</b> Booleans are stored as '1' and '' (the empty string), which is why core/post-meta leaves an empty list item for Gatsby and Catcher, and why Exercise 3 compares pagesco_in_stock with '1'.</div></div>
+
+  <div class="sec"><h2>Lab Reference Solutions</h2><span class="rule"></span></div>
+<p>Every output below is real: the lab files run exactly as <code class="inline">labs/check_labs.py</code> runs them, on a fresh course site at the state each file declares (Lesson 6.2's labs at <code class="inline">after:lesson_19</code>, Lesson 6.3's at <code class="inline">after:lesson_20</code>: what each lesson starts from), copied into the WordPress root and run with <code class="inline">wp eval-file --use-include</code> (PHP labs) or <code class="inline">sh</code> in the WP-CLI container (shell labs); folder labs installed and activated first. Paths show <code class="inline">/var/www/html/...</code>, which is the learner's <code class="inline">wordpress/</code> folder.</p>
+<div class="blk lab"><div class="h">Lab 6.2-A (guided): labs/module-12/l6_2-static-blocks/attribute_sources_starter.php → attribute_sources_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">core/heading content: TODO
+core/quote content: TODO
+core/button content: TODO
+parse_blocks() sees: TODO</pre><p>The solution prints:</p>
+<pre class="out">core/heading content: in the HTML (rich-text, h1,h2,h3,h4,h5,h6)
+core/heading level: in the comment (default 2)
+core/quote value: in the HTML (html, blockquote)
+core/quote citation: in the HTML (rich-text, cite)
+core/button tagName: in the comment (default "a")
+core/button type: in the comment (default "button")
+core/button url: in the HTML (attribute, a @href)
+core/button title: in the HTML (attribute, a,button @title)
+core/button text: in the HTML (rich-text, a,button)
+core/button linkTarget: in the HTML (attribute, a @target)
+core/button rel: in the HTML (attribute, a @rel)
+parse_blocks() sees:
+core/heading {"level":3}
+core/image {"id":42,"sizeSlug":"large"}</pre><p>Reading it: core uses <code class="inline">rich-text</code> as a source too (the editor's rich-text value, stored as HTML like <code class="inline">html</code>); the quote's whole inner HTML is one attribute; the button's tagName and type are settings, so comment attributes with defaults. parse_blocks() returns <code class="inline">{"level":3}</code> and the image's id and size: the src, the alt and the heading's text are in the HTML only. Accept any equivalent formatting of TODOs 2 and 3; <code class="inline">array_key_exists()</code> matters because a default can be false.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 6.2-B: labs/module-12/l6_2-static-blocks/card_price_starter/ → card_price_solution/ with test_card_price.sh</div>
+<p>The test with the starter's <code class="inline">pagesco-card-price.php</code> in mu-plugins/:</p>
+<pre class="out">The cards and what follows them:
+&lt;h3 class="wp-block-pagesco-book-card__title"&gt;The Hobbit&lt;/h3&gt;
+&lt;h3 class="wp-block-pagesco-book-card__title"&gt;A book without a link&lt;/h3&gt;
+price lines: 0</pre><p>With the solution's:</p>
+<pre class="out">The cards and what follows them:
+&lt;h3 class="wp-block-pagesco-book-card__title"&gt;The Hobbit&lt;/h3&gt;
+&lt;p class="pagesco-card-price"&gt;Today: $10.99&lt;/p&gt;
+&lt;h3 class="wp-block-pagesco-book-card__title"&gt;A book without a link&lt;/h3&gt;
+price lines: 1</pre><p>Reading it: <code class="inline">render_block_pagesco/book-card</code> passes the card's stored HTML; WP_HTML_Tag_Processor finds the link by class and reads its href (never a regular expression on HTML); <code class="inline">url_to_postid()</code> turns the book's address into its ID; the price is read on every view, so it is live although the card is static. The card without a link gets nothing. It is a dynamic ADDITION to a static block, a preview of Lesson 6.3's reason for dynamic blocks; the test creates and force-deletes its own post.</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-12/l6_2-static-blocks/debug_card_report.php (deliberately broken)</div>
+<p>As shipped, PHP prints:</p>
+<pre class="out">Warning: Undefined array key "title" in /var/www/html/debug_card_report.php on line 28
+Warning: Undefined array key "innerHtml" in /var/www/html/debug_card_report.php on line 30
+Deprecated: strlen(): Passing null to parameter #1 ($string) of type string is deprecated in /var/www/html/debug_card_report.php on line 30
+: h2, 0 characters of HTML
+Warning: Undefined array key "title" in /var/www/html/debug_card_report.php on line 28
+Warning: Undefined array key "innerHtml" in /var/www/html/debug_card_report.php on line 30
+Deprecated: strlen(): Passing null to parameter #1 ($string) of type string is deprecated in /var/www/html/debug_card_report.php on line 30
+: h2, 0 characters of HTML</pre><ol class="steps">
+  <li><b>Warning, line 28:</b> <code class="inline">$block['attrs']['title']</code>: the title is sourced from the HTML, so it is never in the comment's attrs (Lesson 6.2, Common Mistake 1). Read it with WP_HTML_Processor (the fix below), as the lesson's Exercise 1 does.</li>
+  <li><b>Warning + Deprecated, line 30:</b> <code class="inline">innerHtml</code> is spelled <code class="inline">innerHTML</code> in a parsed block; the missing key gives null, and strlen( null ) is deprecated since PHP 8.1. One bug, two messages.</li>
+  <li><b>Silent, line 29:</b> <code class="inline">?? 2</code>: the card's default heading level is 3 (block.json), and a card at its default stores no headingLevel. The second card is an h3 but the report says h2. Use <code class="inline">?? 3</code>, or better, the registered default.</li>
+</ol>
+<p>Fixed (all three), it prints:</p>
+<pre class="out">Dune: h2, 166 characters of HTML
+Emma: h3, 164 characters of HTML</pre><p>The fixed script is in the generator (blocks_S12.py, CARD_REPORT_FIXED), run on the same site.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 6.3-A (guided): labs/module-12/l6_3-dynamic-blocks/next_events_starter/ → next_events_solution/ with test_next_events.php</div>
+<p>With the starter's plugin installed and activated:</p>
+<pre class="out">Plugin 'pagesco-next-events' activated.
+Success: Activated 1 of 1 plugins.
+== no attributes
+&lt;p class="wp-block-pagesco-next-events"&gt;TODO: the next events&lt;/p&gt;
+== 2 at the Café
+&lt;p class="wp-block-pagesco-next-events"&gt;TODO: the next events&lt;/p&gt;
+== rooftop
+&lt;p class="wp-block-pagesco-next-events"&gt;TODO: the next events&lt;/p&gt;
+count 99: 0 events</pre><p>With the solution's:</p>
+<pre class="out">Plugin 'pagesco-next-events' activated.
+Success: Activated 1 of 1 plugins.
+== no attributes
+&lt;ul class="wp-block-pagesco-next-events"&gt;
+			&lt;li&gt;&lt;time datetime="2027-11-04T19:00"&gt;Nov 4&lt;/time&gt; Book club: Dune&lt;/li&gt;
+			&lt;li&gt;&lt;time datetime="2027-11-06T10:30"&gt;Nov 6&lt;/time&gt; Story time: The Hobbit&lt;/li&gt;
+			&lt;li&gt;&lt;time datetime="2027-11-11T18:30"&gt;Nov 11&lt;/time&gt; An evening with Ana Ruiz&lt;/li&gt;
+			&lt;li&gt;&lt;time datetime="2027-11-18T19:30"&gt;Nov 18&lt;/time&gt; Poetry open mic&lt;/li&gt;
+			&lt;li&gt;&lt;time datetime="2027-12-02T19:00"&gt;Dec 2&lt;/time&gt; Book club: Fahrenheit 451&lt;/li&gt;
+	&lt;/ul&gt;
+== 2 at the Café
+&lt;ul class="wp-block-pagesco-next-events"&gt;
+			&lt;li&gt;&lt;time datetime="2027-11-11T18:30"&gt;Nov 11&lt;/time&gt; An evening with Ana Ruiz&lt;/li&gt;
+			&lt;li&gt;&lt;time datetime="2027-11-18T19:30"&gt;Nov 18&lt;/time&gt; Poetry open mic&lt;/li&gt;
+	&lt;/ul&gt;
+== rooftop
+&lt;p class="wp-block-pagesco-next-events"&gt;No events at this location yet.&lt;/p&gt;
+count 99: 6 events</pre><p>Reading it: no count means the Events to show setting (5, the default); the location is sanitized and passed to EventsTable::find(), which prepares the SQL (Lesson 5.5); the empty case prints a sentence inside the same wrapper; count 99 is clamped to 10, and the table has six events. Common answers to accept: <code class="inline">?? (int) Settings::get(...)</code> instead of isset(); <code class="inline">wp_date()</code> is wrong here (starts_at is already local time; mysql2date() formats it as stored). Remove the plugin afterwards.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 6.3-B: labs/module-12/l6_3-dynamic-blocks/core_sources_starter.php → core_sources_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">Dune      pagesco_author     [TODO]
+Dune      pagesco_price      [TODO]
+Gatsby    pagesco_in_stock   [TODO]
+Dune      pagesco_in_stock   [TODO]
+Dune      _edit_lock         [TODO]
+Dune      pagesco_writer     [TODO]
+Dune      link               [TODO]</pre><p>The solution prints:</p>
+<pre class="out">Dune      pagesco_author     [Frank Herbert]
+Dune      pagesco_price      [14.99]
+Gatsby    pagesco_in_stock   []
+Dune      pagesco_in_stock   [1]
+Dune      _edit_lock         [No data]
+Dune      pagesco_writer     [No data]
+Dune      link               [http://localhost:8080/books/dune/]</pre><p>Reading it: core/post-meta returns raw values (14.99 without a dollar sign; the boolean as '' or 1); a protected key (<code class="inline">_edit_lock</code>) and an unknown key both return null, so the fallback "No data" stays, silently; core/post-data's link field gives the permalink. The same rendering with a made-up context is how the lesson's Exercise 1 tests pagesco/book.</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-12/l6_3-dynamic-blocks/debug_genre_counts.php (deliberately broken)</div>
+<p>As shipped, PHP prints:</p>
+<pre class="out">Warning: Undefined array key "limit" in /var/www/html/debug_genre_counts.php on line 18
+Warning: Undefined variable $pagesco_items in /var/www/html/debug_genre_counts.php on line 32
+&lt;ul class="wp-block-pagesco-lab-genres"&gt;&lt;li&gt;Fiction: 11&lt;/li&gt;&lt;/ul&gt;
+&lt;ul class="wp-block-pagesco-lab-genres"&gt;&lt;li&gt;Fiction: 11&lt;/li&gt;&lt;/ul&gt;</pre><ol class="steps">
+  <li><b>Warning, line 18:</b> <code class="inline">$attributes['limit']</code> on a block without a limit: the attribute has no default, so the key is missing (Lesson 6.3, Common Mistake 1). <code class="inline">isset( $attributes['limit'] ) ? ... : 3</code>.</li>
+  <li><b>Warning, line 32:</b> <code class="inline">$pagesco_items .=</code> on a variable that was never set. Add <code class="inline">$pagesco_items = '';</code> before the loop. (PHP shows the warning once per line with this site's settings, so it appears once although both blocks hit it.)</li>
+  <li><b>Silent, line 19:</b> <code class="inline">min( 1, max( 10, ... ) )</code> is the clamp written backwards: it always gives 1, so both blocks show one genre. <code class="inline">min( 10, max( 1, $limit ) )</code>.</li>
+</ol>
+<p>Fixed, the two blocks print three and four genres, the biggest first:</p>
+<pre class="out">&lt;ul class="wp-block-pagesco-lab-genres"&gt;&lt;li&gt;Fiction: 11&lt;/li&gt;&lt;li&gt;Classic: 6&lt;/li&gt;&lt;li&gt;Science Fiction: 3&lt;/li&gt;&lt;/ul&gt;
+&lt;ul class="wp-block-pagesco-lab-genres"&gt;&lt;li&gt;Fiction: 11&lt;/li&gt;&lt;li&gt;Classic: 6&lt;/li&gt;&lt;li&gt;Science Fiction: 3&lt;/li&gt;&lt;li&gt;Dystopian: 3&lt;/li&gt;&lt;/ul&gt;</pre><p>Dystopian and Science Fiction both have three books; their order among themselves is the database's, so accept either. The fixed script is GENRES_FIXED in blocks_S12.py.</p>
+</div>
+
+  <div class="sec"><h2>The Lesson Pages' Own Quick Quizzes</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Lesson 6.2 · Static Blocks: Attributes, Controls &amp; Supports</div>
+<ol class="steps" data-lesson-quiz="6.2">
+  <li><b>A</b> In the saved HTML, inside the element the selector points to: A sourced attribute lives only in the saved HTML; the editor reads it back with the selector, and the comment JSON stays free of it.</li>
+  <li><b>B</b> A ToggleControl inside InspectorControls, in edit: Whatever edit renders inside InspectorControls appears in the sidebar while the block is selected; PanelBody groups it into a collapsible panel.</li>
+  <li><b>C</b> Spreading useBlockProps.save() onto the wrapper in save: Supports add their classes and styles through useBlockProps.save(); a wrapper without it saves none of them.</li>
+  <li><b>C</b> {"headingLevel":4}: parse_blocks returns exactly the comment JSON: the sourced title stays in the HTML, and defaults such as showBadge are not filled in.</li>
+  <li><b>B</b> A deprecated entry with the previous attributes, supports and save: A deprecated entry with the old attributes, supports and save lets the editor recognize existing cards and open them as valid blocks of the new version.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Lesson 6.3 · Dynamic Blocks &amp; Block Bindings</div>
+<ol class="steps" data-lesson-quiz="6.3">
+  <li><b>B</b> Only the block comment with its attributes: A dynamic block saves only its comment with the non-default attributes; render.php produces the HTML on every view.</li>
+  <li><b>A</b> 8: count has no default, so it is missing from the comment and render.php uses Settings::get( 'books_per_page' ), now 8.</li>
+  <li><b>B</b> The paragraph's fallback text: Keys starting with an underscore are protected; core/post-meta returns null for them, so the paragraph keeps its fallback text, silently.</li>
+  <li><b>C</b> Sold out: The context names book 37, the source reads pagesco_in_stock, finds it false and returns the formatted Sold out, which replaces the paragraph's content.</li>
+  <li><b>C</b> When something asks for the block's variations, such as the editor: block.json names the file, and WordPress requires it lazily when the variations are requested, for example by the editor through the block-types REST route.</li>
+</ol>
+</div>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>Title and level:</b> the title in the saved HTML, inside the element its selector names; the heading level in the block comment, only when it is not the default 3.</li>
+  <li><b>render.php and attributes:</b> check optional attributes (isset() or a default in block.json), cast and clamp numbers, sanitize strings (sanitize_key() for a slug), and escape everything printed; start the wrapper with get_block_wrapper_attributes().</li>
+  <li><b>A fallback on a book page:</b> a misspelled meta key, a key not registered with show_in_rest or starting with an underscore (core/post-meta), a custom source without uses_context, or a source that returned null for that field.</li>
+</ol>
+
+  <div class="sec"><h2>Common Wrong Answers and What They Reveal</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li><b>Q1 A ("in the comment").</b> Thinks every attribute is JSON. Show the stored Card test post: the URL is in the href, the comment is empty.</li>
+  <li><b>Q2 with the title in it.</b> The same picture: parse_blocks() never reads the HTML. Run the command.</li>
+  <li><b>Q3 A or B.</b> Thinks validation is about files. It compares stored HTML with save(): CSS and edit are never compared.</li>
+  <li><b>Q5 A ("the hex color").</b> Remembers inline styles; presets are classes and slugs, so the theme can change the color later.</li>
+  <li><b>Q7 A ("a deprecation").</b> Carries Lesson 6.2's rule over to dynamic blocks; there is no stored HTML to validate.</li>
+  <li><b>Q9 A ("wrap it in esc_html()").</b> Good instinct, wrong place: the function escapes its own output, and double escaping breaks the attribute.</li>
+  <li><b>Q10 A ("Sold out").</b> Confuses core/post-meta with the shop's source. Show Gatsby's first template version: an empty item.</li>
+</ul>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 12 · Answer Key · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facilitator Guide: Session 12</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">contains answers &amp; timing · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Facilitator Guide</div>
+    <h1>Session 12: Static and Dynamic Blocks</h1>
+    <p class="sub">How to teach the session where the Book Card becomes a real block and the shop gets its first dynamic one: where a static block keeps each attribute and why its stored HTML is a contract, then a render.php that queries the catalog on every view and core blocks bound to the books' own data.</p>
+    <div class="meta-row">
+      <span class="chip"><b>2</b> lessons</span>
+      <span class="chip"><b>3 hrs</b> session</span>
+      <span class="chip">Lessons <b>6.2–6.3</b></span>
+      <span class="chip">Session <b>12</b> of 18 · Part 2</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>How to Use This Guide</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Same rhythm for both lessons: frame (the goal and one mental model) → live demo (you type, they type along) → guided lab (a kit lab, new practice on the lesson's ideas) → start the lesson's own project. The lesson exercises, quiz and journal are homework.</li>
+  <li>Every command below was run on WordPress 7.1.3 / PHP 8.5 to produce the output printed under it: Lesson 6.2's demo on the site exactly as Lesson 6.1 left it (<code class="inline">after:lesson_19</code>), Lesson 6.3's on the site after Lesson 6.2 (<code class="inline">after:lesson_20</code>). Browser-only results (the editor's validation messages) are quoted from the lesson page, which recorded them in a real 7.1 editor. Ask for a prediction before every run.</li>
+  <li>This session is half JavaScript files the editor runs and half PHP the server runs. Learners copy the .js, .json and .scss files from the lesson pages (they are long, and the lessons explain them line by line); the room's time goes to the PHP side, the stored markup and the mental models, which are what people get wrong alone.</li>
+  <li>Labs live in <code class="inline">labs/module-12/</code> (learners keep the folder in their project folder, next to compose.yaml): <code class="inline">_starter</code> files and folders are handouts, <code class="inline">_solution</code> files and folders are yours. The block labs need no Node: the Next Events block registers a block.json and a render.php from PHP and is tested with do_blocks().</li>
+  <li>Part 2, Session 4 of 10. Teal blocks are hands-on, amber blocks are watch-outs. Lesson codes (6.2, 6.3) match the course site.</li>
+</ul>
+<div class="note warn"><div class="t">The #1 risk of Session 12: the build eats the session</div>
+<p>Both lessons change files that only matter after <code class="inline">npm run build</code>, and every laptop builds differently: native Node 24, the node:24 container, a stale <code class="inline">npm start</code> in another terminal. Ten learners with a missing build means ten editors saying "This block has encountered an error". <b>Before:</b> the warm-up's W3 to W5 are a build check; anyone whose <code class="inline">ls wp-content/plugins/pagesco-books/build/blocks</code> does not show the manifest gets a partner. <b>In the room:</b> you type every file, and the room may watch instead of typing (the files are on the lesson pages); what they must type is the PHP (render.php, BookBindings.php) and the commands. <b>After:</b> the two lesson projects need the built blocks; send the Before the Next Lesson checks home in writing.</p>
+</div>
+
+  <div class="sec"><h2>Before the Session</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ <b>Projector site at <code class="inline">after:lesson_19</code>:</b> the end of Lesson 6.1 (the 6.1 Book Card, <code class="inline">npm run build</code> working). Know your build command: native <code class="inline">npm run build</code> in wordpress/wp-content/plugins/pagesco-books, or Lesson 6.1's <code class="inline">docker run --rm ... node:24 npm run build</code>. Keep a second terminal for the WP-CLI container shell (<code class="inline">docker compose run --rm wpcli sh</code>).</li>
+  <li>☐ <b>Rehearse once:</b> Lesson 6.2's sections on a scratch copy of the site (the deprecation step in particular: reload Card test, read the Console, add deprecated.js, reload again), then Lesson 6.3's render.php and BookBindings. The whole session's demo takes three builds.</li>
+  <li>☐ <b>Files to hand out:</b> <code class="inline">labs/module-12/</code> WITHOUT the <code class="inline">*_solution.*</code> files and the <code class="inline">card_price_solution/</code> and <code class="inline">next_events_solution/</code> folders. <b>Run the kit check once:</b> <code class="inline">python3 labs/check_labs.py module-12</code> (15 results, about two minutes).</li>
+  <li>☐ <b>Projector:</b> VS Code on pagesco-dev at a large font, the browser with the editor (admin / password), View Source, and the developer tools' Console; <code class="inline">lesson_20.html</code> and <code class="inline">lesson_21.html</code> in tabs (their screenshots show the Settings and Styles panels if your editor misbehaves).</li>
+  <li>☐ <b>Board, before learners arrive:</b> a two-column table <b>HTML (source + selector) | comment (no source, only if not default)</b>, and the line <b>static = printed card · dynamic = departure board · binding = shelf label</b>.</li>
+</ul>
+<div class="blk warn"><div class="h">Known traps of this session</div>
+<table class="timing">
+<thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td>"This block has encountered an error" or the old card after a change</td><td>No build since the change, or the build failed</td><td><code class="inline">npm run build</code> in the plugin folder; read its last line. <code class="inline">npm start</code> keeps building while you work.</td></tr>
+<tr><td>Notices about <code class="inline">register_collection</code> / <code class="inline">blocks-manifest.php</code> above wp-admin, the editor broken</td><td>build/ is missing (Lesson 6.1's trap)</td><td>Build once; never commit or copy the plugin without build/.</td></tr>
+<tr><td>"Block contains unexpected or invalid content"</td><td>save() changed for content that exists (or a selector catches a nested element, Mistake 2)</td><td>A deprecated entry with the old attributes, supports and save; or delete test posts while still developing.</td></tr>
+<tr><td><code class="inline">Warning: Undefined array key "title"</code> above the doctype</td><td>PHP read an HTML-sourced attribute from <code class="inline">$block['attrs']</code></td><td>Read the HTML with the HTML API, or make the value a comment attribute, or make the block dynamic.</td></tr>
+<tr><td><code class="inline">Warning: Undefined array key "count"</code> inside the page</td><td>render.php read an attribute that has no default</td><td><code class="inline">isset()</code> or <code class="inline">??</code>; and fix it in src/, not in build/ (the next build wipes build/).</td></tr>
+<tr><td>A bound paragraph shows "Author" or "Price"</td><td>Wrong meta key, a key without show_in_rest, or a source without <code class="inline">uses_context</code></td><td><code class="inline">get_registered_meta_keys( 'post', 'book' )</code>; check <code class="inline">uses_context</code>; choose fallbacks that look wrong.</td></tr>
+<tr><td>List items print "Stock" instead of the value</td><td>WordPress older than 7.1</td><td>Bind paragraphs instead (the lesson's version note).</td></tr>
+<tr><td>create-block hangs or fails in the room</td><td>It downloads its template (npm) on venue Wi-Fi</td><td>Create the folder and the five files by hand, as the demo does; scaffold at home.</td></tr>
+</tbody>
+</table>
+</div>
+
+  <div class="sec"><h2>Session 12 Agenda (3 hours)</h2><span class="rule"></span></div>
+  <table class="timing">
+    <thead><tr><th>Clock</th><th>Minutes</th><th>Segment</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="t">0:00</td><td class="t">10</td><td>Warm-up</td><td>Five retrieval questions on Lessons 5.5 and 6.1, homework check, the build working on every laptop.</td></tr>
+      <tr><td class="t">0:10</td><td class="t">10</td><td><b>6.2</b> Frame and mental model</td><td>The printed card with a sticky note: attributes in the HTML or in the comment; save as a contract.</td></tr>
+      <tr><td class="t">0:20</td><td class="t">25</td><td><b>6.2</b> Live demo</td><td>Three sourced attributes, what the post stores and what PHP sees; supports; a validation error and its deprecation; Mistake 1.</td></tr>
+      <tr><td class="t">0:45</td><td class="t">15</td><td><b>6.2</b> Guided lab</td><td><code class="inline">labs/module-12/l6_2-static-blocks/attribute_sources_starter.php</code>: where core's own blocks keep each attribute.</td></tr>
+      <tr><td class="t">1:00</td><td class="t">15</td><td><b>6.2</b> Start the lesson project</td><td>Step 1: the Hobbit staff pick on the Staff picks post, for every laptop whose card builds.</td></tr>
+      <tr><td class="t">1:15</td><td class="t">10</td><td>Break</td><td>Laptops still building stay open; the facilitator helps with Node and the build.</td></tr>
+      <tr><td class="t">1:25</td><td class="t">10</td><td><b>6.3</b> Frame and mental model</td><td>The printed card and the departure board; what a dynamic block stores.</td></tr>
+      <tr><td class="t">1:35</td><td class="t">20</td><td><b>6.3</b> Live demo: render.php</td><td>Stored prices go stale; the Book List's files, build and is_dynamic(); a page of comments; the Books per list setting.</td></tr>
+      <tr><td class="t">1:55</td><td class="t">20</td><td><b>6.3</b> Guided lab</td><td><code class="inline">labs/module-12/l6_3-dynamic-blocks/next_events_starter/</code>: a dynamic block of your own, no JavaScript, tested with do_blocks().</td></tr>
+      <tr><td class="t">2:15</td><td class="t">15</td><td><b>6.3</b> Live demo: block bindings</td><td>What can be bound; core/post-meta's raw values; the shop's pagesco/book source.</td></tr>
+      <tr><td class="t">2:30</td><td class="t">20</td><td><b>6.3</b> Start the lesson project</td><td>Steps 1 and 2: single-book.html with live details, checked on Dune and Gatsby.</td></tr>
+      <tr><td class="t">2:50</td><td class="t">10</td><td>Wrap-up</td><td>Exit ticket (3 questions), homework, bring list for Session 13 (Checkpoint 2).</td></tr>
+      <tr><td class="t"><b>Total</b></td><td class="t"><b>180</b></td><td></td><td>Ends at 3:00.</td></tr>
+    </tbody>
+  </table>
+<p><b>In the room.</b> The lesson pages estimate 140 + 145 = 285 minutes for a learner working alone; after the warm-up, the break and the wrap-up the room has 150. Lesson 6.2 gets 65 minutes: the storage model, a demo through validation, a lab on core's own attributes, and Step 1 of the staff pick. Lesson 6.3 gets 85: render.php and bindings each get their own demo, a lab builds a dynamic block of the learner's own, and Steps 1 and 2 of the book pages.</p>
+<p><b>Goes home (about 2 to 3 hours).</b> Lesson 6.2's project Steps 2 and 3 (the front end, the comparison with Lesson 1.3's helper, deleting Card test) and Common Mistakes 2 and 3 to read; Lesson 6.3's "The Book List in the Editor" section (the controls and core-data) and "Variations" (variations.php and a build), the project's Step 3, Common Mistakes 2 and 3; both lessons' Hands-on Exercises, Quick Quizzes and journal entries; Before the Next Lesson for both.</p>
+<p><b>Protect, in this order:</b> the HTML-or-comment model with the empty <code class="inline">array ()</code> from PHP; the validation error and the deprecation that fixes it; render.php with the setting changing a page nobody touched; core/post-meta's raw values next to pagesco/book. <b>Cut first:</b> the supports step of the 6.2 demo (the workbook's worked example covers it), then the 6.2 project start (Step 1 goes home), then the stale-price step of the 6.3 demo (tell it).</p>
+
+  <div class="sec"><h2>Opening Segment</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">0:00</span><h3>Warm-up: Lessons 5.5 and 6.1</h3><span class="dur">10 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Timing</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">6m</td><td>Five retrieval questions (workbook Warm-up box), answers out loud</td></tr>
+<tr><td class="t">4m</td><td>Homework check: Session 11's projects; on every laptop <code class="inline">ls wp-content/plugins/pagesco-books/build/blocks</code> in the WP-CLI container</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Questions and answers</div>
+<ol class="steps">
+  <li><b>W1 (Lesson 5.5).</b> A shortcode callback ends with <code class="inline">echo $html;</code> instead of <code class="inline">return $html;</code>. What goes wrong? <b>Answer:</b> The HTML appears at the top of the content (wherever the filter runs), not where the shortcode is: shortcodes RETURN their output. The [pagesco_events] callback returns it.</li>
+  <li><b>W2 (Lesson 5.5).</b> Why does EventsTable::find() build its SQL with <code class="inline">$wpdb-&gt;prepare()</code> even though only the plugin calls it? <b>Answer:</b> Because the location comes from shortcode attributes, REST arguments (Lesson 7.2) and anyone who edits a post: every value goes through placeholders, every time.</li>
+  <li><b>W3 (Lesson 6.1).</b> Where does <code class="inline">npm run build</code> write, and which file does WordPress read to register the plugin's blocks? <b>Answer:</b> Into build/blocks/ (<code class="inline">blocks-manifest.php</code> and <code class="inline">book-card</code> on the projector site), and build/blocks/blocks-manifest.php, read by wp_register_block_types_from_metadata_collection() in the Blocks feature.</li>
+  <li><b>W4 (Lesson 6.1).</b> You add a second block folder in src/blocks/ and build. What PHP do you add to register it? <b>Answer:</b> None: the manifest lists every built block and the Blocks feature registers them all. Today's Book List proves it.</li>
+  <li><b>W5 (Lesson 6.1).</b> You edited src/blocks/book-card/edit.js, reloaded the editor, and nothing changed. First question? <b>Answer:</b> Did you build? The editor loads build/blocks/book-card/index.js. <code class="inline">npm start</code> rebuilds on every save while you work.</li>
+</ol>
+<p>On the projector site the build folder holds:</p>
+<pre class="code">ls wp-content/plugins/pagesco-books/build/blocks</pre><pre class="out">blocks-manifest.php  book-card</pre><p>Anyone who sees no <code class="inline">book-card</code> folder builds now (or pairs). Laptops that cannot build at all do today's PHP labs and type the PHP parts of the demos; the JavaScript halves wait for the build at home.</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Lesson Plans</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">6.2</span><h3>Static Blocks: Attributes, Controls &amp; Supports</h3><span class="dur">65 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Declare attributes in block.json and choose where each one is stored: in the saved HTML (source and selector) or in the block's comment</li>
+  <li>Make text editable on the canvas with RichText and save it with RichText.Content</li>
+  <li>Add settings to the block sidebar with InspectorControls and components from @wordpress/components</li>
+  <li>Opt into color, spacing and typography block supports and read the classes and styles they save</li>
+  <li>Explain block validation, and change save safely with a deprecated entry and migrate</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing in the room</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame: the printed card with a sticky note; HTML or comment; the stored HTML is a contract</td></tr>
+<tr><td class="t">25m</td><td>Live demo: three attributes, the stored post and PHP's view, supports, validation and a deprecation, Mistake 1</td></tr>
+<tr><td class="t">15m</td><td>Guided lab: <code class="inline">attribute_sources_starter.php</code></td></tr>
+<tr><td class="t">15m</td><td>Start the lesson project: Step 1, the Hobbit staff pick</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Mental model to say</div>
+<p>Hold up a printed shop card: "A static block in a post is this card with a sticky note on the back. The printed side is the HTML: every visitor sees it, and the bookseller's words are printed right on it. The sticky note is the comment JSON: the few settings that are not words, such as heading level 2. The editor reads both to rebuild the card for editing. PHP can read the sticky note easily; to find the words it would have to read the print."</p>
+<p>Then the board table: <b>source + selector = in the HTML</b> (title, author, the link's href); <b>no source = in the comment, and only when it differs from the default</b> (headingLevel, showBadge, colors). "Lesson 1.3's pagesco_book_card() took the same data as arguments. The difference is WHERE a block keeps them."</p>
+<p>Then the contract: "Every time the editor opens a post it runs your CURRENT save() with the attributes it read and compares the result with the stored HTML. Different means invalid. Once content exists, save() may not change without describing the old version: a deprecation."</p>
+</div>
+<div class="blk"><div class="h">Live demo (you type, they follow)</div>
+<p>Lesson 6.2's own files and commands, typed live. The block files are long: show them on the lesson page, paste them into VS Code, and spend the time on what each part STORES. Outputs come from the site exactly as Lesson 6.1 left it.</p>
+<ol class="steps">
+  <li><b>Before: the 6.1 card (2m).</b> "Lesson 6.1's card has no data of its own. Ask WordPress which attributes it has." Type the registry one-liner from the lesson in the WP-CLI container (<code class="inline">docker compose run --rm wpcli sh</code>):
+<pre class="code">wp eval 'echo implode( ", ", array_keys( WP_Block_Type_Registry::get_instance()-&gt;get_registered( "pagesco/book-card" )-&gt;get_attributes() ) ), "\n";'</pre>
+<pre class="out">lock, metadata, className, style</pre>
+Four attributes WordPress adds to every block, none of the card's own. Write <b>HTML or comment?</b> on the board.</li>
+  <li><b>Three sourced attributes (6m).</b> "A bookseller types the title, the author and why she loves the book, right on the card." Replace block.json with the lesson's first version (show the <code class="inline">attributes</code> part on the projector), then edit.js (RichText for each field, <code class="inline">allowedFormats</code>), save.js (RichText.Content) and style.scss, all from the lesson page, and build in the plugin folder:
+<pre class="code">{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "pagesco/book-card",
+	"version": "0.2.0",
+	"title": "Book Card",
+	"category": "widgets",
+	"icon": "book",
+	"description": "A book recommended by the Pages &amp; Co. staff.",
+	"keywords": [ "staff pick", "recommendation" ],
+	"textdomain": "pagesco-books",
+	"attributes": {
+		"title": {
+			"type": "string",
+			"source": "html",
+			"selector": ".wp-block-pagesco-book-card__title"
+		},
+		...</pre>
+Then <code class="inline">npm run build &gt; /dev/null</code> in wordpress/wp-content/plugins/pagesco-books (natively, or with Lesson 6.1's node:24 container) and the registry again:
+<pre class="code">wp eval 'echo implode( ", ", array_keys( WP_Block_Type_Registry::get_instance()-&gt;get_registered( "pagesco/book-card" )-&gt;get_attributes() ) ), "\n";'</pre>
+<pre class="out">title, author, pick, lock, metadata, className, style</pre></li>
+  <li><b>What the post stores, and what PHP sees (5m).</b> In the editor: a post "Card test" with a card for Fahrenheit 451 (the lesson's text, the last words in bold). Open the Code editor (Ctrl+Shift+Alt+M) and read it out loud:
+<pre class="code">&lt;!-- wp:pagesco/book-card --&gt;
+&lt;div class="wp-block-pagesco-book-card"&gt;&lt;h3 class="wp-block-pagesco-book-card__title"&gt;Fahrenheit 451&lt;/h3&gt;&lt;p class="wp-block-pagesco-book-card__author"&gt;Ray Bradbury&lt;/p&gt;&lt;p class="wp-block-pagesco-book-card__pick"&gt;Short, fierce and &lt;strong&gt;more relevant every year&lt;/strong&gt;.&lt;/p&gt;&lt;/div&gt;
+&lt;!-- /wp:pagesco/book-card --&gt;</pre>
+The front end prints exactly that HTML (View Source of /card-test/):
+<pre class="out">&lt;div class="wp-block-pagesco-book-card"&gt;&lt;h3 class="wp-block-pagesco-book-card__title"&gt;Fahrenheit 451&lt;/h3&gt;&lt;p class="wp-block-pagesco-book-card__author"&gt;Ray Bradbury&lt;/p&gt;&lt;p class="wp-block-pagesco-book-card__pick"&gt;Short, fierce and &lt;strong&gt;more relevant every year&lt;/strong&gt;.&lt;/p&gt;&lt;/div&gt;</pre>
+Now ask PHP with the lesson's <code class="inline">read-card.php</code> (<code class="inline">wp eval-file read-card.php</code>):
+<pre class="code"><span class="k">&lt;?php</span>
+<span class="v">$post</span>  = get_page_by_path( <span class="s">'card-test'</span>, OBJECT, <span class="s">'post'</span> );
+<span class="v">$block</span> = parse_blocks( <span class="v">$post</span>-&gt;post_content )[<span class="s">0</span>];
+
+<span class="k">echo</span> <span class="v">$block</span>[<span class="s">'blockName'</span>], <span class="s">"\n"</span>;
+var_export( <span class="v">$block</span>[<span class="s">'attrs'</span>] );
+<span class="k">echo</span> <span class="s">"\n"</span>;</pre>
+<pre class="out">pagesco/book-card
+array (
+)</pre>
+"An empty array: everything is in the HTML." That is the sticky note, and it is empty.</li>
+  <li><b>Supports: features for free (5m).</b> "The shop wants a sage card for summer." Jump to the lesson's supports version of block.json (it already has the link and the heading level of the controls section; build the controls section's edit.js and save.js with it). Build, then the registry once more:
+<pre class="code">wp eval 'echo implode( ", ", array_keys( WP_Block_Type_Registry::get_instance()-&gt;get_registered( "pagesco/book-card" )-&gt;get_attributes() ) ), "\n";'</pre>
+<pre class="out">title, author, pick, url, headingLevel, lock, metadata, className, style, backgroundColor, textColor, fontSize</pre>
+Three new attributes came from supports: <code class="inline">backgroundColor</code>, <code class="inline">textColor</code>, <code class="inline">fontSize</code>. In the editor's Styles tab pick Sage, font size S and padding Medium; the stored card:
+<pre class="out">&lt;div class="wp-block-pagesco-book-card has-sage-background-color has-background has-small-font-size" style="padding-top:var(--wp--preset--spacing--medium);padding-bottom:var(--wp--preset--spacing--medium)"&gt;&lt;a class="wp-block-pagesco-book-card__link" href="http://localhost:8080/books/fahrenheit-451/"&gt;&lt;h2 class="wp-block-pagesco-book-card__title"&gt;Fahrenheit 451&lt;/h2&gt;&lt;/a&gt;&lt;p class="wp-block-pagesco-book-card__author"&gt;Ray Bradbury&lt;/p&gt;&lt;p class="wp-block-pagesco-book-card__pick"&gt;Short, fierce and &lt;strong&gt;more relevant every year&lt;/strong&gt;.&lt;/p&gt;&lt;/div&gt;</pre>
+And where the class gets its color, the theme's global styles:
+<pre class="code">curl -s http://localhost:8080/card-test/ | grep -o '\.has-sage-background-color{[^}]*}'</pre>
+<pre class="out">.has-sage-background-color{background-color: var(--wp--preset--color--sage) !important;}</pre></li>
+  <li><b>The contract: validation and a deprecation (5m).</b> "Now the shop wants a Staff pick badge on every card." Add the lesson's showBadge version (block.json, edit.js, save.js, style.scss), build, and reload Card test in the editor with the Console open (F12). The card shows <b>Block contains unexpected or invalid content</b>; the Console says why:
+<pre class="code">Block validation: Expected tag name `p`, instead saw `a`.
+Block validation: Block validation failed for `pagesco/book-card` (Object).
+
+Content generated by `save` function:
+
+&lt;div class="wp-block-pagesco-book-card has-sage-background-color has-background has-small-font-size" style="…"&gt;&lt;p class="wp-block-pagesco-book-card__badge"&gt;Staff pick&lt;/p&gt;&lt;a class="wp-block-pagesco-book-card__link" …
+
+Content retrieved from post body:
+
+&lt;div class="wp-block-pagesco-book-card has-sage-background-color has-background has-small-font-size" style="…"&gt;&lt;a class="wp-block-pagesco-book-card__link" …</pre>
+Read the first line: the new save() starts with the badge <code class="inline">&lt;p&gt;</code>, the stored card with the link <code class="inline">&lt;a&gt;</code>. Then create the lesson's <code class="inline">deprecated.js</code> (the old attributes, supports and save, plus <code class="inline">migrate()</code> that sets <code class="inline">showBadge: false</code>), the new index.js, build, reload: the card opens normally and the Console logs "Block successfully updated". Nothing is saved until someone updates the post.</li>
+  <li><b>Mistake 1: a sourced attribute in PHP (2m).</b> "A PHP developer wants to log every card's title." Save the lesson's throwaway must-use plugin <code class="inline">mistake-card-title.php</code>, then in the container shell:
+<pre class="code">curl -s http://localhost:8080/card-test/ | head -n 2
+curl -s http://localhost:8080/card-test/ | grep -o '&lt;!-- Book Card:[^&gt;]*&gt;'</pre>
+<pre class="out">Warning: Undefined array key "title" in /var/www/html/wp-content/mu-plugins/mistake-card-title.php on line 9
+&lt;!-- Book Card:  --&gt;</pre>
+The title is not in the comment, so it is not in <code class="inline">$block['attrs']</code>: a Warning above the doctype and an empty comment. In PHP a static block is finished HTML; the HTML API reads it (Exercise 1, and the fast finishers' <code class="inline">card_price</code> lab). <code class="inline">rm wp-content/mu-plugins/mistake-card-title.php</code>.</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b>Reading the card's text in PHP from <code class="inline">$block['attrs']</code></b> (the demo's Mistake 1). Coach with the board: "Is the title on the sticky note or on the print?" The fixes: the HTML API, a comment attribute, or a dynamic block. (Self-check Q2, the debug handout.)</li>
+  <li><b>Changing save() and blaming the editor.</b> "The block broke after my change." Coach: "What does the Console's first validation line say, and does content already exist?" Test posts can be deleted while developing; client content needs a deprecation. (Self-check Q3.)</li>
+  <li><b>Translating text in save() or using a too-wide selector</b> (Mistakes 3 and 2). Coach: "Will save() return the same HTML in Spanish? Does the selected element contain only its own value?" Insert, save, RELOAD before trusting a change. (Self-check Q6.)</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<p><b>File:</b> learners copy <code class="inline">labs/module-12/l6_2-static-blocks/attribute_sources_starter.php</code> into wordpress/ and run it with <code class="inline">wp eval-file --use-include attribute_sources_starter.php</code>; your reference is <code class="inline">labs/module-12/l6_2-static-blocks/attribute_sources_solution.php</code>. It practices the lesson's central question on blocks the learner did not write: for core/heading, core/quote and core/button, which attribute lives in the HTML and which in the comment, read from the registry; then what parse_blocks() returns for a stored heading and image.</p>
+<ul class="tick">
+  <li><b>Run it as shipped (2m).</b> Every line says TODO; the skip list (the attributes WordPress adds to many blocks) is given.</li>
+  <li><b>TODOs 1 to 4 in pairs (10m).</b> TODO 1 is the registry call from the demo. TODOs 2 and 3 are one if/else on <code class="inline">isset( $attr['source'] )</code>; circulate for <code class="inline">array_key_exists()</code> (core/image's isDecorative defaults to false, and <code class="inline">isset()</code> would miss a false default). Before TODO 4, ask for a prediction: will the image's src be in the attrs?</li>
+  <li><b>Expected when done:</b></li>
+</ul>
+<pre class="out">core/heading content: in the HTML (rich-text, h1,h2,h3,h4,h5,h6)
+core/heading level: in the comment (default 2)
+core/quote value: in the HTML (html, blockquote)
+core/quote citation: in the HTML (rich-text, cite)
+core/button tagName: in the comment (default "a")
+core/button type: in the comment (default "button")
+core/button url: in the HTML (attribute, a @href)
+core/button title: in the HTML (attribute, a,button @title)
+core/button text: in the HTML (rich-text, a,button)
+core/button linkTarget: in the HTML (attribute, a @target)
+core/button rel: in the HTML (attribute, a @rel)
+parse_blocks() sees:
+core/heading {"level":3}
+core/image {"id":42,"sizeSlug":"large"}</pre><ul class="tick">
+  <li><b>Debrief (3m):</b> "Core uses a fourth source the lesson did not list: <code class="inline">rich-text</code>. Where does it store?" (In the HTML, like html.) "Why is the button's <code class="inline">tagName</code> in the comment?" (It is a setting, not text.) "The image's src is not in the attrs: who reads it back?" (The editor, through the selector.)</li>
+  <li><b>Fast finishers:</b> the folder lab <code class="inline">labs/module-12/l6_2-static-blocks/card_price_starter/</code> (a must-use plugin that reads a static card's link with the HTML API and adds the live price after it; test with <code class="inline">labs/module-12/l6_2-static-blocks/test_card_price.sh</code>), then <code class="inline">labs/module-12/l6_2-static-blocks/debug_card_report.php</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Start the lesson project</div>
+<p>The lesson project is <b>A Staff Pick on the Staff Picks Post</b>: the finished card for The Hobbit under Lesson 2.1's list. It needs the block as the lesson's sections leave it (badge, deprecation and all): laptops whose card is at that point start it; the others finish the sections at home first.</p>
+<ul class="tick">
+  <li>Step 1 (12 minutes in the lesson): insert a Book Card after the list, type the title, author and recommendation ("everyone" in italics), set the link, H3 and the badge in Card settings, Sage in Styles. Update the post.</li>
+  <li><b>Done in the room</b> = the Code editor shows the card's comment with only <code class="inline">{"backgroundColor":"sage"}</code> (the lesson prints the whole post). Ask why headingLevel and showBadge are not there. (Both are at their defaults.)</li>
+  <li><b>Goes home:</b> Step 2 (the front end), Step 3 (the comparison table with Lesson 1.3's helper, deleting Card test, the parse_blocks check) and the pagesco-plan.txt line.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<p>Ask these out loud during the demo and the lab:</p>
+<ul class="tick">
+  <li>Where is a card's title stored, and where is its heading level? <b>Answer:</b> the title in the HTML (inside the selector's element); the level in the comment, and only when it is not 3.</li>
+  <li>Which hook gives a block's wrapper the supports' classes and styles? <b>Answer:</b> <code class="inline">useBlockProps()</code> in edit and <code class="inline">useBlockProps.save()</code> in save (Quiz Q3 of the lesson).</li>
+  <li>What happens to the front end when a card turns invalid in the editor? <b>Answer:</b> nothing: the front end prints the stored HTML.</li>
+  <li>What three things does a deprecated entry repeat? <b>Answer:</b> the old attributes, the old supports and the old save (plus an optional migrate).</li>
+</ul>
+<p>Workbook self-check, items Q1 to Q6 (learners do them at the end of the block or at home).</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q1</b> <span data-sc="1">C) In the saved HTML: the <code class="inline">href</code> of the first <code class="inline">&lt;a&gt;</code> inside the block</span>; <b>Q2</b> <span data-sc="2"><code class="inline">{"showBadge":false}</code></span>; <b>Q3</b> <span data-sc="3">C) Wrapping the author in a <code class="inline">&lt;cite&gt;</code> in save()</span>; <b>Q4</b> <span data-sc="4">A) Inside <code class="inline">&lt;BlockControls&gt;</code> in edit</span>; <b>Q5</b> <span data-sc="5">B) The class <code class="inline">has-sage-background-color</code> in the HTML and <code class="inline">"backgroundColor":"sage"</code> in the comment</span>; <b>Q6</b> <span data-sc="6">save() must return the same HTML for the same attributes in every language: a translated string makes cards invalid as soon as someone edits in another locale</span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> learners new to React read edit.js and save.js side by side with the lesson's explanation and type only the attribute names; pair them with someone who has written JSX. For the lab, write the <code class="inline">isset( $attr['source'] )</code> branch on the board.</p>
+<p><b>Stretch:</b> the <code class="inline">card_price</code> folder lab and <code class="inline">debug_card_report.php</code>; then the lesson's Exercise 3 (a Plain style variation) and the Bonus Challenge (the heading level in the toolbar: does it need a deprecation?).</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">6.3</span><h3>Dynamic Blocks &amp; Block Bindings</h3><span class="dur">85 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Explain when a block should be dynamic, and what a dynamic block stores in post_content</li>
+  <li>Render a block on the server with render.php: attributes, a WP_Query through get_posts(), get_block_wrapper_attributes(), and escaping</li>
+  <li>Preview a dynamic block in the editor with ServerSideRender, and fill its controls from the REST API through @wordpress/core-data</li>
+  <li>Offer ready-made versions of a block as variations, generated in PHP</li>
+  <li>Bind core blocks to post meta with core/post-meta, and write a custom binding source with register_block_bindings_source()</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing in the room</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame: the printed card and the departure board; what a dynamic block stores</td></tr>
+<tr><td class="t">20m</td><td>Live demo A: stale prices, the Book List's files and build, a page of comments, the setting</td></tr>
+<tr><td class="t">20m</td><td>Guided lab: the <code class="inline">next_events_starter/</code> plugin</td></tr>
+<tr><td class="t">15m</td><td>Live demo B: what can be bound, core/post-meta's raw values, pagesco/book</td></tr>
+<tr><td class="t">20m</td><td>Start the lesson project: single-book.html, Steps 1 and 2</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Mental model to say</div>
+<p>"A static block is a printed card: the shop prints it once, and it says the same thing until someone reprints it. A dynamic block is a station's departure board: what is stored is only 'show the next trains from platform 2', and the board looks up the timetable whenever someone glances at it. The post keeps the instruction, the comment; your render.php is the board."</p>
+<p>Then the comparison on the board, from the lesson's table: stored = <b>comment + HTML</b> vs <b>comment only</b>; HTML made by <b>save(), once</b> vs <b>render.php, every view</b>; changing markup = <b>a deprecation</b> vs <b>edit render.php</b>; plugin off = <b>HTML stays</b> vs <b>nothing shows</b>.</p>
+<p>Before demo B, the third picture: "A bound block is a shelf label with an empty slot. The design is fixed in the template; the slot says 'price of the book on this shelf', and a clerk, the source, fills it every time someone looks."</p>
+</div>
+<div class="blk"><div class="h">Live demo A: render.php (you type, they follow)</div>
+<p>From the site as Lesson 6.2 left it. Learners type render.php themselves (it is the PHP of today); the other four files they paste.</p>
+<ol class="steps">
+  <li><b>Stored HTML goes stale (4m).</b> "Put Dune on sale, as a bookseller would, and compare the front page with the book club post."
+<pre class="code">wp post meta update 30 pagesco_price 12.99
+curl -s http://localhost:8080/ | grep -A 10 '&gt;Dune&lt;' | grep -o '\$[0-9.]*'
+curl -s http://localhost:8080/book-club-dune/ | grep -o 'pagesco-book__price"&gt;[^&lt;]*'</pre>
+<pre class="out">Success: Updated custom field 'pagesco_price'.
+$14.99
+pagesco-book__price"&gt;$12.99</pre>
+Lesson 3.3's pattern still says $14.99: it was typed into a file. The shortcode reads the meta on every view. A static block is like the pattern; today's Book List is like the shortcode. Put the price back (<code class="inline">wp post meta update 30 pagesco_price 14.99</code>).</li>
+  <li><b>The Book List's files and the build (6m).</b> In the room, skip create-block (it downloads its template on venue Wi-Fi): create src/blocks/book-list/ in VS Code and save the lesson's five files: block.json (three settings, no source), render.php (read it top to bottom, it is Module 4 and 5), style.scss, the first edit.js (ServerSideRender only) and index.js. Build and list the build folder:
+<pre class="code">npm run build &gt; /dev/null
+ls build/blocks/book-list</pre>
+<pre class="out">block.json
+index.asset.php
+index.js
+render.php
+style-index-rtl.css
+style-index.css</pre>
+render.php was COPIED into build/: the copy WordPress runs (Mistake 2's trap). No PHP change, the manifest registers it:
+<pre class="code">wp eval '$type = WP_Block_Type_Registry::get_instance()-&gt;get_registered( "pagesco/book-list" );
+echo $type-&gt;title, ": ", $type-&gt;is_dynamic() ? "dynamic" : "static", "\n";
+echo implode( ", ", array_keys( $type-&gt;get_attributes() ) ), "\n";'</pre>
+<pre class="out">Book List: dynamic
+count, genre, orderBy, lock, metadata, className, style, backgroundColor, textColor, fontSize</pre></li>
+  <li><b>A page of comments (5m).</b> A page "List test" with two Book Lists (one as inserted, one Fantasy by price). The Code editor shows only this:
+<pre class="code">&lt;!-- wp:pagesco/book-list /--&gt;
+
+&lt;!-- wp:pagesco/book-list {"genre":"fantasy","orderBy":"price"} /--&gt;</pre>
+And View Source shows two finished lists (8 items: six books, the Books per list default, then the two fantasy books cheapest first):
+<pre class="out">&lt;ul class="wp-block-pagesco-book-list"&gt;
+			&lt;li class="wp-block-pagesco-book-list__item"&gt;&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/1984/"&gt;1984&lt;/a&gt; by George Orwell, &lt;span class="pagesco-book__price"&gt;$9.99&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
+			&lt;li class="wp-block-pagesco-book-list__item"&gt;&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/animal-farm/"&gt;Animal Farm&lt;/a&gt; by George Orwell, &lt;span class="pagesco-book__price"&gt;$8.49&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
+			&lt;li class="wp-block-pagesco-book-list__item"&gt;&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/brave-new-world/"&gt;Brave New World&lt;/a&gt; by Aldous Huxley, &lt;span class="pagesco-book__price"&gt;$9.49&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
+			&lt;li class="wp-block-pagesco-book-list__item"&gt;&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/dune/"&gt;Dune&lt;/a&gt; by Frank Herbert, &lt;span class="pagesco-book__price"&gt;$14.99&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
+			&lt;li class="wp-block-pagesco-book-list__item"&gt;&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/fahrenheit-451/"&gt;Fahrenheit 451&lt;/a&gt; by Ray Bradbury, &lt;span class="pagesco-book__price"&gt;$10.49&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
+			&lt;li class="wp-block-pagesco-book-list__item"&gt;&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/lord-of-the-rings/"&gt;Lord of the Rings&lt;/a&gt; by J.R.R. Tolkien, &lt;span class="pagesco-book__price"&gt;$15.99&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
+	&lt;/ul&gt;
+...</pre>
+Shown here up to the end of the first list. Every item is Lesson 5.5's BookShortcode::render(), escaped where printed: the 5.5 promise kept.</li>
+  <li><b>The shop changes its mind (3m).</b> "Books per list: 4." From the container (the whole option as JSON, Lesson 5.4's Common Mistake 3), count the items, delete the option again:
+<pre class="code">wp option update pagesco_books_settings '{"notice_extra":"Open until 9 p.m. on Thursdays.","show_events_link":true,"books_per_page":4,"events_limit":5}' --format=json
+curl -s http://localhost:8080/list-test/ | grep -c '&lt;li class="wp-block-pagesco-book-list__item'
+wp option delete pagesco_books_settings</pre>
+<pre class="out">Success: Updated 'pagesco_books_settings' option.
+6
+Success: Deleted 'pagesco_books_settings' option.</pre>
+Four plus two: the first list followed the setting, nobody touched the page. That is why count has no default in block.json.</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b>Reading an attribute that has no default</b> (<code class="inline">$attributes['count']</code>): a Warning INSIDE the page content, with curly quotes, naming build/.../render.php. Coach: "Which attributes get a default from block.json? Only the ones that declare one." (The lab's TODO 1, the debug handout.)</li>
+  <li><b>Fixing the file the message names</b>, build/blocks/book-list/render.php. Coach: "What does the next build do to build/?" It empties it and copies src/ again. Edit src/, build (or keep <code class="inline">npm start</code> running).</li>
+  <li><b>A binding that shows its fallback.</b> Coach with three questions: is the key exactly one of BookMeta::fields()? Is it registered with show_in_rest and without an underscore? Does a custom source declare <code class="inline">uses_context</code>? (Self-check Q10, Q11; the <code class="inline">core_sources</code> lab.)</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<p><b>Folder:</b> <code class="inline">labs/module-12/l6_3-dynamic-blocks/next_events_starter/</code>, a small plugin whose block <code class="inline">pagesco/next-events</code> lists the next events from Lesson 5.5's table; your reference is <code class="inline">labs/module-12/l6_3-dynamic-blocks/next_events_solution/</code>. It practices render.php on data the lesson did not use: an attribute without a default that falls back to a setting (Events to show), a clamp, a query through the plugin's own class, <code class="inline">get_block_wrapper_attributes()</code> and escaping. It registers block.json from PHP and has no editor script, so it needs no build: the test renders it with do_blocks(), exactly as a page view would.</p>
+<ul class="tick">
+  <li><b>Install and run as shipped (4m).</b> <code class="inline">cp -r labs/module-12/l6_3-dynamic-blocks/next_events_starter wordpress/wp-content/plugins/pagesco-next-events</code>, <code class="inline">wp plugin activate pagesco-next-events</code>, <code class="inline">cp labs/module-12/l6_3-dynamic-blocks/test_next_events.php wordpress/</code>, <code class="inline">wp eval-file --use-include test_next_events.php</code>. Every block prints its TODO paragraph.</li>
+  <li><b>TODOs 1 to 4 (12m),</b> in the copy in wordpress/wp-content/plugins/pagesco-next-events/block/render.php. Circulate for <code class="inline">$attributes['count']</code> without <code class="inline">isset()</code> (the Warning lands in the output: it is the lesson's Mistake 1 made for real) and for <code class="inline">echo $event-&gt;title</code> without <code class="inline">esc_html()</code>.</li>
+  <li><b>Expected when done</b> (the solution):</li>
+</ul>
+<pre class="out">Plugin 'pagesco-next-events' activated.
+Success: Activated 1 of 1 plugins.
+== no attributes
+&lt;ul class="wp-block-pagesco-next-events"&gt;
+			&lt;li&gt;&lt;time datetime="2027-11-04T19:00"&gt;Nov 4&lt;/time&gt; Book club: Dune&lt;/li&gt;
+			&lt;li&gt;&lt;time datetime="2027-11-06T10:30"&gt;Nov 6&lt;/time&gt; Story time: The Hobbit&lt;/li&gt;
+			&lt;li&gt;&lt;time datetime="2027-11-11T18:30"&gt;Nov 11&lt;/time&gt; An evening with Ana Ruiz&lt;/li&gt;
+			&lt;li&gt;&lt;time datetime="2027-11-18T19:30"&gt;Nov 18&lt;/time&gt; Poetry open mic&lt;/li&gt;
+			&lt;li&gt;&lt;time datetime="2027-12-02T19:00"&gt;Dec 2&lt;/time&gt; Book club: Fahrenheit 451&lt;/li&gt;
+	&lt;/ul&gt;
+== 2 at the Café
+&lt;ul class="wp-block-pagesco-next-events"&gt;
+			&lt;li&gt;&lt;time datetime="2027-11-11T18:30"&gt;Nov 11&lt;/time&gt; An evening with Ana Ruiz&lt;/li&gt;
+			&lt;li&gt;&lt;time datetime="2027-11-18T19:30"&gt;Nov 18&lt;/time&gt; Poetry open mic&lt;/li&gt;
+	&lt;/ul&gt;
+== rooftop
+&lt;p class="wp-block-pagesco-next-events"&gt;No events at this location yet.&lt;/p&gt;
+count 99: 6 events</pre><ul class="tick">
+  <li><b>Debrief (4m):</b> "Where did <code class="inline">class="wp-block-pagesco-next-events"</code> come from?" (get_block_wrapper_attributes().) "Why does count 99 show six?" (The clamp allows ten; the table has six.) "What would you need to insert this block in the editor?" (An editor script, built as in Lesson 6.1.) Then <code class="inline">wp plugin deactivate pagesco-next-events</code> and <code class="inline">rm -r</code> the folder.</li>
+  <li><b>Fast finishers:</b> <code class="inline">labs/module-12/l6_3-dynamic-blocks/core_sources_starter.php</code> (what core/post-meta and core/post-data return for bound paragraphs, rendered with a made-up context), then <code class="inline">labs/module-12/l6_3-dynamic-blocks/debug_genre_counts.php</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Live demo B: block bindings (you type, they follow)</div>
+<ol class="steps">
+  <li><b>What can be bound (3m).</b> "Core blocks can show data they do not store."
+<pre class="code">wp eval 'foreach ( array( "core/paragraph", "core/heading", "core/list-item", "core/image", "core/button" ) as $name ) { echo $name, ": ", implode( ", ", get_block_bindings_supported_attributes( $name ) ), "\n"; }'</pre>
+<pre class="out">core/paragraph: content
+core/heading: content
+core/list-item: content
+core/image: id, url, title, alt, caption
+core/button: url, text, linkTarget, rel</pre>
+List items arrived in 7.1 (the lesson's version note: on 6.8 to 7.0 they print their fallback). Core's four sources:
+<pre class="code">wp eval 'foreach ( get_all_registered_block_bindings_sources() as $name =&gt; $source ) { echo $name, " (", $source-&gt;label, ")\n"; }'</pre>
+<pre class="out">core/pattern-overrides (Pattern Overrides)
+core/post-data (Post Data)
+core/post-meta (Post Meta)
+core/term-data (Term Data)</pre></li>
+  <li><b>core/post-meta on book pages (5m).</b> Create the lesson's first single-book.html (an author paragraph and three list items bound to <code class="inline">core/post-meta</code>) and view Gatsby's page:
+<pre class="out">&lt;main id="wp--skip-link--target" class="wp-block-group has-global-padding is-layout-constrained wp-block-group-is-layout-constrained" style="padding-top:var(--wp--preset--spacing--medium);padding-bottom:var(--wp--preset--spacing--large)"&gt;
+	&lt;h1 class="wp-block-post-title"&gt;The Great Gatsby&lt;/h1&gt;
+
+	&lt;p class="pagesco-book-author wp-block-paragraph"&gt;F. Scott Fitzgerald&lt;/p&gt;
+
+	&lt;ul class="wp-block-list pagesco-book-facts"&gt;
+	&lt;li&gt;8.99&lt;/li&gt;
+
+	&lt;li&gt;&lt;/li&gt;
+
+	&lt;li&gt;180&lt;/li&gt;
+	&lt;/ul&gt;
+
+&lt;/main&gt;</pre>
+Binding works and is not formatting: <code class="inline">8.99</code> with no dollar sign, an EMPTY item for the false stock, raw pages. core/post-meta reads only keys registered with show_in_rest and without a leading underscore.</li>
+  <li><b>The shop's own source (7m).</b> Save the lesson's <code class="inline">src/BookBindings.php</code>. Read <code class="inline">uses_context</code>, the visibility check and the five fields aloud. Then register it as the fourteenth feature and list the sources:
+<pre class="code">sed -i '/\t\t\tBlocks::class,/a\			BookBindings::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+grep -c "::class," wp-content/plugins/pagesco-books/src/Plugin.php
+wp eval 'foreach ( get_all_registered_block_bindings_sources() as $name =&gt; $source ) { echo $name, " (", $source-&gt;label, ")\n"; }'</pre>
+<pre class="out">14
+core/pattern-overrides (Pattern Overrides)
+core/post-data (Post Data)
+core/post-meta (Post Meta)
+core/term-data (Term Data)
+pagesco/book (Book details)</pre>
+No build: PHP only. The project rewrites single-book.html with <code class="inline">pagesco/book</code> for the price and the facts.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Start the lesson project</div>
+<p>The lesson project is <b>Book Pages with Live Details</b>: single-book.html with the author on core/post-meta, the price and four facts on pagesco/book, and the New Arrivals variation of the Book List underneath. In the room: Steps 1 and 2 (20 minutes).</p>
+<ul class="tick">
+  <li>Step 1: replace single-book.html with the lesson's project version (paste it; read the <code class="inline">metadata.bindings</code> comments aloud with the room).</li>
+  <li>Step 2: View Source of /books/dune/ and of Gatsby's facts. What the projector shows for Gatsby:</li>
+</ul>
+<pre class="out">&lt;ul class="wp-block-list pagesco-book-facts"&gt;
+	&lt;li&gt;Sold out&lt;/li&gt;
+
+	&lt;li&gt;&lt;a href="http://localhost:8080/genre/classic/" rel="tag"&gt;Classic&lt;/a&gt;, &lt;a href="http://localhost:8080/genre/fiction/" rel="tag"&gt;Fiction&lt;/a&gt;&lt;/li&gt;
+
+	&lt;li&gt;180 pages&lt;/li&gt;
+
+	&lt;li&gt;First published in 1925&lt;/li&gt;
+	&lt;/ul&gt;</pre><ul class="tick">
+  <li><b>Done in the room</b> = Dune shows $14.99, In stock, two genre links, 412 pages and 1965, then three new arrivals. (The New Arrivals comment needs the Book List block, which the demo built.)</li>
+  <li><b>Goes home:</b> Step 3 (put Dune on sale and watch both pages follow, delete List test, the checks), the variations section and build, the editor section with the List settings panel.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<p>Ask these out loud during the demos and the lab:</p>
+<ul class="tick">
+  <li>What does a page with a Book List store? <b>Answer:</b> only the comment with the attributes; the HTML is made on every view.</li>
+  <li>Why does render.php use <code class="inline">get_posts()</code> and not a Loop with <code class="inline">the_post()</code>? <b>Answer:</b> it leaves the global $post alone, so a block in the middle of someone else's Loop breaks nothing; and it loads the meta in one query.</li>
+  <li>core/post-meta or pagesco/book for the price? <b>Answer:</b> pagesco/book: core/post-meta prints the raw 8.99; the shop's source formats it.</li>
+  <li>When does variations.php run? <b>Answer:</b> only when something asks for the variations (the editor, through REST), not on page views (lesson quiz Q5).</li>
+</ul>
+<p>Workbook self-check, items Q7 to Q12 (learners do them at the end of the block or at home).</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q7</b> <span data-sc="7">C) Run <code class="inline">npm run build</code> (render.php is copied into build/), then nothing: every page follows on its next view</span>; <b>Q8</b> <span data-sc="8"><code class="inline">4</code></span>; <b>Q9</b> <span data-sc="9">D) get_block_wrapper_attributes() returns attributes that are already escaped (class and style from the supports)</span>; <b>Q10</b> <span data-sc="10">D) Nothing: an empty list item</span>; <b>Q11</b> <span data-sc="11">A) Its fallback text, with no error</span>; <b>Q12</b> <span data-sc="12"><code class="inline">First published in 1945</code></span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> learners who did not reach the Book List type only render.php and copy the rest; in the lab, give them the solution's line for TODO 1 and let them do TODOs 2 to 4. For the bindings demo, the board table: <b>source → args → value or null</b>.</p>
+<p><b>Stretch:</b> <code class="inline">core_sources_starter.php</code> and <code class="inline">debug_genre_counts.php</code>; the lesson's Exercise 2 (an ISBN field that stays quiet) and Exercise 3 (only books in stock); the Bonus Challenge (registerBlockBindingsSource() in the editor).</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Closing</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Exit ticket (3 questions, no notes, 4 minutes)</div>
+<p>Put the three questions on the slide. Learners answer in the workbook's Exit Ticket box or on a sticky note. Sort them before Session 13: question 2's pile tells you whether the checkpoint's Part C (blocks) needs a five-minute review in the warm-up.</p>
+<ol class="steps">
+  <li>A static block's title and heading level: where is each stored? <b>Answer:</b> the title in the saved HTML (found by its selector), the heading level in the block comment (only when it differs from its default).</li>
+  <li>Name two things a dynamic block's render.php must do with its attributes. <b>Answer:</b> treat them as input (isset or a default for optional ones, cast, clamp, sanitize) and escape everything it prints; plus starting the wrapper with get_block_wrapper_attributes().</li>
+  <li>A bound paragraph shows its fallback text on a book page. Name two causes. <b>Answer:</b> the meta key is wrong, not registered with show_in_rest or protected (core/post-meta), or a custom source lacks uses_context or returns null.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Homework (about 2 to 3 hours)</div>
+<ul class="tick">
+  <li><b>Finish both lesson projects.</b> 6.2: Steps 2 and 3 (and Step 1 if the block was not ready). 6.3: Step 3, plus the editor section (List settings) and the variations section with its build, so New Arrivals is in the inserter.</li>
+  <li><b>Lesson exercises.</b> 6.2: Exercises 1 and 2 (the HTML API, register_block_type_args); Exercise 3 is a stretch. 6.3: Exercises 1 and 2 (a binding without a browser, the ISBN field); Exercise 3 is a stretch.</li>
+  <li><b>Both Quick Quizzes</b> on the lesson pages (five questions each; answers are in the Answer Key).</li>
+  <li><b>Journal:</b> both entries (where every piece of the card's data lives; sorting the site's book data into typed, rendered and bound).</li>
+  <li><b>Before the Next Lesson (from both lessons):</b> the Staff picks card valid in the editor, Card test and List test gone, <code class="inline">npm run build</code> run on the final files; refresh JavaScript getters and <code class="inline">event.preventDefault()</code> for Lesson 6.4.</li>
+  <li><b>Checkpoint 2 is in Session 13</b> (Modules 5 and 6, 30 minutes, open notes): reread Lessons 5.2 to 5.5 and today's two lessons; bring a site at the end of Lesson 6.3.</li>
+  <li><b>Optional:</b> <code class="inline">labs/module-12/l6_2-static-blocks/card_price_starter/</code>, <code class="inline">labs/module-12/l6_3-dynamic-blocks/core_sources_starter.php</code> and both debug handouts.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Bring list for Session 13</div>
+<ul class="tick">
+  <li>A site at the end of Lesson 6.3 (book pages with live details, the Book List with its variations) and a working <code class="inline">npm run build</code>.</li>
+  <li>The project folder with <code class="inline">labs/</code> (Session 13 adds <code class="inline">labs/module-13/</code>, including the checkpoint, handed out in the room).</li>
+  <li>pagesco-plan.txt, the journal and the workbook; Maria's and Devon's passwords are the course's (maria-pass, devon-pass), Lesson 7.1 creates application passwords from them.</li>
+</ul>
+</div>
+
+  <div class="sec"><h2>If You Run Long or Short</h2><span class="rule"></span></div>
+<div class="blk warn"><div class="h">Running long: what to protect and what to cut first</div>
+<ul class="tick">
+  <li><b>Protect:</b> the empty <code class="inline">array ()</code> from PHP; the validation error and its deprecation; render.php with the setting; core/post-meta next to pagesco/book.</li>
+  <li><b>Cut first (saves 5m):</b> the supports step of the 6.2 demo; the workbook's worked example shows the supports and the style engine.</li>
+  <li><b>Cut second (saves 15m):</b> the 6.2 project start: Step 1 goes home with Steps 2 and 3.</li>
+  <li><b>Cut third (saves 4m):</b> the stale-price step of the 6.3 demo: tell the story, show the lesson's output.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Running short: what to add</div>
+<ul class="tick">
+  <li>Lesson 6.2's Exercise 1 live: the HTML API reads the Hobbit card's title and link (<code class="inline">WP_HTML_Processor::create_fragment()</code>, <code class="inline">next_token()</code>).</li>
+  <li>Lesson 6.3's ServerSideRender request with curl as admin: the block-renderer route returns render.php's HTML as JSON; then an orderBy outside the enum gets a 400.</li>
+  <li>Run <code class="inline">debug_genre_counts.php</code> for everyone and fix it together; the silent bug (a reversed clamp) is the best discussion.</li>
+</ul>
+</div>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 12 · Facilitator Guide · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

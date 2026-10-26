@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Key: Session 14</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">answers &amp; solutions · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Answer Key</div>
+    <h1>Session 14: Custom Endpoints, External APIs and Cron</h1>
+    <p class="sub">Answers and reasoning for every Session 14 item: the warm-up, both self-checks, the predict-then-run items, the lab reference outputs, the lesson pages' own quizzes and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Session <b>14</b></span>
+      <span class="chip"><b>12</b> self-check items</span>
+      <span class="chip">Confidential</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Warm-up: Lessons 6.4 and 7.1</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>W1.</b> <code class="inline">9</code> of eleven: the server evaluated data-wp-bind--hidden for each book (two fantasy books stay visible).</li>
+  <li><b>W2.</b> It calls event.preventDefault(); since 6.8 actions may run after the event, too late to stop the link.</li>
+  <li><b>W3.</b> The role: 403 means "I know you, and no" (Devon on Maria's book). 401 would be the credentials.</li>
+  <li><b>W4.</b> A HEAD request (<code class="inline">curl -I</code>) and the header: <code class="inline">X-WP-TotalPages: 3</code> on the projector site.</li>
+  <li><b>W5.</b> apiFetch sends Maria's cookie AND the page's wp_rest nonce; a script has neither, so it needs an application password.</li>
+</ol>
+<p>On the projector site (after Lesson 7.1):</p>
+<pre class="code">curl -s 'http://localhost:8080/find-a-book/?genre=fantasy' | grep -c '&lt;li hidden'</pre><pre class="out">9</pre><pre class="code">curl -s -I 'http://localhost:8080/wp-json/wp/v2/books?per_page=5' | grep -i '^X-WP-TotalPages'</pre><pre class="out">X-WP-TotalPages: 3</pre>
+  <div class="sec"><h2>7.2 · Custom REST Endpoints: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">A route registers <code class="inline">'methods' =&gt; WP_REST_Server::CREATABLE</code>. Which HTTP method does that endpoint answer?</div><div class="opts"><div class="opt">A) GET</div><div class="opt correct">B) POST</div><div class="opt">C) POST, PUT and PATCH</div><div class="opt">D) DELETE</div></div><div class="why"><b>Why:</b> READABLE is GET, CREATABLE POST, EDITABLE 'POST, PUT, PATCH', DELETABLE DELETE. The constants say what you mean; the events route uses READABLE and CREATABLE on one route.<br><b>A</b> is wrong: That is READABLE.<br><b>C</b> is wrong: That is EDITABLE.<br><b>D</b> is wrong: That is DELETABLE.</div></div>
+  <div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">On the course site after Lesson 7.2 (Books per list = 6, eleven books): what does this print?</div><pre class="code">wp eval '$r = rest_do_request( new WP_REST_Request( "GET", "/pagesco/v1/books" ) ); echo $r-&gt;get_status(), " ", count( $r-&gt;get_data() ), " ", $r-&gt;get_headers()["X-WP-TotalPages"], "\n";'</pre><div class="opts"><div class="opt correct"><code class="inline">200 6 2</code></div></div><div class="why"><b>Why:</b> rest_do_request() runs the route without HTTP: the same validation, permission check and callback. per_page defaults to the Books per list setting (6), so six books and two pages.</div></div>
+  <div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">An anonymous client POSTs to /pagesco/v1/events WITHOUT a title. Which answer does it get first?</div><div class="opts"><div class="opt correct">A) 400 rest_missing_callback_param: arguments are validated before the permission check</div><div class="opt">B) 401 rest_forbidden: the permission check comes first</div><div class="opt">C) 500: the callback fails on a missing title</div><div class="opt">D) 201: the event is created without a title</div></div><div class="why"><b>Why:</b> The order is validate, sanitize, permission, callback. A missing required argument stops the request at the first desk, before anyone asks who the client is (the predict item P2 shows it with rest_do_request()).<br><b>B</b> is wrong: Only once the arguments are valid.<br><b>C</b> is wrong: The callback never runs.<br><b>D</b> is wrong: required stops it.</div></div>
+  <div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">Maria sends a bad starts_at AND a negative capacity. The answer names only starts_at. Why?</div><div class="opts"><div class="opt">A) capacity is not validated</div><div class="opt">B) The schema stops at the first error it finds in alphabetical order</div><div class="opt">C) A negative capacity is turned into 0</div><div class="opt correct">D) validate_callbacks run first; the schema checks of the other arguments run in the sanitizing step, which a failed validation never reaches</div></div><div class="why"><b>Why:</b> Lesson 7.2, Step 3: starts_at has a validate_callback; capacity's minimum is checked by the schema during sanitizing. Clients should expect errors one round at a time.<br><b>A</b> is wrong: Fix the date and the capacity error comes next.<br><b>B</b> is wrong: There is no alphabetical rule.<br><b>C</b> is wrong: The schema refuses it; nothing is coerced.</div></div>
+  <div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">Which permission_callback fits a route that DELETES events?</div><div class="opts"><div class="opt">A) '__return_true': the callback checks the ID</div><div class="opt">B) 'is_user_logged_in'</div><div class="opt correct">C) A check of <code class="inline">current_user_can( 'edit_others_posts' )</code> that returns a WP_Error with rest_authorization_required_code()</div><div class="opt">D) None: DELETE routes are protected by WordPress</div></div><div class="why"><b>Why:</b> Every write needs a capability check as specific as the job; rest_authorization_required_code() gives 401 to nobody and 403 to a logged-in user who may not. The lesson's Exercise 3 reuses can_manage_events().<br><b>A</b> is wrong: Anyone on the internet could delete events.<br><b>B</b> is wrong: Any subscriber is logged in.<br><b>D</b> is wrong: WordPress protects nothing you do not check (and warns when the key is missing).</div></div>
+  <div class="q" data-sc="6" data-kind="short"><div class="qn">Q6</div><div class="qt"><code class="inline">GET /pagesco/v1/books/14</code> asks for the Events page (a page, not a book). Why does the answer say only "No book was found with that ID." and not "that is a page"?</div><div class="opts"><div class="opt correct">An endpoint must not tell visitors what exists behind an ID they may not see: drafts, private books and other post types all get the same 404</div></div><div class="why"><b>Why:</b> Leaking existence is information disclosure. get_book() requires a published book and answers one 404 for everything else.</div></div>
+
+  <div class="sec"><h2>7.2 · Custom REST Endpoints: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it.</div><pre class="code">curl -s 'http://localhost:8080/wp-json/pagesco/v1/books?per_page=0'; echo</pre><div class="opts"><div class="opt correct"><pre class="out">{"code":"rest_invalid_param","message":"Invalid parameter(s): per_page","data":{"status":400,"params":{"per_page":"per_page must be between 1 (inclusive) and 100 (inclusive)"},"details":{"per_page":{"code":"rest_out_of_bounds","message":"per_page must be between 1 (inclusive) and 100 (inclusive)","data":null}}}}</pre></div></div><div class="why"><b>Why:</b> per_page has a minimum of 1: the schema refuses 0 with 400 before the callback runs, with the same message core's routes use.</div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval '$r = rest_do_request( new WP_REST_Request( "POST", "/pagesco/v1/events" ) ); echo $r-&gt;get_status(), " ", $r-&gt;get_data()["code"], "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">400 rest_missing_callback_param</pre></div></div><div class="why"><b>Why:</b> Validation comes before the permission check: the missing required title stops the request at the first desk (400 rest_missing_callback_param), although nobody is logged in.</div></div>
+
+  <div class="sec"><h2>7.3 · External APIs, Transients &amp; WP-Cron: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">The supplier's host does not resolve, and code calls <code class="inline">wp_remote_retrieve_body( $response )</code> on the WP_Error. What does it get?</div><div class="opts"><div class="opt">A) A fatal error</div><div class="opt">B) null and a Warning</div><div class="opt">C) The error message</div><div class="opt correct">D) An empty string</div></div><div class="why"><b>Why:</b> The wp_remote_retrieve_*() helpers accept a WP_Error and return '' (or 0) instead of failing: safe to call, but '' decodes to null, so check is_wp_error() first anyway.<br><b>A</b> is wrong: That is why the helpers exist.<br><b>B</b> is wrong: No message at all.<br><b>C</b> is wrong: That is $response->get_error_message().</div></div>
+  <div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt">What does this print, for a transient nobody ever set?</div><pre class="code">wp eval 'var_dump( get_transient( "pagesco_books_nothing_here" ) );'</pre><div class="opts"><div class="opt correct"><code class="inline">bool(false)</code></div></div><div class="why"><b>Why:</b> get_transient() returns false for "missing or expired". That is why a cache must never STORE false (it would look missing), and why the project stores an array even for a failure.</div></div>
+  <div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">A plugin fetches a book cover from a URL an editor types into a field. Which function?</div><div class="opts"><div class="opt correct">A) <code class="inline">wp_safe_remote_get()</code>: it refuses private networks and odd ports</div><div class="opt">B) <code class="inline">wp_remote_get()</code> with a short timeout</div><div class="opt">C) <code class="inline">file_get_contents()</code></div><div class="opt">D) <code class="inline">wp_remote_head()</code></div></div><div class="why"><b>Why:</b> A URL from a user could point at http://192.168.1.1/ or a cloud metadata service: server-side request forgery. The safe variants refuse those before connecting; the site's own host stays allowed.<br><b>B</b> is wrong: A timeout does not stop the request reaching an internal address.<br><b>C</b> is wrong: It bypasses the HTTP API's protections and filters.<br><b>D</b> is wrong: It is just a HEAD request.</div></div>
+  <div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">You want to run the daily sync now, while developing, without moving tomorrow's 03:00 run. What do you type?</div><div class="opts"><div class="opt">A) <code class="inline">wp cron event run pagesco_books_daily_sync</code></div><div class="opt correct">B) <code class="inline">wp eval 'do_action( "pagesco_books_daily_sync" );'</code></div><div class="opt">C) <code class="inline">wp cron test</code></div><div class="opt">D) <code class="inline">curl -s http://localhost:8080/wp-cron.php</code></div></div><div class="why"><b>Why:</b> WP-CLI's event run reschedules a recurring event from now (a 03:00 job run at 10:15 moves to 10:15); firing the hook yourself runs the work and leaves the schedule alone (Lesson 7.3's warning box).<br><b>A</b> is wrong: It moves the schedule.<br><b>C</b> is wrong: It only checks the loopback.<br><b>D</b> is wrong: It runs what is DUE; tomorrow's 03:00 is not.</div></div>
+  <div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">Where does the supplier's API key belong?</div><div class="opts"><div class="opt">A) In the plugin's Client class, as a constant</div><div class="opt">B) In a transient, refreshed daily</div><div class="opt correct">C) In wp-config.php (or an environment variable it reads), on each site</div><div class="opt">D) In the REST API response, for the JavaScript</div></div><div class="why"><b>Why:</b> A key in code ends up in Git, backups and every copy of the plugin, and the live site needs a different one. <code class="inline">wp config set</code> writes the constant; the live site gets its own.<br><b>A</b> is wrong: Code is shared; secrets are not.<br><b>B</b> is wrong: Transients can vanish at any time.<br><b>D</b> is wrong: Never send secrets to browsers.</div></div>
+  <div class="q" data-sc="12" data-kind="short"><div class="qn">Q12</div><div class="qt">On the course site after Lesson 7.3: what does this print?</div><pre class="code">wp cron event list --hook=pagesco_books_daily_sync --fields=hook,recurrence</pre><div class="opts"><div class="opt correct"><code class="inline">| pagesco_books_daily_sync | 1 day      |</code></div></div><div class="why"><b>Why:</b> Exactly one daily event: Activator schedules it once, guarded by wp_next_scheduled(), and deactivation clears it. Two rows here would be Common Mistake 2 (scheduling on every request).</div></div>
+
+  <div class="sec"><h2>7.3 · External APIs, Transients &amp; WP-Cron: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'var_dump( is_wp_error( wp_remote_get( "http://localhost:8080/supplier-sandbox/v1/availability" ) ) );'</pre><div class="opts"><div class="opt correct"><pre class="out">bool(false)</pre></div></div><div class="why"><b>Why:</b> The sandbox answers 401 with JSON, which is a perfectly good HTTP response: not a WP_Error. Only the status code tells you it failed.</div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'echo wp_safe_remote_get( "http://10.0.0.1/" )-&gt;get_error_message(), "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">A valid URL was not provided.</pre></div></div><div class="why"><b>Why:</b> wp_safe_remote_get() refuses private networks before connecting: "A valid URL was not provided." (the site's own host stays allowed).</div></div>
+
+  <div class="sec"><h2>Lab Reference Solutions</h2><span class="rule"></span></div>
+<p>Every output below is real: the lab files run exactly as <code class="inline">labs/check_labs.py</code> runs them, on a fresh course site at the state each file declares (Lesson 7.2's labs at <code class="inline">after:lesson_23</code>, Lesson 7.3's at <code class="inline">after:lesson_24</code>), copied into the WordPress root and run with <code class="inline">wp eval-file --use-include</code> (PHP labs) or <code class="inline">sh</code> in the WP-CLI container (shell labs); folder labs installed and activated first.</p>
+<div class="blk lab"><div class="h">Lab 7.2-A (guided): labs/module-14/l7_2-custom-endpoints/opening_hours_starter/ → opening_hours_solution/ with test_opening_hours.sh</div>
+<p>With the starter's plugin:</p>
+<pre class="out">Plugin 'pagesco-opening-hours' activated.
+Success: Activated 1 of 1 plugins.
+== Saturday
+{"todo":"TODO: the hours"}
+== Sunday
+{"todo":"TODO: the hours"}
+== A day that does not exist
+{"todo":"TODO: the hours"}
+== The whole week: how many days, and Thursday
+0
+(no Thursday)
+== What OPTIONS says about the argument
+(no day argument)</pre><p>With the solution's:</p>
+<pre class="out">Plugin 'pagesco-opening-hours' activated.
+Success: Activated 1 of 1 plugins.
+== Saturday
+{"day":"saturday","closed":false,"opens":"10:00","closes":"16:00"}
+== Sunday
+{"day":"sunday","closed":true}
+== A day that does not exist
+{"code":"rest_invalid_param","message":"Invalid parameter(s): day","data":{"status":400,"params":{"day":"day is not one of monday, tuesday, wednesday, thursday, friday, saturday, and sunday."},"details":{"day":{"code":"rest_not_in_enum","message":"day is not one of monday, tuesday, wednesday, thursday, friday, saturday, and sunday.","data":null}}}}
+== The whole week: how many days, and Thursday
+7
+{"day":"thursday","closed":false,"opens":"9:00","closes":"21:00"}
+== What OPTIONS says about the argument
+"day":{"description":"One day of the week, in lowercase English. Without it: the whole week."</pre><p>Reading it: the 400 for funday comes from the enum, not from the learner's code; without a default the argument is null when not sent, which means the whole week; Sunday is <code class="inline">closed: true</code> with no times (a client tests the flag); OPTIONS documents the argument. <code class="inline">__return_true</code> is right: opening hours are public. Remove the plugin afterwards.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 7.2-B: labs/module-14/l7_2-custom-endpoints/schema_rules_starter.php → schema_rules_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">price = "14.99"                   TODO
+price = "free"                    TODO
+in_stock = "true"                 TODO
+in_stock = "maybe"                TODO
+per_page = "500"                  TODO
+orderby = "pages"                 TODO
+genres = "fantasy,classic"        TODO
+title = ""                        TODO
+starts_at = "2027-12-16T19:00:00" TODO
+starts_at = "16/12/2027 7pm"      TODO</pre><p>The solution prints:</p>
+<pre class="out">price = "14.99"                   yes: 14.99
+price = "free"                    no: price is not of type number.
+in_stock = "true"                 yes: true
+in_stock = "maybe"                no: in_stock is not of type boolean.
+per_page = "500"                  no: per_page must be between 1 (inclusive) and 100 (inclusive)
+orderby = "pages"                 no: orderby is not one of title, newest, and price.
+genres = "fantasy,classic"        yes: ["fantasy","classic"]
+title = ""                        no: title must be at least 1 character long.
+starts_at = "2027-12-16T19:00:00" yes: "2027-12-16T19:00:00"
+starts_at = "16/12/2027 7pm"      no: Invalid date.</pre><p>Reading it: query strings carry strings, and the schema turns "14.99" into a float and "true" into a boolean; "fantasy,classic" becomes a list; the messages are the ones clients get in data.params. A date-time format must be RFC 3339 (<code class="inline">2027-12-16T19:00:00</code>): the shop's own "2027-12-16 19:00" needs Lesson 7.2's validate_starts_at().</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-14/l7_2-custom-endpoints/debug_staff_picks_route.php (deliberately broken)</div>
+<p>As shipped, WordPress prints:</p>
+<pre class="out">Notice: Function register_rest_route was called &lt;strong&gt;incorrectly&lt;/strong&gt;. The REST API route definition for &lt;code&gt;pagesco/v1/picks&lt;/code&gt; is missing the required &lt;code&gt;permission_callback&lt;/code&gt; argument. For REST API routes that are intended to be public, use &lt;code&gt;__return_true&lt;/code&gt; as the permission callback. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 5.5.0.) in /var/www/html/wp-includes/functions.php on line 6260
+?limit=2   200 ["1984","Animal Farm"]
+Warning: Undefined array key "limit" in /var/www/html/debug_staff_picks_route.php on line 43
+(none)     200 ["1984","Animal Farm","Brave New World","Dune","Fahrenheit 451"]
+?limit=50  200 ["1984","Animal Farm","Brave New World","Dune","Fahrenheit 451","Lord of the Rings","Pride and Prejudice","The Catcher in the Rye","The Great Gatsby","The Hobbit","To Kill a Mockingbird"]</pre><ol class="steps">
+  <li><b>doing_it_wrong (route at line 20):</b> no permission_callback. Outside a REST request the Notice prints; inside one it would only be an X-WP-DoingItWrong header. Add <code class="inline">'permission_callback' =&gt; '__return_true'</code> (a public read).</li>
+  <li><b>Warning, line 43:</b> <code class="inline">get_query_params()</code> holds only what the client sent, so <code class="inline">limit</code> is missing without ?limit=; the default lives in the request's parameters: <code class="inline">$request['limit']</code>.</li>
+  <li><b>Silent, line 30:</b> <code class="inline">'sanitize_callback' =&gt; 'absint'</code> switches the schema off for limit, so 50 passes and all eleven books come back (Lesson 7.2, Mistake 2). Remove it (the type sanitizes), or add <code class="inline">'validate_callback' =&gt; 'rest_validate_request_arg'</code>.</li>
+</ol>
+<p>Fixed (all three), it prints:</p>
+<pre class="out">?limit=2   200 ["1984","Animal Farm"]
+(none)     200 ["1984","Animal Farm","Brave New World"]
+?limit=50  400 "rest_invalid_param"</pre><p>The fixed script is PICKS_FIXED in blocks_S14.py (it prints an error's code instead of the whole error).</p>
+</div>
+<div class="blk lab"><div class="h">Lab 7.3-A (guided): labs/module-14/l7_3-external-apis-cron/remote_answers_starter.php → remote_answers_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">genre=fantasy     pagesco_todo: TODO: ask and check the answer
+genre=romance     pagesco_todo: TODO: ask and check the answer
+books/99          pagesco_todo: TODO: ask and check the answer
+a web page        pagesco_todo: TODO: ask and check the answer
+shop.invalid      pagesco_todo: TODO: ask and check the answer</pre><p>The solution prints:</p>
+<pre class="out">genre=fantasy     2 books: The Hobbit, Lord of the Rings
+genre=romance     pagesco_remote_http_error (400): Invalid parameter(s): genre
+books/99          pagesco_remote_http_error (404): No book was found with that ID.
+a web page        pagesco_remote_bad_response: The answer is not JSON.
+shop.invalid      http_request_failed: cURL error 6: Could not resolve host: shop.invalid (Domain name not found)</pre><p>Reading it: the 400 and the 404 are normal responses with JSON bodies, turned into WP_Errors that keep the status; the About page is a 200 that is not JSON (the third check); only shop.invalid gives no answer at all, a WP_Error from the transport. Accept a status check of <code class="inline">200 !== $code</code> for this API.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 7.3-B: labs/module-14/l7_3-external-apis-cron/events_cache_starter.php → events_cache_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">View 1: 5 events, error "TODO: no cache yet", requests so far: 1
+View 2: 5 events, error "TODO: no cache yet", requests so far: 2
+View 3: 5 events, error "TODO: no cache yet", requests so far: 3
+After the failure, view 1: 0 events, error "TODO: no cache yet", requests so far: 4
+After the failure, view 2: 0 events, error "TODO: no cache yet", requests so far: 5
+rows left: 0</pre><p>The solution prints:</p>
+<pre class="out">View 1: 5 events, error "", requests so far: 1
+View 2: 5 events, error "", requests so far: 1
+View 3: 5 events, error "", requests so far: 1
+After the failure, view 1: 0 events, error "cURL error 7: Failed to connect", requests so far: 2
+After the failure, view 2: 0 events, error "cURL error 7: Failed to connect", requests so far: 2
+rows left: 0</pre><p>Reading it: one request for three views; after the simulated failure (pre_http_request answers instead of the network) the failure itself is cached for a minute, so the second view does not ask again; the value is always an array, never false; the cleanup leaves no rows. <code class="inline">global $pagesco_requests</code> is deliberate: WP-CLI runs the file inside a function.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 7.3-C: labs/module-14/l7_3-external-apis-cron/cron_plan_starter.sh → cron_plan_solution.sh</div>
+<p>As shipped:</p>
+<pre class="out">Events of pagesco_books_lab_job after three schedule calls: 0
++------+------------+
+| hook | recurrence |
++------+------------+
++------+------------+
+First run (site time): TODO
+Removed: 0 + 0
+Left: 0</pre><p>The solution prints:</p>
+<pre class="out">Events of pagesco_books_lab_job after three schedule calls: 1
++-----------------------+------------+
+| hook                  | recurrence |
++-----------------------+------------+
+| pagesco_books_lab_job | 12 hours   |
++-----------------------+------------+
+First run (site time): 04:30
++----------------------------+---------------+------+
+| hook                       | recurrence    | args |
++----------------------------+---------------+------+
+| pagesco_books_lab_reminder | Non-repeating | [7]  |
++----------------------------+---------------+------+
+Removed: 1 + 1
+Left: 0</pre><p>Reading it: three schedule calls, one event, because each checks wp_next_scheduled() first (and the start time is fixed, so even an exact duplicate would be refused); the first run is 04:30 in the site's time zone; the reminder carries its argument, and clearing it needs the same arguments.</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-14/l7_3-external-apis-cron/debug_event_counts.php (deliberately broken)</div>
+<p>As shipped, PHP prints:</p>
+<pre class="out">Warning: Undefined array key "items" in /var/www/html/debug_event_counts.php on line 35
+Warning: foreach() argument must be of type array|object, null given in /var/www/html/debug_event_counts.php on line 35
+Warning: Undefined array key "items" in /var/www/html/debug_event_counts.php on line 35
+Warning: foreach() argument must be of type array|object, null given in /var/www/html/debug_event_counts.php on line 35
+Warning: Undefined array key "items" in /var/www/html/debug_event_counts.php on line 35
+Warning: foreach() argument must be of type array|object, null given in /var/www/html/debug_event_counts.php on line 35
+Warning: Undefined variable $pagesco_totals in /var/www/html/debug_event_counts.php on line 48
+Café: 0 events (asked the API 3 times in 3 views)
+Warning: Undefined array key "items" in /var/www/html/debug_event_counts.php on line 35
+Warning: foreach() argument must be of type array|object, null given in /var/www/html/debug_event_counts.php on line 35
+Warning: Undefined array key "items" in /var/www/html/debug_event_counts.php on line 35
+Warning: foreach() argument must be of type array|object, null given in /var/www/html/debug_event_counts.php on line 35
+Warning: Undefined array key "items" in /var/www/html/debug_event_counts.php on line 35
+Warning: foreach() argument must be of type array|object, null given in /var/www/html/debug_event_counts.php on line 35
+Warning: Undefined variable $pagesco_totals in /var/www/html/debug_event_counts.php on line 48
+Rooftop: 0 events (asked the API 3 times in 3 views)</pre><ol class="steps">
+  <li><b>Warnings, line 35:</b> the events route answers a LIST, not <code class="inline">{ items: ... }</code>: <code class="inline">$data['items']</code> is undefined and foreach gets null. Count the list: <code class="inline">is_array( $data ) ? count( $data ) : 0</code>.</li>
+  <li><b>Warning, line 48:</b> <code class="inline">$pagesco_totals</code> is a typo for <code class="inline">$pagesco_total</code>.</li>
+  <li><b>Silent, line 26:</b> <code class="inline">if ( $cached )</code> treats a cached 0 as missing, so the Rooftop (0 events) asks the API on every view. Use <code class="inline">false !== $cached</code> (the reason Lesson 7.3 says never to store false, and to compare with false).</li>
+</ol>
+<p>Fixed (all three), it prints:</p>
+<pre class="out">Café: 2 events (asked the API 1 times in 3 views)
+Rooftop: 0 events (asked the API 1 times in 3 views)</pre><p>The fixed script is COUNTS_FIXED in blocks_S14.py.</p>
+</div>
+
+  <div class="sec"><h2>The Lesson Pages' Own Quick Quizzes</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Lesson 7.2 · Custom REST Endpoints</div>
+<ol class="steps" data-lesson-quiz="7.2">
+  <li><b>A</b> rest_api_init: rest_api_init fires when WordPress builds the REST server, only on requests that need it; registering anywhere else triggers a called incorrectly notice.</li>
+  <li><b>C</b> 8 books, and X-WP-Total: 11, X-WP-TotalPages: 2: per_page defaults to Settings::get( 'books_per_page' ), now 8, so page 1 has 8 books and the headers say 11 in total on 2 pages.</li>
+  <li><b>B</b> The callback receives 500: the maximum is not checked: With a sanitize_callback of its own, the argument is no longer run through rest_parse_request_arg, so the maximum is never checked and the callback receives 500.</li>
+  <li><b>A</b> A function that returns current_user_can( 'edit_others_posts' ), or a WP_Error with rest_authorization_required_code(): A write needs a capability check; edit_others_posts lets editors and administrators add shop-wide events, and the function answers 401 or 403 otherwise.</li>
+  <li><b>C</b> 500: Without a status of 404 in the error data, WordPress sends 500 Internal Server Error with data null.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Lesson 7.3 · External APIs, Transients &amp; WP-Cron</div>
+<ol class="steps" data-lesson-quiz="7.3">
+  <li><b>C</b> A normal response array; wp_remote_retrieve_response_code() returns 503: An error status is still a response: an array whose code wp_remote_retrieve_response_code() reports as 503, with the HTML as the body. Only a missing answer is a WP_Error.</li>
+  <li><b>A</b> In the object cache only, where it may be evicted before the hour is over: With an external object cache, transients are stored in the cache only, and may be evicted before they expire; without one they are two rows in wp_options.</li>
+  <li><b>B</b> In the activation callback, after checking wp_next_scheduled(), with wp_clear_scheduled_hook() on deactivation: Schedule once on activation, guarded by wp_next_scheduled(), and clear it with wp_clear_scheduled_hook() on deactivation; the callback itself is added on every request.</li>
+  <li><b>B</b> With the first request after 3:00, around 8 a.m.: WP-Cron checks for due events on requests; the first request after 3:00, here the first visitor around 8 a.m., starts it. A system cron calling wp cron event run --due-now removes that dependency.</li>
+  <li><b>C</b> So that a broken supplier is not asked, and waited for, on every screen view: Without a cached failure, every Books screen view would call the broken supplier again and wait for its timeout; five minutes protects both sites and still retries soon.</li>
+</ol>
+</div>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>The four desks:</b> validate (schema and validate_callbacks), sanitize (schema or sanitize_callbacks, defaults), permission (permission_callback), callback.</li>
+  <li><b>Three failures:</b> no answer (a WP_Error: DNS, connection, timeout); an error status (401, 404, 503: a normal response); a body that is not the expected data (HTML, no items).</li>
+  <li><b>The daily job:</b> in the activation callback, <code class="inline">if ( ! wp_next_scheduled( $hook ) )</code>; wp_clear_scheduled_hook() on deactivation; the callback added on every request.</li>
+</ol>
+
+  <div class="sec"><h2>Common Wrong Answers and What They Reveal</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li><b>Q1 C.</b> Mixes CREATABLE and EDITABLE: show WP_REST_Server's constants.</li>
+  <li><b>Q3 B (401 first).</b> Thinks permission comes first: redraw the four desks and run P2.</li>
+  <li><b>Q4 B.</b> Guessing at the schema's behavior: the validate_callbacks run first, then sanitizing.</li>
+  <li><b>Q5 B (is_user_logged_in).</b> Any subscriber is logged in: a capability names the job.</li>
+  <li><b>Q7 B or C.</b> Has not met the helpers' tolerance of WP_Error; still check is_wp_error() first.</li>
+  <li><b>Q10 A.</b> Uses WP-CLI's event run: it moves the schedule.</li>
+  <li><b>Q11 A.</b> Puts secrets in code: they end up in Git and in every copy.</li>
+</ul>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 14 · Answer Key · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

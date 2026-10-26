@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facilitator Guide: Session 13</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">contains answers &amp; timing · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Facilitator Guide</div>
+    <h1>Session 13: The Interactivity API and Using the REST API</h1>
+    <p class="sub">How to teach the session where the shop's pages react without reloading and its data answers over HTTP: the Interactivity API's server-first model (directives the server already evaluates, a small store that takes over), then the REST API's routes, headers, authentication and errors, and Checkpoint 2 on Modules 5 and 6.</p>
+    <div class="meta-row">
+      <span class="chip"><b>2</b> lessons</span>
+      <span class="chip"><b>3 hrs</b> session</span>
+      <span class="chip">Lessons <b>6.4–7.1</b></span>
+      <span class="chip">Checkpoint <b>2</b></span>
+      <span class="chip">Session <b>13</b> of 18 · Part 2</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>How to Use This Guide</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Same rhythm for both lessons: frame (the goal and one mental model) → live demo (you type, they type along) → guided lab (a kit lab, new practice on the lesson's ideas) → start the lesson's own project. Today ends with <b>Checkpoint 2 at 2:20</b>: 30 minutes, scored, open notes, on Modules 5 and 6. The lesson exercises, quiz and journal are homework.</li>
+  <li>Every command below was run on WordPress 7.1.3 / PHP 8.5 to produce the output printed under it: Lesson 6.4's demo on the site after Lesson 6.3 (<code class="inline">after:lesson_21</code>), Lesson 7.1's on the site after Lesson 6.4 (<code class="inline">after:lesson_22</code>). Browser recordings (the filter's clicks, fetch() without a nonce) are the lesson's own, made with Playwright on a 7.1 site. REST requests shown as <code class="inline">curl --user "maria:$PASS"</code> were sent with a real application password; yours prints its own password once.</li>
+  <li>Labs live in <code class="inline">labs/module-13/</code>: <code class="inline">_starter</code> files are handouts, <code class="inline">_solution</code> files are yours, and the whole <code class="inline">checkpoint-2/</code> folder stays with you until 2:20. The 6.4 labs need no browser and no build: <code class="inline">wp_interactivity_process_directives()</code> runs the server half of the Interactivity API on any HTML.</li>
+  <li>Part 2, Session 5 of 10. Teal blocks are hands-on, amber blocks are watch-outs. Lesson codes (6.4, 7.1) match the course site.</li>
+</ul>
+<div class="note warn"><div class="t">The #1 risk of Session 13: two big lessons squeeze the checkpoint</div>
+<p>Lessons 6.4 and 7.1 are written for 140 and 140 minutes; the room has 115 for both, and Checkpoint 2 needs its full 30. A demo that runs ten minutes over eats the checkpoint, and a checkpoint started at 2:30 is unfair to the slow, careful learners it should reward. <b>Start the checkpoint at 2:20 whatever happens.</b> The cuts are listed under If You Run Long; the first is the 6.4 project start (5 minutes), then the browser step of the 6.4 demo, then the apiFetch step of the 7.1 demo. Both lessons' projects mostly go home anyway: say so at 0:00.</p>
+</div>
+
+  <div class="sec"><h2>Before the Session</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ <b>Projector site at <code class="inline">after:lesson_21</code></b> (the end of Lesson 6.3, a working build). Rehearse 6.4's files and build once on a scratch copy; then put the projector site at <code class="inline">after:lesson_22</code> for 7.1, or keep going on the same site (the 6.4 demo creates the Book Filter, which 7.1 does not need).</li>
+  <li>☐ <b>Two terminals:</b> the project folder (<code class="inline">wp</code> shortcut, the build) and the WP-CLI container shell (<code class="inline">docker compose run --rm wpcli sh</code>) for curl. Keep <code class="inline">PASS</code> and <code class="inline">DEVON_PASS</code> in the shell once created; never in a file under wordpress/.</li>
+  <li>☐ <b>Files to hand out:</b> <code class="inline">labs/module-13/</code> WITHOUT the <code class="inline">*_solution.*</code> files and WITHOUT the <code class="inline">checkpoint-2/</code> folder. At 2:20 hand out <code class="inline">checkpoint-2/checkpoint_starter.php</code> only (shared folder or USB stick), and the printed Part D page.</li>
+  <li>☐ <b>Run the kit check once:</b> <code class="inline">python3 labs/check_labs.py module-13</code> (14 results, about two minutes), and run <code class="inline">checkpoint_solution.php</code> on your site so you know the four lines it prints.</li>
+  <li>☐ <b>Print:</b> the workbook's Checkpoint 2 page for every learner, and one rubric per learner (answer key, "Checkpoint 2: Rubric and Model Answer").</li>
+  <li>☐ <b>Board, before learners arrive:</b> <b>state · derived state · context</b>; the status table <b>400 the request · 401 who are you? · 403 you may not · 404 no such route or item</b>.</li>
+</ul>
+<div class="blk warn"><div class="h">Known traps of this session</div>
+<table class="timing">
+<thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td>The filter reloads the page on every click; no view.js in build/</td><td>package.json without <code class="inline">--experimental-modules</code></td><td>Add it to both scripts, rebuild, check <code class="inline">ls build/blocks/book-filter | grep view</code> (Mistake 1).</td></tr>
+<tr><td>The filter reloads the page, Console empty, view.js built</td><td>The store's namespace does not match data-wp-interactive</td><td>One spelling in render.php and view.js (Mistake 3); watch for page loads, not just the result.</td></tr>
+<tr><td>Console warning about synchronous <code class="inline">event.preventDefault()</code></td><td>The action is not wrapped in withSyncEvent()</td><td><code class="inline">selectGenre: withSyncEvent( ( event ) =&gt; { ... } )</code> (Mistake 2).</td></tr>
+<tr><td><code class="inline">rest_not_logged_in</code> with <code class="inline">--user</code></td><td>The account password instead of an application password, a password with a missing character, or a revoked one</td><td>Create one with <code class="inline">wp user application-password create ... --porcelain</code>; Users &gt; Profile shows Last Used (Mistake 3).</td></tr>
+<tr><td><code class="inline">rest_not_logged_in</code> in the browser although logged in</td><td>fetch() without X-WP-Nonce</td><td>wp.apiFetch() (dependency wp-api-fetch), or send the nonce yourself.</td></tr>
+<tr><td><code class="inline">$PASS</code> empty in the next command</td><td>Each <code class="inline">docker compose run --rm wpcli sh</code> is a new shell</td><td>Set PASS again in the shell you are using; keep the password in a password manager.</td></tr>
+<tr><td>The widget's list never appears</td><td>The script is not enqueued on index.php, or a typo in the widget ID</td><td>View Source: <code class="inline">#pagesco-stock-widget-js</code>; the Console shows the error.</td></tr>
+</tbody>
+</table>
+</div>
+
+  <div class="sec"><h2>Session 13 Agenda (3 hours)</h2><span class="rule"></span></div>
+  <table class="timing">
+    <thead><tr><th>Clock</th><th>Minutes</th><th>Segment</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="t">0:00</td><td class="t">10</td><td>Warm-up</td><td>Five retrieval questions on Lessons 6.2 and 6.3, homework check, the checkpoint's rules in one sentence.</td></tr>
+      <tr><td class="t">0:10</td><td class="t">10</td><td><b>6.4</b> Frame and mental model</td><td>The stage and the lighting desk: server-rendered HTML with directives, a store that takes over.</td></tr>
+      <tr><td class="t">0:20</td><td class="t">25</td><td><b>6.4</b> Live demo</td><td>The Book Filter's files and the module build; what the server already did for ?genre=fantasy; the state JSON; the browser recording.</td></tr>
+      <tr><td class="t">0:45</td><td class="t">15</td><td><b>6.4</b> Guided lab</td><td><code class="inline">labs/module-13/l6_4-interactivity-api/open_today_starter.php</code>: directives and derived state, processed by the server.</td></tr>
+      <tr><td class="t">1:00</td><td class="t">5</td><td><b>6.4</b> Start the lesson project</td><td>Step 1: the Find a Book page; Steps 2 and 3 go home.</td></tr>
+      <tr><td class="t">1:05</td><td class="t">10</td><td>Break</td><td>Checkpoint files stay closed until 2:20.</td></tr>
+      <tr><td class="t">1:15</td><td class="t">10</td><td><b>7.1</b> Frame and mental model</td><td>The service counter: routes, endpoints, JSON, status codes, who is asking.</td></tr>
+      <tr><td class="t">1:25</td><td class="t">30</td><td><b>7.1</b> Live demo</td><td>The index and the routes, the headers, _fields and pages; 401, cookie and nonce, an application password; 400, 403, 404.</td></tr>
+      <tr><td class="t">1:55</td><td class="t">15</td><td><b>7.1</b> Guided lab</td><td><code class="inline">labs/module-13/l7_1-rest-api/catalog_queries_starter.sh</code>: six questions for the catalog, six requests.</td></tr>
+      <tr><td class="t">2:10</td><td class="t">10</td><td><b>7.1</b> Start the lesson project</td><td>Step 1: the inventory script sells the last Fahrenheit 451 and restocks it.</td></tr>
+      <tr><td class="t">2:20</td><td class="t">30</td><td>Checkpoint 2 (Modules 5 and 6)</td><td><code class="inline">labs/module-13/checkpoint-2/checkpoint_starter.php</code> plus the written Part D: scored, open notes, on their own.</td></tr>
+      <tr><td class="t">2:50</td><td class="t">10</td><td>Wrap-up</td><td>Exit ticket (3 questions), homework, bring list for Session 14.</td></tr>
+      <tr><td class="t"><b>Total</b></td><td class="t"><b>180</b></td><td></td><td>Ends at 3:00.</td></tr>
+    </tbody>
+  </table>
+<p><b>In the room.</b> The lesson pages estimate 140 + 140 = 280 minutes for a learner working alone; after the warm-up, the break, the checkpoint and the wrap-up the room has 115. Lesson 6.4 gets 55 minutes: the server-first model, a demo through what curl already sees, a lab on server-processed directives and the Find a Book page. Lesson 7.1 gets 65: the vocabulary, a long demo of the counter's answers and refusals, a lab of six requests and the inventory script's first sale. Then the checkpoint, on its own, scored.</p>
+<p><b>Goes home (about 3 hours: this is a heavy week).</b> Lesson 6.4's project Steps 2 and 3 (test it like a customer, with and without JavaScript; clean up) and Common Mistakes 1 to 3 to reproduce; Lesson 7.1's "apiFetch" section in practice and the project's Steps 2 to 4 (the Stock at a glance widget); both lessons' Hands-on Exercises, Quick Quizzes and journal entries. Say at 0:00 that the 7.1 widget is the main homework.</p>
+<p><b>Protect, in this order:</b> the checkpoint's 30 minutes (start at 2:20); what the server already did for ?genre=fantasy (the server-first idea); 401 versus 403 and the application password; the guided labs. <b>Cut first:</b> the 6.4 project start (the page is one paste at home), then the browser step of the 6.4 demo (the workbook has the recording), then the apiFetch step of the 7.1 demo.</p>
+
+  <div class="sec"><h2>Opening Segment</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">0:00</span><h3>Warm-up: Lessons 6.2 and 6.3</h3><span class="dur">10 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Timing</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">6m</td><td>Five retrieval questions (workbook Warm-up box), answers out loud</td></tr>
+<tr><td class="t">4m</td><td>Homework check: the staff pick and the book pages; the checkpoint's rules: 2:20, 30 minutes, open notes, on your own</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Questions and answers</div>
+<ol class="steps">
+  <li><b>W1 (Lesson 6.2).</b> The Hobbit card on the Staff picks post: which of its attributes does PHP's parse_blocks() see? <b>Answer:</b> Only the comment's: <code class="inline">{"backgroundColor":"sage"}</code>. Title, author, recommendation and link are in the HTML; headingLevel and showBadge are at their defaults.</li>
+  <li><b>W2 (Lesson 6.2).</b> You changed the card's save(). When do you need a deprecated entry, and when not? <b>Answer:</b> When content with the old HTML exists that must stay editable (a client's posts): always. While the block exists only on a test site: delete the test posts instead.</li>
+  <li><b>W3 (Lesson 6.3).</b> The Book List stores only <code class="inline">&lt;!-- wp:pagesco/book-list /--&gt;</code>. Who decides how many books it shows? <b>Answer:</b> render.php, on every view: no count means the Books per list setting (6), clamped to 1 to 24.</li>
+  <li><b>W4 (Lesson 6.3).</b> Which line makes WordPress pass the book's ID to a paragraph bound to pagesco/book? <b>Answer:</b> <code class="inline">'uses_context' =&gt; array( 'postId', 'postType' )</code> in register_block_bindings_source(); without it the fallback stays, silently.</li>
+  <li><b>W5 (Lesson 6.3).</b> What does the Hobbit's page show as its price, and where does the value come from? <b>Answer:</b> <code class="inline">$10.99</code>: the large paragraph is bound to pagesco/book's price field, which formats pagesco_price on every view.</li>
+</ol>
+<p>The projector site's answers to W1 and W5:</p>
+<pre class="code">wp eval '$b = wp_list_filter( parse_blocks( get_page_by_path( "staff-picks", OBJECT, "post" )-&gt;post_content ), array( "blockName" =&gt; "pagesco/book-card" ) ); echo wp_json_encode( reset( $b )["attrs"] ), "\n";'</pre><pre class="out">{"backgroundColor":"sage"}</pre><pre class="code">curl -s http://localhost:8080/books/the-hobbit/ | grep -o 'has-large-font-size wp-block-paragraph"&gt;[^&lt;]*'</pre><pre class="out">has-large-font-size wp-block-paragraph"&gt;$10.99</pre></div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Lesson Plans</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">6.4</span><h3>The Interactivity API</h3><span class="dur">55 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Explain how the Interactivity API splits the work: server-rendered HTML with directives, then hydration by a store in a script module</li>
+  <li>Scaffold an interactive block into the plugin, and build its viewScriptModule with --experimental-modules</li>
+  <li>Set state and per-element context in PHP with wp_interactivity_state() and wp_interactivity_data_wp_context(), including derived state the server can compute</li>
+  <li>Write a store with store(), state getters, getContext() and actions, and connect it with data-wp-on, bind, class and text</li>
+  <li>Build interactive features that stay accessible and keep working without JavaScript</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing in the room</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame: the stage and the lighting desk; server first, then hydration; state, derived state, context</td></tr>
+<tr><td class="t">25m</td><td>Live demo: the module build, render.php, the store, what the server already did, the browser</td></tr>
+<tr><td class="t">15m</td><td>Guided lab: <code class="inline">open_today_starter.php</code></td></tr>
+<tr><td class="t">5m</td><td>Start the lesson project: the Find a Book page</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Mental model to say</div>
+<p>"The server builds the stage: every book is on it, every genre link, finished and visible. Directives are cables from each light to a fader on the lighting desk: 'this book is lit while isVisible is true'. The store is the desk: move the genre fader and every light wired to it changes at once. You only ever touch the faders; the cables do the rest."</p>
+<p>Then the two consequences on the board: <b>the server evaluates directives too</b> (the page is right before any JavaScript) and <b>one shared runtime</b>, loaded as a module only where an interactive block is. Then the design question before any code: "What is the ONE thing that changes when a customer clicks?" (the genre). "Everything else is derived. What does each element need to know about itself?" (its slug, its genres: context).</p>
+</div>
+<div class="blk"><div class="h">Live demo (you type, they follow)</div>
+<p>From the site as Lesson 6.3 left it. The JavaScript and JSON files are pasted from the lesson; render.php is read aloud; the outputs are what curl, the build and the page really return.</p>
+<ol class="steps">
+  <li><b>The module build (4m).</b> "Interactive blocks are built a second way." The scaffold (<code class="inline">--template @wordpress/create-block-interactive-template</code>) downloads its template, so in the room create src/blocks/book-filter/ by hand. First the plugin's package.json: both scripts gain <code class="inline">--experimental-modules</code>:
+<pre class="code">"build": "wp-scripts build --webpack-src-dir=src/blocks --output-path=build/blocks --blocks-manifest --experimental-modules",
+		"start": "wp-scripts start --webpack-src-dir=src/blocks --output-path=build/blocks --blocks-manifest --experimental-modules"</pre>
+"Without it, view.js is silently not built" (Common Mistake 1). Then the lesson's block.json: <code class="inline">"interactivity": true</code> and <code class="inline">"viewScriptModule": "file:./view.js"</code>.</li>
+  <li><b>render.php: state, derived state, context, directives (8m).</b> Paste the lesson's render.php and read it in four parts with the room: the data (books, genres, each book's genre slugs); <code class="inline">?genre=</code> validated against the real slugs; <code class="inline">wp_interactivity_state()</code> with two values and three CLOSURES; the HTML with <code class="inline">data-wp-interactive</code>, <code class="inline">wp_interactivity_data_wp_context()</code> and the directives. Write on the board: <b>state = genre · derived = isVisible, isSelected, visibleCount · context = slug, genres</b>.</li>
+  <li><b>The store (4m).</b> Paste view.js: the same three derived values as getters, and one action, <code class="inline">selectGenre</code>, wrapped in <code class="inline">withSyncEvent()</code> because it calls <code class="inline">preventDefault()</code>. Then style.scss, index.js, edit.js (ServerSideRender) and build:
+<pre class="code">npm run build &gt; /dev/null
+ls build/blocks/book-filter</pre>
+<pre class="out">block.json
+index.asset.php
+index.js
+render.php
+style-index-rtl.css
+style-index.css
+view.asset.php
+view.js</pre>
+view.js and view.asset.php: the module was built. Create a page "Filter test" with only <code class="inline">&lt;!-- wp:pagesco/book-filter /--&gt;</code>.</li>
+  <li><b>What the server already did (5m).</b> "curl runs no JavaScript. Ask for the fantasy books."
+<pre class="code">curl -s 'http://localhost:8080/filter-test/?genre=fantasy' &gt; filter.html
+grep -o 'Showing &lt;span data-wp-text="state.visibleCount"&gt;[0-9]*&lt;/span&gt; of [0-9]* books' filter.html
+grep -o '&lt;a aria-current="true" class="is-selected"' filter.html
+grep -c '&lt;li hidden' filter.html</pre>
+<pre class="out">Showing &lt;span data-wp-text="state.visibleCount"&gt;2&lt;/span&gt; of 11 books
+&lt;a aria-current="true" class="is-selected"
+9</pre>
+The server ran the directives: the count says 2, the Fantasy link has aria-current and the class, nine books are hidden. Then the state that travels with the page:
+<pre class="code">grep -A 1 'id="wp-script-module-data-@wordpress/interactivity"' filter.html
+rm filter.html</pre>
+<pre class="out">&lt;script id="wp-script-module-data-@wordpress/interactivity" type="application/json"&gt;
+{"state":{"pagesco/book-filter":{"genre":"fantasy","bookGenres":[["classic","dystopian","fiction"],["classic","fiction"],["dystopian","fiction","science-fiction"],["fiction","science-fiction"],["dystopian","fiction","science-fiction"],["fantasy","fiction"],["classic","fiction"],["classic","fiction"],["classic","fiction"],["fantasy","fiction"],["classic","fiction"]],"isVisible":{},"isSelected":{},"visibleCount":{}}},"derivedStateClosures":{"pagesco/book-filter":["state.isSelected","state.visibleCount","state.isVisible"]}}</pre>
+<code class="inline">genre</code> and <code class="inline">bookGenres</code> as values; the closures arrive as <code class="inline">{}</code> and are listed in <code class="inline">derivedStateClosures</code>: the store must bring its own getters. And the module only where the block is:
+<pre class="code">curl -s http://localhost:8080/filter-test/ | grep -o 'id="pagesco-book-filter-view-script-module-js-module"'
+curl -s http://localhost:8080/filter-test/ | grep -o '"@wordpress/interactivity":"[^"?]*'
+curl -s http://localhost:8080/about/ | grep -c 'pagesco-book-filter-view-script-module'</pre>
+<pre class="out">id="pagesco-book-filter-view-script-module-js-module"
+"@wordpress/interactivity":"http://localhost:8080/wp-includes/js/dist/script-modules/interactivity/index.js
+0</pre></li>
+  <li><b>In the browser (4m).</b> Open /filter-test/ with the Console, click Fantasy, Science Fiction, All books. Then the lesson's Playwright recording, for the room to compare with what they saw:
+<pre class="code">Loaded                   Showing 11 of 11 books current: All books        address: /find-a-book/
+                         visible: all 11
+Clicked Fantasy          Showing 2 of 11 books  current: Fantasy          address: /find-a-book/?genre=fantasy
+                         visible: Lord of the Rings, The Hobbit
+Clicked Science Fiction  Showing 3 of 11 books  current: Science Fiction  address: /find-a-book/?genre=science-fiction
+                         visible: Brave New World, Dune, Fahrenheit 451
+Clicked All books        Showing 11 of 11 books current: All books        address: /find-a-book/
+                         visible: all 11
+Page loads: 1
+Console: (empty)</pre>
+"Three filters, one page load, an empty Console." With JavaScript switched off the same click reloads the page and the server filters it: progressive enhancement, almost for free.</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b>No <code class="inline">--experimental-modules</code>:</b> "compiled successfully", no view.js, and a filter that reloads the page. Coach: "Is view.js in build/? Does the page load on every click?" (Lesson quiz Q1.)</li>
+  <li><b>A JavaScript getter that disagrees with its PHP closure:</b> the page changes on hydration (a flash). Coach: "Write the closure and the getter side by side; same inputs, same answer." (Self-check Q2, the guided lab.)</li>
+  <li><b>Per-element data in the state, or a typo in the namespace.</b> Coach: "Is this the same for every element (state) or one element's own (context)? Is the namespace spelled the same in render.php and view.js?" (Self-check Q4, the debug handout.)</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<p><b>File:</b> <code class="inline">labs/module-13/l6_4-interactivity-api/open_today_starter.php</code>; your reference is <code class="inline">labs/module-13/l6_4-interactivity-api/open_today_solution.php</code>. An opening-hours box with a folded week: the learner writes two derived-state closures and the directives, and <code class="inline">wp_interactivity_process_directives()</code> does on the server exactly what WordPress does for a block with <code class="inline">interactivity: true</code>. It practices the server half of the lesson, which is the half PHP developers own, with no build and no browser.</p>
+<ul class="tick">
+  <li><b>Run it as shipped (2m):</b> the paragraph says TODO, and the three days carry only their context.</li>
+  <li><b>TODOs 1 to 4 in pairs (9m).</b> Before each run, predict which <code class="inline">&lt;li&gt;</code> gets <code class="inline">hidden</code>, <code class="inline">aria-current</code> and the class. Circulate for <code class="inline">wp_interactivity_state( 'pagesco/hours' )</code> inside the closures (it works, but the namespace is already known: no argument needed) and for a forgotten <code class="inline">!</code>.</li>
+  <li><b>Expected when done:</b></li>
+</ul>
+<pre class="out">&lt;div data-wp-interactive="pagesco/hours"&gt;&lt;p data-wp-text="state.todayText"&gt;Today (Saturday): 10:00-16:00&lt;/p&gt;
+&lt;button aria-expanded="false" data-wp-on--click="actions.toggleWeek" data-wp-bind--aria-expanded="state.showWeek"&gt;The whole week&lt;/button&gt;&lt;ul&gt;
+&lt;li aria-current="false" hidden data-wp-context='{"day":"Friday"}' data-wp-bind--hidden="state.isHidden" data-wp-bind--aria-current="state.isToday" data-wp-class--is-today="state.isToday"&gt;Friday: 9:00-18:00&lt;/li&gt;
+&lt;li aria-current="true" class="is-today" data-wp-context='{"day":"Saturday"}' data-wp-bind--hidden="state.isHidden" data-wp-bind--aria-current="state.isToday" data-wp-class--is-today="state.isToday"&gt;Saturday: 10:00-16:00&lt;/li&gt;
+&lt;li aria-current="false" hidden data-wp-context='{"day":"Sunday"}' data-wp-bind--hidden="state.isHidden" data-wp-bind--aria-current="state.isToday" data-wp-class--is-today="state.isToday"&gt;Sunday: closed&lt;/li&gt;
+&lt;/ul&gt;&lt;/div&gt;</pre><ul class="tick">
+  <li><b>Debrief (4m):</b> "aria-current says false on Friday: why not simply absent?" (aria- attributes get the words true and false.) "Which directive did the server NOT touch?" (data-wp-on--click.) "What would the browser's store need?" (A getter for each closure and the toggleWeek action: the lesson's view.js pattern; optional at home.)</li>
+  <li><b>Fast finishers:</b> <code class="inline">labs/module-13/l6_4-interactivity-api/event_list_starter.php</code> (data-wp-each repeats a template from a list in the state), then <code class="inline">labs/module-13/l6_4-interactivity-api/debug_stock_badges.php</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Start the lesson project</div>
+<p>The lesson project is <b>A Find a Book Page</b>: the Book Filter on its own page, which the header menu picks up by itself. In the room only Step 1 (5 minutes), on laptops whose build has view.js.</p>
+<ul class="tick">
+  <li>Step 1: a page "Find a Book" with the lesson's paragraph and the Book Filter. Then ask the server for the dystopian books, as text:</li>
+</ul>
+<pre class="code">http://localhost:8080/find-a-book/?genre=dystopian   (the count, as text)</pre><pre class="out">Showing 3 of 11 books</pre><ul class="tick">
+  <li><b>Goes home:</b> Step 2 (test it like a customer: every genre, a reload on ?genre=classic, the keyboard, JavaScript off) and Step 3 (delete Filter test, the checks, the plan line).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<p>Ask these out loud during the demo and the lab:</p>
+<ul class="tick">
+  <li>What is the state of the Book Filter, and what is derived? <b>Answer:</b> the state is the genre (and the books' genres); isVisible, isSelected and visibleCount are derived.</li>
+  <li>Why are the genres links and not buttons? <b>Answer:</b> without JavaScript the link is followed and the server renders the filtered page; with it, the action prevents the navigation.</li>
+  <li>Which directives does the server process? <b>Answer:</b> interactive, context, bind, class, style, text, each; not on, watch, init, run.</li>
+  <li>What does the page load only where the block is? <b>Answer:</b> the view.js script module (and the import map entry for @wordpress/interactivity).</li>
+</ul>
+<p>Workbook self-check, items Q1 to Q6 (learners do them at the end of the block or at home).</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q1</b> <span data-sc="1">B) From the state JSON that render.php's wp_interactivity_state() put into the page</span>; <b>Q2</b> <span data-sc="2">D) <code class="inline">data-wp-on--click="actions.selectGenre"</code></span>; <b>Q3</b> <span data-sc="3"><code class="inline">8</code></span>; <b>Q4</b> <span data-sc="4">A) In the element's context, <code class="inline">wp_interactivity_data_wp_context( array( 'slug' =&gt; $slug ) )</code></span>; <b>Q5</b> <span data-sc="5">C) Wrapping the action in withSyncEvent()</span>; <b>Q6</b> <span data-sc="6">The link is followed (a page load) and the server renders the filtered page: the links are real ?genre= links and render.php reads the address</span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> learners new to JavaScript stores read view.js next to the render.php closures (the board's three columns) and type only render.php. In the lab, give TODO 1's closure on the board; TODO 2 is the same shape.</p>
+<p><b>Stretch:</b> <code class="inline">event_list_starter.php</code> and <code class="inline">debug_stock_badges.php</code>; the lesson's Exercise 3 (a heading that follows the filter) and the Bonus Challenge (hide sold-out books, with a no-JavaScript fallback).</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">7.1</span><h3>Using the REST API</h3><span class="dur">65 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Explain routes, endpoints, methods, JSON responses and status codes, and list the routes your site offers</li>
+  <li>Read the catalog from core endpoints and shape the answer with _fields, _embed, context, filters and the pagination headers</li>
+  <li>Authenticate the right way: cookie plus nonce for logged-in JavaScript, application passwords for other programs</li>
+  <li>Call the REST API from JavaScript with apiFetch, and handle its errors</li>
+  <li>Read REST errors (400, 401, 403, 404) and tell "who are you?" from "you may not"</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing in the room</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame: the service counter; base, namespace, route, endpoint, response; the request's trip</td></tr>
+<tr><td class="t">30m</td><td>Live demo: the index and routes, headers and pages, 401, cookie and nonce, an application password, 400, 403, 404, apiFetch</td></tr>
+<tr><td class="t">15m</td><td>Guided lab: <code class="inline">catalog_queries_starter.sh</code></td></tr>
+<tr><td class="t">10m</td><td>Start the lesson project: the inventory script sells the last copy</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Mental model to say</div>
+<p>"The shop floor is the website: customers browse the shelves, which is HTML. At the back is a service counter with a list of what it handles: 'ask for a book by its number', 'change a price'. Anyone may ask the counter for public information. For anything that changes the shop, the clerk first checks who you are, authentication, and then whether your role allows it, permission. What you get back is a neat package, JSON, with a slip stapled to it: the status code and the headers."</p>
+<p>Then the five words on the board with the site's examples: <b>base</b> /wp-json/ · <b>namespace</b> wp/v2 · <b>route</b> /wp/v2/books/(?P&lt;id&gt;[\d]+) · <b>endpoint</b> GET or POST on a route · <b>response</b> JSON + status + headers. And the trip: authentication → route and method → arguments validated → permission → callback → JSON. "Lesson 7.2 builds counters of the shop's own."</p>
+</div>
+<div class="blk"><div class="h">Live demo (you type, they follow)</div>
+<p>From the site as Lesson 6.4 left it, in the WP-CLI container shell (curl is there, http://localhost:8080 is the site). Learners type every curl: that is the skill.</p>
+<ol class="steps">
+  <li><b>Ask the API about itself (4m).</b> "Every site has a service counter at /wp-json/." Three fields of the index:
+<pre class="code">curl -s http://localhost:8080/wp-json/   (the fields name, url and namespaces)</pre>
+<pre class="out">{
+  "name": "Pages &amp;amp; Co.",
+  "url": "http://localhost:8080",
+  "namespaces": [
+    "oembed/1.0",
+    "wp/v2",
+    "wp-site-health/v1",
+    "wp-block-editor/v1",
+    "wp-abilities/v1"
+  ]
+}</pre>
+Then the routes Lesson 5.2's show_in_rest built for books and genres:
+<pre class="code">wp eval 'foreach ( array_keys( rest_get_server()-&gt;get_routes() ) as $route ) { if ( str_contains( $route, "books" ) || str_contains( $route, "genres" ) ) { echo $route, "\n"; } }'</pre>
+<pre class="out">/wp/v2/books
+/wp/v2/books/(?P&lt;id&gt;[\d]+)
+/wp/v2/books/(?P&lt;id&gt;[\d]+)/autosaves
+/wp/v2/books/(?P&lt;parent&gt;[\d]+)/autosaves/(?P&lt;id&gt;[\d]+)
+/wp/v2/genres
+/wp/v2/genres/(?P&lt;id&gt;[\d]+)</pre></li>
+  <li><b>The catalog, and its headers (5m).</b> "Ten books, and the totals travel in headers."
+<pre class="code">curl -s -D - -o books.json http://localhost:8080/wp-json/wp/v2/books | grep -E '^(HTTP|Link|X-WP-)'
+wc -c &lt; books.json
+rm books.json</pre>
+<pre class="out">HTTP/1.1 200 OK
+Link: &lt;http://localhost:8080/wp-json/wp/v2/books?page=2&gt;; rel="next"
+X-WP-Total: 11
+X-WP-TotalPages: 2
+13202</pre>
+13202 bytes for ten books. Ask for less with <code class="inline">_fields</code>, and for a page with <code class="inline">per_page</code> and <code class="inline">page</code>:
+<pre class="code">curl -s 'http://localhost:8080/wp-json/wp/v2/books?_fields=id,title.rendered,meta.pagesco_price&amp;per_page=3'</pre>
+<pre class="out">[{"id":40,"title":{"rendered":"Animal Farm"},"meta":{"pagesco_price":8.49}},{"id":39,"title":{"rendered":"Fahrenheit 451"},"meta":{"pagesco_price":10.49}},{"id":38,"title":{"rendered":"Lord of the Rings"},"meta":{"pagesco_price":15.99}}]</pre>
+<pre class="code">curl -s -i 'http://localhost:8080/wp-json/wp/v2/books?per_page=4&amp;page=2&amp;_fields=id'   (status line, three headers, body)</pre>
+<pre class="out">HTTP/1.1 200 OK
+Link: &lt;http://localhost:8080/wp-json/wp/v2/books?per_page=4&amp;page=1&amp;_fields=id&gt;; rel="prev", &lt;http://localhost:8080/wp-json/wp/v2/books?per_page=4&amp;page=3&amp;_fields=id&gt;; rel="next"
+X-WP-Total: 11
+X-WP-TotalPages: 3
+
+[{"id":36},{"id":35},{"id":34},{"id":33}]</pre></li>
+  <li><b>Who is asking? 401 (3m).</b> "Now change something, anonymously."
+<pre class="code">curl -s -X POST -H 'Content-Type: application/json' -d '{"meta":{"pagesco_price":12.99}}' http://localhost:8080/wp-json/wp/v2/books/30</pre>
+<pre class="out">{"code":"rest_cannot_edit","message":"Sorry, you are not allowed to edit this post.","data":{"status":401}}</pre>
+401: "who are you?" Then the cookie and the nonce, from the container (the lesson's block: a cookie file for Maria, then users/me without, with and with a made-up nonce):
+<pre class="code">curl -s -o /dev/null -c jar.txt http://localhost:8080/wp-login.php
+curl -s -o /dev/null -b jar.txt -c jar.txt --data-urlencode log=maria --data-urlencode pwd=maria-pass -d testcookie=1 http://localhost:8080/wp-login.php
+curl -s -b jar.txt 'http://localhost:8080/wp-json/wp/v2/users/me?_fields=id,name'; echo
+NONCE=$(curl -s -b jar.txt 'http://localhost:8080/wp-admin/admin-ajax.php?action=rest-nonce')
+curl -s -b jar.txt -H "X-WP-Nonce: $NONCE" 'http://localhost:8080/wp-json/wp/v2/users/me?_fields=id,name'; echo
+curl -s -b jar.txt -H 'X-WP-Nonce: 0123456789' 'http://localhost:8080/wp-json/wp/v2/users/me?_fields=id,name'; echo
+rm jar.txt</pre>
+<pre class="out">{"code":"rest_not_logged_in","message":"You are not currently logged in.","data":{"status":401}}
+{"id":2,"name":"Maria Lopez"}
+{"code":"rest_cookie_invalid_nonce","message":"Cookie check failed","data":{"status":403}}</pre></li>
+  <li><b>An application password (6m).</b> "A program has no cookie and must never know Maria's real password." Create one for the inventory script (your 24 characters will differ; put them in <code class="inline">PASS</code> in the container shell):
+<pre class="code">wp user application-password create maria "Inventory script" --porcelain</pre>
+<pre class="out">PeVINOjKoM7cd6O2FzYsnzqd</pre>
+Who am I, the sale that was refused a minute ago, and the book page that follows at once through Lesson 6.3's binding:
+<pre class="code">curl -s --user "maria:$PASS" 'http://localhost:8080/wp-json/wp/v2/users/me?_fields=id,name'</pre>
+<pre class="out">{"id":2,"name":"Maria Lopez"}</pre>
+<pre class="code">curl -s --user "maria:$PASS" -X POST -H 'Content-Type: application/json' -d '{"meta":{"pagesco_price":12.99}}' 'http://localhost:8080/wp-json/wp/v2/books/30?_fields=id,meta.pagesco_price'</pre>
+<pre class="out">{"id":30,"meta":{"pagesco_price":12.99}}</pre>
+<pre class="code">curl -s http://localhost:8080/books/dune/ | grep -o 'has-large-font-size wp-block-paragraph"&gt;[^&lt;]*'</pre>
+<pre class="out">has-large-font-size wp-block-paragraph"&gt;$12.99</pre>
+Put the price back (the lesson's next command, <code class="inline">14.99</code>). "Basic authentication only encodes: HTTPS, or the local environment, as here."</li>
+  <li><b>When the answer is no (7m).</b> "Every error has the same shape: a code, a message, a status." Too many books:
+<pre class="code">curl -s -i 'http://localhost:8080/wp-json/wp/v2/books?per_page=500'</pre>
+<pre class="out">HTTP/1.1 400 Bad Request
+
+{"code":"rest_invalid_param","message":"Invalid parameter(s): per_page","data":{"status":400,"params":{"per_page":"per_page must be between 1 (inclusive) and 100 (inclusive)"},"details":{"per_page":{"code":"rest_out_of_bounds","message":"per_page must be between 1 (inclusive) and 100 (inclusive)","data":null}}}}</pre>
+Devon, an author, with his own application password, on Maria's book:
+<pre class="code">curl -s --user "devon:$DEVON_PASS" -X POST -H 'Content-Type: application/json' -d '{"meta":{"pagesco_price":1}}' http://localhost:8080/wp-json/wp/v2/books/30</pre>
+<pre class="out">{"code":"rest_cannot_edit","message":"Sorry, you are not allowed to edit this post.","data":{"status":403}}</pre>
+The same code as the anonymous POST, but <b>403</b>: "I know you, and no." Two 404s and a context only editors get:
+<pre class="code">curl -s http://localhost:8080/wp-json/wp/v2/bookz; echo
+curl -s http://localhost:8080/wp-json/wp/v2/books/99; echo</pre>
+<pre class="out">{"code":"rest_no_route","message":"No route was found matching the URL and request method.","data":{"status":404}}
+{"code":"rest_post_invalid_id","message":"Invalid post ID.","data":{"status":404}}</pre>
+<pre class="code">curl -s 'http://localhost:8080/wp-json/wp/v2/books/30?context=edit'; echo</pre>
+<pre class="out">{"code":"rest_forbidden_context","message":"Sorry, you are not allowed to edit this post.","data":{"status":401}}</pre></li>
+  <li><b>apiFetch, on the board (5m).</b> Show the lesson's apiFetch fragment (read, write, catch) and the recording of Common Mistake 2: a plain <code class="inline">fetch()</code> on Maria's Dashboard is anonymous, <code class="inline">wp.apiFetch()</code> sends the nonce.
+<pre class="code">&gt; await ( await fetch( '/wp-json/wp/v2/users/me?_fields=id,name' ) ).json()
+{"code":"rest_not_logged_in","message":"You are not currently logged in.","data":{"status":401}}
+&gt; await wp.apiFetch( { path: '/wp/v2/users/me?_fields=id,name' } )
+{"id":2,"name":"Maria Lopez"}
+
+Network:  GET /wp-json/wp/v2/users/me?_fields=id,name                        no X-WP-Nonce header   401
+          GET /wp-json/wp/v2/users/me?_fields=id%2Cname&amp;_locale=user          X-WP-Nonce header      200</pre>
+"When an API says 'not logged in' while you are, check the nonce first."</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b><code class="inline">_fields</code> without <code class="inline">_links</code>, so <code class="inline">_embed</code> embeds nothing.</b> No error, no genres. Coach: "What does _embed follow? Is it still in the answer?" (Self-check Q10.)</li>
+  <li><b>fetch() without the nonce:</b> "not logged in" on a screen where Maria plainly is. Coach: "Which header proves the request comes from your own page?" (Self-check Q12; lesson quiz Q2.)</li>
+  <li><b>The account password with <code class="inline">--user</code>:</b> 401 rest_not_logged_in, indistinguishable from a typo in an application password. Coach: "Which password did you create for this program? Users &gt; Profile: was it ever used?"</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<p><b>File:</b> <code class="inline">labs/module-13/l7_1-rest-api/catalog_queries_starter.sh</code>; your reference is <code class="inline">labs/module-13/l7_1-rest-api/catalog_queries_solution.sh</code>. Six questions for the catalog, each one curl request to a core route shaped with the lesson's parameters or read from a header: a genre's ID by its slug, its books by title, a search, the pages, a status code, the biggest genres. It practices reading the API from the outside, as any client does.</p>
+<ul class="tick">
+  <li><b>Run it as shipped (2m):</b> <code class="inline">cp labs/module-13/l7_1-rest-api/catalog_queries_starter.sh wordpress/</code>, <code class="inline">docker compose run --rm wpcli sh catalog_queries_starter.sh</code>: only the total works.</li>
+  <li><b>TODOs 1 to 6 in pairs (10m),</b> each request tried alone in a container shell first. Circulate for <code class="inline">&amp;</code> in an unquoted URL (the shell starts a background job: quote every URL) and for <code class="inline">genres=dystopian</code> (the filter takes the ID, which is why TODO 1 exists).</li>
+  <li><b>Expected when done:</b></li>
+</ul>
+<pre class="out">Books in the catalog: 11
+The Dystopian genre:
+[{"id":9,"name":"Dystopian"}]
+Its books, by title:
+[{"slug":"1984"},{"slug":"brave-new-world"},{"slug":"fahrenheit-451"}]
+Search for farm:
+[{"id":40,"title":{"rendered":"Animal Farm"}}]
+The site's pages, oldest first:
+[{"slug":"sample-page"},{"slug":"about"},{"slug":"contact"},{"slug":"events"},{"slug":"find-a-book"}]
+Book 99: 404
+The two biggest genres:
+[{"count":11,"name":"Fiction"},{"count":6,"name":"Classic"}]</pre><ul class="tick">
+  <li><b>Debrief (3m):</b> "Why does the genre filter take an ID when the site's addresses use slugs?" (Core's routes link resources by ID; Lesson 7.2's own route takes the slug.) "How would you get all eleven titles if per_page stopped at 4?" (Loop up to X-WP-TotalPages: the lesson's Exercise 1.)</li>
+  <li><b>Fast finishers:</b> <code class="inline">labs/module-13/l7_1-rest-api/who_may_starter.sh</code> (five requests as anonymous, Devon, Maria and admin, with throwaway application passwords it revokes), then <code class="inline">labs/module-13/l7_1-rest-api/debug_stock_list.php</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Start the lesson project</div>
+<p>The lesson project is <b>Stock at a Glance</b>: the inventory script's credentials in use, then a Dashboard widget that reads and updates books with apiFetch. In the room: Step 1 (10 minutes), the two requests a stock system sends.</p>
+<ul class="tick">
+  <li>Step 1: the last Fahrenheit 451 is sold (POST with Maria's "Inventory script" password), the book's page says so, and the delivery puts it back:</li>
+</ul>
+<pre class="code">curl -s --user "maria:$PASS" -X POST -H 'Content-Type: application/json' -d '{"meta":{"pagesco_in_stock":false}}' 'http://localhost:8080/wp-json/wp/v2/books/39?_fields=id,title.rendered,meta.pagesco_in_stock'</pre><pre class="out">{"id":39,"title":{"rendered":"Fahrenheit 451"},"meta":{"pagesco_in_stock":false}}</pre><pre class="out">&lt;li&gt;Sold out&lt;/li&gt;</pre><pre class="code">curl -s --user "maria:$PASS" -X POST -H 'Content-Type: application/json' -d '{"meta":{"pagesco_in_stock":true}}' 'http://localhost:8080/wp-json/wp/v2/books/39?_fields=id,title.rendered,meta.pagesco_in_stock'</pre><pre class="out">{"id":39,"title":{"rendered":"Fahrenheit 451"},"meta":{"pagesco_in_stock":true}}</pre><ul class="tick">
+  <li><b>Done in the room</b> = both answers and the page's <code class="inline">&lt;li&gt;Sold out&lt;/li&gt;</code> in between. Ask: "Which pages followed without anyone touching them?" (The book page, the Book List, Find a Book: they all read the meta.)</li>
+  <li><b>Goes home:</b> Steps 2 to 4: <code class="inline">Admin\StockWidget</code> as the fifteenth feature, <code class="inline">assets/js/stock-widget.js</code> (plain JavaScript, no build), trying it as Maria; then the checks. The widget's frame, as Maria's Dashboard source shows it on the projector site:</li>
+</ul>
+<pre class="out">&lt;div class="inside"&gt;
+		&lt;p class="pagesco-stock-widget__status" aria-live="polite"&gt;Loading the catalog…&lt;/p&gt;
+		&lt;ul class="pagesco-stock-widget__books"&gt;&lt;/ul&gt;
+		&lt;/div&gt;</pre></div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<p>Ask these out loud during the demo and the lab:</p>
+<ul class="tick">
+  <li>Where do the totals of a collection travel? <b>Answer:</b> in the headers X-WP-Total and X-WP-TotalPages (and Link for the neighbors), so the body stays a plain list.</li>
+  <li>Cookie without a nonce, cookie with a wrong nonce: what does each get? <b>Answer:</b> treated as anonymous (401 for anything protected); 403 rest_cookie_invalid_nonce.</li>
+  <li>Devon gets rest_cannot_edit. 401 or 403, and what does it mean? <b>Answer:</b> 403: WordPress knows him and his role says no.</li>
+  <li>Why one application password per program? <b>Answer:</b> revoking one (a lost laptop, a retired script) cuts off exactly that program.</li>
+</ul>
+<p>Workbook self-check, items Q7 to Q12 (learners do them at the end of the block or at home).</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q7</b> <span data-sc="7">C) 401 rest_forbidden_context</span>; <b>Q8</b> <span data-sc="8"><code class="inline">X-WP-TotalPages: 2</code></span>; <b>Q9</b> <span data-sc="9">A) 403 rest_cookie_invalid_nonce: the page must fetch a fresh nonce</span>; <b>Q10</b> <span data-sc="10">D) _fields removed _links, so there was nothing to follow, and _embedded is cut off too</span>; <b>Q11</b> <span data-sc="11">B) WP_ENVIRONMENT_TYPE is local; elsewhere WordPress offers them only on HTTPS</span>; <b>Q12</b> <span data-sc="12">The REST nonce (X-WP-Nonce) for the logged-in user, and the API's root URL (also _locale=user, a JSON body and the server's error object on failure)</span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> a card with the three request shapes: <code class="inline">curl -s URL</code> (read), <code class="inline">curl -s -I URL</code> (headers only), <code class="inline">curl -s --user "maria:$PASS" -X POST -H 'Content-Type: application/json' -d '{...}' URL</code> (write). For the lab, TODO 1 and 2 together on the projector.</p>
+<p><b>Stretch:</b> <code class="inline">who_may_starter.sh</code> and <code class="inline">debug_stock_list.php</code>; the lesson's Exercise 3 (batch/v1) and Exercise 4 (register_rest_field); the Bonus Challenge (a search box with a debounce and AbortController).</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Checkpoint 2</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">2:20</span><h3>Checkpoint 2: Modules 5 and 6</h3><span class="dur">30 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Timing</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">2m</td><td>Hand out <code class="inline">checkpoint-2/checkpoint_starter.php</code> and the printed Part D page; read the rules aloud</td></tr>
+<tr><td class="t">25m</td><td>Parts A to C in the file, Part D on paper; on their own, open notes (lesson pages, their own plugin)</td></tr>
+<tr><td class="t">3m</td><td>Collect: the file (renamed <code class="inline">checkpoint_NAME.php</code>, left in wordpress/ until you have run it) and the Part D page</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk lab"><div class="h">The task (the workbook's Checkpoint page)</div>
+<p><b>The Weekly Picks report.</b> The shop's newsletter wants four lines built from the plugin's data. Learners write the bodies of four functions; the main section is given and must not change; the script changes nothing on the site. Run with <code class="inline">wp eval-file --use-include checkpoint_NAME.php</code> on a site at the end of Lesson 6.3 (the Book List block must exist).</p>
+<ul class="tick">
+  <li><b>Part A (Lessons 5.2, 5.3):</b> <code class="inline">pagesco_cp_cheap_books( float $max )</code>: the books in stock that cost at most $max, cheapest first, as "Title ($8.49)": one get_posts() with a meta_query (price as a number, stock '1') and orderby meta_value_num.</li>
+  <li><b>Part B (Lesson 5.5):</b> <code class="inline">pagesco_cp_events_at( string $location )</code>: how many events take place at a location: one COUNT query on the events table through <code class="inline">$wpdb-&gt;prepare()</code> (the main section tries a hostile location).</li>
+  <li><b>Part C (Lessons 6.2, 6.3):</b> <code class="inline">pagesco_cp_list_titles( string $genre )</code>: render a Book List block for the genre, cheapest first, with do_blocks() and return its titles; <code class="inline">pagesco_cp_cards_in( string $slug )</code>: how many Book Cards a post stores and the first one's comment attributes.</li>
+  <li><b>Part D (written):</b> three questions on the workbook page, one on Module 5, two on Module 6.</li>
+</ul>
+<p>As shipped, the starter runs without a message and prints:</p>
+<pre class="out">A  Under $10, in stock: TODO
+B  Café: -1 events · Rooftop: -1 events · Reading corner'; DROP TABLE x; --: -1 events
+C1 Fantasy, cheapest first: TODO
+C2 Staff picks post: 0 Book Card, comment attributes {"TODO":true}</pre><p>The model answer prints:</p>
+<pre class="out">A  Under $10, in stock: Pride and Prejudice ($7.99), Animal Farm ($8.49), Brave New World ($9.49), 1984 ($9.99)
+B  Café: 2 events · Rooftop: 0 events · Reading corner'; DROP TABLE x; --: 0 events
+C1 Fantasy, cheapest first: The Hobbit, Lord of the Rings
+C2 Staff picks post: 1 Book Card, comment attributes {"backgroundColor":"sage"}</pre></div>
+<div class="blk warn"><div class="h">Rules and scoring</div>
+<ul class="tick">
+  <li>Open notes: the lesson pages, their own plugin and pagesco-plan.txt; no neighbor, no AI assistant. Questions about the wording only.</li>
+  <li>Score with the rubric in the Answer Key: five rows, 0 to 2 points each. Run each learner's file once on your projector site (it changes nothing); compare with the model output line by line.</li>
+  <li><b>8 to 10:</b> on track for Session 14. <b>5 to 7:</b> name the weakest row in your feedback and point to its lesson. <b>Under 5:</b> a one-to-one before Session 15; Module 7 builds directly on 5.3 and 5.5.</li>
+  <li>A learner whose site is not at the end of Lesson 6.3 (no Book List): score Part C from the code, and say so on the sheet.</li>
+</ul>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Closing</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Exit ticket (3 questions, no notes, 4 minutes)</div>
+<p>Right after the checkpoint, so keep it short: three questions on today's lessons, on a sticky note.</p>
+<ol class="steps">
+  <li>In the Book Filter, name the state and one piece of derived state. <b>Answer:</b> the state is the selected genre (and the books' genres); derived: isVisible, isSelected or visibleCount.</li>
+  <li>401 or 403: which means "who are you?" <b>Answer:</b> 401 (not authenticated); 403 is "I know you, and no".</li>
+  <li>Which credential does a partner's nightly price script use? <b>Answer:</b> an application password of a user whose role can edit books, over HTTPS.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Homework (about 3 hours)</div>
+<ul class="tick">
+  <li><b>Finish both lesson projects.</b> 6.4: Steps 2 and 3 (test it like a customer, with JavaScript off; clean up). 7.1: Steps 2 to 4, the Stock at a glance widget, and the checks.</li>
+  <li><b>Lesson exercises.</b> 6.4: Exercises 1 and 2 (every filter from the server, the state registry); Exercise 3 is a stretch. 7.1: Exercises 1 and 2 (the catalog page by page, a draft round trip with a throwaway password); 3 and 4 are stretches.</li>
+  <li><b>Both Quick Quizzes</b> on the lesson pages (answers are in the Answer Key).</li>
+  <li><b>Journal:</b> both entries (state, derived state and context for the filter; every program that might talk to the site).</li>
+  <li><b>Before the Next Lesson (7.1):</b> the widget works for Maria, Fahrenheit 451 is in stock; keep the "Inventory script" password (in <code class="inline">$PASS</code>, never in wordpress/) and create Devon's "Test" password for Lesson 7.2; reread Lesson 5.3's sanitize and validate and Lesson 5.5's EventsTable::find() and add().</li>
+  <li><b>Optional:</b> <code class="inline">labs/module-13/l6_4-interactivity-api/event_list_starter.php</code>, <code class="inline">labs/module-13/l7_1-rest-api/who_may_starter.sh</code> and both debug handouts.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Bring list for Session 14</div>
+<ul class="tick">
+  <li>A site at the end of Lesson 7.1 (the widget, fifteen features) and Maria's "Inventory script" and Devon's "Test" application passwords in your password manager.</li>
+  <li>The project folder with <code class="inline">labs/</code>; Session 14's labs call the site's own REST API over HTTP, no internet needed.</li>
+  <li>pagesco-plan.txt, the journal and the workbook.</li>
+</ul>
+</div>
+
+  <div class="sec"><h2>If You Run Long or Short</h2><span class="rule"></span></div>
+<div class="blk warn"><div class="h">Running long: what to protect and what to cut first</div>
+<ul class="tick">
+  <li><b>Protect:</b> the checkpoint's 30 minutes (start at 2:20 even if a lab is unfinished); what the server already did for ?genre=fantasy; 401 versus 403 and the application password.</li>
+  <li><b>Cut first (saves 5m):</b> the 6.4 project start: the Find a Book page is one paste at home.</li>
+  <li><b>Cut second (saves 4m):</b> the browser step of the 6.4 demo: the workbook and the lesson have the recording.</li>
+  <li><b>Cut third (saves 5m):</b> the apiFetch step of the 7.1 demo: the project's widget at home teaches it.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Running short: what to add</div>
+<ul class="tick">
+  <li>Lesson 6.4's Exercise 1 live: the count for every genre, <code class="inline">romance</code> and an encoded <code class="inline">&lt;script&gt;</code>, from curl.</li>
+  <li>Lesson 7.1's Exercise 3: restock two books in one batch request, read the answer's per-request status, undo it.</li>
+  <li>Run <code class="inline">who_may_starter.sh</code> for everyone and fill in the table together before running the solution.</li>
+</ul>
+</div>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 13 · Facilitator Guide · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

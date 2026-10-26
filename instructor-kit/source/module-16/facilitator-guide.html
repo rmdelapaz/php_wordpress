@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facilitator Guide: Session 16</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">contains answers &amp; timing · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Facilitator Guide</div>
+    <h1>Session 16: Distribution and Deployment</h1>
+    <p class="sub">How to teach Lessons 8.3 and 8.4 and hand out the final project: translator-friendly strings, accessibility checks that are honest about their limits and a release ZIP that ships only what runs; then the shop's code in Git, release builds from a tag, a migration previewed and the production configuration, rehearsed on a second WordPress; and the Reserve &amp; Pick Up brief, milestones and rubric.</p>
+    <div class="meta-row">
+      <span class="chip"><b>2</b> lessons</span>
+      <span class="chip"><b>3 hrs</b> session</span>
+      <span class="chip">Lessons <b>8.3–8.4</b></span>
+      <span class="chip">Session <b>16</b> of 18 · Part 2</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>How to Use This Guide</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Same rhythm for both lessons: frame → live demo → guided lab → start the lesson's own project; exercises, quiz and journal are homework. Then a third block: <b>the final project's brief</b>, handed out today so that learners arrive at Session 17 with a plan.</li>
+  <li>Type, do not paste. Every command below was run to produce the output under it on WordPress 7.1.3, PHP 8.5, MySQL 9.7 and WP-CLI 2.12: Lesson 8.3's demos on the site as Lesson 8.2 leaves it, Lesson 8.4's on the site as Lesson 8.3 leaves it. <b>Recordings quoted from the lessons</b> say so: Plugin Check and the Spanish front end (they need the internet), the keyboard walk and axe audits (a browser), and everything on the pagesco-live rehearsal server.</li>
+  <li>The lessons are the reference: keep <code class="inline">lesson_28.html</code>, <code class="inline">lesson_29.html</code> and <code class="inline">lesson_30.html</code> open. Labs live in <code class="inline">labs/module-16/</code>: <code class="inline">_starter</code> files are handouts, <code class="inline">_solution</code> files are yours. Each lesson was written for 150 minutes of work alone (Lesson 8.4: 150); the room has 120 for both, plus 25 for the brief.</li>
+  <li>Git, the release builds and the rehearsal server run on the learner's own computer (the WP-CLI container has no git); the kit's labs practice the server-side half (WP-CLI, <code class="inline">wp db</code>, cron) on the development site.</li>
+</ul>
+<div class="note warn"><div class="t">The #1 risk of Session 16: the launch needs the earlier release</div>
+<p>Lesson 8.4's project commits and tags "Pages &amp; Co. Books 1.1.0": it needs Lesson 8.3's release finished (Steps 3 to 5: the Spanish files, the accessibility fixes, the readme and the ZIP), which does not fit in the room. <b>So the room starts Lesson 8.4's project at Step 3</b> (the rehearsal server: download, .env, <code class="inline">docker compose up -d</code>), which needs nothing from 8.3; Steps 1 and 2 go home after 8.3's Step 5. <b>Before:</b> learners download pagesco-live.zip at home (Session 15's bring list) and check <code class="inline">git --version</code>. <b>In the room:</b> nobody types <code class="inline">git commit</code> before <code class="inline">wp plugin list</code> shows pagesco-books 1.1.0.</p>
+</div>
+
+  <div class="sec"><h2>Before the Session</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ <b>A week before:</b> remind learners of the bring list (the site as Lesson 8.2 leaves it, pagesco-live.zip downloaded, Git, Node.js 24, internet at home for es_ES and Plugin Check).</li>
+  <li>☐ <b>Run the kit check once:</b> <code class="inline">python3 labs/check_labs.py module-16</code> (every line PASS; 14 results in about two minutes); with your project, <code class="inline">WP_LABS_COMPOSE=~/pagesco-dev ...</code> (labs/README.md). Lesson 8.4's labs need the site after Lesson 8.3.</li>
+  <li>☐ <b>Projector machine:</b> the site as Lesson 8.2 leaves it, and a copy as Lesson 8.3 leaves it (a database export and the plugin folder) for the second half; <code class="inline">pagesco-live</code> unzipped next to <code class="inline">pagesco-dev</code>, its .env made and its images pulled (<code class="inline">docker compose pull</code> in its folder) so that <code class="inline">up -d</code> takes seconds; Git configured; <code class="inline">lesson_30.html</code> printed or on screen for the brief.</li>
+  <li>☐ <b>Print:</b> the workbook (Session 16), and one copy of Lesson 9.1's brief, milestones table, security checklist and rubric per pair (or the final project part of <code class="inline">final-assessment.html</code>).</li>
+  <li>☐ <b>Board:</b> the publisher's three jobs (i18n · l10n · a11y); "code goes up · content comes down · configuration stays"; the release recipe (tag → git archive → composer install --no-dev → npm ci, build, plugin-zip).</li>
+</ul>
+<div class="blk warn"><div class="h">Known environment traps</div>
+<table class="timing">
+<thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td><code class="inline">wp language core install es_ES</code> or <code class="inline">wp plugin install plugin-check</code> fails</td><td>No internet</td><td>Show the lesson's recorded cards; do it at home. The labs need neither.</td></tr>
+<tr><td>make-pot warns but "Success"</td><td>Warnings do not fail the command</td><td>Read them; Mistake 1.</td></tr>
+<tr><td>The Spanish JSON strings vanish from the PO</td><td>make-json without --no-purge</td><td><code class="inline">wp i18n make-json ... --no-purge</code>; rebuild from the backup PO.</td></tr>
+<tr><td><code class="inline">Failed opening required ... deep_copy.php</code> after installing the ZIP</td><td>The development autoloader</td><td><code class="inline">composer dump-autoload --no-dev</code> before plugin-zip, then <code class="inline">composer dump-autoload</code>.</td></tr>
+<tr><td><code class="inline">git: command not found</code> in <code class="inline">docker compose run --rm wpcli sh</code></td><td>Git runs on the computer, not in the WP-CLI container</td><td>A terminal on the computer in <code class="inline">wordpress/wp-content</code> (Windows: inside WSL).</td></tr>
+<tr><td><code class="inline">docker compose up -d</code> in pagesco-live: port 8081 already allocated</td><td>Something else on 8081</td><td>Stop it; the lesson's addresses assume 8081.</td></tr>
+<tr><td><code class="inline">docker compose restart wordpress</code> breaks wpcli and cron in pagesco-live</td><td>network_mode: service:wordpress</td><td><code class="inline">docker compose up -d</code> instead (the compose file says so).</td></tr>
+<tr><td><code class="inline">wp db export</code> on pagesco-live: error 1044 LOCK TABLES</td><td>Least privilege, on purpose (Step 6)</td><td>Grant LOCK TABLES as root, as the lesson does; delete the 831-byte failed file.</td></tr>
+<tr><td><code class="inline">wp db import</code> prints Access denied lines but Success</td><td>A dump with LOCK TABLES, an account without it</td><td>Read the whole output; grant the right, import again.</td></tr>
+</tbody>
+</table>
+</div>
+
+  <div class="sec"><h2>Session 16 Agenda (3 hours)</h2><span class="rule"></span></div>
+  <table class="timing">
+    <thead><tr><th>Clock</th><th>Minutes</th><th>Segment</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="t">0:00</td><td class="t">10</td><td>Warm-up</td><td>Five retrieval questions on Lessons 8.1 and 8.2, homework check (composer lint 0, the twelve tests, the Performance table).</td></tr>
+      <tr><td class="t">0:10</td><td class="t">10</td><td><b>8.3</b> Frame and mental model</td><td>A publisher's three jobs: manuscript (i18n), translations (l10n), editions for every reader (a11y). Distribution as the professional baseline.</td></tr>
+      <tr><td class="t">0:20</td><td class="t">20</td><td><b>8.3</b> Live demo</td><td>make-pot and a POT entry, the JSON hashes, contrast computed, untranslatable strings caught, the uninstall without its taxonomy, the ZIP with the development autoloader; the recorded audits and Plugin Check.</td></tr>
+      <tr><td class="t">0:40</td><td class="t">15</td><td><b>8.3</b> Guided lab</td><td><code class="inline">labs/module-16/l8_3-i18n-a11y-distribution/plural_strings_starter.php</code>: four strings rewritten until the translator's file translates them.</td></tr>
+      <tr><td class="t">0:55</td><td class="t">15</td><td><b>8.3</b> Start the lesson project</td><td>Release 1.1.0, Steps 1 and 2: the delete-all opt-in, and the uninstall tested both ways from a backup. Steps 3 to 5 go home.</td></tr>
+      <tr><td class="t">1:10</td><td class="t">10</td><td>Break</td><td>Learners who have not downloaded pagesco-live.zip start the download now.</td></tr>
+      <tr><td class="t">1:20</td><td class="t">10</td><td><b>8.4</b> Frame and mental model</td><td>Code goes up, content comes down, configuration stays. Development, staging, production.</td></tr>
+      <tr><td class="t">1:30</td><td class="t">20</td><td><b>8.4</b> Live demo</td><td>The development configuration, development mode and the pattern cache, the secrets, the .gitignore and Git, a dry run, serialized data, a dump and .git in the web root; the recorded rehearsal.</td></tr>
+      <tr><td class="t">1:50</td><td class="t">15</td><td><b>8.4</b> Guided lab</td><td><code class="inline">labs/module-16/l8_4-deployment-maintenance/migration_preview_starter.sh</code>: a move to a staging address, previewed without changing anything.</td></tr>
+      <tr><td class="t">2:05</td><td class="t">20</td><td><b>8.4</b> Start the lesson project</td><td>Launch Day, Step 3: the rehearsal server set up and started (download, .env, docker compose up -d). Steps 1 and 2 (after 8.3's release) and 4 to 7 go home.</td></tr>
+      <tr><td class="t">2:25</td><td class="t">25</td><td>Final-project brief (Lesson 9.1)</td><td>Reserve &amp; Pick Up handed out: the brief, the hand-in, the ten milestones, the security checklist, the rubric; first plan in pairs; what Session 17 starts with.</td></tr>
+      <tr><td class="t">2:50</td><td class="t">10</td><td>Wrap-up</td><td>Exit ticket (3 questions), homework, the full bring list for Session 17.</td></tr>
+      <tr><td class="t"><b>Total</b></td><td class="t"><b>180</b></td><td></td><td>Ends at 3:00.</td></tr>
+    </tbody>
+  </table>
+<p><b>In the room.</b> The lessons estimate 150 + 150 = 300 minutes alone; after the warm-up, the break, the brief and the wrap-up the room has 120. Each lesson keeps its shape; Lesson 8.3's project starts with the two steps that need no internet (the opt-in and its test), Lesson 8.4's with the one step that does not depend on 8.3's release (the rehearsal server).</p>
+<p><b>Goes home (about 2 to 3 hours).</b> Lesson 8.3: Steps 3 to 5 (Spanish, the three accessibility fixes, version 1.1.0 with readme, ZIP and Plugin Check) and the Release note. Then Lesson 8.4: Steps 1 and 2 (commit, tag, build release 1, the launch database), Step 4 (launch), 5 (check), 6 (backup and restore) and 7 (release 2), and the Deployment note. Both lessons' exercises, quizzes, journals, and the final project's planning (the brief's homework below).</p>
+<p><b>Protect, in this order:</b> the 8.4 frame and the Git step ("code goes up, content comes down" is the idea the final project deploys by); the final-project brief (Session 17 starts building); the 8.3 uninstall tested both ways; the 8.4 dry run. <b>Cut first:</b> the 8.3 Plugin Check recordings, then the 8.4 pattern-cache step (tell it), then the 8.3 contrast step.</p>
+
+  <div class="sec"><h2>Opening Segment</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">0:00</span><h3>Warm-up and Homework Check</h3><span class="dur">10 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Timing</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">6m</td><td>Five retrieval questions on Lessons 8.1 and 8.2 (workbook, Warm-up), pairs compare</td></tr>
+<tr><td class="t">4m</td><td>Homework check: <code class="inline">composer lint</code> 0, the twelve tests green, the Performance table in pagesco-plan.txt</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Questions and answers</div>
+<ol class="steps">
+  <li><b>W1 (Lesson 8.1).</b> On a live site, where do PHP's messages go, and why not to wp-content/debug.log? <b>Answer:</b> To a log outside the web root (or the server's log), display always off: wp-content/debug.log is a public download (200 for anyone).</li>
+  <li><b>W2 (Lesson 8.1).</b> Which command runs the plugin's tests, and in which site? <b>Answer:</b> npx @wordpress/env run cli --env-cwd=wp-content/plugins/pagesco-books vendor/bin/phpunit, in the plugin's own wp-env test site on port 8889, never in the site you develop on.</li>
+  <li><b>W3 (Lesson 8.2).</b> get_posts() with 'fields' =&gt; 'ids', then get_post_meta() for each ID: what is that called, and the fix? <b>Answer:</b> N+1 queries; update_postmeta_cache( $ids ) before the loop loads all the meta in one query.</li>
+  <li><b>W4 (Lesson 8.2).</b> What makes a cached result of EventsTable::find() unreachable after a new event is added? <b>Answer:</b> add() calls flush_cache(), which renews wp_cache_get_last_changed( 'pagesco_events' ), and that value is part of every key.</li>
+  <li><b>W5 (Lesson 8.2).</b> The theme's hero image got two fixes. Which, and what did each change? <b>Answer:</b> The Image block's aspectRatio (CLS 0.101 to 0.001: the space is reserved) and a preload with fetchpriority high in wp_preload_resources (LCP a little earlier).</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Watch-outs</div>
+<ul class="tick">
+  <li><b>No tests run yet</b> (wp-env did not start at home): fine for today; they must be green before Session 17, because Lesson 9.1's Milestone 7 adds five.</li>
+  <li><b>A learner still on 8.1's project:</b> the 8.3 labs run on the 8.2 state; they finish 8.2's Steps 4 and 5 before 8.3's Step 5.</li>
+</ul>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Lesson Plans</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">8.3</span><h3>Internationalization, Accessibility &amp; Distribution</h3><span class="dur">60 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Generate a POT file with wp i18n make-pot, write translator-friendly strings, and produce .mo, .l10n.php and JavaScript .json translations with WP-CLI</li>
+  <li>Explain how WordPress 7.1 finds a plugin's translations, for PHP (Domain Path) and for scripts (wp_set_script_translations() and block.json)</li>
+  <li>Check a theme and its blocks for accessibility with contrast ratios, a keyboard walk and an automated axe audit, and say what automated checks miss</li>
+  <li>Prepare a plugin for distribution: a valid readme.txt, version numbers, the directory guidelines, a release ZIP without development files, and a clean Plugin Check report</li>
+  <li>Write an uninstall routine that removes content only when an administrator has opted in</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing in the room</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame: manuscript, translations, editions for every reader</td></tr>
+<tr><td class="t">20m</td><td>Live demo: make-pot, the JSON hashes, untranslatable strings, contrast, the uninstall without its taxonomy, the ZIP's autoloader, Plugin Check as recorded</td></tr>
+<tr><td class="t">15m</td><td>Guided lab: <code class="inline">plural_strings_starter.php</code></td></tr>
+<tr><td class="t">15m</td><td>Start the lesson project: Steps 1 and 2</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Mental model to say</div>
+<p>"A publisher who buys a novel does three things before every reader can have it. The manuscript is prepared for translators: nothing that only works in English. Translators produce the Spanish edition. And there are editions for readers who read differently: large print, an audiobook." On the board: <b>i18n</b> = your code, every string through a translation function with the text domain, in a form a translator can work with; <b>l10n</b> = translation files, from anyone, later; <b>a11y</b> = a quality of every page.</p>
+<p>Then distribution in one sentence: "Pages &amp; Co. Books is installed on one site, and it is still distributed: to staging, to the live site, to the next developer, as a ZIP with a version number. Building it to the directory's standard is the professional baseline."</p>
+</div>
+<div class="blk"><div class="h">Live demo (you type, they follow)</div>
+<p>In the WP-CLI container, on the site as Lesson 8.2 leaves it.</p>
+<ol class="steps">
+  <li><b>Strings to a POT file (4m).</b> "A translator never reads your code: they get a POT file." From the WP-CLI container:
+<pre class="code">wp i18n make-pot wp-content/plugins/pagesco-books /tmp/pagesco-books.pot --exclude=src/blocks,tests
+grep -c '^msgid ' /tmp/pagesco-books.pot
+grep -B3 -A4 '^msgid "%d seat"' /tmp/pagesco-books.pot</pre>
+<pre class="out">Plugin file detected.
+Success: POT file successfully generated.
+132
+#. translators: %d: number of seats.
+#: src/Shortcodes/EventsShortcode.php:65
+#, php-format
+msgid "%d seat"
+msgid_plural "%d seats"
+msgstr[0] ""
+msgstr[1] ""</pre>
+Read the entry from the top: the translators comment you wrote in Lesson 5.5, the file and line, php-format, singular and plural. Then why <code class="inline">--exclude=src/blocks,tests</code>: JavaScript translations are matched to the script the browser loads, so the POT points at build/. The names those JSON files will need:
+<pre class="code">for script in assets/js/stock-widget.js build/blocks/book-list/index.js; do
+  echo "$(printf '%s' "$script" | md5sum | cut -d' ' -f1)  $script"
+done</pre>
+<pre class="out">cfe2bc3ef2a0800531dc26491d4caca6  assets/js/stock-widget.js
+1ef6e759fb00b1b9d64a64056a083f27  build/blocks/book-list/index.js</pre></li>
+  <li><b>Mistake 1: strings a translator cannot translate (4m).</b> "Four typical mistakes in a scratch file, wordpress/pagesco-strings-test/strings.php. Count what make-pot notices."
+<pre class="code"><span class="k">&lt;?php</span>
+<span class="c">/**
+ * Plugin Name: Strings Test
+ * Text Domain: pagesco-books
+ */</span>
+
+<span class="v">$shown</span> = <span class="s">3</span>;
+<span class="v">$total</span> = <span class="s">11</span>;
+<span class="v">$genre</span> = <span class="s">'Fantasy'</span>;
+
+<span class="k">echo</span> sprintf( __( <span class="s">'Showing %s of %s books'</span>, <span class="s">'pagesco-books'</span> ), <span class="v">$shown</span>, <span class="v">$total</span> );
+<span class="k">echo</span> __( <span class="s">'Books in '</span>, <span class="s">'pagesco-books'</span> ) . <span class="v">$genre</span>;
+<span class="k">echo</span> sprintf( __( <span class="s">'%d books'</span>, <span class="s">'pagesco-books'</span> ), <span class="v">$shown</span> );
+<span class="k">echo</span> __( <span class="v">$genre</span>, <span class="s">'pagesco-books'</span> );</pre>
+<pre class="code">wp i18n make-pot pagesco-strings-test /tmp/strings.pot
+grep '^msgid' /tmp/strings.pot</pre>
+<pre class="out">Plugin file detected.
+Warning: The string "Showing %s of %s books" contains placeholders but has no "translators:" comment to clarify their meaning. (strings.php:11)
+Warning: Multiple placeholders should be ordered. (strings.php:11)
+Warning: The string "%d books" contains placeholders but has no "translators:" comment to clarify their meaning. (strings.php:13)
+Success: POT file successfully generated.
+msgid ""
+msgid "Strings Test"
+msgid "Showing %s of %s books"
+msgid "Books in "
+msgid "%d books"</pre>
+Two warnings for four mistakes, and exit 0. The silent two are worse: <code class="inline">"Books in "</code> is a fragment, and <code class="inline">__( $genre )</code> produced no entry at all. Then <code class="inline">rm -r pagesco-strings-test /tmp/strings.pot</code>.</li>
+  <li><b>Contrast, computed (3m).</b> "Accessibility check one: numbers, not taste." Save the lesson's <code class="inline">wordpress/pagesco-contrast.php</code>:
+<pre class="code">wp eval-file pagesco-contrast.php</pre>
+<pre class="out">ink      on paper     13.9:1  AAA   body text
+oxblood  on paper      8.8:1  AAA   links
+slate    on paper      5.8:1  AA    dates, small text
+ink      on sage      12.0:1  AAA   header band
+paper    on ink       13.9:1  AAA   notice bar, footer
+paper    on oxblood    8.8:1  AAA   buttons</pre>
+4.5:1 for normal text, 3:1 for large text and control outlines. Then the two checks no script does: the keyboard walk and an axe audit, recorded in the lesson (show its cards): the selected genre's focus is invisible, the Navigation nests a list, the notice is outside any landmark.</li>
+  <li><b>Mistake 2: an uninstall that cannot find the genres (3m).</b> "uninstall.php runs with the plugin NOT loaded. Reproduce that with --skip-plugins:"
+<pre class="code">wp --skip-plugins=pagesco-books eval '$genres = get_terms( array( "taxonomy" =&gt; "genre", "hide_empty" =&gt; false ) ); echo is_wp_error( $genres ) ? $genres-&gt;get_error_code() . ": " . $genres-&gt;get_error_message() : count( $genres ) . " genres", "\n";'
+wp --skip-plugins=pagesco-books eval 'echo count( get_posts( array( "post_type" =&gt; "book", "numberposts" =&gt; -1 ) ) ), " books\n";'</pre>
+<pre class="out">invalid_taxonomy: Invalid taxonomy.
+11 books</pre>
+Books found (WP_Query just compares a column), genres not (an unregistered taxonomy is a WP_Error): an uninstall that loops over that deletes nothing, silently. The project's uninstall.php registers the taxonomy first.</li>
+  <li><b>Mistake 3: the development autoloader in a ZIP (3m).</b> "Copy what a careful ZIP would contain, and load it as WordPress would."
+<pre class="code">mkdir -p /tmp/zip-test/vendor
+cp -r wp-content/plugins/pagesco-books/vendor/autoload.php wp-content/plugins/pagesco-books/vendor/composer /tmp/zip-test/vendor/
+php -r 'require "/tmp/zip-test/vendor/autoload.php";'</pre>
+<pre class="out">[26-Oct-2026 14:03:20 UTC] PHP Warning:  require(/tmp/zip-test/vendor/composer/../myclabs/deep-copy/src/DeepCopy/deep_copy.php): Failed to open stream: No such file or directory in /tmp/zip-test/vendor/composer/autoload_real.php on line 41
+[26-Oct-2026 14:03:20 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/tmp/zip-test/vendor/composer/../myclabs/deep-copy/src/DeepCopy/deep_copy.php' (include_path='.:/usr/local/lib/php') in /tmp/zip-test/vendor/composer/autoload_real.php:41
+Stack trace:
+...
+  thrown in /tmp/zip-test/vendor/composer/autoload_real.php on line 41</pre>
+The stack frames with Composer's generated class name are trimmed. <code class="inline">composer dump-autoload --no-dev</code> before packaging (8.3), or a clean <code class="inline">composer install --no-dev</code> (8.4). Then <code class="inline">rm -r /tmp/zip-test</code>.</li>
+  <li><b>Plugin Check, as recorded (3m).</b> "The review team's own tool (it needs the internet to install). On the plugin as Lesson 8.2 left it:"
+<pre class="code">wp plugin check pagesco-books --format=csv</pre>
+<pre class="out">     60 WARNING,WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
+      7 ERROR,missing_direct_file_access_protection
+      4 WARNING,WordPress.DB.DirectDatabaseQuery.DirectQuery
+      3 WARNING,WordPress.DB.SlowDBQuery.slow_db_query_tax_query
+      3 WARNING,WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+      2 WARNING,WordPress.DB.DirectDatabaseQuery.NoCaching
+      2 ERROR,wp_function_not_compatible_with_requires_wp
+      2 ERROR,application_detected
+      1 WARNING,WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+      1 WARNING,WordPress.DB.DirectDatabaseQuery.SchemaChange
+      1 ERROR,plugin_header_invalid_plugin_uri_domain
+      1 ERROR,plugin_header_invalid_author_uri_domain
+      1 ERROR,no_plugin_readme
+      1 ERROR,hidden_files</pre>
+Read the errors as a release checklist (the ABSPATH guards, Requires at least 6.9, the placeholder URIs, the readme, development files). And on the unpacked release ZIP at the end of the project:
+<pre class="out">   280261                     72 files
+Success: Checks complete. No errors found.
+     30 WARNING,WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
+      4 WARNING,WordPress.DB.DirectDatabaseQuery.DirectQuery
+      2 WARNING,WordPress.DB.SlowDBQuery.slow_db_query_tax_query
+      2 WARNING,WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+      2 WARNING,WordPress.DB.DirectDatabaseQuery.NoCaching
+      1 WARNING,WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+      1 WARNING,WordPress.DB.DirectDatabaseQuery.SchemaChange
+Deactivating 'plugin-check'...
+Plugin 'plugin-check' deactivated.
+Uninstalled and deleted 'plugin-check' plugin.
+Success: Uninstalled 1 of 1 plugins.</pre></li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b>Concatenating translated fragments.</b> Coach: "Read it in a language where the genre comes first." One sentence, placeholders, a translators comment. (Self-check Q1, the guided lab.)</li>
+  <li><b>Trusting a tool that found nothing.</b> axe passes, so "it is accessible". Coach: "Did the keyboard walk find the focus problem? Did axe?" (Lesson quiz Q3.)</li>
+  <li><b>Shipping the working copy.</b> A ZIP of the plugin folder, with tests, rulesets and the development autoloader. Coach with <code class="inline">release_check.sh</code>. (Self-check Q5.)</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<p><b>File:</b> <code class="inline">labs/module-16/l8_3-i18n-a11y-distribution/plural_strings_starter.php</code>; your reference is <code class="inline">labs/module-16/l8_3-i18n-a11y-distribution/plural_strings_solution.php</code>. A translator's Spanish file is given (written to /tmp, loaded for the lab's own text domain): the learner changes the CODE until it can be translated, which is the developer's half of i18n.</p>
+<ul class="tick">
+  <li><b>Run it as shipped (2m):</b> <code class="inline">cp labs/module-16/l8_3-i18n-a11y-distribution/plural_strings_starter.php wordpress/</code>, <code class="inline">wp eval-file --use-include plural_strings_starter.php</code>: the es lines are English.</li>
+  <li><b>TODO 1 to 4 in pairs (10m):</b> _n(), numbered placeholders, _x() with two contexts, a whole sentence. Circulate for _n() without the count passed to sprintf() too, and for msgids that differ by a space from the translator's.</li>
+  <li><b>Expected when done:</b></li>
+</ul>
+<pre class="out">en  1 book in stock | 9 books in stock
+en  Showing 3 of 11 books
+en  Order | Order
+en  Books in Fantasy
+es  1 libro disponible | 9 libros disponibles
+es  De 11 libros, se muestran 3
+es  Orden | Pedido
+es  Libros de Fantasy</pre><ul class="tick">
+  <li><b>Debrief (3m):</b> "Which string did the translator turn around?" (%2$s first.) "Which two of the starter's strings could never be translated, whatever the file?" (The fragment and the concatenated count.)</li>
+  <li><b>Fast finishers:</b> <code class="inline">labs/module-16/l8_3-i18n-a11y-distribution/a11y_scan_starter.sh</code>, then <code class="inline">labs/module-16/l8_3-i18n-a11y-distribution/debug_seats_spanish.php</code>; <code class="inline">labs/module-16/l8_3-i18n-a11y-distribution/release_check_starter.sh</code> after the project's Step 5.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Start the lesson project</div>
+<p><b>Release 1.1.0.</b> In the room: Steps 1 and 2 (15 minutes): the opt-in and the uninstall tested both ways from a backup.</p>
+<ul class="tick">
+  <li>Step 1: the new Settings.php, SettingsPage.php and uninstall.php; the three section headings; <code class="inline">delete_data</code> false.</li>
+  <li>Step 2, in ONE container shell (<code class="inline">docker compose run --rm wpcli sh</code>: the backup lives in its /tmp): the counts, the export, the uninstall with <code class="inline">--skip-delete</code>, the import. The recorded default run:</li>
+</ul>
+<pre class="out">books	genres	book_meta	events_table
+11	5	66	1
+
+Success: Exported to '/tmp/before-uninstall.sql'.
+Deactivating 'pagesco-books'...
+Plugin 'pagesco-books' deactivated.
+Ran uninstall procedure for 'pagesco-books' plugin without deleting.
+Success: Uninstalled 1 of 1 plugins.
+books	genres	book_meta	events_table
+11	5	66	0
+
+Success: Imported from '/tmp/before-uninstall.sql'.</pre><p>And with the opt-in:</p>
+<pre class="out">Success: Updated 'pagesco_books_settings' option.
+Deactivating 'pagesco-books'...
+Plugin 'pagesco-books' deactivated.
+Ran uninstall procedure for 'pagesco-books' plugin without deleting.
+Success: Uninstalled 1 of 1 plugins.
+books	genres	book_meta	events_table
+0	0	0	0
+
+Success: Imported from '/tmp/before-uninstall.sql'.
+books	genres	book_meta	events_table
+11	5	66	1</pre><ul class="tick">
+  <li><b>Done in the room</b> = 11 books after both imports. <b>Goes home:</b> Steps 3 (Spanish; internet), 4 (accessibility fixes), 5 (version, readme, ZIP, Plugin Check).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<ul class="tick">
+  <li>Which string can a translator translate well? <b>Answer:</b> a whole sentence with numbered placeholders and a translators comment (lesson quiz Q1).</li>
+  <li>What is the long part of the JSON file's name? <b>Answer:</b> the MD5 of the script's path in the plugin (lesson quiz Q2).</li>
+  <li>axe reports nothing. What do you know? <b>Answer:</b> the machine-checkable rules pass; keyboard and screen reader tests are still needed (lesson quiz Q3).</li>
+  <li>Why <code class="inline">composer dump-autoload --no-dev</code> before plugin-zip? <b>Answer:</b> the development autoloader requires files the ZIP does not contain (lesson quiz Q5).</li>
+</ul>
+<p>Workbook self-check, items Q1 to Q6.</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q1</b> <span data-sc="1">C) Numbered placeholders, <code class="inline">'Showing %1$s of %2$s books'</code>, with a translators comment naming both</span>; <b>Q2</b> <span data-sc="2"><code class="inline">languages/pagesco-books-es_ES-f9065c2ff2c4d291b5b56d1be2a45f3f.json</code></span>; <b>Q3</b> <span data-sc="3">A) Normal-size text in slate on paper meets WCAG AA (4.5:1), but not AAA (7:1)</span>; <b>Q4</b> <span data-sc="4">D) During uninstall the plugin is not loaded: its classes, post type and taxonomy are not there</span>; <b>Q5</b> <span data-sc="5">B) <code class="inline">phpcs.xml.dist</code></span>; <b>Q6</b> <span data-sc="6">It keeps the JavaScript strings in the PO file; without it make-json moves them into the JSON files and removes them from the PO</span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> the string rules table of the lesson is the only reference for the lab: each TODO is one row.</p>
+<p><b>Stretch:</b> the lesson's Exercise 1 (_n() in the Stock widget) and Exercise 3 (the must-use plugin translated); the Bonus Challenge (the skip link first again).</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">8.4</span><h3>Deployment &amp; Maintenance</h3><span class="dur">65 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Choose a hosting type for a WordPress project by what it needs, and explain how code, content and configuration move between development, staging and production</li>
+  <li>Keep a WordPress project's own code in Git with a .gitignore, and build release files from a tagged commit with composer install --no-dev, npm ci, npm run build and the plugin ZIP</li>
+  <li>Move a database with wp db export, wp db import and wp search-replace, including serialized values and a plugin's own tables</li>
+  <li>Configure WordPress for production: debugging and development mode off, the environment type, secrets outside the code, a real cron job, file editing disabled and a least-privilege database account</li>
+  <li>Back up a site and prove the backup with a restore, deploy an update, and keep a maintenance checklist</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing in the room</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame: code goes up, content comes down, configuration stays</td></tr>
+<tr><td class="t">20m</td><td>Live demo: the configuration, development mode, secrets, Git, a dry run, serialized data, what the web root hands out, the recorded rehearsal</td></tr>
+<tr><td class="t">15m</td><td>Guided lab: <code class="inline">migration_preview_starter.sh</code></td></tr>
+<tr><td class="t">20m</td><td>Start the lesson project: Step 3, the rehearsal server</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Mental model to say</div>
+<p>"Pages &amp; Co. moves into a bigger store. The carpenter builds the shelves in the workshop and carries them in finished. The books come along once, on moving day, and from then on the booksellers add and sell them in the store. The alarm code is set for the new building and never painted on a shelf." On the board: <b>code goes up</b> (Git, a release build, a deploy) · <b>content comes down</b> (the database moves once, then only copies from live) · <b>configuration stays</b> (written per environment).</p>
+<p>Then the consequence that surprises everyone once: "An edit in the live Site Editor is content. Deploy a new header.html and Maria's header stays." (Self-check Q7.)</p>
+</div>
+<div class="blk"><div class="h">Live demo (you type, they follow)</div>
+<p>On the site as Lesson 8.3 leaves it; Git in a terminal on the computer, in <code class="inline">wordpress/wp-content</code> (here the node:24 container ran it, as the lesson's runner does).</p>
+<ol class="steps">
+  <li><b>The development configuration (3m).</b> "Your site has the opposite of a production configuration, on purpose."
+<pre class="code">wp eval 'foreach ( array( "WP_DEBUG", "WP_DEBUG_DISPLAY", "SCRIPT_DEBUG", "WP_ENVIRONMENT_TYPE", "WP_DEVELOPMENT_MODE", "DISALLOW_FILE_EDIT", "DISABLE_WP_CRON" ) as $name ) { printf( "%-20s %s\n", $name, defined( $name ) ? var_export( constant( $name ), true ) : "(not defined)" ); }'</pre>
+<pre class="out">WP_DEBUG             true
+WP_DEBUG_DISPLAY     true
+SCRIPT_DEBUG         true
+WP_ENVIRONMENT_TYPE  'local'
+WP_DEVELOPMENT_MODE  'theme'
+DISALLOW_FILE_EDIT   (not defined)
+DISABLE_WP_CRON      (not defined)</pre>
+Fill in the lesson's production column on the board: debug off, no SCRIPT_DEBUG, production, no development mode, DISALLOW_FILE_EDIT true, DISABLE_WP_CRON true with a real cron job, secrets on the server only.</li>
+  <li><b>Development mode and the pattern cache (4m).</b> "Why the theme's Version matters on a live site." Development mode off, one page view fills the cache:
+<pre class="code">wp config delete WP_DEVELOPMENT_MODE
+curl -s -o /dev/null http://localhost:8080/
+wp db query "SELECT option_name FROM wp_options WHERE option_name LIKE '_site_transient_wp_theme_files_patterns%'"</pre>
+<pre class="out">Success: Deleted the constant 'WP_DEVELOPMENT_MODE' from the 'wp-config.php' file.
+option_name
+_site_transient_wp_theme_files_patterns-ab0ac91d73cd40af5667134910f64f93</pre>
+Now a new pattern file, <code class="inline">wordpress/wp-content/themes/pagesco/patterns/gift-cards.php</code> (the lesson's), and the question "does WordPress know it?", before and after one changed Version line:
+<pre class="code">wp eval 'var_dump( WP_Block_Patterns_Registry::get_instance()-&gt;is_registered( "pagesco/gift-cards" ) );'
+sed -i 's/^Version: 1.0.0$/Version: 1.1.0/' wp-content/themes/pagesco/style.css
+wp eval 'var_dump( WP_Block_Patterns_Registry::get_instance()-&gt;is_registered( "pagesco/gift-cards" ) );'</pre>
+<pre class="out">bool(false)
+bool(true)</pre>
+Then <code class="inline">rm wp-content/themes/pagesco/patterns/gift-cards.php; wp config set WP_DEVELOPMENT_MODE theme</code>. On a live site: raise the theme's Version with every release that changes the theme.</li>
+  <li><b>Where the secrets are (2m).</b> "A secret is anything that lets someone act as the site."
+<pre class="code">grep -n -e "define( 'WP_DEBUG'" -e "WORDPRESS_CONFIG_EXTRA" -e "SUPPLIER" wp-config.php</pre>
+<pre class="out">116:define( 'WP_DEBUG', !!getenv_docker('WORDPRESS_DEBUG', '') );
+127:if ($configExtra = getenv_docker('WORDPRESS_CONFIG_EXTRA', '')) {
+131:define( 'PAGESCO_BOOKS_SUPPLIER_URL', 'http://localhost:8080/supplier-sandbox/v1/' );
+132:define( 'PAGESCO_BOOKS_SUPPLIER_KEY', 'sandbox-7f3a9c' );</pre>
+The sandbox key in wp-config.php is fine here (not in Git, a fake supplier). Live: the server's wp-config.php or environment, different per environment; the supplier-sandbox folder never ships.</li>
+  <li><b>The shop's code in Git (4m).</b> "Git keeps your own source and nothing else." Save the lesson's <code class="inline">wordpress/wp-content/.gitignore</code> (ignore everything, let the shop's folders back in), then in <code class="inline">wordpress/wp-content</code> on your computer:
+<pre class="code">git init -q -b main
+git config user.name "Your Name"
+git config user.email "you@example.com"
+git add .
+git status --short | wc -l
+git ls-files | cut -d/ -f1-2 | sort | uniq -c</pre>
+<pre class="out">91
+      1 .gitignore
+      1 mu-plugins/pagesco-site.php
+     66 plugins/pagesco-books
+     23 themes/pagesco</pre>
+And why a file is missing:
+<pre class="code">git check-ignore -v mu-plugins/mailpit-smtp.php plugins/pagesco-books/vendor plugins/akismet uploads</pre>
+<pre class="out">.gitignore:7:/mu-plugins/*	mu-plugins/mailpit-smtp.php
+.gitignore:19:/plugins/pagesco-books/vendor/	plugins/pagesco-books/vendor
+.gitignore:15:/plugins/*	plugins/akismet
+.gitignore:3:/*	uploads</pre>
+mailpit-smtp.php can never reach the live site: the rule guarantees it.</li>
+  <li><b>A migration, dry run (3m).</b> "WordPress stores full URLs in the database. What would the move to 8081 change?"
+<pre class="code">wp search-replace 'http://localhost:8080' 'http://localhost:8081' --all-tables-with-prefix --skip-columns=guid --dry-run --report-changed-only</pre>
+<pre class="out">+------------+--------------+--------------+------+
+| Table      | Column       | Replacements | Type |
++------------+--------------+--------------+------+
+| wp_options | option_value | 2            | PHP  |
+| wp_posts   | post_content | 6            | SQL  |
+| wp_users   | user_url     | 1            | SQL  |
++------------+--------------+--------------+------+
+Success: 9 replacements to be made.</pre>
+Then serialized data: the length is rewritten with the string (s:34 → s:40), which a plain SQL REPLACE() breaks:
+<pre class="code">wp option add pagesco_demo_links '{"shop":"http://localhost:8080/find-a-book/"}' --format=json
+wp db query "SELECT option_value FROM wp_options WHERE option_name = 'pagesco_demo_links'"
+wp search-replace 'http://localhost:8080' 'https://www.pagesco.example' wp_options --export | grep -o "pagesco_demo_links', '[^']*'"
+wp option delete pagesco_demo_links</pre>
+<pre class="out">Success: Added 'pagesco_demo_links' option.
+option_value
+a:1:{s:4:"shop";s:34:"http://localhost:8080/find-a-book/";}
+
+pagesco_demo_links', 'a:1:{s:4:\"shop\";s:40:\"https://www.pagesco.example/find-a-book/\";}'
+Success: Deleted 'pagesco_demo_links' option.</pre></li>
+  <li><b>Mistakes 1 and 3: what the web root hands out (3m).</b> "Ask like a stranger."
+<pre class="code">wp db export pagesco-dev.sql
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/pagesco-dev.sql
+curl -s http://localhost:8080/pagesco-dev.sql | grep -o "'admin','[$]wp[$]2y[$][0-9]*"</pre>
+<pre class="out">Success: Exported to 'pagesco-dev.sql'.
+200
+'admin','$wp$2y$12</pre>
+The whole database, password hashes included. <code class="inline">rm pagesco-dev.sql</code>. And the repository in wp-content:
+<pre class="code">curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/wp-content/.git/config
+curl -s http://localhost:8080/wp-content/.git/HEAD</pre>
+<pre class="out">200
+ref: refs/heads/main</pre>
+On your machine leave it; on a server: deploy release files, never the repository, and deny hidden files (the rehearsal's Apache does).</li>
+  <li><b>The rehearsal, as recorded (1m).</b> Show the lesson's recorded Step 5 card from pagesco-live: the production settings checked on the running site.
+<pre class="out">debug false, environment production, development mode "", file editor off, application passwords not available
+Error: The DISABLE_WP_CRON constant is set to true. WP-Cron spawning is disabled.
+Grants for pagesco_app@%
+GRANT USAGE ON *.* TO `pagesco_app`@`%`
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER ON `pagesco`.* TO `pagesco_app`@`%`
+
+Error: Query failed: --------------
+CREATE DATABASE test
+--------------
+
+ERROR 1044 (42000) at line 1: Access denied for user 'pagesco_app'@'%' to database 'test'</pre>
+Debug off, production, no editor, no application passwords without HTTPS, WP-Cron's spawning off, a database account limited to its database. Learners make this card themselves at home.</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b>Deploying the database again with an update.</b> Coach: "Where were today's orders made?" A later deploy is code only. (Lesson quiz Q1.)</li>
+  <li><b>A migration without the plugin's table.</b> Coach: "Count the CREATE TABLE lines before you import." (Self-check Q8, the debug handout.)</li>
+  <li><b>A backup nobody restored.</b> Coach: "How big is the file? When did you last restore one?" (Self-check Q12, <code class="inline">restore_drill</code>.)</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<p><b>File:</b> <code class="inline">labs/module-16/l8_4-deployment-maintenance/migration_preview_starter.sh</code>; your reference is <code class="inline">labs/module-16/l8_4-deployment-maintenance/migration_preview_solution.sh</code>. A move to a staging address, previewed with dry runs and exports to /tmp: the habit of counting before importing, without touching the database.</p>
+<ul class="tick">
+  <li><b>Run it as shipped (2m):</b> <code class="inline">cp labs/module-16/l8_4-deployment-maintenance/migration_preview_starter.sh wordpress/</code>, <code class="inline">docker compose run --rm wpcli sh migration_preview_starter.sh</code>.</li>
+  <li><b>TODO 1 to 4 in pairs (10m):</b> never a search-replace without <code class="inline">--dry-run</code> or <code class="inline">--export</code>. Circulate for <code class="inline">--format=count</code> and for <code class="inline">&gt; /dev/null</code> on the exports.</li>
+  <li><b>Expected when done:</b></li>
+</ul>
+<pre class="out">tables WordPress registers: 12, all with the prefix: 13
+the tables only the second list has: wp_pagesco_events
+dry run, every table with the prefix, GUIDs left alone: 9 replacements
+export without --all-tables-with-prefix: 12 tables
+export with --all-tables-with-prefix: 13 tables
+new address in the export: 15, old address left (the GUIDs): 34
+options with the address inside a serialized value: 0
+the database still says: http://localhost:8080</pre><ul class="tick">
+  <li><b>Debrief (3m):</b> "What is the 34?" (The GUIDs, left alone on purpose.) "Which line would have caught Common Mistake 2?"</li>
+  <li><b>Fast finishers:</b> <code class="inline">labs/module-16/l8_4-deployment-maintenance/restore_drill_starter.sh</code>, <code class="inline">labs/module-16/l8_4-deployment-maintenance/cron_audit_starter.php</code>, then <code class="inline">labs/module-16/l8_4-deployment-maintenance/debug_launch_check.sh</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Start the lesson project</div>
+<p><b>Launch Day, Rehearsed.</b> In the room: Step 3 only (20 minutes), because Steps 1 and 2 need Lesson 8.3's release 1.1.0.</p>
+<ul class="tick">
+  <li>Unzip pagesco-live.zip next to pagesco-dev, <code class="inline">cp .env.example .env</code> and two long random passwords, <code class="inline">mkdir wordpress deploy backups</code>, on Linux and WSL the two lines and compose.override.yaml, <code class="inline">docker compose up -d</code>.</li>
+  <li>Read the folder's table together (compose.yaml, .env, create-app-user.sh, apache-8081.conf, php-production.ini): every line of the production configuration is in one of them.</li>
+  <li><b>Done in the room</b> = four containers started and http://localhost:8081 answering (WordPress's installer: nothing is installed, on purpose). <b>Goes home:</b> Steps 1, 2, 4 to 7, in that order, after 8.3's Step 5. The recorded results learners compare with:</li>
+</ul>
+<pre class="out">+------------+--------------+--------------+------+
+| Table      | Column       | Replacements | Type |
++------------+--------------+--------------+------+
+| wp_options | option_value | 2            | PHP  |
+| wp_posts   | post_content | 6            | PHP  |
+| wp_users   | user_url     | 1            | PHP  |
++------------+--------------+--------------+------+
+Success: Made 9 replacements and exported to release/pagesco-live.sql.
+http://localhost:8080
+13
+     34 http://localhost:8080
+     15 http://localhost:8081</pre><pre class="out">Server: Apache
+403
+404</pre><pre class="out">0
+Pages &amp; Co. Books 1.1.1 and theme 1.1.1: HTTPS for the supplier, Update URI
+Pages &amp; Co. release 1: theme 1.1.0, Pages &amp; Co. Books 1.1.0, site plugin 1.2.0
+release-1       First launch
+release-2       Plugin 1.1.1, theme 1.1.1</pre></div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<ul class="tick">
+  <li>A bug fix after a month live: what do you deploy? <b>Answer:</b> only the plugin ZIP built from the release tag (lesson quiz Q1).</li>
+  <li>Export without --all-tables-with-prefix: what is missing? <b>Answer:</b> the plugin's events table (lesson quiz Q2).</li>
+  <li>A new pattern, the same theme Version: what happens? <b>Answer:</b> unknown until the cached list expires (lesson quiz Q3).</li>
+  <li>DISABLE_WP_CRON and no cron job: the nightly sync? <b>Answer:</b> never runs (lesson quiz Q5).</li>
+</ul>
+<p>Workbook self-check, items Q7 to Q12.</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q7</b> <span data-sc="7">B) Maria's header: Site Editor changes are saved in the database, and they win over the theme's files</span>; <b>Q8</b> <span data-sc="8"><code class="inline">12 13</code>: <code class="inline">wp_pagesco_events</code>, the plugin's own table, which WordPress does not register</span>; <b>Q9</b> <span data-sc="9">A) The GUID is an identifier feed readers use to recognize posts, not a link: it must not change</span>; <b>Q10</b> <span data-sc="10">D) Git cannot let a file back in when its folder is ignored: the folder is let in, its contents ignored again, then the one subfolder let in</span>; <b>Q11</b> <span data-sc="11"><code class="inline">composer install --no-dev --optimize-autoloader</code>: the development packages (PHPUnit, PHPCS), so vendor/composer has no autoload_files.php that requires them</span>; <b>Q12</b> <span data-sc="12">C) It fails with error 1044, and leaves a small header-only file under the backup's name</span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> one card with the release recipe in order (tag, git archive, composer install --no-dev -o, npm ci, build, plugin-zip) and the launch in order (code first, then the database).</p>
+<p><b>Stretch:</b> the lesson's three exercises (launch check as code, nightly backup script, smoke test), and the Bonus Challenge (a CI workflow on release-* tags).</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>The Final Project</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">2:25</span><h3>The Final-Project Brief: Reserve &amp; Pick Up</h3><span class="dur">25 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Timing</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">8m</td><td>The brief: Maria's requirements, read aloud, and what learners hand in</td></tr>
+<tr><td class="t">7m</td><td>The ten milestones, the security checklist and the rubric</td></tr>
+<tr><td class="t">8m</td><td>First plan, in pairs: nouns and verbs, requirements to layers</td></tr>
+<tr><td class="t">2m</td><td>What Session 17 starts with, and what to plan tonight</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Turn a client's brief into data, rules, routes, blocks and screens, and decide where each rule is enforced</li>
+  <li>Build a feature through every layer of the course: a custom table, settings, a service class with a custom hook, REST routes with real permission callbacks, form handlers, a staff screen, a dynamic and an interactive block, and a theme pattern with live data</li>
+  <li>Make it secure and private by default: nonces and capabilities on every change, ownership in every query, escaping, and personal data kept no longer than needed</li>
+  <li>Prove the feature with coding standards, PHPUnit tests, a smoke test from outside, accessibility checks and a performance measurement</li>
+  <li>Release it from a tagged commit and deploy it as code only, then present your work against a rubric</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Sequence and talking points</div>
+<ul class="tick">
+  <li><b>The brief (8m).</b> Hand out the brief (<code class="inline">lesson_30.html</code>, "The Brief"; or the final project part of <code class="inline">final-assessment.html</code>). Read Maria's eight requirements aloud and ask after each: "Which layer handles that?" Then the hand-in: the Git repository with tag release-3 (plugin and theme 1.2.0), both ZIPs, the proof (composer lint, PHPUnit, the smoke test on both sites, the performance numbers), RESERVE-AND-PICKUP.md, a five-minute showcase. The lesson estimates 300 minutes; Sessions 17 and 18 give it studio time, the rest is homework.</li>
+  <li><b>Milestones and assessment (7m).</b> Put the milestones table on the slide (read from the lesson) and say: "Each ends with something you can check and commit. Three sittings: 1 to 4, 5 to 7, 8 to 10." Then the security checklist (it carries the most points) and the rubric: 80 of 100 is portfolio-ready.</li>
+  <li><b>First plan (8m).</b> In pairs, the From Requirements to Code habit: underline the nouns (the data: a hold, a customer, a book, a pickup date), the verbs (reserve, cancel, collect, email), and fill a requirements-to-layers table: rule, door (form, REST, block), screen. Pairs share one decision each: why a custom table, why "expired" is computed.</li>
+  <li><b>What comes next (2m).</b> "Session 17 starts at Milestone 1 with your plan in your hands, on the site and server as Lesson 8.4 leaves them. Tonight: finish 8.3 and 8.4 first, then read the brief again and write your plan." Read the bring list.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Milestones (from the lesson page)</div>
+<table class="timing">
+<thead><tr><th>#</th><th>Milestone</th><th>Uses lessons</th><th>Time</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Plan, and measure before you build</td><td>1.1, 8.2</td><td>15 min</td></tr>
+<tr><td>2</td><td>The data: a holds table and two settings</td><td>5.1, 5.4, 5.5</td><td>25 min</td></tr>
+<tr><td>3</td><td>The rules, and the email</td><td>1.3, 2.3, 5.3, 1.2</td><td>30 min</td></tr>
+<tr><td>4</td><td>REST routes, form handlers and the staff screen</td><td>5.3, 5.4, 7.1, 7.2</td><td>30 min</td></tr>
+<tr><td>5</td><td>Two blocks: Reserve for Pickup and My Holds</td><td>3.2, 6.1, 6.3, 6.4</td><td>45 min</td></tr>
+<tr><td>6</td><td>Live prices on the front page</td><td>3.3, 6.3</td><td>15 min</td></tr>
+<tr><td>7</td><td>Quality: standards, tests, speed, accessibility</td><td>8.1, 8.2, 8.3</td><td>30 min</td></tr>
+<tr><td>8</td><td>Release 1.2.0</td><td>8.3, 8.4</td><td>20 min</td></tr>
+<tr><td>9</td><td>Deploy to the rehearsal server</td><td>8.4, 7.3</td><td>25 min</td></tr>
+<tr><td>10</td><td>Write-up and showcase</td><td>all</td><td>15 min</td></tr>
+</tbody>
+</table>
+<p>250 minutes of building; the brief, the mistakes, exercises, quiz and journal make up the rest of the lesson's 300.</p>
+</div>
+<div class="blk"><div class="h">Rubric (from the lesson page)</div>
+<table class="timing">
+<thead><tr><th>Area</th><th>Points</th></tr></thead>
+<tbody>
+<tr><td>Features</td><td>20</td></tr>
+<tr><td>Data and rules</td><td>15</td></tr>
+<tr><td>Security and privacy</td><td>20</td></tr>
+<tr><td>Blocks and experience</td><td>15</td></tr>
+<tr><td>Code quality</td><td>10</td></tr>
+<tr><td>Testing</td><td>10</td></tr>
+<tr><td>Release and deploy</td><td>5</td></tr>
+<tr><td>Write-up and showcase</td><td>5</td></tr>
+</tbody>
+</table>
+<p>Each area: 0 (missing), half (meets) or all (exceeds). The lesson's table has the meets and exceeds descriptions.</p>
+</div>
+<div class="blk warn"><div class="h">Watch-outs</div>
+<ul class="tick">
+  <li><b>Do not start building today.</b> A learner who types code for holds tonight on a site still at 8.2 builds on the wrong state; the plan is tonight's work.</li>
+  <li><b>The reference solution</b> (<code class="inline">downloads/pagesco-final</code>, and each milestone's "Reference solution" panel) exists: say so, and say how to use it: try first, then compare.</li>
+  <li><b>Privacy is a requirement</b>, not a nice-to-have: holds name customers (requirement 8, the checklist's last row).</li>
+</ul>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Closing</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Exit ticket (3 questions, no notes, 4 minutes)</div>
+<ol class="steps">
+  <li>Give one example each of code, content and configuration on the Pages &amp; Co. site, and how each moves to the live site. <b>Answer:</b> the plugin (Git, release ZIP, deploy); the books (the database, once at launch, then created live); the supplier key (written on the server, never copied).</li>
+  <li>Name two translator-friendly rules for strings. <b>Answer:</b> whole sentences with placeholders; numbered placeholders with a translators comment; _n() for counts; _x() for ambiguous words; literal strings only.</li>
+  <li>Which two Reserve &amp; Pick Up requirements do you expect to be the hardest, and which layer handles each? <b>Answer:</b> any honest pair; for example "nobody can see anyone else's holds" (the user ID in the SQL WHERE, "not found") and "works without JavaScript" (forms to admin-post.php under the block's store).</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Homework (about 2 to 3 hours)</div>
+<ul class="tick">
+  <li><b>Finish Lesson 8.3's project first:</b> Steps 3 to 5 (Spanish, the accessibility fixes, version 1.1.0 with readme, ZIP and Plugin Check) and the Release note.</li>
+  <li><b>Then Lesson 8.4's project:</b> Steps 1 and 2, then 4 to 7 on the rehearsal server you started today, and the Deployment note. The final project deploys to that server.</li>
+  <li><b>Lesson exercises.</b> 8.3: Exercises 1 and 2 (3 is a stretch). 8.4: Exercises 1 and 2 (3 is a stretch).</li>
+  <li><b>Both Quick Quizzes</b> and <b>both journal entries</b>; both "Before the Next Lesson" lists.</li>
+  <li><b>The final project's plan:</b> read Lesson 9.1's Brief, From Requirements to Code, the Security and Privacy Checklist and How Your Work Is Assessed; write your requirements-to-layers table and three questions. Do not build yet.</li>
+  <li><b>Optional:</b> the labs not reached: <code class="inline">labs/module-16/l8_3-i18n-a11y-distribution/a11y_scan_starter.sh</code> (before and after your Step 4), <code class="inline">labs/module-16/l8_3-i18n-a11y-distribution/release_check_starter.sh</code> (after Step 5), <code class="inline">labs/module-16/l8_3-i18n-a11y-distribution/debug_seats_spanish.php</code>, <code class="inline">labs/module-16/l8_4-deployment-maintenance/restore_drill_starter.sh</code>, <code class="inline">labs/module-16/l8_4-deployment-maintenance/cron_audit_starter.php</code>, <code class="inline">labs/module-16/l8_4-deployment-maintenance/debug_launch_check.sh</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Bring list for Session 17</div>
+<ul class="tick">
+  <li>The site as Lesson 8.4 leaves it: <code class="inline">wordpress/wp-content</code> is a Git repository with a clean working copy and the tags release-1 and release-2 (<code class="inline">git status</code>, <code class="inline">git tag -n</code>), plugin and theme 1.1.1, <code class="inline">composer lint</code> exits 0.</li>
+  <li>The rehearsal server <code class="inline">~/pagesco-live</code> launched, with plugin and theme 1.1.1, its new passwords in your password manager, <code class="inline">LOCK TABLES</code> granted, and one backup in <code class="inline">backups/</code> (Lesson 8.4, Steps 3 to 7). <code class="inline">docker compose up -d</code> in its folder before the session.</li>
+  <li>The test environment works: <code class="inline">npx @wordpress/env start</code> in the plugin's folder, the twelve tests green (Node.js 24; the node:24 and composer:2 images pulled).</li>
+  <li>An internet connection for npx and <code class="inline">npm ci</code> (Lesson 9.1's Milestones 5 and 8).</li>
+  <li>Your plan for Reserve &amp; Pick Up from tonight's homework (the requirements-to-layers table, the questions you still have), Lesson 9.1 open in a browser tab, pagesco-plan.txt, the journal and the workbook.</li>
+</ul>
+</div>
+
+  <div class="sec"><h2>If You Run Long or Short</h2><span class="rule"></span></div>
+<div class="blk warn"><div class="h">Running long: what to protect and what to cut first</div>
+<ul class="tick">
+  <li><b>Protect:</b> the 8.4 frame and Git; the final-project brief (at least 15 minutes); the 8.3 uninstall test.</li>
+  <li><b>Cut first (saves 3m):</b> the Plugin Check recordings (they are in the Answer Key).</li>
+  <li><b>Cut second (saves 4m):</b> the 8.4 pattern-cache step: tell it with the self-check's numbers.</li>
+  <li><b>Cut third (saves 8m):</b> the brief's first plan in pairs goes home with the reading.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Running short: what to add</div>
+<ul class="tick">
+  <li><code class="inline">restore_drill_solution.sh</code> on the projector: the drill read line by line.</li>
+  <li>Lesson 8.4's Exercise 3 (the smoke test) live against the development site and a wrong address.</li>
+  <li>Longer planning for the final project: pairs swap tables and review each other's against the security checklist.</li>
+</ul>
+</div>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 16 · Facilitator Guide · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

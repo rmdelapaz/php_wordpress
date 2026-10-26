@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Key: Session 6</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">answers &amp; solutions · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Answer Key</div>
+    <h1>Session 6: The Loop and Custom Queries</h1>
+    <p class="sub">Answers and reasoning for every Session 6 item: the warm-up, both self-checks, the predict-then-run items, the lab reference outputs, the lesson pages' own quizzes and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Session <b>6</b></span>
+      <span class="chip"><b>12</b> self-check items</span>
+      <span class="chip">Confidential</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Start Here · Warm-up</h2><span class="rule"></span></div>
+<p>Session 5 retrieval, not graded. W5's output on a site ready for today:</p>
+<pre class="code">wp theme list --fields=name,status
+wp post list --post_type=wp_template,wp_template_part,wp_global_styles --format=count</pre><pre class="out">+-------------------+----------+
+| name              | status   |
++-------------------+----------+
+| pagesco-tt5-child | inactive |
+| pagesco           | active   |
+| twentytwentyfive  | inactive |
+| twentytwentyfour  | inactive |
+| twentytwentythree | inactive |
++-------------------+----------+
+0</pre><ol class="steps">
+  <li><b>W1</b> Theme pattern or synced pattern: which one is a post in the database, and why does a theme never ship one? <b>Answer:</b> The synced pattern: a wp_block post referenced by ID, and IDs differ on every site (Lesson 3.3).</li>
+  <li><b>W2</b> Two JSON files in styles/: what makes one a section style and the other a style variation? <b>Answer:</b> The blockTypes key: with it, a section style for the listed blocks; without it, a look for the whole site.</li>
+  <li><b>W3</b> A child theme is active. What do the template and stylesheet options hold? <b>Answer:</b> template = the parent's folder, stylesheet = the child's (Lesson 3.4).</li>
+  <li><b>W4</b> Why did the child's style.css not load until functions.php enqueued it, and why must a parent hook be removed on after_setup_theme? <b>Answer:</b> A block theme's style.css is a header file; CSS loads only when enqueued. The child's functions.php runs first, so the parent's hooks do not exist yet when it runs.</li>
+  <li><b>W5</b> Run the two commands on the slide. What should a site ready for today print? <b>Answer:</b> pagesco active, pagesco-tt5-child inactive (Twenty Twenty-One deleted), and 0 Site Editor copies. Today's demo starts by building pagesco-classic and switching to it.</li>
+</ol>
+
+  <div class="sec"><h2>4.1 · The Loop &amp; Template Tags: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">A classic theme has only index.php, singular.php and 404.php. Which file draws /author/maria/?</div><div class="opts"><div class="opt">A) <code class="inline">singular.php</code></div><div class="opt correct">B) <code class="inline">index.php</code>, with a Loop over Maria's posts</div><div class="opt">C) <code class="inline">author.php</code>, which WordPress generates</div><div class="opt">D) <code class="inline">404.php</code>, because there is no author template</div></div><div class="why"><b>Why:</b> The hierarchy for an author archive is author-{nicename}, author-{id}, author, archive, then index (Lesson 3.1). With none of the specific files, index.php runs, and its Loop walks whatever the main query found: Maria's two posts. That is why one index.php can draw every list.<br><b>A</b> is wrong: singular.php is for one post or page.<br><b>C</b> is wrong: WordPress never generates templates.<br><b>D</b> is wrong: 404 is only for requests whose main query finds nothing at all.</div></div>
+  <div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">On the course site, what does this print, and why?</div><pre class="code">wp eval 'var_dump( is_home(), get_the_title() );'</pre><div class="opts"><div class="opt correct"><code class="inline">bool(false)</code> and <code class="inline">string(0) ""</code>: WP-CLI loads WordPress but runs no main query, so is_home() has nothing to answer from and there is no current post for get_the_title()</div></div><div class="why"><b>Why:</b> Conditional tags and template tags read the main query and the global <code class="inline">$post</code>, which only a front-end request (or <code class="inline">wp()</code>, as the session's debug handouts do) fills. In a template both would work.</div></div>
+  <div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">Inside the Loop you need the post's title in a link's <code class="inline">title</code> attribute and as the link text inside an h2. Which pair is right?</div><div class="opts"><div class="opt">A) <code class="inline">title="&lt;?php the_title(); ?&gt;"</code> and <code class="inline">echo '&lt;h2&gt;' . the_title() . '&lt;/h2&gt;';</code></div><div class="opt">B) <code class="inline">title="&lt;?php echo get_the_title(); ?&gt;"</code> and <code class="inline">the_title( '&lt;h2&gt;', '&lt;/h2&gt;' );</code></div><div class="opt">C) <code class="inline">title="&lt;?php echo esc_html( the_title() ); ?&gt;"</code> and <code class="inline">the_title();</code></div><div class="opt correct">D) <code class="inline">title="&lt;?php the_title_attribute(); ?&gt;"</code> and <code class="inline">the_title( '&lt;h2&gt;', '&lt;/h2&gt;' );</code></div></div><div class="why"><b>Why:</b> the_title() prints text prepared for HTML, not for an attribute; <code class="inline">the_title_attribute()</code> (or <code class="inline">esc_attr( get_the_title() )</code>) is the attribute version. the_title() with $before and $after wraps itself; concatenating it into a string prints the title first and an empty h2 after it (Lesson 4.1, Common Mistakes 1).<br><b>A</b> is wrong: Both halves are wrong: an unescaped attribute, and the concatenation mistake.<br><b>B</b> is wrong: The h2 is right; the attribute is not escaped for its context.<br><b>C</b> is wrong: the_title() prints and returns nothing, so esc_html() escapes an empty value after the title is already out.</div></div>
+  <div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt"><code class="inline">get_template_part( 'template-parts/content.php' );</code> prints nothing, and there is no message. Why?</div><div class="opts"><div class="opt correct">A) It looked for template-parts/content.php.php, found nothing and returned false</div><div class="opt">B) Template parts only work inside the Loop</div><div class="opt">C) Template parts must be in the theme's root folder</div><div class="opt">D) It found the file but needs a third argument with the post</div></div><div class="why"><b>Why:</b> get_template_part() adds .php itself and goes through locate_template() (child first, then parent). A missing file is not an error: the function returns false, a found file null. var_dump() its return value when a part seems to print nothing.<br><b>B</b> is wrong: Parts can run anywhere; content.php just uses template tags, which need a current post.<br><b>C</b> is wrong: Any path relative to the theme works.<br><b>D</b> is wrong: $args is optional (WordPress 5.5+).</div></div>
+  <div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">A plugin must do something only on single posts and pages. Which is the EARLIEST of these hooks on which <code class="inline">is_singular()</code> gives the right answer?</div><div class="opts"><div class="opt">A) <code class="inline">plugins_loaded</code></div><div class="opt">B) <code class="inline">init</code></div><div class="opt correct">C) <code class="inline">template_redirect</code></div><div class="opt">D) <code class="inline">wp_footer</code></div></div><div class="why"><b>Why:</b> Conditional tags read the main query, which runs after init (wp() in the request order, Lesson 2.2). template_redirect fires after the query and before the template, which is why the lesson's conditions tool logs there. wp_footer works too, but much later.<br><b>A</b> is wrong: Before the query: the tag returns false, with a "called incorrectly" notice.<br><b>B</b> is wrong: Still before the query.<br><b>D</b> is wrong: It works, but it is not the earliest; by then the page is printed.</div></div>
+  <div class="q" data-sc="6" data-kind="short"><div class="qn">Q6</div><div class="qt">singular.php shows only one page. Why does it still use while ( have_posts() ) { the_post(); ... }?</div><div class="opts"><div class="opt correct">The main query holds exactly one post, and the_post() is what sets the global $post that every template tag reads (and fires loop_start / loop_end for plugins)</div></div><div class="why"><b>Why:</b> On a single post or page the Loop has one item. Skipping it leaves template tags without a current post, and plugins that hook into the Loop never see it.</div></div>
+
+  <div class="sec"><h2>4.1 · The Loop &amp; Template Tags: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it.</div><pre class="code">curl -s http://localhost:8080/author/devon/ | grep -o '&lt;h1&gt;.*&lt;/h1&gt;' | sed 's/&lt;[^&gt;]*&gt;//g'</pre><div class="opts"><div class="opt correct"><pre class="out">Author: Devon Park</pre></div></div><div class="why"><b>Why:</b> No author branch in index.php: <code class="inline">the_archive_title()</code> knows every archive type and prints "Author: Devon Park" (the tags removed by sed). One call covers category, tag, author and date archives.</div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'var_dump( did_action( "wp" ), have_posts() );'</pre><div class="opts"><div class="opt correct"><pre class="out">int(0)
+bool(false)</pre></div></div><div class="why"><b>Why:</b> WP-CLI loads WordPress but never runs <code class="inline">wp()</code>, so the <code class="inline">wp</code> action has fired 0 times and the main query has no posts: <code class="inline">have_posts()</code> is false. That is why the session's debug handouts call <code class="inline">wp( 's=dune' )</code> themselves.</div></div>
+
+  <div class="sec"><h2>4.2 · Custom Queries: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="7" data-kind="short"><div class="qn">Q7</div><div class="qt">On the site at the end of Lesson 4.1: what does this print, and why the second number?</div><pre class="code">wp eval '$q = new WP_Query( array( "post_type" =&gt; "page", "posts_per_page" =&gt; 2, "no_found_rows" =&gt; true ) ); echo $q-&gt;post_count, " ", $q-&gt;found_posts, "\n";'</pre><div class="opts"><div class="opt correct"><code class="inline">2 0</code>: two pages loaded; found_posts is 0 because no_found_rows skips the counting query</div></div><div class="why"><b>Why:</b> no_found_rows is right for a list you will not paginate (Lesson 4.2's query-args demo). Without it found_posts would be the four published pages.</div></div>
+  <div class="q" data-sc="8"><div class="qn">Q8</div><div class="qt">A pre_get_posts callback reads <code class="inline">if ( is_home() ) { $query-&gt;set( 'posts_per_page', 3 ); }</code> and nothing else. What goes wrong?</div><div class="opts"><div class="opt">A) Nothing: is_home() makes sure only the blog home changes</div><div class="opt correct">B) Every other WP_Query that runs on the blog home (a box, a widget, a block) is also cut to three posts</div><div class="opt">C) It is a filter, so it must return $query</div><div class="opt">D) The admin's Posts screen breaks, but the front end is fine</div></div><div class="why"><b>Why:</b> The callback runs for every WP_Query. The global is_home() describes the request, not the query being built, so secondary queries on the blog home pass the test too. Guard with is_admin(), <code class="inline">$query-&gt;is_main_query()</code> and the query's own <code class="inline">$query-&gt;is_home()</code> (Lesson 4.2).<br><b>A</b> is wrong: It checks the request, not which query is about to run.<br><b>C</b> is wrong: pre_get_posts is an action: the object is changed in place.<br><b>D</b> is wrong: is_home() is false in the admin, so the admin is not the problem here.</div></div>
+  <div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">A query with <code class="inline">'posts_per_page' =&gt; 3</code> matches 7 posts. On page 3, what are post_count, found_posts and max_num_pages?</div><div class="opts"><div class="opt correct">A) 1, 7, 3</div><div class="opt">B) 3, 7, 3</div><div class="opt">C) 1, 3, 7</div><div class="opt">D) 3, 3, 3</div></div><div class="why"><b>Why:</b> post_count is what this page holds (7 = 3 + 3 + 1), found_posts the total match, max_num_pages ceil(7 / 3). The session's query_shelf lab prints all three for every query.<br><b>B</b> is wrong: Page 3 holds only the remainder.<br><b>C</b> is wrong: found_posts and max_num_pages are swapped.<br><b>D</b> is wrong: found_posts is the total, not the page size.</div></div>
+  <div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">In which case does your code need NO <code class="inline">wp_reset_postdata()</code>?</div><div class="opts"><div class="opt">A) After a WP_Query Loop at the end of a template part</div><div class="opt">B) After a secondary Loop inside the main Loop of singular.php</div><div class="opt">C) After a secondary Loop in front-page.php, before the main Loop</div><div class="opt correct">D) After <code class="inline">get_posts()</code>, when each WP_Post is passed to the functions you call (<code class="inline">get_the_title( $post )</code>)</div></div><div class="why"><b>Why:</b> Only $query->the_post() (and setup_postdata()) replaces the global $post. get_posts() returns an array and leaves the global alone, as long as you pass each post along instead of calling setup_postdata() (Lesson 4.2, "get_posts() needs no reset").<br><b>A</b> is wrong: Somebody will add a template tag after your part one day; reset.<br><b>B</b> is wrong: That is exactly the broken post navigation of Common Mistakes 2.<br><b>C</b> is wrong: The main Loop's first the_post() sets the post again, but tags between the two Loops would talk about the wrong post: reset anyway.</div></div>
+  <div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">An old template starts with <code class="inline">query_posts( 'cat=2&amp;posts_per_page=5' );</code>. How do you translate it?</div><div class="opts"><div class="opt">A) Keep it, and call wp_reset_query() at the end</div><div class="opt">B) Replace it with get_posts() and the same string</div><div class="opt correct">C) If it changes the page's main list: pre_get_posts on the main query (category_name, posts_per_page); if it adds a list: new WP_Query plus wp_reset_postdata()</div><div class="opt">D) Move it into functions.php so it runs earlier</div></div><div class="why"><b>Why:</b> query_posts() throws the main query away and runs a second one, so pagination and conditional tags disagree with what is shown; its own documentation says not to use it (Lesson 4.2 FAQ).<br><b>A</b> is wrong: The reset only cleans up after the damage.<br><b>B</b> is wrong: get_posts() returns data; it does not change what the template's Loop shows.<br><b>D</b> is wrong: query_posts() in functions.php runs before the main query exists and breaks more.</div></div>
+  <div class="q" data-sc="12" data-kind="short"><div class="qn">Q12</div><div class="qt">Module 5 brings a Book post type. The shop wants (a) a "three newest books" box under every post and (b) 12 books per page on /books/. Which tool for each?</div><div class="opts"><div class="opt correct">(a) a secondary WP_Query (or get_posts()) with posts_per_page 3, plus wp_reset_postdata() after a Loop; (b) pre_get_posts on the main query (is_post_type_archive( 'book' ), posts_per_page 12)</div></div><div class="why"><b>Why:</b> Extra lists are secondary queries; the page's own list is the main query, changed before it runs so that pagination and the 404 decision agree (the lesson's decision table and journal prompt).</div></div>
+
+  <div class="sec"><h2>4.2 · Custom Queries: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval '$q = new WP_Query( array( "category_name" =&gt; "news", "posts_per_page" =&gt; 2 ) ); echo $q-&gt;post_count, " ", $q-&gt;found_posts, " ", $q-&gt;max_num_pages, "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">2 3 2</pre></div></div><div class="why"><b>Why:</b> post_count 2 (this page), found_posts 3 (all News posts), max_num_pages 2 (ceil(3 / 2)).</div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it.</div><pre class="code">curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/page/2/
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/category/news/page/2/</pre><div class="opts"><div class="opt correct"><pre class="out">200
+404</pre></div></div><div class="why"><b>Why:</b> The home page's main query has three per page (pre_get_posts), so its page 2 exists; the News archive still has ten per page and three posts, so its page 2 does not, and WordPress answers 404 before any template runs.</div></div>
+
+  <div class="sec"><h2>Lab Reference Solutions</h2><span class="rule"></span></div>
+<p>Every output below is real: the lab files run exactly as <code class="inline">labs/check_labs.py</code> runs them, on a course site at the state each file declares (WordPress 7.1.3, PHP 8.5, MySQL 9.7, WP-CLI 2.12). Paths show <code class="inline">/var/www/html/...</code>, the learner's <code class="inline">wordpress/</code> folder.</p>
+<div class="blk lab"><div class="h">Lab 4.1-A (guided): labs/module-06/l4_1-loop-template-tags/shelf_theme_starter/ → shelf_theme_solution/ with test_shelf_theme.sh</div>
+<p>The test with the starter:</p>
+<pre class="out">Success: Switched to 'Pages &amp;amp; Co. Lab: Shelf' theme.
+/category/news/   TODO
+    TODO: the Loop
+/author/devon/    TODO
+    TODO: the Loop
+/?s=dune          TODO
+    TODO: the Loop
+/?s=zzz           TODO
+    TODO: the Loop
+/book-club-dune/  TODO
+    TODO: the Loop
+the first link: </pre><p>With the solution:</p>
+<pre class="out">Success: Switched to 'Pages &amp;amp; Co. Lab: Shelf' theme.
+/category/news/   Shelf: News
+    Book club: Dune · 2026-10-01 · Maria Lopez
+    Staff picks for the season · 2026-09-15 · Devon Park
+    Welcome to the new Pages &amp;#038; Co. website · 2026-09-01 · Maria Lopez
+/author/devon/    Archive
+    Staff picks for the season · 2026-09-15 · Devon Park
+/?s=dune          Found for: dune
+    Book club: Dune · 2026-10-01 · Maria Lopez
+    Staff picks for the season · 2026-09-15 · Devon Park
+/?s=zzz           Found for: zzz
+    Nothing on this shelf.
+/book-club-dune/  Book club: Dune
+    Book club: Dune · 2026-10-01 · Maria Lopez
+the first link: &lt;li class="shelf-item"&gt;&lt;a href="http://localhost:8080/book-club-dune/" title="Book club: Dune"&gt;</pre><p>Reading it: one template, five addresses, and the Loop never asked for posts. /author/devon/ says Archive because the heading has no is_author() branch (fine: the task did not ask for one; a good extension). /book-club-dune/ is a Loop of one. The <code class="inline">&amp;#038;</code> in Welcome's title is the_title()'s display filter writing the ampersand as an entity, which the browser shows as &amp;. The title attribute comes from the_title_attribute(). Accept <code class="inline">the_title( '&lt;a href="' . esc_url( get_permalink() ) . '"&gt;', '&lt;/a&gt;' )</code> with the attribute added any correct way, and an if/elseif chain inside the h1 instead of a variable.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 4.1-B: labs/module-06/l4_1-loop-template-tags/template_tags_starter.php → template_tags_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">post_title:        Welcome to the new Pages &amp; Co. website
+title:             Welcome to the new Pages &amp;#038; Co. website
+title attribute:   TODO
+permalink:         TODO
+date (Y-m-d):      TODO
+author:            TODO
+categories:        TODO
+raw content:       TODO
+rendered content:  TODO
+excerpt:           TODO
+classes:           TODO</pre><p>The solution prints:</p>
+<pre class="out">post_title:        Welcome to the new Pages &amp; Co. website
+title:             Welcome to the new Pages &amp;#038; Co. website
+title attribute:   Welcome to the new Pages &amp;#038; Co. website
+permalink:         http://localhost:8080/welcome/
+date (Y-m-d):      2026-09-01
+author:            Maria Lopez
+categories:        &lt;a href="http://localhost:8080/category/news/" rel="category tag"&gt;News&lt;/a&gt;
+raw content:       &lt;!-- wp:paragraph --&gt;
+rendered content:  &lt;p class="wp-block-paragraph"&gt;Our new website is open! Browse our pages, read the shop news, and soon you will find our whole catalog here.&lt;/p&gt;
+excerpt:           Our new website is open! Browse our pages, read the shop news, and soon you will find our whole catalog here.
+classes:           post-15 post type-post status-publish format-standard hentry category-news</pre><p>The answers to the workbook's questions: post_title is stored with a plain &amp;, the display filters (wptexturize) turn it into <code class="inline">&amp;#038;</code>; the attribute version is the same here because the title has no tags or quotes; the raw content starts with a block comment, the rendered one with the paragraph's HTML (only the content filters render blocks); the excerpt was built from the content (no hand-written excerpt).</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-06/l4_1-loop-template-tags/debug_loop_report.php (deliberately broken)</div>
+<p>As shipped:</p>
+<pre class="out">Book club: Dune-  (2026-10-01)
+Staff picks for the season-  (2026-09-15)
+Warning: Undefined variable $pagesco_foud in /var/www/html/debug_loop_report.php on line 30
+0 result(s) for "dune"</pre><ol class="steps">
+  <li><b>Silent, line 17:</b> <code class="inline">is_search()</code> before <code class="inline">wp( 's=dune' )</code>: no query has run, so it is false and the heading never prints. Move the check after the <code class="inline">wp()</code> call (in a plugin: after template_redirect).</li>
+  <li><b>Silent, line 26:</b> <code class="inline">the_title()</code> inside the string prints the title first and returns null, hence <code class="inline">Book club: Dune- </code> with the dash after it. Use <code class="inline">get_the_title()</code>.</li>
+  <li><b>Warning, line 30:</b> <code class="inline">$pagesco_foud</code> is undefined (a typo for <code class="inline">$pagesco_found</code>), so the count prints 0.</li>
+</ol>
+<p>Fixed, it prints:</p>
+<pre class="out">Search results
+- Book club: Dune (2026-10-01)
+- Staff picks for the season (2026-09-15)
+2 result(s) for "dune"</pre></div>
+<div class="blk lab"><div class="h">Lab 4.2-A (guided): labs/module-06/l4_2-custom-queries/query_shelf_starter.php → query_shelf_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">Maria's posts:     TODO
+news, page 2:      TODO
+before October:    TODO
+pages, A to Z:     TODO
+how many news?     TODO</pre><p>The solution prints:</p>
+<pre class="out">Maria's posts:     Book club: Dune, Welcome to the new Pages &amp;#038; Co. website  (post_count 2, found_posts 2, max_num_pages 1)
+news, page 2:      Welcome to the new Pages &amp;#038; Co. website  (post_count 1, found_posts 3, max_num_pages 2)
+before October:    Welcome to the new Pages &amp;#038; Co. website, Staff picks for the season  (post_count 2, found_posts 2, max_num_pages 1)
+pages, A to Z:     About Us, Contact, Events  (post_count 3, found_posts 3, max_num_pages 1)
+how many news?     Book club: Dune  (post_count 1, found_posts 3, max_num_pages 3)</pre><p>Accept other correct arrays: <code class="inline">'author' =&gt; 2</code> for Maria works on this site but is not portable; a date_query with <code class="inline">'year' =&gt; 2026, 'month' =&gt; 9</code> gives the same two posts today. <code class="inline">before October</code> excludes Hello world! because its date is the day the site was installed. The last line is the point: found_posts counts all matches although one ID was loaded; max_num_pages is pages of ONE.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 4.2-B: labs/module-06/l4_2-custom-queries/archive_rules_starter/ → archive_rules_solution/ with test_archive_rules.sh</div>
+<p>The test with the starter (the callback changes nothing):</p>
+<pre class="out">/author/maria/      200  Book club: Dune | Welcome to the new Pages &amp;#038; Co. website
+/2026/09/           200  Staff picks for the season | Welcome to the new Pages &amp;#038; Co. website
+/2026/09/page/2/    404  (no list)
+WP-CLI post list:   4 posts
+a September box:    2 posts (a secondary query: must stay 2)</pre><p>With the solution:</p>
+<pre class="out">/author/maria/      200  Welcome to the new Pages &amp;#038; Co. website | Book club: Dune
+/2026/09/           200  Staff picks for the season
+/2026/09/page/2/    200  Welcome to the new Pages &amp;#038; Co. website
+WP-CLI post list:   4 posts
+a September box:    2 posts (a secondary query: must stay 2)</pre><p>Reading it: Maria's archive is now oldest first; September has one post per page, so /2026/09/page/2/ answers 200 (the main query decides that page exists, Lesson 4.2); and the two queries that are not the main query are unchanged. Without the is_main_query() guard the last line would say 1: the September box is a date query too. Remove the file afterwards.</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-06/l4_2-custom-queries/debug_related_box.php (deliberately broken)</div>
+<p>As shipped:</p>
+<pre class="out">More from the shop:
+- Staff picks for the season
+- Welcome to the new Pages &amp;#038; Co. website
+Warning: Undefined array key 2 in /var/www/html/wp-includes/class-wp-query.php on line 3754
+- 
+Titles: 
+This page is about: </pre><ol class="steps">
+  <li><b>Warning, line 31:</b> a <code class="inline">for</code> loop that runs three times over a query that holds two posts: the third <code class="inline">the_post()</code> reads past the end of <code class="inline">$posts</code> (Undefined array key 2 in class-wp-query.php, the core line that reads it) and leaves no post. Loop with <code class="inline">while ( $pagesco_related-&gt;have_posts() )</code>.</li>
+  <li><b>Silent, line 36:</b> <code class="inline">wp_list_pluck()</code> gets the query object instead of its <code class="inline">-&gt;posts</code> array, so the Titles line is empty. Pass <code class="inline">$pagesco_related-&gt;posts</code>.</li>
+  <li><b>Silent, line 15 (it appears once bug 1 is fixed):</b> no <code class="inline">wp_reset_postdata()</code> after the box, so the last line names Welcome, the box's last post, instead of Book club: Dune. Reset right after the loop.</li>
+</ol>
+<p>Fixed, it prints:</p>
+<pre class="out">More from the shop:
+- Staff picks for the season
+- Welcome to the new Pages &amp;#038; Co. website
+Titles: Staff picks for the season, Welcome to the new Pages &amp; Co. website
+This page is about: Book club: Dune</pre></div>
+
+  <div class="sec"><h2>The Lesson Pages' Own Quick Quizzes</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Lesson 4.1 · The Loop &amp; Template Tags</div>
+<ol class="steps" data-lesson-quiz="4.1">
+  <li><b>C</b> Dune&lt;p&gt;&lt;/p&gt;: PHP evaluates the expression first: the_title prints Dune and returns null, then echo prints the empty paragraph. Inside a string use get_the_title with esc_html.</li>
+  <li><b>A</b> the_title_attribute(), or esc_attr( get_the_title() ): the_title_attribute prints the title escaped for an attribute; esc_attr( get_the_title() ) is the returning equivalent. the_title prepares HTML text, not attribute values.</li>
+  <li><b>B</b> index.php: The search chain is search, then index. A search is not an archive, so archive.php is never a candidate and index.php draws it.</li>
+  <li><b>C</b> It returns false, and WordPress notices that it was called incorrectly: The main query has not run when must-use plugins load, so conditional tags return false, and with WP_DEBUG on WordPress reports that they were called incorrectly. Ask on template_redirect instead.</li>
+  <li><b>A</b> template-parts/content-none.php: The name is joined to the slug with a hyphen: template-parts/content-none.php, looked up in the child theme and then the parent. Only if it is missing does WordPress fall back to template-parts/content.php.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Lesson 4.2 · Custom Queries</div>
+<ol class="steps" data-lesson-quiz="4.2">
+  <li><b>A</b> A pre_get_posts callback that sets posts_per_page to 5 when the main query is_category( 'news' ): Changing the main query before it runs keeps the 404 decision, the template, the conditional tags and the_posts_pagination in agreement.</li>
+  <li><b>B</b> The title of the last post of the secondary Loop: Each the_post() of the secondary query replaced the global post, so the last post of that Loop is still current until wp_reset_postdata() restores the main query's post.</li>
+  <li><b>C</b> 4, 10, 3: post_count is the 4 posts on this page, found_posts the 10 that match in total, and max_num_pages is 10 divided by 4, rounded up: 3.</li>
+  <li><b>C</b> is_admin(): Admin list screens run a main query too, so is_main_query alone does not exclude them; is_admin() returns early for every admin request.</li>
+  <li><b>B</b> All four published posts, without any warning: cat takes category IDs; the string news is not one, so the filter is dropped silently and every published post comes back. category_name takes the slug.</li>
+</ol>
+</div>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>The Loop</b> walks the posts the main query already found; <b>the_post()</b> moves to the next one and sets the global $post (and fires loop_start the first time).</li>
+  <li><b>A pair:</b> the_title() prints HTML-ready text for the page; get_the_title() returns the value, for an attribute (with esc_attr()), a string, or a comparison. Same for the_permalink() / get_permalink() (esc_url()) and the_date() / get_the_date() (esc_html()).</li>
+  <li><b>Three per page:</b> a pre_get_posts callback in functions.php (or a plugin), returning early on is_admin() or ! $query-&gt;is_main_query(), then <code class="inline">if ( $query-&gt;is_home() ) $query-&gt;set( 'posts_per_page', 3 );</code>.</li>
+</ol>
+
+  <div class="sec"><h2>Common Wrong Answers and What They Reveal</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li><b>Q1 C.</b> Believes WordPress makes missing templates. Show the hierarchy falling through to index.php.</li>
+  <li><b>Q3 B.</b> Knows the_title( $before, $after ) but not that attributes need their own escaping.</li>
+  <li><b>Q5 A or B.</b> Mixes up "WordPress is loaded" and "the main query has run". Redraw the request order.</li>
+  <li><b>Q8 A.</b> Thinks the global is_home() describes the query being built. Ask how many queries run on the blog home.</li>
+  <li><b>Q9 B.</b> Confuses post_count with posts_per_page.</li>
+  <li><b>Q10 B or C.</b> Thinks the reset is optional inside templates. Rerun the broken navigation.</li>
+</ul>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 6 · Answer Key · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

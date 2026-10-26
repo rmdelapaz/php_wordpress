@@ -110,7 +110,7 @@
 
                 <div class="card card-info">
                     <h4>💡 Mental model: a new drawer in the same filing cabinet</h4>
-                    <p>In Lesson 2.1 we called <code>wp_posts</code> one big filing cabinet. A custom post type is a new labelled drawer in it, not a new cabinet: books are stored in the same table as posts and pages, with the same columns, so everything you already know (the Loop, <code>WP_Query</code>, revisions, the block editor) works on them for free. A <strong>taxonomy</strong> is the colored tabs you clip onto the files to group them (a book's genres), and <strong>meta</strong> is the index card you tuck into each file with its specific facts (this book's price, its author, its page count).</p>
+                    <p>In Lesson 2.1 we called <code>wp_posts</code> one big filing cabinet. A custom post type is a new labeled drawer in it, not a new cabinet: books are stored in the same table as posts and pages, with the same columns, so everything you already know (the Loop, <code>WP_Query</code>, revisions, the block editor) works on them for free. A <strong>taxonomy</strong> is the colored tabs you clip onto the files to group them (a book's genres), and <strong>meta</strong> is the index card you tuck into each file with its specific facts (this book's price, its author, its page count).</p>
                 </div>
 
                 <p>Three WordPress functions do the work, all called on the <code>init</code> action (the moment, from Lesson 2.3, when WordPress is ready and asks every plugin to register its things):</p>
@@ -493,7 +493,7 @@ final class BookMeta implements Feature {
 
                 <div class="card card-success">
                     <h4>✅ Why the keys do not start with an underscore</h4>
-                    <p>A meta key that starts with <code>_</code> (like the <code>_edit_lock</code> and <code>_pingme</code> keys you saw in Lesson 2.2) is <strong>protected</strong>: WordPress hides it from the Custom Fields box and refuses to expose it in REST unless you write a permission callback. Our keys are named <code>pagesco_author</code>, <code>pagesco_price</code> and so on, with the project's prefix but <em>no</em> leading underscore, precisely because the shop <em>wants</em> them public: the REST API returns them, and in Module 6 a block binds a heading to <code>pagesco_price</code> through the <code>core/post-meta</code> source, which only works for registered, REST-visible, unprotected keys.</p>
+                    <p>A meta key that starts with <code>_</code> (like the <code>_pingme</code> and <code>_edit_lock</code> keys from Lesson 2.2) is <strong>protected</strong>: WordPress hides it from the Custom Fields box, the REST API will not let anyone change it unless you register an <code>auth_callback</code>, and block bindings refuse it. Our keys are named <code>pagesco_author</code>, <code>pagesco_price</code> and so on, with the project's prefix but <em>no</em> leading underscore, precisely because the shop <em>wants</em> them public: the REST API returns them, and in Module 6 a block binds a heading to <code>pagesco_price</code> through the <code>core/post-meta</code> source, which only works for registered, REST-visible, unprotected keys.</p>
                 </div>
 
                 <p>List the feature and confirm the keys are registered on the book type:</p>
@@ -513,7 +513,7 @@ pagesco_isbn</code></pre>
 
             <section id="admin" class="lesson-section">
                 <h2>🖥️ Seeing Books in the Admin</h2>
-                <p>Registered meta reaches the block editor's Custom Fields panel, but a raw key/value list is a poor way to type a price. Two small admin features make the Books screen pleasant: a <strong>meta box</strong>, a labelled form under the editor, and extra <strong>columns</strong> in the books list. Both live under a sub-namespace, <code>PagesCo\Books\Admin</code>, which (Lesson 5.1's PSR-4 rule) maps to <code>src/Admin/</code>.</p>
+                <p>Registered meta reaches the block editor's Custom Fields panel, but a raw key/value list is a poor way to type a price. Two small admin features make the Books screen pleasant: a <strong>meta box</strong>, a labeled form under the editor, and extra <strong>columns</strong> in the books list. Both live under a sub-namespace, <code>PagesCo\Books\Admin</code>, which (Lesson 5.1's PSR-4 rule) maps to <code>src/Admin/</code>.</p>
 
                 <h3>A "Book details" meta box</h3>
                 <p>Create <code>src/Admin/BookMetaBox.php</code>. It adds the box on the book screen, renders a form filled with the saved values, and saves them when the book is saved:</p>
@@ -627,7 +627,7 @@ final class BookMetaBox implements Feature {
 }</code></pre>
                 <p>Three details carry the lesson's security habits, each one covered in depth next lesson:</p>
                 <ul>
-                    <li><code>wp_nonce_field()</code> prints a hidden token, and <code>wp_verify_nonce()</code> checks it on save, so the save only runs for a form this site served (Lesson 2.3 mentioned nonces; Lesson 5.3 is all about them).</li>
+                    <li><code>wp_nonce_field()</code> prints a hidden token, and <code>wp_verify_nonce()</code> checks it on save, so the save only runs for a form this site served (Lesson 1.3 mentioned nonces; Lesson 5.3 is all about them).</li>
                     <li><code>current_user_can( 'edit_post', $post_id )</code> makes sure the person may edit <em>this</em> book before writing anything.</li>
                     <li>Every value is sanitized on the way in: <code>sanitize_text_field()</code>, <code>absint()</code> for the page count, a cast to <code>float</code> for the price, and a plain boolean for the checkbox.</li>
                 </ul>
@@ -720,19 +720,18 @@ grep -n "::class," wp-content/plugins/pagesco-books/src/Plugin.php</code></pre>
                 <h2>⚠️ Common Mistakes</h2>
 
                 <h3>1. Forgetting to flush, so single books 404</h3>
-                <p>The commonest custom-post-type bug: the archive and single pages return 404 even though the code is right. It happens when the rewrite rules were not flushed after the type was registered. Reproduce it by resetting the rules to the state a browser install leaves and visiting a (not-yet-existing) book, then flushing:</p>
-                <pre data-cli><code class="language-bash">wp option update rewrite_rules ''
+                <p>The commonest custom-post-type bug: the archive and single pages return 404 even though the code is right. It happens when the rewrite rules were saved before the type was registered and nothing flushed them since: WordPress keeps using the saved rules, which know nothing about <code>/books/</code>. Reproduce it by saving the rules once without the type (unregistered for that one command), visiting the archive, then flushing:</p>
+                <pre data-cli><code class="language-bash">wp eval 'unregister_post_type( "book" ); flush_rewrite_rules();'
 curl -s -o /dev/null -w 'before flush: %{http_code}\n' http://localhost:8080/books/
 wp rewrite flush
 curl -s -o /dev/null -w 'after flush:  %{http_code}\n' http://localhost:8080/books/</code></pre>
                 <div class="card card-output">
                     <h4>Output</h4>
-                    <pre><code>Success: Updated 'rewrite_rules' option.
-before flush: 200
+                    <pre><code>before flush: 404
 Success: Rewrite rules flushed.
 after flush:  200</code></pre>
                 </div>
-                <p><strong>What it means:</strong> with no rules, WordPress cannot match <code>/books/</code> and falls through to a 404; after a flush, the archive rule is back. <strong>Fix:</strong> flush on activation (as your <code>Activator</code> does), never on every request. Calling <code>flush_rewrite_rules()</code> on <code>init</code> is the classic performance mistake: it rewrites the whole rules option on every page load.</p>
+                <p><strong>What it means:</strong> the saved rules have no rule for <code>/books/</code>, so WordPress treats it as a page that does not exist and answers 404; after a flush (with the type registered again, as on every request), the archive rule is back. An <em>empty</em> rules option would not show the bug: WordPress rebuilds the rules as soon as it finds the option empty. Stale rules are the trap. <strong>Fix:</strong> flush on activation (as your <code>Activator</code> does), never on every request. Calling <code>flush_rewrite_rules()</code> on <code>init</code> is the classic performance mistake: it rewrites the whole rules option on every page load.</p>
 
                 <h3>2. <code>tax_input</code> ignored when no user is logged in</h3>
                 <p>When you create a book in code and try to set its genres with <code>wp_insert_post()</code>'s <code>tax_input</code> argument, the genres silently vanish if the current user cannot assign terms, and WP-CLI runs as no user. See it with a throwaway book:</p>
@@ -1056,7 +1055,7 @@ echo ob_get_clean(), "\n";'</code></pre>
 +---------+-----------------+-----------------+-------+
 Frank Herbert | $8.99 | Sold out</code></pre>
                     </div>
-                    <p>Dune is book 30 (the next free ID after Lesson 4.3's content), so the eleven books are 30 to 40; The Great Gatsby (book 33) is out of stock in the catalog, which is why its stock cell reads "Sold out". Now the public API:</p>
+                    <p>Dune is book 30 (the first ID after Lesson 4.3's content, fixed by <code>import_id</code>), so the eleven books are 30 to 40; The Great Gatsby (book 33) is out of stock in the catalog, which is why its stock cell reads "Sold out". Now the public API:</p>
                     <pre data-web="/wp-json/wp/v2/books/30" data-json-pick="id,slug,title.rendered,genres,meta"><code class="language-json">GET http://localhost:8080/wp-json/wp/v2/books/30</code></pre>
                     <div class="card card-output">
                         <h4>Output</h4>
@@ -1453,7 +1452,7 @@ Success: 11 books in the catalog.
 
                 <div class="card">
                     <h3>🏋️ Exercise 4: Register One More Meta Key (Stretch)</h3>
-                    <p>Suppose the shop wants to show each book's reading time. Register one more public meta key for books, <code>pagesco_reading_minutes</code> (an integer), compute and store it for Dune as its page count times two, and confirm it reaches REST. Do it from a throwaway must-use plugin so <code>BookMeta</code> and the catalog stay exactly as the project left them, then remove the file and the stored value.</p>
+                    <p>Suppose the shop wants to show each book's reading time. Register one more public meta key for books, <code>pagesco_reading_minutes</code> (an integer), compute and store it for Dune as its page count times two, and confirm it is registered for REST. Do it from a throwaway must-use plugin so <code>BookMeta</code> and the catalog stay exactly as the project left them, then remove the file and the stored value.</p>
                     <details>
                         <summary>💡 Hint</summary>
                         <p>Call <code>register_post_meta( 'book', 'pagesco_reading_minutes', array( 'type' =&gt; 'integer', 'single' =&gt; true, 'show_in_rest' =&gt; true ) )</code> on <code>init</code> in <code>mu-plugins/exercise-reading-time.php</code>. A key registered <code>show_in_rest</code> shows in <code>/wp/v2/books/30?_fields=meta</code> once it has a value. In the real plugin you would instead add one entry to <code>BookMeta::fields()</code>, which the loop would register for you.</p>
@@ -1540,8 +1539,8 @@ wp eval 'delete_post_meta( 30, "pagesco_reading_minutes" );'</code></pre>
                             <button class="quiz-option" data-correct="false" data-hint="Both forms are stored the same way in wp_postmeta; the difference is visibility.">
                                 B) Underscore keys are stored in a different table
                             </button>
-                            <button class="quiz-option" data-correct="true" data-explanation="A leading underscore marks meta as protected, hidden from the Custom Fields box and kept out of REST by default; the shop wants these keys public for the API and block bindings, so it leaves the underscore off.">
-                                C) A leading underscore would make them protected and hidden from REST
+                            <button class="quiz-option" data-correct="true" data-explanation="A leading underscore marks meta as protected: hidden from the Custom Fields box, not writable through REST without an auth_callback, and refused by block bindings. The shop wants these keys editable through the API and usable in bindings, so it leaves the underscore off.">
+                                C) A leading underscore would make them protected: not writable through REST and refused by block bindings
                             </button>
                         </div>
                         <div class="quiz-feedback"></div>

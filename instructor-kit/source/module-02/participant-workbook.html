@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Workbook: Session 2</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Student workbook —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">write in it · bring it to every session</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Participant Workbook</div>
+    <h1>Session 2: PHP the WordPress Way and the Content Model</h1>
+    <p class="sub">Your workbook for Session 2: a warm-up on Session 1, the key ideas of Lessons 1.3 and 2.1, worked examples, the guided labs, predict-then-run practice, a self-check for each lesson, and your exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Lessons <b>1.3–2.1</b></span>
+      <span class="chip">Session <b>2</b> · 3 hours</span>
+      <span class="chip">Name: ____________________</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Session Goals</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Write PHP the WordPress way: the coding standards (checked by PHPCS), a prefix on every global name, and core's functions instead of your own helpers.</li>
+  <li>Sanitize what comes in and escape what goes out, with the function that fits each place, and make visible strings translatable.</li>
+  <li>Pass callbacks in WordPress's shapes, write functions that take an array of arguments, and handle WP_Error results.</li>
+  <li>Read the content model as a developer: post types, statuses, terms, attachments, revisions, roles and capabilities, options and block markup.</li>
+  <li>Stock the Pages &amp; Co. site with its staff, pages and News posts, with the IDs every later lesson uses.</li>
+</ul>
+
+  <div class="sec"><h2>Warm-up: Session 1 Revisited</h2><span class="rule"></span></div>
+<div class="blk lab"><div class="h">Five questions, no notes</div>
+<p>Answer from memory, then check with the class.</p>
+<div class="q"><div class="qn">W1</div><div class="qt">Which folder of the WordPress root is yours, and why is nothing else?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W2</div><div class="qt">Put them in order: the main query, <code class="inline">init</code>, the template.</div><div class="write"></div></div>
+<div class="q"><div class="qn">W3</div><div class="qt"><code class="inline">docker compose down</code> and <code class="inline">docker compose down -v</code>: what survives each?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W4</div><div class="qt">A page says "There has been a critical error on this website." Where do you look first?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W5</div><div class="qt">What does <code class="inline">wp option get blogname</code> print on the course site, and why?</div><div class="write"></div></div>
+<p>Site check, from the project folder: <code class="inline">wp core version</code> and <code class="inline">wp plugin list --status=must-use --fields=name,status</code>. ☐ WordPress 7.1 and only mailpit-smtp listed. Homework: ☐ the health check said "All checks passed." ☐ <code class="inline">pagesco-plan.txt</code> is in my course folder ☐ <code class="inline">docker image ls composer:2</code> lists the image.</p>
+</div>
+
+  <div class="sec"><h2>Lessons</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">1.3</span><h3>PHP the WordPress Way</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Write PHP that follows the WordPress coding standards, and check it with PHPCS and the WordPress ruleset</li>
+  <li>Choose the right escaping function for each output context (esc_html, esc_attr, esc_url, wp_kses_post) and the right sanitizing function for each input</li>
+  <li>Make strings translatable with __(), esc_html__(), _n() and sprintf(), with a text domain and translator comments</li>
+  <li>Pass callbacks in every form WordPress accepts, and write functions that take an array of arguments merged with wp_parse_args()</li>
+  <li>Handle WP_Error results, and use core's globals ($wpdb, $post, $wp_query) and classes without fighting them</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>WordPress code is a guest</b> in a PHP process shared with core, the theme and every plugin: house rules make that work.</li>
+  <li><b>The WordPress Coding Standards</b> (tabs, spaces inside parentheses, Yoda conditions, single quotes, <code class="inline">array()</code>, DocBlocks); <b>PHPCS</b> with the WordPress ruleset checks them and also finds unescaped output; <code class="inline">phpcbf</code> fixes the mechanical part.</li>
+  <li><b>Prefix every global name</b> (<code class="inline">pagesco_</code>): functions, global variables, constants, hooks, options, meta keys, handles; the text domain is the folder slug. A namespace is a prefix.</li>
+  <li><b>Sanitize early, escape late:</b> <code class="inline">wp_unslash()</code> then <code class="inline">sanitize_text_field()</code> / <code class="inline">sanitize_email()</code> / <code class="inline">absint()</code> (or validate); at the echo <code class="inline">esc_html()</code>, <code class="inline">esc_attr()</code>, <code class="inline">esc_url()</code>, <code class="inline">wp_kses_post()</code>.</li>
+  <li><b>Translatable strings:</b> <code class="inline">__()</code> returns, <code class="inline">_e()</code> echoes, <code class="inline">esc_html__()</code> for templates, <code class="inline">_n()</code> for plurals, <code class="inline">sprintf()</code> placeholders with a <code class="inline">/* translators: */</code> comment.</li>
+  <li><b>Callbacks</b> come as a name, a closure, an arrow function, <code class="inline">array( $obj, 'method' )</code> or a static method; named ones can be unhooked.</li>
+  <li><b>Arrays of arguments</b> merged with <code class="inline">wp_parse_args()</code>; <b>failures as WP_Error</b>, checked with <code class="inline">is_wp_error()</code>; read core's globals, never assign them; values from the database are strings, so cast instead of using strict types.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: the slashes WordPress adds</div>
+<p>WordPress adds a backslash before every quote in <code class="inline">$_GET</code>, <code class="inline">$_POST</code> and <code class="inline">$_COOKIE</code> (<code class="inline">wp_magic_quotes()</code>, Lesson 1.3). You can watch the round trip without a form: <code class="inline">wp_slash()</code> does what WordPress does on the way in, <code class="inline">wp_unslash()</code> undoes it.</p>
+<pre class="code">wp eval '$pagesco_in = wp_slash( "O'\''Reilly" ); var_dump( $pagesco_in, wp_unslash( $pagesco_in ) );'</pre>
+<pre class="out">string(9) "O\'Reilly"
+string(8) "O'Reilly"</pre><p>Nine characters on the way in, eight after <code class="inline">wp_unslash()</code>: the backslash is real, not a display artifact. Store the first value and the apostrophe in O'Reilly grows a backslash in the database; that is why every input line in WordPress code starts with <code class="inline">wp_unslash()</code> and then a <code class="inline">sanitize_*()</code> function: <code class="inline">sanitize_text_field( wp_unslash( $_POST['name'] ) )</code>. (The <code class="inline">'\''</code> in the command is the shell's way of writing one apostrophe inside single quotes.)</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>From the project folder: <code class="inline">cp labs/module-02/l1_3-php-the-wordpress-way/signup_form_starter.php wordpress/</code>, then <code class="inline">wp eval-file --use-include signup_form_starter.php</code>. Open <code class="inline">wordpress/signup_form_starter.php</code> in VS Code.</li>
+  <li>TODOs 1 to 4 sanitize (and validate) the form; TODO 5 checks the email; TODOs 6 and 7 escape the two HTML lines. Run after each one.</li>
+  <li>For each field write which function you chose and why that one:</li>
+</ul>
+<div class="write tall"></div>
+<ul class="tick">
+  <li>Done when your output matches the "Expected when done" comment at the end of the file. Then <code class="inline">rm wordpress/signup_form_starter.php</code>.</li>
+  <li>Finished early? <code class="inline">event_line_starter.php</code>, then <code class="inline">debug_book_badge.php</code> in the same folder (run both the same way).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Predict, then run</div>
+<p>Write your prediction on the line first, then run it from the project folder. A wrong prediction you can explain afterward is worth more than a right guess.</p>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it. (A URL without a protocol, and an ampersand.)</div><pre class="code">wp eval 'echo esc_url( "example.com/books?a=1&amp;b=2" ), "\n";'</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it. (A plural with zero, and no sprintf().)</div><pre class="code">wp eval 'echo _n( "%s book", "%s books", 0 ), "\n";'</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>The Book Card Helper</b> (lesson page, "Project: The Book Card Helper"). In class: Step 1. At home: Steps 2 to 4.</p>
+<ul class="tick">
+  <li>☐ Step 1: <code class="inline">wordpress/pagesco-practice/book-card.php</code> typed, every comment read</li>
+  <li>☐ Step 2: <code class="inline">render-cards.php</code>: three cards, "1,178 pages", a second Dune card with an h2 and no price</li>
+  <li>☐ Step 3: the break test: no working script, link or attribute in the output</li>
+  <li>☐ Step 4: PHPCS says "book-card.php: no coding standards problems."; a copy of book-card.php in my notes; <code class="inline">pagesco-practice/</code> deleted</li>
+</ul>
+<div class="write"></div>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">A template prints a book cover: <code class="inline">&lt;img src="..." alt="..."&gt;</code>. The alt text is the book's title as staff typed it. Which function goes around the title?</div><div class="opts"><div class="opt">A) <code class="inline">esc_html()</code></div><div class="opt">B) <code class="inline">esc_attr()</code></div><div class="opt">C) <code class="inline">esc_url()</code></div><div class="opt">D) <code class="inline">wp_kses_post()</code></div></div></div>
+<div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">From the project folder, on the course site: what does this print?</div><pre class="code">wp eval 'echo esc_html( esc_html( "Tom &amp; Jerry" ) ), "\n";'</pre><div class="write"></div></div>
+<div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">What reaches the page from <code class="inline">$h = '&lt;h2&gt;' . _e( 'Staff picks', 'pagesco' ) . '&lt;/h2&gt;'; echo $h;</code>?</div><div class="opts"><div class="opt">A) <code class="inline">&lt;h2&gt;Staff picks&lt;/h2&gt;</code></div><div class="opt">B) Nothing: PHP stops with a fatal error</div><div class="opt">C) "Staff picks" first, then an empty <code class="inline">&lt;h2&gt;&lt;/h2&gt;</code></div><div class="opt">D) <code class="inline">&lt;h2&gt;_e(Staff picks)&lt;/h2&gt;</code></div></div></div>
+<div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">Which of these needs NO <code class="inline">pagesco_</code> prefix?</div><div class="opts"><div class="opt">A) A class inside the namespace <code class="inline">PagesCo\Books</code>, such as <code class="inline">PagesCo\Books\Plugin</code></div><div class="opt">B) A global function that formats prices</div><div class="opt">C) A variable defined at the top level of a plugin file</div><div class="opt">D) An option your plugin saves in wp_options</div></div></div>
+<div class="q" data-sc="5" data-kind="short"><div class="qn">Q5</div><div class="qt">What does this print?</div><pre class="code">wp eval 'var_dump( absint( "-7 copies" ), sanitize_key( "Staff Picks!" ) );'</pre><div class="write"></div></div>
+<div class="q" data-sc="6"><div class="qn">Q6</div><div class="qt"><code class="inline">$id = wp_insert_post( array( 'post_title' =&gt; '' ) );</code> What is <code class="inline">$id</code>, and how do you learn why it failed?</div><div class="opts"><div class="opt">A) A WP_Error: call <code class="inline">$id-&gt;get_error_message()</code></div><div class="opt">B) false: read debug.log</div><div class="opt">C) An exception: wrap the call in try/catch</div><div class="opt">D) <code class="inline">0</code>: pass <code class="inline">true</code> as the second argument to get a WP_Error with the message</div></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>Make two columns: "habits I keep from PHP Foundations" and "habits I change for WordPress". Put at least four items in each (strict types, naming, escaping, error handling, arrays...). For one habit you are changing, write why WordPress does it differently in your own words. Which rule felt most like going backwards, and has the reason behind it changed how you feel about it?</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">2.1</span><h3>The Content Model</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Explain why posts, pages, media, revisions, templates and navigation menus are all posts with a different post_type, and read a WP_Post object</li>
+  <li>Choose between posts and pages, use post statuses, and organize content with categories, tags and terms</li>
+  <li>Describe how roles, capabilities and users fit together, and check capabilities rather than roles in code</li>
+  <li>Find the option behind a Settings screen, and read the block markup the editor stores in post_content with parse_blocks()</li>
+  <li>Create users, pages and posts from the command line, with authors, categories, dates and revisions</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>Everything is a post:</b> posts, pages, attachments, revisions, templates, patterns and block-theme menus are rows of <code class="inline">wp_posts</code>, told apart by <code class="inline">post_type</code> (16 types on a fresh site); PHP sees a row as a WP_Post.</li>
+  <li><b>Posts</b> are dated and filed under categories and tags; <b>pages</b> are timeless and hierarchical. <code class="inline">post_status</code> decides who sees a row; new content defaults to <b>draft</b>, and a draft has no slug.</li>
+  <li><b>Tools differ in their defaults:</b> WP-CLI lists every status, <code class="inline">get_posts()</code> and WP_Query only published content.</li>
+  <li><b>Taxonomies</b> group content into <b>terms</b>; an upload is an attachment post plus its files and generated sizes.</li>
+  <li><b>Every update is a revision</b>, and the newest one equals the current post; trash is a status for 30 days, <code class="inline">--force</code> deletes for good.</li>
+  <li><b>Roles bundle capabilities;</b> code checks the capability (<code class="inline">current_user_can()</code>, <code class="inline">user_can()</code>), including meta capabilities like <code class="inline">edit_post</code> with an ID.</li>
+  <li><b>Every Settings field is an option</b> (a string); content is <b>block markup</b>: <code class="inline">parse_blocks()</code> reads it, <code class="inline">do_blocks()</code> renders it.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: from a Settings field to its option</div>
+<p>Settings &gt; General has a Date Format field. Every Settings field is an option (Lesson 2.1's table); read it, then let WordPress use it the way a theme does:</p>
+<pre class="code">wp option get date_format</pre>
+<pre class="out">F j, Y</pre><pre class="code">wp eval 'echo date_i18n( get_option( "date_format" ), strtotime( "2026-10-01" ) ), "\n";'</pre>
+<pre class="out">October 1, 2026</pre><p><code class="inline">F j, Y</code> is a PHP date format (F = month name, j = day, Y = year). <code class="inline">date_i18n()</code> formats a time stamp in the site's language and format: the News post dates of the project will print like this. Options can also be searched by name; the image sizes of Settings &gt; Media:</p>
+<pre class="code">wp option list --search='*_size_w' --fields=option_name,option_value</pre>
+<pre class="out">+---------------------+--------------+
+| option_name         | option_value |
++---------------------+--------------+
+| thumbnail_size_w    | 150          |
+| medium_size_w       | 300          |
+| large_size_w        | 1024         |
+| medium_large_size_w | 768          |
++---------------------+--------------+</pre><p>Four widths, four rows: this is how you find the option behind a field you cannot name. (The values print without quotes here, but in PHP they are strings: <code class="inline">'300'</code>.)</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>From the project folder: <code class="inline">cp labs/module-02/l2_1-content-model/content_census_starter.sh wordpress/</code>, then <code class="inline">docker compose run --rm wpcli sh content_census_starter.sh</code>.</li>
+  <li>For each TODO, try the command alone first (<code class="inline">wp post list --post_type=page --format=count</code>), then put it inside the <code class="inline">$( )</code> and run the script again. Run it BEFORE you start the project.</li>
+  <li>Finished early? <code class="inline">post_report_starter.php</code>, then <code class="inline">debug_page_report.php</code> (both only read).</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>Which page is the draft, and who made it?</td><td></td></tr>
+<tr><td>Why does an editor need so many capabilities?</td><td></td></tr>
+<tr><td>Which TODO needed a pipe, and why?</td><td></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Predict, then run</div>
+<p>Write your prediction on the line first, then run it from the project folder. A wrong prediction you can explain afterward is worth more than a right guess.</p>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it. (Twenty Twenty-Five shows images. Are they attachments?)</div><pre class="code">wp post list --post_type=attachment --format=count</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it. (An option that is set, and one that does not exist.)</div><pre class="code">wp eval 'var_dump( get_option( "page_on_front" ), get_option( "pagesco_no_such_option" ) );'</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>Stock the Pages &amp; Co. Site</b> (lesson page, "Project: Stock the Pages &amp; Co. Site"). In class: Steps 1 to 3. At home: Step 4. First, the next-ID check from the demo printed: ______ (it must be 12).</p>
+<ul class="tick">
+  <li>☐ Step 1: maria (Editor, user 2) and devon (Author, user 3), with the course passwords</li>
+  <li>☐ Step 2: About Us, Contact, Events published by Maria: IDs 12, 13, 14; the header menu lists them</li>
+  <li>☐ Step 3: the News category (2) and three posts 15, 16, 17 with their dates; /category/news/ lists them newest first</li>
+  <li>☐ Step 4: Maria's edit (revision 18), Devon refused on the Pages screen, <code class="inline">pagesco-content/</code> deleted, the final list matches the lesson</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">Twenty Twenty-Five's header menu lists the site's pages. Which post type stores that menu?</div><div class="opts"><div class="opt">A) <code class="inline">nav_menu_item</code></div><div class="opt">B) <code class="inline">page</code></div><div class="opt">C) <code class="inline">wp_template_part</code></div><div class="opt">D) <code class="inline">wp_navigation</code></div></div></div>
+<div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt">On a fresh course site (before the lesson project): what does this print, and why are the two numbers counting different things?</div><pre class="code">wp eval 'echo count( get_posts( array( "post_type" =&gt; "page" ) ) ), " ", wp_count_posts( "page" )-&gt;draft, "\n";'</pre><div class="write"></div></div>
+<div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">Devon (Author) opens Maria's published post "Book club: Dune" (ID 17). What does <code class="inline">user_can( $devon, 'edit_post', 17 )</code> answer?</div><div class="opts"><div class="opt">A) false: <code class="inline">edit_post</code> is a meta capability that maps to <code class="inline">edit_others_posts</code> here, which authors lack</div><div class="opt">B) true: authors have <code class="inline">edit_posts</code></div><div class="opt">C) true: the post is published</div><div class="opt">D) An error: <code class="inline">edit_post</code> needs a role, not a user</div></div></div>
+<div class="q" data-sc="10" data-kind="short"><div class="qn">Q10</div><div class="qt">What does this print?</div><pre class="code">wp eval 'echo parse_blocks( "&lt;!-- wp:separator /--&gt;" )[0]["blockName"], "\n";'</pre><div class="write"></div></div>
+<div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">A script creates a post with WP-CLI and then updates it twice. How many revisions does the post have, and what is in the newest one?</div><div class="opts"><div class="opt">A) Three: the newest holds the version before the last update</div><div class="opt">B) Two: the newest is identical to the current post</div><div class="opt">C) One: WordPress keeps only the latest</div><div class="opt">D) None: only the block editor makes revisions</div></div></div>
+<div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">A deployment script must set the "Site Address (URL)" field of Settings &gt; General. Which option is that?</div><div class="opts"><div class="opt">A) <code class="inline">siteurl</code></div><div class="opt">B) <code class="inline">blogname</code></div><div class="opt">C) <code class="inline">home</code></div><div class="opt">D) <code class="inline">permalink_structure</code></div></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>Open pagesco-plan.txt from Lesson 1.1 and sort every item of your site map into the content model: which are pages, which are posts and in which category, which need a custom post type, which are settings, and who (which role) maintains each. Did anything not fit? Write down the one you are least sure about; Lessons 5.2 and 5.4 will help you decide.</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<p>Three questions, no notes. Write your answers, hand them in or keep them: they tell you and your instructor what to revisit.</p>
+<div class="q"><div class="qn">E1</div><div class="qt">Which escaping function for text between tags, for an attribute value, and for an href?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E2</div><div class="qt">Why does every global name in your theme and plugin start with <code class="inline">pagesco_</code>?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E3</div><div class="qt">Posts, pages, uploaded images, revisions and block-theme menus: where are they stored, and what tells them apart?</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Notes</h2><span class="rule"></span></div>
+<div class="notes-lines"></div>
+
+  <div class="sec"><h2>Homework Checklist</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ Finish the Book Card Helper (Steps 2 to 4, PHPCS clean, practice folder deleted, a copy in my notes)</li>
+  <li>☐ Finish Stock the Pages &amp; Co. Site (Step 4 and the final list: users 2 and 3, pages 12 to 14, posts 15 to 17)</li>
+  <li>☐ Lesson 1.3 Hands-on Exercises 1 to 3 (Exercise 4 is a stretch)</li>
+  <li>☐ Lesson 2.1 Hands-on Exercises 1 to 3 (Exercise 4 is a stretch)</li>
+  <li>☐ Both Quick Quizzes on the lesson pages</li>
+  <li>☐ Both journal entries</li>
+  <li>☐ Both "Before the Next Lesson" lists: mu-plugins/ holds only mailpit-smtp.php; no user sam; Settings &gt; Reading on "Your latest posts"</li>
+  <li>☐ Optional: <code class="inline">event_line_starter.php</code>, <code class="inline">debug_book_badge.php</code>, <code class="inline">post_report_starter.php</code>, <code class="inline">debug_page_report.php</code></li>
+  <li>☐ Bring to Session 3: the site at the end of Lesson 2.1, book-card.php, my sorted plan, this workbook</li>
+</ul>
+
+  <div class="sec"><h2>Glossary</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>WPCS / PHPCS</td><td>The WordPress Coding Standards / PHP_CodeSniffer, the tool that checks code against them (<code class="inline">phpcbf</code> fixes the mechanical part)</td></tr>
+<tr><td>prefix</td><td><code class="inline">pagesco_</code> in front of every global name, so it cannot collide with core or another plugin</td></tr>
+<tr><td>sanitize / validate</td><td>Clean input into the shape you expect / accept it only if it is exactly what is allowed</td></tr>
+<tr><td>escape</td><td>Make a value safe for the place it is printed into: <code class="inline">esc_html()</code>, <code class="inline">esc_attr()</code>, <code class="inline">esc_url()</code>, <code class="inline">wp_kses_post()</code></td></tr>
+<tr><td>text domain</td><td>The second argument of <code class="inline">__()</code> and friends: whose translation file to look in (the folder slug)</td></tr>
+<tr><td>callback</td><td>A value that says "call this later": a function name, a closure, an object or static method</td></tr>
+<tr><td><code class="inline">WP_Error</code></td><td>The object core returns when something fails; test it with <code class="inline">is_wp_error()</code></td></tr>
+<tr><td>post type</td><td>The label on a row of wp_posts: post, page, attachment, revision, wp_navigation...</td></tr>
+<tr><td>post status</td><td>Who may see a row: publish, draft, pending, private, future, trash, inherit</td></tr>
+<tr><td>taxonomy / term</td><td>A way of grouping content (category, post_tag) / one group in it (News)</td></tr>
+<tr><td>role / capability</td><td>A bundle of permissions (Editor) / one permission (edit_others_posts)</td></tr>
+<tr><td>meta capability</td><td>A capability about one object (<code class="inline">edit_post</code> with an ID), mapped to real capabilities by WordPress</td></tr>
+<tr><td>option</td><td>A row of wp_options: every Settings field is one, and every value is a string</td></tr>
+<tr><td>block markup</td><td>What the editor stores in post_content: HTML wrapped in <code class="inline">&lt;!-- wp:... --&gt;</code> comments</td></tr>
+</tbody>
+</table>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 2 · Participant Workbook · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

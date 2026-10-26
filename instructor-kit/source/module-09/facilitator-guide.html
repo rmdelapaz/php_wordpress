@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facilitator Guide: Session 9</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">contains answers &amp; timing · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Facilitator Guide</div>
+    <h1>Session 9: Your First Plugin and Custom Post Types</h1>
+    <p class="sub">How to teach the first session of Part 2. Open Part 2 for two groups at once (learners coming from Part 1 and learners joining here) with a refresher, a starting note and the Part 2 environment check, then build the pagesco-books plugin the way it will grow for ten sessions (a header, a namespace, Composer's autoloader, one class per feature, a life cycle) and teach WordPress about books: a post type, a genre taxonomy, typed meta and the seeded catalog.</p>
+    <div class="meta-row">
+      <span class="chip"><b>2</b> lessons</span>
+      <span class="chip"><b>3 hrs</b> session</span>
+      <span class="chip">Lessons <b>5.1–5.2</b></span>
+      <span class="chip">Session <b>9</b> of 18 · Part 2</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>How to Use This Guide</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Same rhythm for both lessons: frame (the goal and one mental model) → live demo (you type, they type along) → guided lab (a kit lab, new practice on the lesson's ideas) → start the lesson's own project. The lesson exercises, quiz and journal are homework.</li>
+  <li>Every command below was run to produce the output printed under it, on WordPress 7.1.3 / PHP 8.5: the 5.1 demo on the Part 2 starting site (the state Lesson 4.3 leaves, <code class="inline">after:lesson_13</code>), the 5.2 demo on the site as Lesson 5.1 leaves it. Ask for a prediction before every run and read every message from the left.</li>
+  <li><b>Type the short files, copy the long ones.</b> Part 2's classes are longer than anything in Part 1: learners type the main file, composer.json, the <code class="inline">sed</code> lines and the commands with you, and copy Plugin.php, Feature.php, Activator.php, BookPostType.php, GenreTaxonomy.php and BookMeta.php from the lesson pages, then read each one aloud with you. Typing a 60-line class in the room teaches typing.</li>
+  <li>The lessons are the reference: keep <code class="inline">lesson_14.html</code> and <code class="inline">lesson_15.html</code> open in browser tabs. Labs live in <code class="inline">labs/module-09/</code> (learners keep the folder in their project folder): <code class="inline">_starter</code> files and folders are handouts, <code class="inline">_solution</code> ones are yours.</li>
+  <li>Session 9 opens Part 2, "Plugins to Launch" (Sessions 9 to 18). Some learners come straight from Part 1; some join here. The 30-minute opening serves both: a Part 1 refresher, the "starting with Part 2" note and the Part 2 environment check. Teal blocks are hands-on, amber blocks are watch-outs.</li>
+</ul>
+<div class="note warn"><div class="t">The #1 risk of Session 9: two rooms in one</div>
+<p>Learners who finished Part 1 a week ago have the Lesson 4.3 site and the habits (debug.log, WP-CLI, hooks). Learners who join at Part 2 may have neither: their machine may not run the course project, their site may be a fresh install, and "the store notice from Lesson 2.3" means nothing to them. <b>Before:</b> send the setup guide (Docker, the project, the Part 2 starting site <code class="inline">pagesco-part2-start.zip</code> from the course's downloads) and the starting note below to every new learner a week ahead, and ask everyone to reply with the last line of <code class="inline">check_environment.sh --part2</code>. <b>In the room:</b> the check gets 12 minutes; a learner whose site is not where Part 2 starts sits with a ready partner for the demos and installs the Part 2 starting site at the break, not during Lesson 5.1. <b>Both groups</b> get the same refresher: R1 and R2 are exactly what Lesson 5.1 builds on.</p>
+</div>
+
+  <div class="sec"><h2>Before the Session</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ <b>A week before:</b> to everyone, "run <code class="inline">bash labs/module-01/l1_0-orientation/check_environment.sh --part2</code> and reply with its last line"; to learners new in Part 2, also the setup guide (the course project of Lesson 1.2 and the Part 2 starting site, <code class="inline">downloads/pagesco-part2-start.zip</code>) and the workbook's "Starting with Part 2" box. <code class="inline">docker pull composer:2</code> and <code class="inline">docker pull node:24</code> at home, on a good connection (the check pulls them if missing: about half a gigabyte to download, about 2 GB on disk).</li>
+  <li>☐ <b>Run the kit check once:</b> <code class="inline">python3 labs/check_labs.py module-09</code> from this kit's folder (16 results in about a minute and a half; every line PASS). With your own course project: <code class="inline">WP_LABS_COMPOSE=~/pagesco-dev python3 labs/check_labs.py module-09</code>.</li>
+  <li>☐ <b>Projector machine at the Part 2 starting site</b> (the end of Lesson 4.3): <code class="inline">pagesco</code> active, <code class="inline">wp plugin list</code> shows no pagesco-books yet. If yours is further along, snapshot it first (<code class="inline">wp db export before-s9.sql</code> and a copy of <code class="inline">wordpress/wp-content/</code>) and reset to the starting site; after the session you can restore. VS Code on <code class="inline">pagesco-dev</code> at a large font, two terminals (one for commands, one for <code class="inline">tail -f wordpress/wp-content/debug.log</code>), <code class="inline">lesson_14.html</code> and <code class="inline">lesson_15.html</code> in browser tabs, and <code class="inline">pagesco-seed.zip</code> downloaded from the course site.</li>
+  <li>☐ <b>Board, before learners arrive:</b> the plugin's layout (pagesco-books.php, composer.json, vendor/, uninstall.php, src/Plugin.php, src/Feature.php, src/Activator.php, src/StoreNotice.php); the life-cycle line <b>activate = set up once · deactivate = pause, keep data · uninstall = remove the plugin's data</b>; and <b>new feature = one class in src/ + one line in feature_classes()</b>.</li>
+  <li>☐ <b>Print or share:</b> the workbook (its Start Here page has the Part 2 check, the starting note and the refresher), sticky notes for help flags and the exit ticket.</li>
+</ul>
+<div class="blk warn"><div class="h">Known Part 2 traps</div>
+<table class="timing">
+<thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td><code class="inline">Failed opening required '.../vendor/autoload.php'</code> on activation</td><td>Composer never ran in this copy of the plugin</td><td><code class="inline">composer dump-autoload</code> in the composer:2 container, in the plugin folder (Lesson 5.1, Common Mistakes 2).</td></tr>
+<tr><td><code class="inline">Class "PagesCo\Books\StoreNotice" not found</code>, the whole site down</td><td>A file name that does not match the class name letter for letter (Storenotice.php)</td><td>Rename the file; on macOS and Windows the bug hides until a Linux server (project Step 3).</td></tr>
+<tr><td><code class="inline">docker: invalid reference format</code> or <code class="inline">$(id -u)</code> errors in PowerShell</td><td>The Linux form of the composer command on Windows PowerShell</td><td>Leave out <code class="inline">--user</code>, write <code class="inline">${PWD}</code> (Lesson 1.3); better: run it in the Ubuntu terminal where the project lives.</td></tr>
+<tr><td>The plugin activates but the activation callback never ran</td><td><code class="inline">register_activation_hook()</code> inside a callback (plugins_loaded, init)</td><td>Top level of the main file, with <code class="inline">__FILE__</code> (Common Mistakes 3).</td></tr>
+<tr><td>/books/ or /books/dune/ is a 404 although the code is right</td><td>Rewrite rules saved before the type existed</td><td><code class="inline">wp rewrite flush</code> now; the activator flushes from then on (5.2, Common Mistakes 1).</td></tr>
+<tr><td>Seeded books have no genres</td><td><code class="inline">tax_input</code> in a script that runs as no user</td><td><code class="inline">wp_set_object_terms()</code>, as the seeding script does (5.2, Common Mistakes 2).</td></tr>
+<tr><td><code class="inline">Activate the pagesco-books plugin first</code> from the seeding script</td><td>The plugin is inactive, or BookPostType/GenreTaxonomy are not in feature_classes()</td><td><code class="inline">wp plugin list</code>, then <code class="inline">grep -n "::class," .../src/Plugin.php</code>.</td></tr>
+<tr><td>The store notice shows the Thursday hours twice after the session</td><td>StoreNotice listed, but Step 2 (trimming pagesco-site.php) not done yet</td><td>Expected half-way through the project: Step 2 is the fix.</td></tr>
+<tr><td><code class="inline">Error: This does not seem to be a WordPress installation</code> from the seeding command</td><td><code class="inline">pagesco-seed/</code> unzipped somewhere other than the WordPress root</td><td>It belongs in <code class="inline">wordpress/pagesco-seed/</code>, next to wp-load.php; run from the project folder with the <code class="inline">wp</code> shortcut.</td></tr>
+</tbody>
+</table>
+</div>
+
+  <div class="sec"><h2>Session 9 Agenda (3 hours)</h2><span class="rule"></span></div>
+  <table class="timing">
+    <thead><tr><th>Clock</th><th>Minutes</th><th>Segment</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="t">0:00</td><td class="t">30</td><td>Opening Part 2: refresher, starting note and environment check</td><td>Five Part 1 questions, the "starting with Part 2" note for anyone new, <code class="inline">check_environment.sh --part2</code> on every machine.</td></tr>
+      <tr><td class="t">0:30</td><td class="t">10</td><td><b>5.1</b> Frame and mental model</td><td>The shop's departments; plugin, must-use plugin, functions.php; the layout of pagesco-books.</td></tr>
+      <tr><td class="t">0:40</td><td class="t">25</td><td><b>5.1</b> Live demo</td><td>Hello Dolly's header, the main file, Composer's autoloader, Plugin and Feature, the life cycle of a role, a late activation hook.</td></tr>
+      <tr><td class="t">1:05</td><td class="t">15</td><td><b>5.1</b> Guided lab</td><td><code class="inline">labs/module-09/l5_1-first-plugin/gift_wrap_starter/</code> in pairs: a one-file plugin with the whole life cycle.</td></tr>
+      <tr><td class="t">1:20</td><td class="t">15</td><td><b>5.1</b> Start the lesson project</td><td>The first feature moves in: StoreNotice, Steps 1 and 2 (everything twice, then once); Steps 3 and 4 go home.</td></tr>
+      <tr><td class="t">1:35</td><td class="t">10</td><td>Break</td><td>Anyone without a working skeleton copies the lesson's files now (the lesson page has every file).</td></tr>
+      <tr><td class="t">1:45</td><td class="t">10</td><td><b>5.2</b> Frame and mental model</td><td>A new drawer in the same filing cabinet; type, taxonomy, meta; why flushing matters.</td></tr>
+      <tr><td class="t">1:55</td><td class="t">25</td><td><b>5.2</b> Live demo</td><td>The book type, the rules and a flush, the genre taxonomy, the activator that registers first, six meta keys, stale rules.</td></tr>
+      <tr><td class="t">2:20</td><td class="t">15</td><td><b>5.2</b> Guided lab</td><td><code class="inline">labs/module-09/l5_2-custom-post-types/book_quotes_starter/</code>: a second post type, REST and an activator.</td></tr>
+      <tr><td class="t">2:35</td><td class="t">15</td><td><b>5.2</b> Start the lesson project</td><td>Fill the shelves: Steps 1 and 2 (the seeding script) and the start of Step 3.</td></tr>
+      <tr><td class="t">2:50</td><td class="t">10</td><td>Wrap-up</td><td>Exit ticket (3 questions), homework, bring list for Session 10.</td></tr>
+      <tr><td class="t"><b>Total</b></td><td class="t"><b>180</b></td><td></td><td>Ends at 3:00.</td></tr>
+    </tbody>
+  </table>
+<p><b>In the room.</b> The lesson pages estimate 135 + 130 = 265 minutes for a learner working alone; after the 30-minute opening, the break and the wrap-up the room has 130. Both lessons keep their shape (model, demo, lab, project start), with two cuts: the long classes are copied, not typed, and the demos skip what learners can read alone.</p>
+<p><b>Goes home (about 2 to 3 hours).</b> 5.1: the project Steps 3 and 4 (the case of the missing class, the final check), Common Mistakes 1 and 2 (direct access, the missing autoloader) if the demo skipped them, the version note on load_plugin_textdomain(). 5.2: "Seeing Books in the Admin" (the meta box and the columns: Session 10 hardens that meta box, so it MUST be done), Common Mistakes 2 and 3, the project Steps 3 and 4. Each lesson's Hands-on Exercises, both Quick Quizzes and both journal entries.</p>
+<p><b>Protect, in this order:</b> the Part 2 check result for every learner; the 5.1 skeleton working on every machine (activated, <code class="inline">int(10)</code>), because everything in Part 2 is a feature of it; the 5.1 life cycle (activate, deactivate, uninstall); the 5.2 flush (it explains the most common bug of the module). <b>Cut first:</b> the late-hook mistake (it is in the lesson), then the 5.2 genre step (show the class, run its block at home), then the 5.2 project start (learners seed at home; it takes eight minutes).</p>
+
+  <div class="sec"><h2>Opening Segment</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">0:00</span><h3>Opening Part 2: Refresher, Starting Note and Environment Check</h3><span class="dur">30 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Timing</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">5m</td><td>Welcome to Part 2: what it builds, how the sessions run, who is new</td></tr>
+<tr><td class="t">8m</td><td>Part 1 refresher: R1 to R5 (think, pair, answer); the starting site on the projector</td></tr>
+<tr><td class="t">5m</td><td>"Starting with Part 2": what the lessons assume, for learners joining here</td></tr>
+<tr><td class="t">12m</td><td>Part 2 environment check: <code class="inline">check_environment.sh --part2</code> on every machine; sort the results</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Sequence and talking points</div>
+<ul class="tick">
+  <li><b>Welcome to Part 2 (5m).</b> Say: "Part 1 made Pages &amp; Co. look right. Part 2 makes it DO things: a plugin, pagesco-books, that grows into a bookstore over ten sessions: books and genres, settings, an events calendar, blocks, REST endpoints, tests, a deployment, and the final project, Reserve &amp; Pick Up." Same deal as Part 1: model, demo, lab and project start in the room, the rest at home. Ask who is new to the course and pair each new learner with a Part 1 learner for today.</li>
+  <li><b>Part 1 refresher (8m).</b> The workbook's R1 to R5, one minute alone, then pairs, then answers. Show the starting site on the projector while you go: the notice bar and its hooks, and the themes. R1 and R2 are the two that matter for today: Lesson 5.1's first feature hooks into the notice's filter and end action, and the plugin starts on plugins_loaded.</li>
+  <li><b>"Starting with Part 2" (5m).</b> Read the box in the workbook aloud for the new learners (Part 1 learners can check their site against it): what the site must contain, what the lessons assume you can do, and what to skim this week. New learners whose site is not the starting site follow the demos on a partner's screen today and install the Part 2 starting site at the break.</li>
+  <li><b>Part 2 environment check (12m).</b> On the projector, then theirs, from the project folder: <code class="inline">bash labs/module-01/l1_0-orientation/check_environment.sh --part2</code>. Same script as Session 1, plus three lines at the end. Done = the last line says <code class="inline">READY</code> or <code class="inline">READY WITH NOTES</code> (no Node 24 on the laptop is a NOTE: the node:24 image works until Module 6). Sort the FIX lines into three piles: Docker or the project (new learners: setup guide, pair today), composer:2 (pull it during the break), and the starting-site line (install the Part 2 starting site at the break; until then, a partner's screen).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Refresher answers (R1 to R5)</div>
+<ol class="steps">
+  <li><b>R1</b> <code class="inline">wp-content/mu-plugins/pagesco-site.php</code>; <code class="inline">pagesco_store_notice</code> is the filter (the text), <code class="inline">pagesco_before_store_notice</code> and <code class="inline">pagesco_store_notice_end</code> are actions. Lesson 5.1 hooks a plugin feature into the filter and the end action.</li>
+  <li><b>R2</b> Load (wp-settings.php): must-use plugins, plugins, <code class="inline">plugins_loaded</code>, the theme, then <code class="inline">init</code>. pagesco-books starts its features on <code class="inline">plugins_loaded</code>; post types register on <code class="inline">init</code>.</li>
+  <li><b>R3</b> A <code class="inline">templates/index.html</code> (Lesson 3.1); its <code class="inline">theme.json</code> holds the design. Part 2 never edits the theme's looks: books get their template in Module 6.</li>
+  <li><b>R4</b> Because the action fires for every query, in the admin too: without the guards it would change the Books screen, widgets and REST lists (Lesson 4.2). The book archive at /books/ is a main query again.</li>
+  <li><b>R5</b> A plugin (Lessons 3.4 and 4.3: the theme is the looks, the plugin is what the shop does). That rule is why Part 2 builds pagesco-books.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">The starting site on the projector (Part 2 begins here)</div>
+<p>Three commands from the WP-CLI container shell, all on the site as Lesson 4.3 left it:</p>
+<pre class="code">curl -s http://localhost:8080/ | grep -o '&lt;div class="pagesco-notice"&gt;.*&lt;/div&gt;'</pre>
+<pre class="out">&lt;div class="pagesco-notice"&gt;Free shipping on orders over $35. Open until 9 p.m. on Thursdays. &lt;a href="http://localhost:8080/events/"&gt;See events&lt;/a&gt;&lt;/div&gt;</pre>
+<pre class="code">wp eval 'foreach ( array( "pagesco_store_notice", "pagesco_store_notice_end" ) as $h ) { echo $h, ": ", has_filter( $h ) ? "hooked" : "free", "\n"; }'</pre>
+<pre class="out">pagesco_store_notice: hooked
+pagesco_store_notice_end: hooked</pre>
+<pre class="code">wp theme list --fields=name,status,version</pre>
+<pre class="out">+-------------------+----------+---------+
+| name              | status   | version |
++-------------------+----------+---------+
+| pagesco-classic   | inactive | 1.1.0   |
+| pagesco-tt5-child | inactive | 1.0.0   |
+| pagesco           | active   | 1.0.0   |
+| twentytwentyfive  | inactive | 1.5     |
+| twentytwentyfour  | inactive | 1.6     |
+| twentytwentythree | inactive | 1.7     |
++-------------------+----------+---------+</pre><p>The notice and its two hooked callbacks (the Thursday hours and the events link, which Lesson 5.1 moves into the plugin), the pagesco theme active, the child theme and the classic theme installed. No plugin is active yet: <code class="inline">wp plugin list</code> shows only Akismet and Hello Dolly, inactive, and the two must-use plugins.</p>
+</div>
+<div class="blk"><div class="h">What the Part 2 check adds (read from the script)</div>
+<p><code class="inline">--part2</code> runs every Session 1 check (Docker, the project, WordPress 7.1, PHP 8.5, WP-CLI, debugging, Mailpit, the ports) and then three more. Their possible lines, as the script prints them:</p>
+<ul class="tick">
+  <li><code class="inline">OK    Node $nv and npm $(npm --version 2&gt;/dev/null)</code></li>
+  <li><code class="inline">CHECK Node $nv: the course uses Node 24 LTS; newer usually works</code></li>
+  <li><code class="inline">CHECK no Node 24 on this computer ($nv): use the node:24 image as Lesson 6.1 shows (docker run ... node:24 npm ...)</code></li>
+  <li><code class="inline">FIX   no Node 24 and no node:24 image: install Node 24 LTS (nvm install 24) before Module 6</code></li>
+  <li><code class="inline">OK    $(echo </code></li>
+  <li><code class="inline">FIX   the composer:2 image does not run: docker pull composer:2 (Lesson 1.3)</code></li>
+  <li><code class="inline">OK    the site as Lesson 4.3 left it: pagesco active, pagesco-classic installed, mu-plugins/pagesco-site.php</code></li>
+  <li><code class="inline">FIX   the site is not where Part 2 starts (active theme '$theme'): finish Lesson 4.3, or import the Part 2 starting site (the course download pagesco-part2-start.zip: its README.txt)</code></li>
+</ul>
+<p>Most laptops: <code class="inline">OK</code> for Composer and the site, and <code class="inline">CHECK no Node 24 on this computer (v20.20.2): use the node:24 image as Lesson 6.1 shows (docker run ... node:24 npm ...)</code> → <code class="inline">READY WITH NOTES</code>. That is fine for Sessions 9 and 10; Node is needed from Session 11 (Lesson 6.1). The site line says <code class="inline">FIX the site is not where Part 2 starts (active theme 'twentytwentyfive'): finish Lesson 4.3, or import the Part 2 starting site (the course download pagesco-part2-start.zip: its README.txt)</code> on a site that is not at the end of Lesson 4.3.</p>
+</div>
+<div class="blk warn"><div class="h">Watch-outs</div>
+<ul class="tick">
+  <li><b>Do not rebuild Part 1 in the room.</b> A new learner without the starting site cannot catch up by typing Lessons 2.1 to 4.3 today. Pair them, and install the Part 2 starting site at the break (<code class="inline">pagesco-part2-start.zip</code>: copy the folder into <code class="inline">wordpress/</code>, then <code class="inline">docker compose run --rm wpcli sh pagesco-part2-start/install.sh</code>, about a minute).</li>
+  <li><b>"My site is further along"</b> (a Part 1 learner who already started Lesson 5.1 at home): fine. They follow the 5.1 demo as a reading and help a new learner; the 5.2 demo is new for everyone.</li>
+  <li><b>Old habits.</b> Learners who wrote plugins before often put everything in one file with global functions. Today's structure (a namespace, Composer, one class per feature) is the course's convention from here to the final project; say so once, kindly.</li>
+</ul>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Lesson Plans</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">5.1</span><h3>Your First Plugin</h3><span class="dur">65 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Write a plugin header WordPress understands, including the version requirements it checks on activation</li>
+  <li>Organize a plugin as a short main file plus namespaced classes in src/, loaded by Composer's PSR-4 autoloader</li>
+  <li>Start features from one main object on plugins_loaded, and add a new feature by writing one class and listing it</li>
+  <li>Use activation and deactivation hooks and uninstall.php for the right jobs, and say what each must never do</li>
+  <li>Recognize the typical first-plugin failures: direct file access, a missing autoloader, a class the autoloader cannot find, a hook registered too late</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing in the room</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame: the shop's departments; plugin, must-use plugin, functions.php; the layout</td></tr>
+<tr><td class="t">25m</td><td>Live demo: header and guard, main file, Composer, Plugin and Feature, the role's life cycle, a late hook</td></tr>
+<tr><td class="t">15m</td><td>Guided lab: <code class="inline">gift_wrap_starter/</code> in pairs</td></tr>
+<tr><td class="t">15m</td><td>Start the lesson project: StoreNotice, Steps 1 and 2</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Mental model to say</div>
+<p>Draw the shop on the board: "pagesco-books is the shop's back office. Each feature, the notice additions, the catalog, the events calendar, the settings page, is a department with its own room. The main file is the front door with the shop's name on it: it unlocks, switches on the lights and hands a list of departments to the manager, the Plugin object, who opens each one in the morning, on plugins_loaded. A new department means a new room and one new line on the manager's list, never knocking through the walls of the existing ones."</p>
+<p>Then the three relatives in one line each: <b>must-use plugin</b> = always on, no switch (Lesson 2.3); <b>functions.php</b> = only while that theme is active (Lesson 4.3); <b>plugin</b> = the owner switches it on and off, and it can clean up after itself. "Everything the shop DOES goes in a plugin, so it survives the next redesign."</p>
+<p>Then the two tools for a plugin that will have fifteen features: <b>a namespace</b> (<code class="inline">PagesCo\Books</code>, the prefix for classes) and <b>autoloading</b> (Composer's PSR-4 rule: <code class="inline">PagesCo\Books\Admin\SettingsPage</code> lives in <code class="inline">src/Admin/SettingsPage.php</code>, letter for letter).</p>
+</div>
+<div class="blk"><div class="h">Live demo (you type, they follow)</div>
+<p>On the Part 2 starting site. Learners type along on theirs; the long classes they copy from the lesson page as you reach them. Ask for a prediction before every run.</p>
+<ol class="steps">
+  <li><b>A plugin is a header and a guard (3m).</b> "You have met two relatives already: the must-use plugin of Lesson 2.3 and functions.php of Lesson 4.3. A normal plugin sits in between: the owner switches it on and off." In the WP-CLI container shell, show the top of Hello Dolly. Ask first: which line makes it a plugin?
+<pre class="code">sed -n '1,20p' wp-content/plugins/hello.php</pre>
+<pre class="out">&lt;?php
+/**
+ * @package Hello_Dolly
+ * @version 1.7.2
+ */
+/*
+Plugin Name: Hello Dolly
+Plugin URI: http://wordpress.org/plugins/hello-dolly/
+Description: This is not just a plugin, it symbolizes the hope and enthusiasm of an entire generation summed up in two words sung most famously by Louis Armstrong: Hello, Dolly. When activated you will randomly see a lyric from &lt;cite&gt;Hello, Dolly&lt;/cite&gt; in the upper right of your admin screen on every page.
+Author: Matt Mullenweg
+Version: 1.7.2
+Author URI: http://ma.tt/
+Text Domain: hello-dolly
+*/
+
+// Don't load directly.
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}</pre>
+The comment block is the header (only <code class="inline">Plugin Name:</code> is required; WordPress reads it WITHOUT running the file), and the first code is the ABSPATH guard. Everything after that is two functions and two hooks: Lesson 2.3's toolkit.</li>
+  <li><b>The main file (4m).</b> "pagesco-books starts as a folder and a main file of the same name." Learners type it with you, from the lesson page (it is short). Then ask WordPress what it sees:
+<pre class="code"><span class="k">&lt;?php</span>
+<span class="c">/**
+ * Plugin Name:       Pages &amp; Co. Books
+ * Plugin URI:        https://example.com/pagesco-books/
+ * Description:       The bookstore features of the Pages &amp; Co. website: books, genres, events and the shop's blocks.
+ * Version:           1.0.0
+ * Requires at least: 6.8
+ * Requires PHP:      8.2
+ * Author:            Pages &amp; Co.
+ * Author URI:        https://example.com/
+ * License:           GPL-2.0-or-later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain:       pagesco-books
+ *
+ * @package PagesCo\Books
+ */</span>
+
+defined( <span class="s">'ABSPATH'</span> ) || exit;
+
+define( <span class="s">'PAGESCO_BOOKS_VERSION'</span>, <span class="s">'1.0.0'</span> );
+define( <span class="s">'PAGESCO_BOOKS_FILE'</span>, __FILE__ );
+define( <span class="s">'PAGESCO_BOOKS_DIR'</span>, plugin_dir_path( __FILE__ ) );</pre>
+<pre class="code">wp plugin list --fields=name,status,version
+wp plugin get pagesco-books --fields=name,title,version,status</pre>
+<pre class="out">+---------------+----------+---------+
+| name          | status   | version |
++---------------+----------+---------+
+| akismet       | inactive | 5.7.2   |
+| hello         | inactive | 1.7.2   |
+| pagesco-books | inactive | 1.0.0   |
+| mailpit-smtp  | must-use |         |
+| pagesco-site  | must-use | 1.0.0   |
++---------------+----------+---------+
++---------+-------------------+
+| Field   | Value             |
++---------+-------------------+
+| name    | pagesco-books     |
+| title   | Pages &amp; Co. Books |
+| version | 1.0.0             |
+| status  | inactive          |
++---------+-------------------+</pre>
+Point at <code class="inline">Pages &amp; Co. Books</code> with a plain &amp;: WordPress read the header without running a line. Installed, inactive, and that is right: there is nothing to run yet. Stop on the two requirement lines: they are the reason a PHP 8.1 server refuses the plugin politely (self-check Q1).</li>
+  <li><b>Composer writes the autoloader (4m).</b> "A namespace is the prefix for classes; PSR-4 is the rule that turns a class name into a file name." Write composer.json (learners copy it from the lesson), then run Composer in its container from the project folder:
+<pre class="code">{
+	"name": "pagesco/pagesco-books",
+	"description": "The bookstore features of the Pages &amp; Co. website.",
+	"type": "wordpress-plugin",
+	"license": "GPL-2.0-or-later",
+	"require": {
+		"php": "&gt;=8.2"
+	},
+	"autoload": {
+		"psr-4": {
+			"PagesCo\\Books\\": "src/"
+		}
+	}
+}</pre>
+<pre class="code">docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD/wordpress:/var/www/html" -w /var/www/html/wp-content/plugins/pagesco-books composer:2 composer dump-autoload</pre>
+<pre class="out">Composer could not detect the root package (pagesco/pagesco-books) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version
+Generating autoload files
+Generated autoload files</pre>
+The first line is a harmless note (no version in composer.json). Windows PowerShell: no <code class="inline">--user</code>, <code class="inline">${PWD}</code> (Lesson 1.3). Then Feature.php and Plugin.php: learners COPY these two from the lesson page; you read Plugin.php aloud with them: <code class="inline">instance()</code>, <code class="inline">boot()</code> with its own filter <code class="inline">pagesco_books_features</code>, <code class="inline">feature()</code>, and the empty list in <code class="inline">feature_classes()</code>.</li>
+  <li><b>Boot on plugins_loaded (3m).</b> "Two lines finish the main file: load the autoloader, hand boot() to plugins_loaded." Append them, activate, and ask PHP two questions:
+<pre class="code">require PAGESCO_BOOKS_DIR . 'vendor/autoload.php';
+
+add_action( 'plugins_loaded', array( PagesCo\Books\Plugin::instance(), 'boot' ) );
+
+wp plugin activate pagesco-books
+wp eval 'var_dump( has_action( "plugins_loaded", array( PagesCo\Books\Plugin::instance(), "boot" ) ), class_exists( "PagesCo\Books\Plugin", false ) );'</pre>
+<pre class="out">Plugin 'pagesco-books' activated.
+Success: Activated 1 of 1 plugins.
+int(10)
+bool(true)</pre>
+Hooked at priority 10, and the class is loaded (<code class="inline">false</code> = "do not autoload just for this question"). The plugin runs, with no features yet.</li>
+  <li><b>A role through the life cycle (6m).</b> "Three moments are different: activation, deactivation, uninstall." Copy Activator.php from the lesson, append the two <code class="inline">register_*_hook()</code> lines at the TOP LEVEL of the main file, write uninstall.php, then walk the role through all three:
+<pre class="code">register_activation_hook( __FILE__, array( PagesCo\Books\Activator::class, 'activate' ) );
+register_deactivation_hook( __FILE__, array( PagesCo\Books\Activator::class, 'deactivate' ) );
+
+wp plugin deactivate pagesco-books
+wp plugin activate pagesco-books
+wp role list --fields=name,role
+wp plugin deactivate pagesco-books
+wp role list --field=role | grep -c pagesco_bookseller
+wp plugin uninstall pagesco-books --skip-delete
+wp role list --field=role | grep -c pagesco_bookseller
+wp plugin activate pagesco-books</pre>
+<pre class="out">Plugin 'pagesco-books' deactivated.
+Success: Deactivated 1 of 1 plugins.
+Plugin 'pagesco-books' activated.
+Success: Activated 1 of 1 plugins.
++---------------+--------------------+
+| name          | role               |
++---------------+--------------------+
+| Administrator | administrator      |
+| Editor        | editor             |
+| Author        | author             |
+| Contributor   | contributor        |
+| Subscriber    | subscriber         |
+| Bookseller    | pagesco_bookseller |
++---------------+--------------------+
+Plugin 'pagesco-books' deactivated.
+Success: Deactivated 1 of 1 plugins.
+1
+Ran uninstall procedure for 'pagesco-books' plugin without deleting.
+Success: Uninstalled 1 of 1 plugins.
+0
+Plugin 'pagesco-books' activated.
+Success: Activated 1 of 1 plugins.</pre>
+Read the two numbers: deactivation kept the role (1), uninstall removed it (0), the last activation made it again. Write the life-cycle table on the board: <b>activate = set up once · deactivate = pause, keep data · uninstall = remove the plugin's data</b>.</li>
+  <li><b>Mistake: a late activation hook (4m).</b> "A tidy-minded developer moves everything into plugins_loaded, the activation hook too." Save the lesson's one-file demo plugin as wordpress/wp-content/plugins/pagesco-late-hook.php:
+<pre class="code"><span class="k">&lt;?php</span>
+<span class="c">/**
+ * Plugin Name: Late Hook Demo
+ */</span>
+
+add_action(
+	<span class="s">'plugins_loaded'</span>,
+	<span class="k">function</span> () {
+		register_activation_hook( __FILE__, <span class="s">'pagesco_late_hook_activate'</span> );
+	}
+);
+
+<span class="c">/**
+ * Should run once, on activation.
+ */</span>
+<span class="k">function</span> pagesco_late_hook_activate() {
+	update_option( <span class="s">'pagesco_late_hook'</span>, <span class="s">'activated'</span> );
+}</pre>
+<pre class="code">wp plugin activate pagesco-late-hook
+wp option get pagesco_late_hook</pre>
+<pre class="out">Plugin 'pagesco-late-hook' activated.
+Success: Activated 1 of 1 plugins.
+Error: Could not get 'pagesco_late_hook' option. Does it exist?</pre>
+Activated, and the callback never ran: no option, no warning. On the activation request plugins_loaded fired BEFORE WordPress included the new file. Delete the demo:
+<pre class="code">wp plugin deactivate pagesco-late-hook
+wp plugin delete pagesco-late-hook</pre>
+<pre class="out">Plugin 'pagesco-late-hook' deactivated.
+Success: Deactivated 1 of 1 plugins.
+Deleted 'pagesco-late-hook' plugin.
+Success: Deleted 1 of 1 plugins.</pre></li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b>A file name that does not match the class.</b> <code class="inline">storeNotice.php</code>, <code class="inline">Store_Notice.php</code>, <code class="inline">class-store-notice.php</code> (Lesson 1.3's style). Coach: "Read the class name, swap PagesCo\Books\ for src/, add .php: is that the file?" (Self-check Q3; the psr4_paths lab.)</li>
+  <li><b>Hooks registered in the wrong place.</b> The activation hook inside a callback; <code class="inline">add_action( 'init', ... )</code> inside a class constructor that nothing creates. Coach: "Who calls this line, and when?" For features: only register() adds hooks, and boot() calls it. (Self-check Q6.)</li>
+  <li><b>Deleting data on deactivation.</b> "Clean up" in deactivate(). Coach with the life-cycle line on the board: deactivate is a pause. (Self-check Q4; the gift_wrap lab's uninstall.php.)</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<p><b>Folder:</b> <code class="inline">labs/module-09/l5_1-first-plugin/gift_wrap_starter/</code> (a one-file plugin, <code class="inline">pagesco-gift-wrap</code>, plus its uninstall.php) with <code class="inline">labs/module-09/l5_1-first-plugin/test_gift_wrap.sh</code>; your reference is <code class="inline">labs/module-09/l5_1-first-plugin/gift_wrap_solution/</code>. It practices the whole life cycle on a plugin small enough to hold in your head: the requirement headers, the guard, an activation hook that stores an option once, a filter on the store notice of Lesson 2.3, and uninstall.php. It is not the lesson's project (that is StoreNotice in pagesco-books).</p>
+<ul class="tick">
+  <li><b>Install and run it as shipped (3m).</b> <code class="inline">cp -r labs/module-09/l5_1-first-plugin/gift_wrap_starter wordpress/wp-content/plugins/pagesco-gift-wrap</code>, <code class="inline">wp plugin activate pagesco-gift-wrap</code>, copy the test into wordpress/ and <code class="inline">docker compose run --rm wpcli sh test_gift_wrap.sh</code>. Everything says TODO, the direct request is a <b>500</b> (no guard: the file runs without WordPress and dies on add_filter()), no price is stored.</li>
+  <li><b>TODOs 1 to 5 in pairs (10m).</b> After editing, the activation hook must run again: <code class="inline">wp plugin deactivate pagesco-gift-wrap &amp;&amp; wp plugin activate pagesco-gift-wrap</code>, then the test. The test ends with <code class="inline">wp plugin uninstall --deactivate --skip-delete</code>, so activate it again before the next run. Circulate for the activation hook written inside <code class="inline">pagesco_gift_wrap_notice()</code> and for <code class="inline">get_option()</code> without a check for false.</li>
+  <li><b>Expected when done</b> (the solution's test):</li>
+</ul>
+<pre class="out">Plugin 'pagesco-gift-wrap' activated.
+Success: Activated 1 of 1 plugins.
+header: requires WordPress 6.8, PHP 8.2
+direct request: 200
+stored price: 2.50
+notice:
+&lt;div class="pagesco-notice"&gt;Free shipping on orders over $35. Open until 9 p.m. on Thursdays. Gift wrapping: $2.50. &lt;a href="http://localhost:8080/events/"&gt;See events&lt;/a&gt;&lt;/div&gt;
+Deactivating 'pagesco-gift-wrap'...
+Plugin 'pagesco-gift-wrap' deactivated.
+Ran uninstall procedure for 'pagesco-gift-wrap' plugin without deleting.
+Success: Uninstalled 1 of 1 plugins.
+after uninstall: (not stored)</pre><ul class="tick">
+  <li><b>Debrief (2m):</b> "Why 200 now, and not a page?" (the guard ends the request quietly). "Where did the option go after the last command?" (uninstall.php; deactivation alone would have kept it).</li>
+  <li><b>Fast finishers:</b> <code class="inline">labs/module-09/l5_1-first-plugin/psr4_paths_starter.php</code> (the PSR-4 rule written by hand), then <code class="inline">labs/module-09/l5_1-first-plugin/debug_plugin_audit.php</code> (two Warnings and a silent wrong answer about Requires PHP).</li>
+  <li><b>Remove it afterwards:</b> <code class="inline">rm -r wordpress/wp-content/plugins/pagesco-gift-wrap wordpress/test_gift_wrap.sh</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Start the lesson project</div>
+<p>The lesson project is <b>The First Feature Moves In</b>: the two notice callbacks that Lesson 2.3 promised to move become the plugin's first feature. In the room: Steps 1 and 2 (15 minutes), on top of the skeleton from the demo.</p>
+<ul class="tick">
+  <li>Step 1: learners copy src/StoreNotice.php, put <code class="inline">StoreNotice::class,</code> in <code class="inline">feature_classes()</code> (editor or the lesson's <code class="inline">sed</code>), and look at the notice: everything twice. Ask why that is good news (the feature works, and Composer did not have to run again for the new class).</li>
+  <li>Step 2: replace mu-plugins/pagesco-site.php with the lesson's 1.1.0 version, then check the notice with the plugin on and off:</li>
+</ul>
+<pre class="code">curl -s http://localhost:8080/ | grep -o '&lt;div class="pagesco-notice"&gt;.*&lt;/div&gt;'
+wp plugin deactivate pagesco-books
+curl -s http://localhost:8080/ | grep -o '&lt;div class="pagesco-notice"&gt;.*&lt;/div&gt;'
+wp plugin activate pagesco-books</pre><pre class="out">&lt;div class="pagesco-notice"&gt;Free shipping on orders over $35. Open until 9 p.m. on Thursdays. &lt;a href="http://localhost:8080/events/"&gt;See events&lt;/a&gt;&lt;/div&gt;
+Plugin 'pagesco-books' deactivated.
+Success: Deactivated 1 of 1 plugins.
+&lt;div class="pagesco-notice"&gt;Free shipping on orders over $35.&lt;/div&gt;
+Plugin 'pagesco-books' activated.
+Success: Activated 1 of 1 plugins.</pre><ul class="tick">
+  <li><b>Done in the room</b> = the notice once with the plugin active, and only the free-shipping text with it off: the plugin/must-use split in one picture.</li>
+  <li><b>Goes home:</b> Step 3 (rename StoreNotice.php to Storenotice.php on purpose, read the fatal, rename it back) and Step 4 (the final check and the line in pagesco-plan.txt).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<p>Ask these out loud during the demo and the lab:</p>
+<ul class="tick">
+  <li>Which line makes a PHP file a plugin? <b>Answer:</b> a header comment with <code class="inline">Plugin Name:</code>; WordPress reads it without running the file.</li>
+  <li>What does <code class="inline">defined( 'ABSPATH' ) || exit;</code> stop? <b>Answer:</b> a direct request to the file from a browser, which would run it without WordPress.</li>
+  <li>Where does <code class="inline">PagesCo\Books\Admin\SettingsPage</code> live? <b>Answer:</b> src/Admin/SettingsPage.php, exactly that case.</li>
+  <li>What may deactivation never do? <b>Answer:</b> delete the owner's data; only uninstall.php does that.</li>
+</ul>
+<p>Workbook self-check, items Q1 to Q6 (learners do them at the end of the block or at home).</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q1</b> <span data-sc="1">B) WordPress refuses to activate it and says which PHP version the plugin requires</span>; <b>Q2</b> <span data-sc="2"><code class="inline">/var/www/html/wp-content/plugins/pagesco-books/</code></span>; <b>Q3</b> <span data-sc="3">C) A fatal error: Class <code class="inline">PagesCo\Books\Admin\BookColumns</code> not found</span>; <b>Q4</b> <span data-sc="4">A) Delete the Bookseller role and the plugin's options</span>; <b>Q5</b> <span data-sc="5"><code class="inline">NULL</code>: uninstall.php removed the role, so get_role() finds nothing</span>; <b>Q6</b> <span data-sc="6">D) Because on the activation request plugins_loaded has already fired before WordPress includes the new plugin's file</span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> a learner whose skeleton will not activate reads the error from the left with you: the file and line almost always point at a typo in the main file or a missing vendor/. If the demo ran away from them, copy all seven files from the lesson page at the break and run its checkpoint block.</p>
+<p><b>Stretch:</b> <code class="inline">psr4_paths_starter.php</code>, <code class="inline">debug_plugin_audit.php</code>; the lesson's Exercise 3 (switch a feature off from outside with <code class="inline">pagesco_books_features</code>) and the Bonus Challenge (a Features link on the Plugins screen).</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">5.2</span><h3>Custom Post Types, Taxonomies &amp; Meta</h3><span class="dur">75 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Register a custom post type with register_post_type() on init, with labels, an archive and REST support</li>
+  <li>Register a custom taxonomy with register_taxonomy() and attach it to the post type</li>
+  <li>Register typed post meta with register_post_meta(), and explain why the keys are public and show_in_rest</li>
+  <li>Add a meta box and extra admin columns so editors can see and change a book's details</li>
+  <li>Flush rewrite rules at the right moment, and seed content safely with a WP-CLI script</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing in the room</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame: a new drawer in the same filing cabinet; type, taxonomy, meta; why rules need a flush</td></tr>
+<tr><td class="t">25m</td><td>Live demo: the book type, the rules, the genre taxonomy, the activator, six meta keys, stale rules</td></tr>
+<tr><td class="t">15m</td><td>Guided lab: <code class="inline">book_quotes_starter/</code></td></tr>
+<tr><td class="t">15m</td><td>Start the lesson project: Fill the Shelves, Steps 1 and 2 and the start of Step 3</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Mental model to say</div>
+<p>Back to Lesson 2.1's picture: "wp_posts is one big filing cabinet. A custom post type is a new labeled drawer in it, not a new cabinet: books are stored in the same table as posts and pages, with the same columns, so the Loop, WP_Query, revisions and the block editor work on them for free. A taxonomy is the colored tabs you clip onto the files to group them, a book's genres. Meta is the index card in each file with its own facts: this book's price, its author, its page count."</p>
+<p>Then the three functions on the board, all called on init: <b>register_post_type()</b> (a kind of content: book), <b>register_taxonomy()</b> (a way to group it: genre), <b>register_post_meta()</b> (a named, typed field: pagesco_price). Each is one feature class in pagesco-books, the rule from Lesson 5.1.</p>
+<p>Then the one thing that surprises everyone: "Registering a type adds URL rules, and WordPress keeps the rules in the database. Until something flushes them, /books/ is a 404." The activation hook gets its second job.</p>
+</div>
+<div class="blk"><div class="h">Live demo (you type, they follow)</div>
+<p>On the site as Lesson 5.1 leaves it. Learners copy the three classes from the lesson page and type the <code class="inline">sed</code> and WP-CLI lines with you.</p>
+<ol class="steps">
+  <li><b>The book post type (5m).</b> "A custom post type is a new value in wp_posts.post_type: a new drawer in the same filing cabinet." Learners copy src/BookPostType.php from the lesson (it is mostly labels); you walk the arguments table: public, has_archive + rewrite, show_in_rest + rest_base, supports (custom-fields is required for meta in REST). List it:
+<pre class="code">sed -i '/StoreNotice::class,/a\			BookPostType::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+grep -n -A 3 "return array(" wp-content/plugins/pagesco-books/src/Plugin.php</pre>
+<pre class="out">75:		return array(
+76-			StoreNotice::class,
+77-			BookPostType::class,
+78-		);</pre>
+Note the NAME constant: no other file spells 'book'.</li>
+  <li><b>Rules, and a flush (4m).</b> "The type registers on every request now. Does /books/ work?" Ask for predictions (most say yes). It would 404: the rules in the database know nothing about books until something flushes them.
+<pre class="code">wp rewrite flush
+wp rewrite list --match=/books/ --fields=match,query,source</pre>
+<pre class="out">Success: Rewrite rules flushed.
++--------------------------+-------------------------------------------------+--------+
+| match                    | query                                           | source |
++--------------------------+-------------------------------------------------+--------+
+| books/?$                 | index.php?post_type=book                        | other  |
+| (.?.+?)(?:/([0-9]+))?/?$ | index.php?pagename=$matches[1]&amp;page=$matches[2] | page   |
+| ([^/]+)(?:/([0-9]+))?/?$ | index.php?name=$matches[1]&amp;page=$matches[2]     | post   |
++--------------------------+-------------------------------------------------+--------+</pre>
+The first rule, <code class="inline">source other</code>, is the archive. A flush rebuilds the whole rules option: expensive, so WordPress does it only when asked. Then ask WordPress what it knows (scroll past core's types to the last row):
+<pre class="code">wp post-type list --fields=name,label,public,has_archive
+wp eval 'echo get_post_type_object( "book" )-&gt;labels-&gt;add_new_item, "\n";'
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/books/</pre>
+<pre class="out">+---------------------+-----------------------+--------+-------------+
+| name                | label                 | public | has_archive |
++---------------------+-----------------------+--------+-------------+
+| post                | Posts                 | 1      |             |
+| page                | Pages                 | 1      |             |
+| attachment          | Media                 | 1      |             |
+| revision            | Revisions             |        |             |
+| nav_menu_item       | Navigation Menu Items |        |             |
+| custom_css          | Custom CSS            |        |             |
+| customize_changeset | Changesets            |        |             |
+| oembed_cache        | oEmbed Responses      |        |             |
+| user_request        | User Requests         |        |             |
+| wp_block            | Patterns              |        |             |
+| wp_template         | Templates             |        |             |
+| wp_template_part    | Template Parts        |        |             |
+| wp_global_styles    | Global Styles         |        |             |
+| wp_navigation       | Navigation Menus      |        |             |
+| wp_font_family      | Font Families         |        |             |
+| wp_font_face        | Font Faces            |        |             |
+| book                | Books                 | 1      | books       |
++---------------------+-----------------------+--------+-------------+
+Add Book
+200</pre></li>
+  <li><b>The genre taxonomy (3m).</b> "Genres are the colored tabs on the files." Copy src/GenreTaxonomy.php: the second argument of register_taxonomy() is the type it attaches to, <code class="inline">BookPostType::NAME</code>. List it and flush once more:
+<pre class="code">sed -i '/BookPostType::class,/a\			GenreTaxonomy::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+wp rewrite flush
+wp taxonomy list --fields=name,label,object_type,hierarchical
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/genre/fiction/</pre>
+<pre class="out">Success: Rewrite rules flushed.
++-----------------------+---------------------+-------------------------------------------------+--------------+
+| name                  | label               | object_type                                     | hierarchical |
++-----------------------+---------------------+-------------------------------------------------+--------------+
+| category              | Categories          | post                                            | 1            |
+| post_tag              | Tags                | post                                            |              |
+| nav_menu              | Navigation Menus    | nav_menu_item                                   |              |
+| post_format           | Formats             | post                                            |              |
+| wp_theme              | Themes              | wp_template, wp_template_part, wp_global_styles |              |
+| wp_template_part_area | Template Part Areas | wp_template_part                                |              |
+| wp_pattern_category   | Pattern Categories  | wp_block                                        |              |
+| genre                 | Genres              | book                                            | 1            |
++-----------------------+---------------------+-------------------------------------------------+--------------+
+404</pre>
+/genre/fiction/ is a 404 only because no genre terms exist yet: the seeding script creates them.</li>
+  <li><b>Flushing where it belongs (5m).</b> "A site owner will not run wp rewrite flush. The activation hook will, but on that one request init has NOT run for our plugin." Replace Activator.php with the lesson's version (it registers the type and taxonomy itself, then flushes; deactivate() unregisters and flushes). Run the cycle:
+<pre class="code">wp plugin deactivate pagesco-books
+wp plugin activate pagesco-books
+curl -s -o /dev/null -w 'books active: %{http_code}\n' http://localhost:8080/books/
+wp plugin deactivate pagesco-books
+curl -s -o /dev/null -w 'books off:    %{http_code}\n' http://localhost:8080/books/
+wp plugin activate pagesco-books</pre>
+<pre class="out">Plugin 'pagesco-books' deactivated.
+Success: Deactivated 1 of 1 plugins.
+Plugin 'pagesco-books' activated.
+Success: Activated 1 of 1 plugins.
+books active: 200
+Plugin 'pagesco-books' deactivated.
+Success: Deactivated 1 of 1 plugins.
+books off:    404
+Plugin 'pagesco-books' activated.
+Success: Activated 1 of 1 plugins.</pre>
+With the plugin off, /books/ is a 404: no broken links left behind, and the books stay in the database.</li>
+  <li><b>Six meta keys (4m).</b> "The index card in each file: author, price, pages." Copy src/BookMeta.php: the keys are DATA in <code class="inline">fields()</code>, one loop registers them. Stop on the box "Why the keys do not start with an underscore" (public keys for REST and block bindings).
+<pre class="code">sed -i '/GenreTaxonomy::class,/a\			BookMeta::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+wp eval 'foreach ( array_keys( get_registered_meta_keys( "post", "book" ) ) as $k ) { echo $k, "\n"; }'</pre>
+<pre class="out">pagesco_author
+pagesco_price
+pagesco_pages
+pagesco_published
+pagesco_in_stock
+pagesco_isbn</pre></li>
+  <li><b>Mistake: stale rules (3m).</b> "The commonest custom-post-type bug: the code is right and single books 404." Save the rules once without the type, then flush:
+<pre class="code">wp eval 'unregister_post_type( "book" ); flush_rewrite_rules();'
+curl -s -o /dev/null -w 'before flush: %{http_code}\n' http://localhost:8080/books/
+wp rewrite flush
+curl -s -o /dev/null -w 'after flush:  %{http_code}\n' http://localhost:8080/books/</pre>
+<pre class="out">before flush: 404
+Success: Rewrite rules flushed.
+after flush:  200</pre>
+An EMPTY rules option would not show the bug (WordPress rebuilds it); stale rules do. Fix: flush on activation, never on init (self-check Q10).</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b>"It's a 404, my code is wrong."</b> Coach: "When did the rules last change? <code class="inline">wp rewrite list --match=/books/</code>." Then the fix in the right place: the activator. (Self-check Q10.)</li>
+  <li><b>The activator that only flushes.</b> It trusts init to have registered the type; on the activation request it has not. Coach with the warning box "Registering is not enough on activation". (The book_quotes lab's TODO 4.)</li>
+  <li><b>Taxonomy or meta?</b> A "genre" meta key, a "price" taxonomy. Coach with the lesson's test: "Would you want a page that lists everything with this value?" (Self-check Q9.)</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<p><b>Folder:</b> <code class="inline">labs/module-09/l5_2-custom-post-types/book_quotes_starter/</code> (a plugin, <code class="inline">pagesco-quotes</code>) with <code class="inline">labs/module-09/l5_2-custom-post-types/test_book_quotes.sh</code>; your reference is <code class="inline">labs/module-09/l5_2-custom-post-types/book_quotes_solution/</code>. A second post type, <code class="inline">pagesco_quote</code>, for favorite lines from the shop's books: learners make it public with an archive at /quotes/, put it in REST, register one public meta key, and write the activator that registers BEFORE it flushes. Same three functions as the lesson, on new data, in procedural style.</p>
+<ul class="tick">
+  <li><b>Install and run it as shipped (3m).</b> <code class="inline">cp -r labs/module-09/l5_2-custom-post-types/book_quotes_starter wordpress/wp-content/plugins/pagesco-quotes</code>, <code class="inline">wp plugin activate pagesco-quotes</code>, copy the test, run it: the archive is a 404 and REST says <code class="inline">rest_no_route</code>.</li>
+  <li><b>TODOs 1 to 4 in pairs (9m).</b> After each change: deactivate and activate the plugin (the activator must run), then the test. Circulate for <code class="inline">has_archive =&gt; true</code> (the archive is then /pagesco_quote/), for a meta key without <code class="inline">show_in_rest</code>, and for an activator that calls flush_rewrite_rules() alone.</li>
+  <li><b>Expected when done</b> (the solution's test):</li>
+</ul>
+<pre class="out">Plugin 'pagesco-quotes' activated.
+Success: Activated 1 of 1 plugins.
+archive /quotes/: 200
+REST /wp/v2/quotes:
+[{"title":{"rendered":"A truth universally acknowledged"},"meta":{"pagesco_quote_source":"Pride and Prejudice"}}]
+quotes left: 0</pre><ul class="tick">
+  <li><b>Debrief (3m):</b> "What did the activator have to do that init does on every other request?" (register first). "Why is the meta key in REST without a leading underscore?" (a protected key cannot be written through REST without an auth callback, and block bindings refuse it).</li>
+  <li><b>Fast finishers:</b> <code class="inline">labs/module-09/l5_2-custom-post-types/debug_meeting_type.php</code> (three registration bugs). <code class="inline">shelf_report_starter.php</code> needs the seeded catalog: it is homework after the project.</li>
+  <li><b>Remove it afterwards:</b> <code class="inline">wp plugin deactivate pagesco-quotes</code>, then <code class="inline">rm -r wordpress/wp-content/plugins/pagesco-quotes wordpress/test_book_quotes.sh</code> (deactivation unregisters the type and flushes the rules again).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Start the lesson project</div>
+<p>The lesson project is <b>Fill the Shelves</b>: the eleven classics of the Pages &amp; Co. catalog, seeded with one WP-CLI script so the whole class has identical data (book IDs 30 to 40). In the room: Steps 1 and 2 and the start of Step 3 (15 minutes).</p>
+<ul class="tick">
+  <li>Step 1: download pagesco-seed.zip from the lesson page and unzip it into <code class="inline">wordpress/pagesco-seed/</code> (next to wp-load.php). Read seed-books.php together for two minutes: the guard for the plugin, fixed term order, <code class="inline">import_id</code> for fixed IDs, <code class="inline">wp_set_object_terms()</code> instead of tax_input.</li>
+  <li>Step 2: run it from the project folder:</li>
+</ul>
+<pre class="code">wp eval-file pagesco-seed/seed-books.php</pre><pre class="out">Genre 5: Fiction
+Genre 6: Science Fiction
+Genre 7: Classic
+Genre 8: Fantasy
+Genre 9: Dystopian
+Book 30: Dune
+Book 31: 1984
+Book 32: To Kill a Mockingbird
+Book 33: The Great Gatsby
+Book 34: Pride and Prejudice
+Book 35: The Hobbit
+Book 36: Brave New World
+Book 37: The Catcher in the Rye
+Book 38: Lord of the Rings
+Book 39: Fahrenheit 451
+Book 40: Animal Farm
+Success: 11 books in the catalog.</pre><ul class="tick">
+  <li>Step 3, the start: the term list (five genres, eleven Fiction) and the REST view of Dune:</li>
+</ul>
+<pre class="code">wp term list genre --fields=term_id,name,slug,count --orderby=term_id</pre><pre class="out">+---------+-----------------+-----------------+-------+
+| term_id | name            | slug            | count |
++---------+-----------------+-----------------+-------+
+| 5       | Fiction         | fiction         | 11    |
+| 6       | Science Fiction | science-fiction | 3     |
+| 7       | Classic         | classic         | 6     |
+| 8       | Fantasy         | fantasy         | 2     |
+| 9       | Dystopian       | dystopian       | 3     |
++---------+-----------------+-----------------+-------+</pre><pre class="out">{
+  "id": 30,
+  "slug": "dune",
+  "title": {
+    "rendered": "Dune"
+  },
+  "genres": [
+    5,
+    6
+  ],
+  "meta": {
+    "pagesco_author": "Frank Herbert",
+    "pagesco_price": 14.99,
+    "pagesco_pages": 412,
+    "pagesco_published": "1965-08-01",
+    "pagesco_in_stock": true,
+    "pagesco_isbn": ""
+  }
+}</pre><ul class="tick">
+  <li><b>Done in the room</b> = <code class="inline">Success: 11 books in the catalog.</code> and Dune's meta in REST with real types (a number, a boolean).</li>
+  <li><b>Goes home:</b> the lesson's "Seeing Books in the Admin" section (BookMetaBox and BookColumns: copy, list, look at the Books screen), the rest of Step 3 (the column check) and Step 4 (<code class="inline">rm -r pagesco-seed</code>). Session 10 hardens that meta box: it must exist by then.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<p>Ask these out loud during the demo and the lab:</p>
+<ul class="tick">
+  <li>Where are books stored? <b>Answer:</b> in wp_posts, with post_type book; their meta in wp_postmeta; genres in the term tables.</li>
+  <li>Why does the activator register the type itself? <b>Answer:</b> on the activation request the plugin's own init callback has not run, so the rules would be flushed without the type.</li>
+  <li>Why <code class="inline">pagesco_price</code> and not <code class="inline">_pagesco_price</code>? <b>Answer:</b> an underscore key is protected: hidden from the Custom Fields box, not writable through REST without an auth callback, refused by block bindings.</li>
+  <li>What happens to the books when the plugin is deactivated? <b>Answer:</b> they stay in the database; the type is unregistered, so they vanish from the admin and their URLs 404 until it is active again.</li>
+</ul>
+<p>Workbook self-check, items Q7 to Q12 (learners do them at the end of the block or at home).</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q7</b> <span data-sc="7">B) <code class="inline">/books/</code></span>; <b>Q8</b> <span data-sc="8"><code class="inline">''</code> (an empty string)</span>; <b>Q9</b> <span data-sc="9">A) As a taxonomy on the book type</span>; <b>Q10</b> <span data-sc="10">D) It rewrites the whole rules option on every page load: a needless, slow database write</span>; <b>Q11</b> <span data-sc="11"><code class="inline">[{"title":{"rendered":"The Hobbit"}},{"title":{"rendered":"Lord of the Rings"}}]</code></span>; <b>Q12</b> <span data-sc="12">C) <code class="inline">wp_set_object_terms( $id, $genres, 'genre' )</code> after the insert</span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> learners who fell behind in the demo copy the three classes and the activator from the lesson page and run its <code class="inline">sed</code> blocks in order; the project's seeding script tells them if the type or taxonomy is missing. Pair them with someone whose <code class="inline">wp post-type list</code> shows book.</p>
+<p><b>Stretch:</b> <code class="inline">debug_meeting_type.php</code>, then (after seeding) <code class="inline">shelf_report_starter.php</code>; the lesson's Exercise 4 (one more meta key from a throwaway must-use plugin) and the Bonus Challenge (a sortable Price column).</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Closing</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Exit ticket (3 questions, no notes, 4 minutes)</div>
+<p>Put the three questions on the slide. Learners answer in the workbook's Exit Ticket box or on a sticky note. Sort the notes before Session 10: question 2's "not yet" pile tells you how much of the warm-up goes to the life cycle.</p>
+<ol class="steps">
+  <li>Name the three files every new pagesco-books feature touches, and what each gets. <b>Answer:</b> a new class in src/ that implements Feature (its hooks in register()), one line in Plugin::feature_classes(), and (if it stores data) a line in uninstall.php.</li>
+  <li>What does each moment do to the Bookseller role: activation, deactivation, uninstall? <b>Answer:</b> creates it, keeps it, removes it.</li>
+  <li>/books/ is a 404 right after you registered the book type. Why, and where does the permanent fix go? <b>Answer:</b> the rewrite rules in the database were saved before the type existed; flush them, and flush in the activator (after registering the type) from then on.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Homework (about 2 to 3 hours)</div>
+<ul class="tick">
+  <li><b>Finish both lesson projects.</b> 5.1: Steps 3 and 4 (the missing class on purpose, the final check, the line in pagesco-plan.txt). 5.2: "Seeing Books in the Admin" (BookMetaBox and BookColumns) and Steps 3 and 4 (the column check, then <code class="inline">rm -r pagesco-seed</code>). Session 10 starts from exactly this site.</li>
+  <li><b>Lesson exercises.</b> 5.1: Exercises 1 to 3 (an old server, a feature the plugin's way, switching a feature off); Exercise 4 is a stretch. 5.2: Exercises 1 to 3 (by author, by genre, the safe re-run); Exercise 4 is a stretch.</li>
+  <li><b>Both Quick Quizzes</b> on the lesson pages (answers in the Answer Key).</li>
+  <li><b>Journal:</b> both entries. The 5.1 prompt asks for the next three features as class names: keep the list, Sessions 10 and 11 build three of them.</li>
+  <li><b>Labs not reached:</b> <code class="inline">labs/module-09/l5_1-first-plugin/psr4_paths_starter.php</code>, <code class="inline">labs/module-09/l5_1-first-plugin/debug_plugin_audit.php</code>, <code class="inline">labs/module-09/l5_2-custom-post-types/debug_meeting_type.php</code>, and after the project <code class="inline">labs/module-09/l5_2-custom-post-types/shelf_report_starter.php</code>.</li>
+  <li><b>Before the Next Lesson (from 5.2):</b> pagesco-books lists six features, eleven books are published, /books/ and /genre/fiction/ load, and the Book details box shows on a book.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Bring list for Session 10</div>
+<ul class="tick">
+  <li>A laptop whose Part 2 check says READY (or READY WITH NOTES), with the site at the end of Lesson 5.2: <code class="inline">wp post list --post_type=book --format=count</code> prints 11 and the Book details box is on the book screen.</li>
+  <li>Two browsers or a private window: Session 10 logs in as admin, maria (editor) and devon (author) side by side.</li>
+  <li>The project folder with <code class="inline">labs/</code>, <code class="inline">pagesco-plan.txt</code>, the journal and the workbook.</li>
+</ul>
+</div>
+
+  <div class="sec"><h2>If You Run Long or Short</h2><span class="rule"></span></div>
+<div class="blk warn"><div class="h">Running long: what to protect and what to cut first</div>
+<ul class="tick">
+  <li><b>Protect:</b> the Part 2 check result for every learner; a working 5.1 skeleton on every machine; the 5.1 life cycle; the 5.2 flush.</li>
+  <li><b>Cut first (saves 4m):</b> the 5.1 late-hook mistake: point at Common Mistakes 3 on the page.</li>
+  <li><b>Cut second (saves 3m):</b> the 5.2 genre step: learners copy GenreTaxonomy.php and run its block at the start of the project.</li>
+  <li><b>Cut third (saves 15m):</b> the 5.2 project start: the seeding script is eight minutes at home and the lesson prints every output.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Running short: what to add</div>
+<ul class="tick">
+  <li>Lesson 5.1's Common Mistakes 2 live (rename vendor/, activate, read the stack trace: <code class="inline">plugin_sandbox_scrape()</code> is the useful frame), then put it back.</li>
+  <li>Lesson 5.1's Exercise 3 together: switch StoreNotice off from a must-use plugin with the plugin's own filter.</li>
+  <li>Lesson 5.2's Common Mistakes 3: the REST API refusing "lots" as a page count, and the draft it leaves behind.</li>
+</ul>
+</div>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 9 · Facilitator Guide · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

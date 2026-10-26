@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Workbook: Session 17</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Student workbook —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">write in it · bring it to every session</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Participant Workbook</div>
+    <h1>Session 17: Final Project Kickoff and Studio I</h1>
+    <p class="sub">Your workbook for Session 17: the readiness check, the brief by layer, the milestone tracker for the whole project, the guided lab, predict-then-run practice, a self-check and your exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Lesson <b>9.1</b> · Milestones 1–4</span>
+      <span class="chip">Session <b>17</b> · 3 hours</span>
+      <span class="chip">Name: ____________________</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Session Goals</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Start the final project from a clean site: release-2 in Git, the rehearsal server ready.</li>
+  <li>Turn Maria's brief into data, rules and doors, and know which layer handles each requirement.</li>
+  <li>Know how the project is scored: the security and privacy checklist and the 100-point rubric.</li>
+  <li>Build Milestones 1 to 3 (the plan and baseline, the holds table and settings, the rules and the email) and start Milestone 4 (the doors).</li>
+  <li>Leave with a plan for Milestones 4 to 6 at home.</li>
+</ul>
+
+  <div class="sec"><h2>Start Here: Ready for the Final Project?</h2><span class="rule"></span></div>
+<div class="blk lab"><div class="h">Readiness check</div>
+<ul class="tick">
+  <li>☐ In wordpress/wp-content: <code class="inline">git tag -n</code> lists release-1 and release-2; <code class="inline">git status --short | wc -l</code> prints 0</li>
+  <li>☐ <code class="inline">wp plugin list --name=pagesco-books --fields=name,status,version</code> says active, 1.1.1</li>
+  <li>☐ In pagesco-live: <code class="inline">docker compose ps</code> shows db, wordpress and cron running</li>
+  <li>☐ I read The Brief, the Milestones, the Security and Privacy Checklist and the rubric on lesson_30.html</li>
+  <li>☐ My question about the brief: ____________________</li>
+</ul>
+</div>
+<div class="blk"><div class="h">The brief in one line each (fill in the layer)</div>
+<table class="timing">
+<thead><tr><th>#</th><th>Requirement</th><th>Data, rules or door? Which class?</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Reserve, three days, expired</td><td></td></tr>
+<tr><td>2</td><td>Limits, duplicates, sold out, settings</td><td></td></tr>
+<tr><td>3</td><td>My holds, cancel, only your own</td><td></td></tr>
+<tr><td>4</td><td>Staff list and "collected"</td><td></td></tr>
+<tr><td>5</td><td>The email</td><td></td></tr>
+<tr><td>6</td><td>No JavaScript, screen readers, no reload</td><td></td></tr>
+<tr><td>7</td><td>Live prices on the home page</td><td></td></tr>
+<tr><td>8</td><td>Personal data, tested, safe deploys</td><td></td></tr>
+</tbody>
+</table>
+</div>
+
+  <div class="sec"><h2>Lesson</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">9.1</span><h3>Final Project: Launch the Pages &amp; Co. Website</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end of the project you can</div>
+<ul class="tick">
+  <li>Turn a client's brief into data, rules, routes, blocks and screens, and decide where each rule is enforced</li>
+  <li>Build a feature through every layer of the course: a custom table, settings, a service class with a custom hook, REST routes with real permission callbacks, form handlers, a staff screen, a dynamic and an interactive block, and a theme pattern with live data</li>
+  <li>Make it secure and private by default: nonces and capabilities on every change, ownership in every query, escaping, and personal data kept no longer than needed</li>
+  <li>Prove the feature with coding standards, PHPUnit tests, a smoke test from outside, accessibility checks and a performance measurement</li>
+  <li>Release it from a tagged commit and deploy it as code only, then present your work against a rubric</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>A feature is a stack of layers:</b> the data (HoldsTable only stores), the rules (Holds only decides), the doors (form handlers, REST routes, blocks only check who is asking). A rule changes in one place.</li>
+  <li><b>A custom table</b> for holds: typed columns, indexes for "this customer's holds" and "what is waiting", a clean delete. <code class="inline">maybe_upgrade()</code> on init creates it on an update, where activation never runs.</li>
+  <li><b>"Expired" is computed,</b> never stored: waiting and <code class="inline">pickup_by</code> before today.</li>
+  <li><b>Ownership goes into the query</b> (<code class="inline">WHERE id = %d AND user_id = %d</code>, the user from the login); another customer's hold is "not found", so its existence is never confirmed.</li>
+  <li><b>Errors carry their HTTP status:</b> 401 not logged in, 404 no such thing (or not yours), 409 the shop's state says no. Every door passes it on.</li>
+  <li><b>Your own action</b> (<code class="inline">pagesco_books_hold_placed</code>) is the extension point: the email listens to it; the rules know nothing about email.</li>
+  <li><b>Measure first</b> (the query report), <b>prove last</b> (lint, tests, a smoke test, the numbers again).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: what a release ZIP would contain</div>
+<p>Lesson 9.1's Common Mistake 1, met before it happens. In the plugin's folder, with Node as in Lesson 6.1, a stand-in file in the folder Milestone 2 creates, then npm's own list of what a package would hold:</p>
+<pre class="code">mkdir -p src/Holds
+printf '&lt;?php\n' &gt; src/Holds/HoldsTable.php
+npm pack --dry-run 2&gt;&amp;1 | grep -c ' src/'
+npm pack --dry-run 2&gt;&amp;1 | grep -c ' src/Holds/'
+rm -r src/Holds</pre>
+<pre class="out">24
+0</pre><p>24 PHP files from src/, none from src/Holds/: package.json's "files" list names the folders that existed in Lesson 8.3. Nothing warns you; the live site would answer "There has been a critical error". The rule: a new top-level folder in src/ goes into "files" in the same commit, and Milestone 8 counts the new folder's files in the ZIP before upload.</p>
+</div>
+<div class="blk"><div class="h">Milestone tracker</div>
+<table class="timing">
+<thead><tr><th>Milestone</th><th>Done when (from the lesson)</th><th>In class / home</th><th>Done</th></tr></thead>
+<tbody>
+<tr><td>1 Plan and baseline</td><td>pagesco-plan.txt has the plan; three query counts written down: / ___ · /books/dune/ ___ · /find-a-book/ ___</td><td>class</td><td>☐</td></tr>
+<tr><td>2 The data</td><td>the maybe_upgrade check: no table, then six columns and version 1; the "Reserve &amp; Pick Up" settings section</td><td>class</td><td>☐</td></tr>
+<tr><td>3 The rules and the email</td><td>holds-check.php prints the lesson's eleven lines; the Animal Farm email is in Mailpit</td><td>class</td><td>☐</td></tr>
+<tr><td>4 The doors</td><td>two routes; a visitor 401; Jordan 409; Priya 201; Jordan's DELETE of hold 5 is 404; Devon gets no Holds menu; the forged POST 403; commit</td><td>start in class, finish at home</td><td>☐</td></tr>
+<tr><td>5 Two blocks</td><td>the four states; holds-smoke.sh: eight ok lines, exit status 0; the JavaScript path in a browser</td><td>home</td><td>☐</td></tr>
+<tr><td>6 Live prices</td><td>the staff picks follow Dune's price; without the plugin: "Ask us for the price"; commit</td><td>home</td><td>☐</td></tr>
+<tr><td>7 to 9</td><td>quality, release 1.2.0, the code-only deploy</td><td>Session 18</td><td>☐</td></tr>
+<tr><td>10 Write-up</td><td>RESERVE-AND-PICKUP.md</td><td>home, after Session 18</td><td>☐</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>From the project folder: <code class="inline">cp labs/module-17/l9_1-final-project/ownership_sql_starter.php wordpress/</code>, then <code class="inline">wp eval-file --use-include ownership_sql_starter.php</code>. Open <code class="inline">wordpress/ownership_sql_starter.php</code> in VS Code.</li>
+  <li>TODO 1: the prepared SELECT. TODO 2: the update with the owner in the WHERE. TODO 3: the door, with the user from the login and ONE error for every refusal. Run again after each.</li>
+  <li>Done when your output matches "Expected when done" at the end of the file. Then <code class="inline">rm wordpress/ownership_sql_starter.php</code>.</li>
+  <li>Finished early? <code class="inline">rsvp_rules_starter.php</code>, then <code class="inline">debug_trash_door.php</code> in the same folder.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>Devon tries wish 1 (Maria's). What would 403 instead of 404 tell him?</td><td></td></tr>
+<tr><td>Which line of Reserve &amp; Pick Up does the same as your TODO 2?</td><td></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Predict, then run</div>
+<p>Write your prediction first, then run it from the project folder with the <code class="inline">wp</code> shortcut (on your site at the end of Lesson 8.4, or later).</p>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it. (Devon is an author. Post 15 is Maria's.)</div><pre class="code">wp eval 'var_dump( current_user_can( "edit_post", 15 ), current_user_can( "edit_posts" ) );' --user=devon</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it. (One line per feature in Plugin::feature_classes().)</div><pre class="code">grep -c '::class,' wp-content/plugins/pagesco-books/src/Plugin.php</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it. (The label of a hold prints its date like this.)</div><pre class="code">wp eval 'echo get_option( "date_format" ), " | ", wp_date( get_option( "date_format" ), strtotime( "2026-11-05 12:00:00" ) ), "\n";'</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it. (The filter trick of HoldsTable::waiting(), with a real ID.)</div><pre class="code">wp eval 'global $wpdb; echo $wpdb-&gt;prepare( "WHERE ( %d = 0 OR user_id = %d )", 4, 4 ), "\n";'</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">Why does the reference solution keep holds in a custom table rather than a post type?</div><div class="opts"><div class="opt">A) A post type cannot store a date</div><div class="opt">B) A hold is one customer, one book, a status and a date: typed columns with indexes answer "this customer's holds" and "what is waiting" directly, and old rows can be deleted cleanly</div><div class="opt">C) Custom tables are always faster than wp_posts</div><div class="opt">D) Post types cannot be private</div></div></div>
+<div class="q" data-sc="2"><div class="qn">Q2</div><div class="qt">Where does the reference solution keep the status <code class="inline">expired</code>?</div><div class="opts"><div class="opt">A) In the status column, set by the daily cron job</div><div class="opt">B) In a post meta field on the book</div><div class="opt">C) In a transient that expires after hold_days</div><div class="opt">D) Nowhere: <code class="inline">Holds::status()</code> computes it from <code class="inline">pickup_by</code> and today's date every time a hold is shown</div></div></div>
+<div class="q" data-sc="3" data-kind="short"><div class="qn">Q3</div><div class="qt">On the course site at the end of Lesson 8.4, what does this print? And after Milestone 4?</div><pre class="code">grep -c '::class,' wp-content/plugins/pagesco-books/src/Plugin.php</pre><div class="write"></div></div>
+<div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">The plugin is already active on your development site. You add <code class="inline">Holds\HoldsTable::install()</code> to <code class="inline">Activator::activate()</code>. When is the holds table created on YOUR site?</div><div class="opts"><div class="opt">A) On the next request that loads WordPress: <code class="inline">maybe_upgrade()</code> runs on init, finds no version option and installs it</div><div class="opt">B) Never, until you deactivate and reactivate the plugin</div><div class="opt">C) When you run <code class="inline">wp db query</code></div><div class="opt">D) At 3 a.m., with the daily job</div></div></div>
+<div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">A reviewer finds these lines in Holds::cancel() (the reference has one call on one line). What can a logged-in customer now do?</div><pre class="code"><span class="v">$done</span> = HoldsTable::finish(
+	<span class="v">$hold_id</span>,
+	<span class="s">'cancelled'</span>
+);
+<span class="k">if</span> ( ! <span class="v">$user_id</span> || ! <span class="v">$done</span> ) {</pre><div class="opts"><div class="opt">A) Nothing new: the $user_id check still stops it</div><div class="opt">B) Cancel only their own holds, as before</div><div class="opt">C) Cancel ANY customer's waiting hold by sending its ID</div><div class="opt">D) Collect holds as staff</div></div></div>
+<div class="q" data-sc="6"><div class="qn">Q6</div><div class="qt">Why does <code class="inline">Holds::place()</code> answer the limit, a duplicate and a sold-out book with status 409, not 400 or 403?</div><div class="opts"><div class="opt">A) 409 is the only status WordPress allows in a WP_Error</div><div class="opt">B) The request is well formed and the customer is allowed to ask; the shop's current state says no (Conflict)</div><div class="opt">C) 403 would log the customer out</div><div class="opt">D) 409 makes the browser retry automatically</div></div></div>
+<div class="q" data-sc="7" data-kind="short"><div class="qn">Q7</div><div class="qt">Common Mistake 2, run as Devon (an author) about Maria's post 15. What does it print, and which check belongs in a handler?</div><pre class="code">wp eval 'var_dump( current_user_can( "delete_posts" ), current_user_can( "delete_post", 15 ) );' --user=devon</pre><div class="write"></div></div>
+<div class="q" data-sc="8"><div class="qn">Q8</div><div class="qt">Why does the confirmation email live in <code class="inline">HoldMail</code>, listening to <code class="inline">pagesco_books_hold_placed</code>, instead of a <code class="inline">wp_mail()</code> call inside <code class="inline">Holds::place()</code>?</div><div class="opts"><div class="opt">A) wp_mail() cannot be called from a class</div><div class="opt">B) Actions run faster than function calls</div><div class="opt">C) Emails must be sent from a must-use plugin</div><div class="opt">D) The rules class knows nothing about email: others (an SMS, a staff notice in Exercise 2) attach to the same moment without changing the rules</div></div></div>
+<div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">Which line computes the last day of pickup, three days from today, the way the reference does?</div><div class="opts"><div class="opt">A) <code class="inline">wp_date( 'Y-m-d', time() + $days * DAY_IN_SECONDS )</code></div><div class="opt">B) <code class="inline">date( 'Y-m-d', time() + $days * DAY_IN_SECONDS )</code></div><div class="opt">C) <code class="inline">current_time( 'mysql', true )</code></div><div class="opt">D) <code class="inline">gmdate( 'Y-m-d' ) . ' + 3'</code></div></div></div>
+<div class="q" data-sc="10" data-kind="short"><div class="qn">Q10</div><div class="qt"><code class="inline">HoldsTable::waiting()</code> uses this trick. What does it print, and what does it mean for the query?</div><pre class="code">wp eval 'global $wpdb; echo $wpdb-&gt;prepare( "WHERE ( %d = 0 OR user_id = %d )", 0, 0 ), "\n";'</pre><div class="write"></div></div>
+<div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">Milestone 4 sends a forged "Mark collected" from Maria's own logged-in session, but without the form's nonce. What does admin-post.php answer?</div><div class="opts"><div class="opt">A) 303, back to Books > Holds with ?pagesco_hold=collected</div><div class="opt">B) 401: Maria is not logged in</div><div class="opt">C) 403 with <code class="inline">The link you followed has expired.</code></div><div class="opt">D) 400: the action is unknown</div></div></div>
+<div class="q" data-sc="12" data-kind="short"><div class="qn">Q12</div><div class="qt">The lesson's mental model is the shop's counter. Name its three layers and the one job of each.</div><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Project log</div>
+<p>Three lines tonight, in pagesco-plan.txt under "Reserve &amp; Pick Up": the milestone you finished last and its done-when output; one decision you made differently from the reference, and why; the one thing you are least sure about. (The lesson's journal prompt comes after Session 18, when the feature is finished.)</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<p>Three questions, no notes.</p>
+<div class="q"><div class="qn">E1</div><div class="qt">Name the three layers of Reserve &amp; Pick Up and one class in each.</div><div class="write"></div></div>
+<div class="q"><div class="qn">E2</div><div class="qt">Priya sends <code class="inline">DELETE /pagesco/v1/holds/5</code> for Jordan's hold. What does she get, and which line of code decides it?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E3</div><div class="qt">Which milestone is the next one you will finish, and what is its done-when?</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Notes</h2><span class="rule"></span></div>
+<div class="notes-lines"></div>
+
+  <div class="sec"><h2>Homework Checklist</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ Milestone 4 finished: the REST checks, the staff screen, the forged request, truncate, passwords revoked, commit</li>
+  <li>☐ Milestone 5: both blocks, the My holds page, the four states, holds-smoke.sh with eight ok lines</li>
+  <li>☐ Milestone 6: live prices, with and without the plugin; commit</li>
+  <li>☐ <code class="inline">npx @wordpress/env start</code> once at home (then <code class="inline">stop</code>), pagesco-live starts</li>
+  <li>☐ The project log in pagesco-plan.txt</li>
+  <li>☐ Optional: <code class="inline">rsvp_rules_starter.php</code>, the own_action folder lab, <code class="inline">debug_trash_door.php</code></li>
+  <li>☐ Bring to Session 18: the site at Milestone 6, holds-smoke.sh, the plan with the baseline numbers, this workbook</li>
+</ul>
+
+  <div class="sec"><h2>Glossary</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>hold</td><td>One customer, one book, a status (waiting, collected, cancelled) and a last day of pickup; a row in <code class="inline">wp_pagesco_holds</code></td></tr>
+<tr><td><code class="inline">pickup_by</code></td><td>The last day of pickup, a date in the site's time zone: today + <code class="inline">hold_days</code> when placed</td></tr>
+<tr><td>expired</td><td>A waiting hold whose <code class="inline">pickup_by</code> is before today: computed by <code class="inline">Holds::status()</code>, never stored</td></tr>
+<tr><td><code class="inline">maybe_upgrade()</code></td><td>Runs on init; installs the table when the version option is older than the code (the update path)</td></tr>
+<tr><td>door</td><td>Anything that receives a request: a form handler, a REST route, a block; it checks who is asking and passes the question to the rules</td></tr>
+<tr><td>IDOR</td><td>Insecure direct object reference: acting on someone else's record by sending its ID; stopped by ownership in the query</td></tr>
+<tr><td>409 Conflict</td><td>The request is fine, the current state says no (limit, duplicate, sold out)</td></tr>
+<tr><td><code class="inline">pagesco_books_hold_placed</code></td><td>The plugin's own action after a hold is saved; HoldMail listens to it</td></tr>
+<tr><td>baseline</td><td>The numbers before a change (Milestone 1's query counts), compared after (Milestone 7)</td></tr>
+</tbody>
+</table>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 17 · Participant Workbook · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

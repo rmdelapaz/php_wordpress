@@ -189,7 +189,7 @@ wp_reset_postdata();</code></pre>
                             <tr><td><code>s</code></td><td><code>'club'</code></td><td>The same search as <code>/?s=club</code></td></tr>
                             <tr><td><code>post__in</code>, <code>post__not_in</code>, <code>post_name__in</code></td><td><code>array( get_the_ID() )</code></td><td>Include or exclude specific posts; slugs are portable between sites, IDs are not</td></tr>
                             <tr><td><code>orderby</code>, <code>order</code></td><td><code>'title'</code>, <code>'ASC'</code></td><td>Default <code>'date'</code>, <code>'DESC'</code>; also <code>'post_name__in'</code>, <code>'rand'</code>, <code>'meta_value_num'</code></td></tr>
-                            <tr><td><code>meta_query</code></td><td>(Lesson 5.2)</td><td>Filters on post meta such as <code>pagesco_price</code>; the book meta does not exist yet</td></tr>
+                            <tr><td><code>meta_query</code></td><td>(Lessons 6.3 and 7.2)</td><td>Filters on post meta such as <code>pagesco_price</code>; the book meta does not exist yet</td></tr>
                             <tr><td><code>no_found_rows</code>, <code>fields</code>, <code>ignore_sticky_posts</code></td><td><code>true</code>, <code>'ids'</code>, <code>true</code></td><td>Speed and shape: skip counting, return IDs only, ignore sticky posts</td></tr>
                         </tbody>
                     </table>
@@ -488,15 +488,15 @@ add_action( 'pre_get_posts', 'pagesco_one_post_only' );
 function pagesco_one_post_only( $query ) {
 	$query-&gt;set( 'posts_per_page', 1 );
 }</code></pre>
-                <pre data-cli><code class="language-bash">wp post list --post_type=page --fields=ID,post_title
+                <pre data-cli><code class="language-bash">wp post list --post_type=page --orderby=ID --order=ASC --fields=ID,post_title
 wp eval 'echo count( get_posts( array( "post_type" =&gt; "page", "numberposts" =&gt; -1 ) ) ), "\n";'</code></pre>
                 <div class="card card-output">
                     <h4>Output</h4>
-                    <pre><code>+----+------------+
-| ID | post_title |
-+----+------------+
-| 12 | About Us   |
-+----+------------+
+                    <pre><code>+----+-------------+
+| ID | post_title  |
++----+-------------+
+| 2  | Sample Page |
++----+-------------+
 1</code></pre>
                 </div>
                 <p><strong>What it means:</strong> the site has four published pages (five with the Privacy Policy draft, and <code>wp post list</code> lists drafts too), but WP-CLI lists one, and <code>get_posts()</code> asked for all of them (<code>-1</code>) and got one. The callback changed <em>every</em> query: WP-CLI's, every <code>get_posts()</code> call in every plugin, the admin's Pages screen, your secondary Loops. (The blog home still shows three posts only because the theme's callback runs after this one and sets 3 again.) <strong>Fix:</strong> start every <code>pre_get_posts</code> callback with the guards from <code>pagesco_classic_adjust_main_query()</code>: <code>is_admin()</code>, <code>$query-&gt;is_main_query()</code> and the kind of page you mean. Delete the file:</p>
@@ -716,7 +716,7 @@ wp-content/themes/pagesco-classic/template-parts/related-posts.php
 
                 <div class="card">
                     <h3>🏋️ Exercise 1: Search Posts Only</h3>
-                    <p>A search for "club" currently finds the Book club post and the Events page. Make front-end searches return blog posts only, with a <code>pre_get_posts</code> callback in a must-use plugin <code>exercise-search.php</code> (so you can delete it afterwards: Lesson 5.2 wants books in the search). Compare the results before and after.</p>
+                    <p>A search for "club" currently finds the Book club post and the Events page. Make front-end searches return blog posts only, with a <code>pre_get_posts</code> callback in a must-use plugin <code>exercise-search.php</code> (so you can delete it afterwards: from Lesson 5.2 on, books belong in the search too). Compare the results before and after.</p>
                     <details>
                         <summary>💡 Hint</summary>
                         <p>The same three guards as the theme's callback, with <code>$query-&gt;is_search()</code> as the third, then <code>$query-&gt;set( 'post_type', 'post' )</code>.</p>
@@ -792,7 +792,7 @@ bool(false)</code></pre>
 
                 <div class="card">
                     <h3>🏋️ Exercise 3: Combine Arguments</h3>
-                    <p>List the IDs and titles of the News posts published on or after September 10, 2026, sorted by title, with a query that returns only IDs and skips the counting query.</p>
+                    <p>List the IDs and titles of the News posts published on or after <code>2026-09-10</code>, sorted by title, with a query that returns only IDs and skips the counting query.</p>
                     <details>
                         <summary>💡 Hint</summary>
                         <p><code>date_query</code> with <code>'after' =&gt; '2026-09-10'</code> and <code>'inclusive' =&gt; true</code>; <code>'fields' =&gt; 'ids'</code> makes <code>$query-&gt;posts</code> an array of integers.</p>
@@ -826,7 +826,7 @@ rm recent-news.php</code></pre>
                             <pre><code>17  Book club: Dune
 16  Staff picks for the season</code></pre>
                         </div>
-                        <p>Welcome (September 1) is too old; the other two News posts come in title order. Arguments combine with AND: category <em>and</em> date. With <code>'fields' =&gt; 'ids'</code> there are no post objects, so you pass IDs to <code>get_the_title()</code>; that is the cheapest shape when you only need a few fields.</p>
+                        <p>Welcome (<code>2026-09-01</code>) is too old; the other two News posts come in title order. Arguments combine with AND: category <em>and</em> date. With <code>'fields' =&gt; 'ids'</code> there are no post objects, so you pass IDs to <code>get_the_title()</code>; that is the cheapest shape when you only need a few fields.</p>
                     </details>
                 </div>
 
@@ -963,7 +963,7 @@ Success: Updated 'sticky_posts' option.</code></pre>
                 </details>
                 <details>
                     <summary>Does the Query Loop block do pre_get_posts for me?</summary>
-                    <p>When its "inherit query from template" option is on, the block uses the main query, so your <code>pre_get_posts</code> callbacks apply to it as they do to a classic Loop. When it is off, the block builds its own <code>WP_Query</code> from its settings (Lesson 4.1's FAQ showed the code), and filters such as <code>query_loop_block_query_vars</code> change those. Module 6 builds blocks that run their own queries.</p>
+                    <p>When its "inherit query from template" option is on, the block uses the main query, so your <code>pre_get_posts</code> callbacks apply to it as they do to a classic Loop. When it is off, the block builds its own <code>WP_Query</code> from its settings (Lesson 4.1's FAQ pointed to the code), and filters such as <code>query_loop_block_query_vars</code> change those. Module 6 builds blocks that run their own queries.</p>
                 </details>
 
                 <div class="card card-accent">

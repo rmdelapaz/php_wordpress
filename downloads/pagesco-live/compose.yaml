@@ -1,0 +1,100 @@
+# Pages & Co. production rehearsal (PHP and WordPress Development, Lesson 8.4)
+# A second WordPress, set up the way a live server is: no debugging, a database account with limited rights,
+# secrets in .env instead of in files you share, and a real scheduler instead of WP-Cron. Your development
+# site in pagesco-dev keeps running next to it, untouched.
+#   cp .env.example .env               then replace every value in .env (never commit or share it)
+#   docker compose up -d               start: http://localhost:8081
+#   wp ...                             WP-CLI of THIS site, run from this folder (the alias from Lesson 1.2)
+#   docker compose logs cron           what the scheduler ran
+#   changed .env or this file?         docker compose up -d   (recreates what changed; the wpcli and cron
+#                                      containers share the wordpress container's network, so do not use
+#                                      "docker compose restart wordpress" alone)
+#   docker compose down                stop (files and database stay)    down -v  also deletes the database
+name: pagesco-live
+
+x-wordpress-env: &wp-env
+  WORDPRESS_DB_HOST: db
+  WORDPRESS_DB_NAME: pagesco
+  WORDPRESS_DB_USER: pagesco_app
+  WORDPRESS_DB_PASSWORD: ${DB_APP_PASSWORD:?copy .env.example to .env and fill it in first}
+  # The production settings, added to wp-config.php by the image (Lesson 8.4 explains each line).
+  # WP_DEBUG stays off: no WORDPRESS_DEBUG here.
+  WORDPRESS_CONFIG_EXTRA: |
+    define( 'WP_ENVIRONMENT_TYPE', 'production' );
+    define( 'DISALLOW_FILE_EDIT', true );
+    define( 'DISABLE_WP_CRON', true );
+    define( 'PAGESCO_BOOKS_SUPPLIER_URL', getenv_docker( 'PAGESCO_BOOKS_SUPPLIER_URL', '' ) );
+    define( 'PAGESCO_BOOKS_SUPPLIER_KEY', getenv_docker( 'PAGESCO_BOOKS_SUPPLIER_KEY', '' ) );
+  PAGESCO_BOOKS_SUPPLIER_URL: ${PAGESCO_BOOKS_SUPPLIER_URL:?copy .env.example to .env and fill it in first}
+  PAGESCO_BOOKS_SUPPLIER_KEY: ${PAGESCO_BOOKS_SUPPLIER_KEY:?copy .env.example to .env and fill it in first}
+
+services:
+  db:
+    image: mysql:9.7
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?copy .env.example to .env and fill it in first}
+      MYSQL_DATABASE: pagesco
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:?copy .env.example to .env and fill it in first}
+    volumes:
+      - db_data:/var/lib/mysql
+      # Runs once, when the database is created: WordPress's own account, with only the rights it needs.
+      - ./config/create-app-user.sh:/docker-entrypoint-initdb.d/create-app-user.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\""]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+  wordpress:
+    image: wordpress:7.1-php8.5-apache
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment: *wp-env
+    volumes:
+      - ./wordpress:/var/www/html
+      - ./config/apache-8081.conf:/etc/apache2/conf-enabled/zz-port-8081.conf:ro
+      - ./config/php-production.ini:/usr/local/etc/php/conf.d/zz-production.ini:ro
+
+  wpcli:
+    build:
+      context: ./config
+      dockerfile: wpcli.Dockerfile
+    image: pagesco-wpcli:php8.5
+    pull_policy: build
+    profiles: ["cli"]
+    user: "33:33"
+    network_mode: "service:wordpress"
+    depends_on:
+      - wordpress
+    environment:
+      <<: *wp-env
+      HOME: /tmp
+    volumes:
+      - ./wordpress:/var/www/html
+      - ./deploy:/deploy:ro          # what you upload: release ZIPs and the database for the launch
+      - ./backups:/backups           # where backups go, outside the web root
+
+  # The scheduler: runs the WP-Cron events that are due, every minute, the way a server's cron would.
+  cron:
+    image: pagesco-wpcli:php8.5
+    pull_policy: build
+    build:
+      context: ./config
+      dockerfile: wpcli.Dockerfile
+    user: "33:33"
+    network_mode: "service:wordpress"
+    depends_on:
+      - wordpress
+    environment:
+      <<: *wp-env
+      HOME: /tmp
+    volumes:
+      - ./wordpress:/var/www/html
+    restart: unless-stopped
+    entrypoint: ["sh", "-c", "while true; do wp cron event run --due-now; sleep 60; done"]
+
+volumes:
+  db_data:

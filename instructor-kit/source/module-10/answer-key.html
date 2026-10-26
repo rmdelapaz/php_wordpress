@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Key: Session 10</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">answers &amp; solutions · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Answer Key</div>
+    <h1>Session 10: Security and the Settings API</h1>
+    <p class="sub">Answers and reasoning for every Session 10 item: the warm-up, both self-checks, the predict-then-run items, the lab reference outputs, the lesson pages' own quizzes and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Session <b>10</b></span>
+      <span class="chip"><b>12</b> self-check items</span>
+      <span class="chip">Confidential</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Start Here · Warm-up</h2><span class="rule"></span></div>
+<p>The five retrieval questions on Session 9, with the answers to give.</p>
+<div class="q"><div class="qn">W1</div><div class="qt">A new feature for pagesco-books: which three places does it touch?</div><div class="opts"><div class="opt correct">A class in <code class="inline">src/</code> implementing <code class="inline">Feature</code> (hooks in <code class="inline">register()</code>), one line in <code class="inline">Plugin::feature_classes()</code>, and uninstall.php if it stores data.</div></div></div>
+<div class="q"><div class="qn">W2</div><div class="qt">Why does <code class="inline">Activator::activate()</code> register the book type itself before it flushes?</div><div class="opts"><div class="opt correct">On the activation request the plugin's own init callback has not run, so the rules would be rebuilt without the type.</div></div></div>
+<div class="q"><div class="qn">W3</div><div class="qt"><code class="inline">get_post_meta( 33, 'pagesco_in_stock', true )</code> on The Great Gatsby returns what?</div><div class="opts"><div class="opt correct"><code class="inline">''</code>: meta is stored as strings, false as an empty string. REST casts it to false.</div></div></div>
+<div class="q"><div class="qn">W4</div><div class="qt">Where did Lesson 5.2's meta box already use a nonce?</div><div class="opts"><div class="opt correct"><code class="inline">wp_nonce_field( 'pagesco_books_save_details', ... )</code> in <code class="inline">render()</code> and <code class="inline">wp_verify_nonce()</code> in <code class="inline">save()</code>: today's lesson hardens that save.</div></div></div>
+<div class="q"><div class="qn">W5</div><div class="qt">Deactivating pagesco-books: what happens to the eleven books?</div><div class="opts"><div class="opt correct">Nothing: they stay in wp_posts; the type is unregistered, so they leave the admin and /books/ is a 404 until it is active again.</div></div></div>
+
+  <div class="sec"><h2>5.3 · Security in WordPress: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">A book title goes into a link's tooltip: <code class="inline">&lt;a href="/books/dune/" title="..."&gt;</code>. Which function escapes it there?</div><div class="opts"><div class="opt">A) <code class="inline">esc_html()</code></div><div class="opt">B) <code class="inline">esc_url()</code></div><div class="opt correct">C) <code class="inline">esc_attr()</code></div><div class="opt">D) <code class="inline">sanitize_text_field()</code></div></div><div class="why"><b>Why:</b> The destination decides: inside an attribute value it is esc_attr(), which also escapes the double quote that would end the attribute (Lesson 5.3, "Escape Late"). The meta box uses it on every value="…".<br><b>A</b> is wrong: esc_html() is for text between tags; it happens to escape quotes too, but say what you mean: the attribute function.<br><b>B</b> is wrong: esc_url() is for href and src, and would mangle a title into a URL.<br><b>D</b> is wrong: Sanitizing cleans input on the way IN; output is escaped on the way out.</div></div>
+  <div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">What does this print?</div><pre class="code">wp eval 'echo esc_html( "Pride &amp; Prejudice &lt;2nd ed.&gt;" ), "\n";'</pre><div class="opts"><div class="opt correct"><code class="inline">Pride &amp;amp; Prejudice &amp;lt;2nd ed.&amp;gt;</code></div></div><div class="why"><b>Why:</b> esc_html() turns &, < and > into entities: the browser shows the text, never runs it. In a terminal you see the entities themselves, which is how you check escaping from WP-CLI (the lesson's XSS demo did the same with the Books column).</div></div>
+  <div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">A form handler calls check_admin_referer() and it passes. What does that prove?</div><div class="opts"><div class="opt">A) The user is allowed to make the change</div><div class="opt correct">B) The request came from a page this site served to this user, for this action, recently</div><div class="opt">C) The submitted values are safe to store</div><div class="opt">D) The request was not sent by a script</div></div><div class="why"><b>Why:</b> A nonce is tied to a user, an action and a few hours: it stops a forged request from another site (CSRF). Whether the user may do it is a separate question, current_user_can(); whether the values are clean is a third, sanitizing (Lesson 5.3, Common Mistakes 2).<br><b>A</b> is wrong: Any logged-in user who can open the form gets a valid nonce.<br><b>C</b> is wrong: A nonce says nothing about the values; sanitize and validate them.<br><b>D</b> is wrong: A script with the user's cookies and a fresh nonce passes too; the nonce defeats forgery from ANOTHER site.</div></div>
+  <div class="q" data-sc="4" data-kind="short"><div class="qn">Q4</div><div class="qt">What does this print?</div><pre class="code">wp eval 'global $wpdb; echo $wpdb-&gt;prepare( "SELECT ID FROM {$wpdb-&gt;posts} WHERE post_title = %s", "Ender\x27s Game" ), "\n";'</pre><div class="opts"><div class="opt correct"><code class="inline">SELECT ID FROM wp_posts WHERE post_title = 'Ender\'s Game'</code></div></div><div class="why"><b>Why:</b> prepare() quoted the %s value and escaped the apostrophe inside it, so the title cannot end the string early: SQL injection is impossible through this placeholder. <code class="inline">{$wpdb-&gt;posts}</code> is WordPress's own value (the prefixed table name), never user input.</div></div>
+  <div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">This handler is reached from a link on the Books screen. Which defense is missing?</div><pre class="code"><span class="v">$book_id</span> = absint( <span class="v">$_GET</span>[<span class="s">'book'</span>] );
+check_admin_referer( <span class="s">'pagesco_books_feature_'</span> . <span class="v">$book_id</span> );
+update_post_meta( <span class="v">$book_id</span>, <span class="s">'pagesco_featured'</span>, <span class="s">1</span> );</pre><div class="opts"><div class="opt correct">A) <code class="inline">current_user_can( 'edit_post', $book_id )</code> before the update</div><div class="opt">B) A nonce check</div><div class="opt">C) <code class="inline">esc_html()</code> on the book ID</div><div class="opt">D) <code class="inline">$wpdb-&gt;prepare()</code> around the update</div></div><div class="why"><b>Why:</b> The nonce is checked, the ID is forced to an integer, and update_post_meta() builds safe SQL itself; but nothing asks whether THIS user may edit THIS book. Database functions trust their caller (Lesson 5.3, Common Mistakes 3), so a subscriber with a valid link could feature any book.<br><b>B</b> is wrong: check_admin_referer() is the nonce check.<br><b>C</b> is wrong: Nothing is printed; esc_html() is for output.<br><b>D</b> is wrong: update_post_meta() prepares its own query.</div></div>
+  <div class="q" data-sc="6"><div class="qn">Q6</div><div class="qt">The meta box's "First published" field receives <code class="inline">soon</code>. What keeps it out of the database?</div><div class="opts"><div class="opt">A) <code class="inline">sanitize_text_field()</code>: it removes words that are not dates</div><div class="opt">B) <code class="inline">esc_attr()</code> when the box prints the value</div><div class="opt">C) <code class="inline">absint()</code>, which turns it into 0</div><div class="opt correct">D) Validating it: DateTime::createFromFormat( 'Y-m-d', $v ) must give back exactly $v, else store ''</div></div><div class="why"><b>Why:</b> Sanitizing cleans characters; it happily stores "soon". A value that must have a shape needs validating: accept or reject. The hardened save's valid_date() helper does exactly the round trip in option D (Lesson 5.3, Exercise 1).<br><b>A</b> is wrong: sanitize_text_field() strips tags and extra whitespace, not words.<br><b>B</b> is wrong: Escaping on output is still required, but it does not stop a bad value being stored.<br><b>C</b> is wrong: A date is not an integer; absint() would store 0.</div></div>
+
+  <div class="sec"><h2>5.3 · Security in WordPress: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'echo esc_url( "javascript:alert(1)" ) === "" ? "(empty)" : "kept", "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">(empty)</pre></div></div><div class="why"><b>Why:</b> esc_url() only lets through the protocols WordPress allows (http, https, mailto and a few more); a javascript: URL becomes an empty string, so an href built from it cannot run code.</div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'echo sanitize_text_field( "  Pages &lt;b&gt;&amp;&lt;/b&gt; Co.\n\tBooks  " ), "|\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">Pages &amp; Co. Books|</pre></div></div><div class="why"><b>Why:</b> sanitize_text_field() strips the tags (keeping their text), turns the line break and tab into nothing it keeps, and trims the outer spaces: one clean line. The ampersand stays a plain &amp;: sanitizing is not escaping; escape when you print it.</div></div>
+
+  <div class="sec"><h2>5.4 · Admin Pages, Settings API &amp; Options: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">An administrator presses Save Changes on Settings > Pages & Co. Books. Which code checks the nonce and the capability?</div><div class="opts"><div class="opt correct">A) Core's own handler, wp-admin/options.php, before it calls your sanitize callback</div><div class="opt">B) Your SettingsPage::render() method</div><div class="opt">C) Your Settings::sanitize() method</div><div class="opt">D) Nothing: the Settings API has no nonce</div></div><div class="why"><b>Why:</b> The form posts to options.php, which checks the nonce settings_fields() printed (action &lt;group&gt;-options), current_user_can( 'manage_options' ) and the allowed options list, then runs update_option() and with it your sanitize callback (Lesson 5.4, "What Save Changes Does").<br><b>B</b> is wrong: render() only prints the form; its own capability check is defense in depth.<br><b>C</b> is wrong: The sanitize callback cleans values; by the time it runs the checks have passed.<br><b>D</b> is wrong: settings_fields() prints the nonce; options.php verifies it.</div></div>
+  <div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt">On the finished Lesson 5.4 site (the uninstall test deleted the row; nothing was saved since), what does this print?</div><pre class="code">wp option get pagesco_books_settings --format=json</pre><div class="opts"><div class="opt correct"><code class="inline">{"notice_extra":"Open until 9 p.m. on Thursdays.","show_events_link":true,"books_per_page":6,"events_limit":5}</code></div></div><div class="why"><b>Why:</b> register_setting()'s default is handed out while the row is missing, so WP-CLI prints the defaults although wp_options has no row named pagesco_books_settings (count it: 0). Nothing is written until someone saves.</div></div>
+  <div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">The Events link checkbox is unticked when the form is saved. What does options.php receive for it?</div><div class="opts"><div class="opt">A) <code class="inline">show_events_link=0</code></div><div class="opt">B) <code class="inline">show_events_link=false</code></div><div class="opt correct">C) Nothing: an unticked checkbox is not sent at all</div><div class="opt">D) <code class="inline">show_events_link=off</code></div></div><div class="why"><b>Why:</b> Browsers send only checked boxes. A sanitize callback that reads the key without a test warns (Undefined array key) on every save with the box off; <code class="inline">! empty( $input['show_events_link'] )</code> turns "missing" into false (Lesson 5.4, Common Mistakes 2).<br><b>A</b> is wrong: That would need a hidden field with the same name before the box.<br><b>B</b> is wrong: HTML forms send strings, never booleans.<br><b>D</b> is wrong: "on" is what a checkbox WITHOUT a value attribute sends when it is ticked; unticked sends nothing.</div></div>
+  <div class="q" data-sc="10" data-kind="short"><div class="qn">Q10</div><div class="qt">On the finished Lesson 5.4 site, what does this print, and why is the notice sentence empty?</div><pre class="code">wp eval 'echo wp_json_encode( sanitize_option( "pagesco_books_settings",
+    array( "books_per_page" =&gt; "0", "events_limit" =&gt; "7" ) ) ), "\n";'</pre><div class="opts"><div class="opt correct"><code class="inline">{"notice_extra":"","show_events_link":false,"books_per_page":6,"events_limit":7}</code>: 0 is out of range, so books_per_page keeps the saved value (6, the default); notice_extra and show_events_link were not in the array, so they come back empty and false</div></div><div class="why"><b>Why:</b> sanitize() always returns the complete option: a missing key means empty (the form always sends every field, code does not). That is Common Mistakes 3: merge before you update, or <code class="inline">wp option patch update</code>. The rejected 0 also queued an add_settings_error() message.</div></div>
+  <div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">Maria, an editor, opens options-general.php?page=pagesco-books and gets a 403. Which line decided that?</div><div class="opts"><div class="opt">A) The current_user_can() check inside render()</div><div class="opt">B) The nonce in settings_fields()</div><div class="opt">C) register_setting()'s type 'object'</div><div class="opt correct">D) The manage_options capability passed to add_options_page()</div></div><div class="why"><b>Why:</b> The capability argument guards both the menu item and the URL: WordPress refuses the page before your callback runs ("Sorry, you are not allowed to access this page."). The check inside render() is the second, defensive layer.<br><b>A</b> is wrong: It would also refuse, but WordPress stops the request earlier.<br><b>B</b> is wrong: No form is posted when a page is opened.<br><b>C</b> is wrong: The type describes the value, for REST and sanitizing.</div></div>
+  <div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">Which value deserves its own option instead of a key in the pagesco_books_settings array?</div><div class="opts"><div class="opt">A) The notice sentence</div><div class="opt correct">B) A counter of page views, updated on every request</div><div class="opt">C) Books per list</div><div class="opt">D) Whether the notice shows the events link</div></div><div class="why"><b>Why:</b> One array option per plugin is the usual choice: one row, one autoloaded read, one delete_option(). Split out a value that changes on every request (rewriting the whole array to bump a number is wasteful) or one that is large and rarely needed (autoload off) (Lesson 5.4, the box "One array option, or several?").<br><b>A</b> is wrong: A setting the shop edits now and then: exactly what the array is for.<br><b>C</b> is wrong: The same; Module 6 reads it through Settings::get().<br><b>D</b> is wrong: The same; a boolean in the array.</div></div>
+
+  <div class="sec"><h2>5.4 · Admin Pages, Settings API &amp; Options: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'var_dump( get_option( "pagesco_no_such_option", array() ) );'</pre><div class="opts"><div class="opt correct"><pre class="out">array(0) {
+}</pre></div></div><div class="why"><b>Why:</b> The option does not exist, so get_option() returns its second argument, here an empty array (without it: false). Settings::get() relies on exactly this, then fills the keys with wp_parse_args().</div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'echo wp_json_encode( sanitize_option( "pagesco_books_settings", "not an array" ) ), "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">{"notice_extra":"","show_events_link":false,"books_per_page":6,"events_limit":5}</pre></div></div><div class="why"><b>Why:</b> The callback treats hostile input as hostile: not an array becomes an empty array, every key falls back to its cleaned value (an empty sentence, the box off) and the two numbers keep the saved values (the defaults). It returns a complete option either way.</div></div>
+
+  <div class="sec"><h2>Lab Reference Solutions</h2><span class="rule"></span></div>
+<p>Every output below is real: the lab files run exactly as <code class="inline">labs/check_labs.py</code> runs them, on the site each declares (<code class="inline">after:lesson_15</code> = after Lesson 5.2, <code class="inline">after:lesson_16</code> = after Lesson 5.3, <code class="inline">after:lesson_17</code> = after Lesson 5.4), with WordPress 7.1.3, PHP 8.5, MySQL 9.7 and WP-CLI 2.12. Paths show <code class="inline">/var/www/html/...</code>, the learner's <code class="inline">wordpress/</code> folder.</p>
+<div class="blk lab"><div class="h">Lab 5.3-A (guided): labs/module-10/l5_3-security/staff_note_starter.php → staff_note_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">no token, as Maria              saved                stored: Signed copy, ask at the counter.
+forged token, as Maria          saved                stored: Signed copy, ask at the counter.
+real token, as Devon            saved                stored: Signed copy, ask at the counter.
+real token, as Maria, with tag  saved                stored: Signed copy&lt;script&gt;alert(1)&lt;/script&gt;, ask at the counter.</pre><p>The solution prints:</p>
+<pre class="out">no token, as Maria              refused: no token    stored: (nothing)
+forged token, as Maria          refused: bad token   stored: (nothing)
+real token, as Devon            refused: not allowed stored: (nothing)
+real token, as Maria, with tag  saved                stored: Signed copy, ask at the counter.</pre><p>The order matters: the cheap structural check first (is there a token at all?), then the nonce, then the capability for THIS book, then the values. Devon carries a real token (he could open the form) and is still refused: a nonce is not a permission. sanitize_text_field() removed the script tag on the way in; any place that prints the note still escapes it on the way out. Accept <code class="inline">wp_verify_nonce()</code> with or without sanitize_key(); the lesson's save uses sanitize_key( wp_unslash() ) on the real $_POST.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 5.3-B: labs/module-10/l5_3-security/prepared_search_starter.php → prepared_search_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">SELECT COUNT(*) FROM wp_postmeta WHERE meta_key = 'pagesco_price' AND meta_value + 0 &lt; 9.990000
+=&gt; 5 books under $9.99
+TODO
+TODO</pre><p>The solution prints:</p>
+<pre class="out">SELECT COUNT(*) FROM wp_postmeta WHERE meta_key = 'pagesco_price' AND meta_value + 0 &lt; 9.990000
+=&gt; 5 books under $9.99
+SELECT p.post_title FROM wp_posts p INNER JOIN wp_postmeta m ON m.post_id = p.ID WHERE p.post_type = 'book' AND m.meta_key = 'pagesco_author' AND m.meta_value LIKE '%Tolkien%' ORDER BY p.post_title
+=&gt; Lord of the Rings, The Hobbit
+SELECT p.post_title FROM wp_posts p INNER JOIN wp_postmeta m ON m.post_id = p.ID WHERE p.post_type = 'book' AND m.meta_key = 'pagesco_author' AND m.meta_value LIKE '%x\' OR \'1\'=\'1%' ORDER BY p.post_title
+=&gt; 0 rows</pre><p>What to point at: <code class="inline">%f</code> printed 9.990000 (a number, never a string that could carry SQL); <code class="inline">esc_like()</code> before the <code class="inline">%</code> wildcards are added, so a word containing % or _ cannot widen the search; in the hostile line the apostrophes are backslash-escaped inside the quoted string, so <code class="inline">OR '1'='1</code> is just text to compare and nothing matches. Without <code class="inline">remove_placeholder_escape()</code> the printed SQL shows a long random string where each literal % is: prepare() protects them until the query runs.</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-10/l5_3-security/debug_book_search.php (deliberately broken)</div>
+<p>As shipped, WordPress prints:</p>
+<pre class="out">Under $9: 4 book(s): Pride and Prejudice, Animal Farm, The Great Gatsby, The Catcher in the Rye
+Notice: Function wpdb::prepare was called &lt;strong&gt;incorrectly&lt;/strong&gt;. The query argument of wpdb::prepare() must have a placeholder. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 3.9.0.) in /var/www/html/wp-includes/functions.php on line 6260
+Notice: Function wpdb::prepare was called &lt;strong&gt;incorrectly&lt;/strong&gt;. The query does not contain the correct number of placeholders (0) for the number of arguments passed (1). Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 4.8.3.) in /var/www/html/wp-includes/functions.php on line 6260
+In stock (whole catalog): 9
+Notice: Function wpdb::prepare was called &lt;strong&gt;incorrectly&lt;/strong&gt;. The query does not contain the correct number of placeholders (2) for the number of arguments passed (1). Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 4.8.3.) in /var/www/html/wp-includes/functions.php on line 6260
+Cheapest: $9</pre><ol class="steps">
+  <li><b>Silent, line 15:</b> <code class="inline">absint( '9.99' )</code> is 9: an integer sanitizer for a decimal price, so the first query asks for books under $9 and finds four instead of five. Use <code class="inline">(float)</code> (and <code class="inline">%f</code>, which the query already has). The wrong sanitizer is as bad as none.</li>
+  <li><b>"called incorrectly" twice, line 27:</b> the in-stock query has no placeholder at all but is given an argument. WordPress says so ("must have a placeholder", then "the correct number of placeholders (0)"). A query with no values needs no prepare(): run it directly.</li>
+  <li><b>"called incorrectly", line 35:</b> two placeholders, one argument (the price is missing). prepare() refuses and returns nothing, and <code class="inline">$wpdb-&gt;get_var( null )</code> then hands back a value of the PREVIOUS query (9, the in-stock count): a loud bug with a silent consequence.</li>
+</ol>
+<p>Fixed (the three changes), it prints, without a message:</p>
+<pre class="out">Under $9.99: 5 book(s): Pride and Prejudice, Animal Farm, The Great Gatsby, The Catcher in the Rye, Brave New World
+In stock (whole catalog): 9
+Cheapest: $7.99</pre></div>
+<div class="blk lab"><div class="h">Lab 5.4-A (guided): labs/module-10/l5_4-settings-api/newsletter_settings_starter/ → newsletter_settings_solution/ with test_newsletter_settings.sh</div>
+<p>The test with the starter's must-use plugin:</p>
+<pre class="out">rows: 1
+&lt;label for="pagesco-lab-signup-text"&gt;Sign-up text&lt;/label&gt;
+options.php answered: 302
+Settings saved.
+stored: {"signup_text":"&lt;b&gt;Join&lt;\/b&gt; our list","frequency":"daily"}
+as maria: 403</pre><p>With the solution's:</p>
+<pre class="out">rows: 3
+&lt;label for="pagesco-lab-signup-text"&gt;Sign-up text&lt;/label&gt;
+&lt;label for="pagesco-lab-frequency"&gt;Frequency&lt;/label&gt;
+&lt;label for="pagesco-lab-show-form"&gt;Sign-up form&lt;/label&gt;
+options.php answered: 302
+Frequency must be weekly or monthly.
+stored: {"signup_text":"Join our list","frequency":"monthly","show_form":false}
+as maria: 403</pre><p>Reading it: the starter has no sanitize callback (TODO 1) and a callback that returns <code class="inline">$input</code> (TODO 2), so the tags and the impossible frequency were stored exactly as sent, and the unticked box simply vanished from the value. The solution's callback returns a complete array every time: the tags stripped, <code class="inline">daily</code> refused with an error and the saved <code class="inline">monthly</code> kept, the missing box as false. The two extra rows are TODO 3. Maria's 403 comes from <code class="inline">manage_options</code> in add_options_page(), in both versions. The test deletes the option at the end, so the learner's site is unchanged.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 5.4-B (homework): labs/module-10/l5_4-settings-api/settings_probe_starter.php → settings_probe_solution.php</div>
+<p>As shipped (on the finished Lesson 5.4 site):</p>
+<pre class="out">group pagesco_books, type object, sanitized by sanitize()
+TODO
+rows in wp_options: TODO
+filters: TODO</pre><p>The solution prints:</p>
+<pre class="out">group pagesco_books, type object, sanitized by sanitize()
+{"notice_extra":"Signed copies this week.","show_events_link":false,"books_per_page":6,"events_limit":3}
+books_per_page: Books per list must be between 1 and 24.
+rows in wp_options: 0
+sanitize_option filter: yes, default_option filter: yes</pre><p>What it shows: sanitize_option() is the function options.php calls, so the result is exactly what Save Changes would store: the tags stripped, the box off (not sent), 30 refused with its message and 6 kept, 3 accepted. Nothing was stored (0 rows). And register_setting() is two filters on the option's name, one for every write and one for the missing-row default.</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-10/l5_4-settings-api/debug_newsletter_sanitize.php (deliberately broken)</div>
+<p>As shipped, WordPress and PHP print:</p>
+<pre class="out">Notice: Function register_setting was called &lt;strong&gt;incorrectly&lt;/strong&gt;. When registering an "array" setting to show in the REST API, you must specify the schema for each array item in "show_in_rest.schema.items". Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 5.4.0.) in /var/www/html/wp-includes/functions.php on line 6260
+box ticked: {"signup_text":"&lt;b&gt;Join&lt;\/b&gt; our list","frequency":"weekly","show_form":"1"}
+box unticked: Warning: Undefined array key "show_form" in /var/www/html/debug_newsletter_sanitize.php on line 24
+{"signup_text":"Join our list","frequency":"daily"}
+[new lines in wp-content/debug.log]
+[26-Oct-2026 13:35:54 UTC] PHP Notice:  Function register_setting was called &lt;strong&gt;incorrectly&lt;/strong&gt;. When registering an "array" setting to show in the REST API, you must specify the schema for each array item in "show_in_rest.schema.items". Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 5.4.0.) in /var/www/html/wp-includes/functions.php on line 6260
+[26-Oct-2026 13:35:54 UTC] PHP Warning:  Undefined array key "show_form" in /var/www/html/debug_newsletter_sanitize.php on line 24</pre><ol class="steps">
+  <li><b>"called incorrectly", line 33:</b> a setting of type <code class="inline">array</code> shown in REST needs a schema for its items. This setting is an associative array: type <code class="inline">object</code> (as Lesson 5.4's Settings uses), or no REST.</li>
+  <li><b>Warning, line 24:</b> <code class="inline">$input['show_form']</code> on the form with the box unticked: the key was not sent. <code class="inline">! empty( $input['show_form'] )</code>.</li>
+  <li><b>Silent, line 26:</b> the callback builds <code class="inline">$clean</code> and returns <code class="inline">$input</code>. Every cleaning step is thrown away: the tags stay, <code class="inline">daily</code> stays, the box stays the string "1". Return the cleaned value (and build it from scratch, not from a copy of the input, so unknown keys cannot ride along).</li>
+</ol>
+<p>Fixed, it prints:</p>
+<pre class="out">box ticked: {"signup_text":"Join our list","frequency":"weekly","show_form":true}
+box unticked: {"signup_text":"Join our list","frequency":"monthly","show_form":false}</pre></div>
+
+  <div class="sec"><h2>The Lesson Pages' Own Quick Quizzes</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Lesson 5.3 · Security in WordPress</div>
+<ol class="steps" data-lesson-quiz="5.3">
+  <li><b>B</b> At the point of output, for its context: Escape late: at the point of output, with the function for that context (esc_html, esc_attr, esc_url), because you cannot be sure where a stored value has been.</li>
+  <li><b>A</b> Any logged-in user, regardless of role, can perform the action: A valid nonce only proves the request came from this user's genuine page; any logged-in user, whatever their role, gets one. The capability check decides whether they are allowed to act.</li>
+  <li><b>C</b> $wpdb-&gt;prepare( $sql, $value ): The prepare() method inserts each value through a typed placeholder (%s, %d, %f, %i), quoting and escaping it so it cannot break out of the query.</li>
+  <li><b>B</b> An autosave carries no form fields and would wipe the saved values: save_post fires on autosaves and revisions, which carry no meta-box fields; without the guard an autosave would overwrite the saved values with empty ones.</li>
+  <li><b>C</b> No; you must check the capability yourself before calling it: No. wp_insert_post() and update_post_meta() trust the caller; you must call current_user_can() yourself before writing. The REST API and block editor add that check, but your own handlers must too.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Lesson 5.4 · Admin Pages, Settings API &amp; Options</div>
+<ol class="steps" data-lesson-quiz="5.4">
+  <li><b>A</b> settings_fields( 'pagesco_books' ) and do_settings_sections( 'pagesco-books' ): settings_fields takes the option group from register_setting, which names the nonce and the allowed options list; do_settings_sections takes the page slug the sections and fields were added to.</li>
+  <li><b>C</b> 7, and the page shows the error: 0 fails the range check, so the callback queues the error and puts the saved value, 7, back. The other fields are still stored; the page shows the error instead of Settings saved.</li>
+  <li><b>B</b> A 403: Sorry, you are not allowed to access this page: add_options_page was given manage_options, which editors lack, so WordPress hides the menu item and answers the URL with a 403 Sorry, you are not allowed to access this page.</li>
+  <li><b>C</b> So keys added in a later version still have a value on sites that saved an older array: A site that saved the settings before a new key existed has an array without that key. Merging with the defaults gives every key a value, so code can rely on it.</li>
+  <li><b>A</b> Delete it, because it only makes sense with the plugin: The option belongs to the plugin and is useless without it, so uninstall deletes it. Deactivation keeps it, so a reactivated plugin finds its settings again.</li>
+</ol>
+</div>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>Four checks:</b> genuine (the nonce: check_admin_referer() or wp_verify_nonce()), allowed (current_user_can() for this object), clean (sanitize, and validate what must have a shape), and safe output (escape for the context); with SQL by hand, every value through $wpdb-&gt;prepare().</li>
+  <li><b>options.php:</b> check_admin_referer( '&lt;group&gt;-options' ), current_user_can( 'manage_options' ) (filterable), the allowed options list built from register_setting(), then update_option() for each option of the group, which runs sanitize_option() and so your callback; then a redirect back with settings-updated=true, and the page prints "Settings saved." or the queued errors.</li>
+  <li><b>A refused value:</b> store the old (saved) value, never nonsense, and call add_settings_error( $option, $code, $message ); settings_errors() prints it above the form on the next page load.</li>
+</ol>
+
+  <div class="sec"><h2>Common Wrong Answers and What They Reveal</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li><b>Q1 A (esc_html).</b> Works by accident here; ask what function the meta box uses in value="…" and why.</li>
+  <li><b>Q3 A ("the user is allowed").</b> The most important confusion of the lesson. Run the lesson's Common Mistakes 2 again.</li>
+  <li><b>Q5 B ("a nonce check").</b> Did not recognize check_admin_referer() as the nonce check; put the two functions side by side on the board.</li>
+  <li><b>Q6 A.</b> Expects sanitizing to judge values. Exercise 1's validator makes the difference visible.</li>
+  <li><b>Q7 B or C.</b> Thinks the plugin's code saves the form. Show the form's action attribute: options.php.</li>
+  <li><b>Q9 A.</b> Expects HTML to send a zero. Show the request with the box unticked (the test's own post has no such field).</li>
+  <li><b>Q11 A.</b> True as a second layer; the 403 comes before render() runs (the page never prints).</li>
+</ul>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 10 · Answer Key · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

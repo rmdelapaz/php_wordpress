@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Workbook: Session 7</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Student workbook —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">write in it · bring it to every session</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Participant Workbook</div>
+    <h1>Session 7: functions.php: Supports, Assets, Menus &amp; Widgets</h1>
+    <p class="sub">Your workbook for Session 7: the warm-up, the key ideas of Lesson 4.3, a worked example, the guided lab, predict-then-run practice, the Part 1 project's first milestones and your template map, the self-check and your exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Lesson <b>4.3</b> + Part 1 project</span>
+      <span class="chip">Session <b>7</b> · 3 hours</span>
+      <span class="chip">Name: ____________________</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Session Goals</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Explain when functions.php runs and put each job in a prefixed callback on the right hook.</li>
+  <li>Declare theme supports, and say which ones block themes get automatically.</li>
+  <li>Enqueue a stylesheet and a deferred script with dependencies and a version that busts caches.</li>
+  <li>Register a menu location and a widget area, print them, and fill them from WP-CLI; add the accessibility and translation basics.</li>
+  <li>Start the Part 1 project, a block theme for the Fernhill Community Garden: Milestone 1 done, Milestone 2 started, Milestone 3 planned.</li>
+</ul>
+
+  <div class="sec"><h2>Start Here: Warm-up and Readiness</h2><span class="rule"></span></div>
+<div class="blk lab"><div class="h">Warm-up (Session 6)</div>
+<p>Answer W1 to W4 from memory, then run W5's two commands.</p>
+<div class="q"><div class="qn">W1</div><div class="qt">What does the Loop do, and what does the_post() do inside it?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W2</div><div class="qt">the_title() or get_the_title() inside echo '&lt;h2&gt;' . ... . '&lt;/h2&gt;'?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W3</div><div class="qt">posts_per_page 2, three matches: post_count, found_posts, max_num_pages on page 1?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W4</div><div class="qt">Name the three guards of a pre_get_posts callback that changes the blog home.</div><div class="write"></div></div>
+<div class="q"><div class="qn">W5</div><div class="qt">Run the two commands on the slide. What should a site ready for today print?</div><pre class="code">wp theme list --status=active --field=name
+curl -s http://localhost:8080/ | grep -c 'class="entry-title"'</pre><div class="write"></div></div>
+</div>
+
+  <div class="sec"><h2>Lesson</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">4.3</span><h3>functions.php: Supports, Assets, Menus &amp; Widgets</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Explain when functions.php runs and choose the right hook for theme setup, widgets and assets</li>
+  <li>Declare theme supports such as title-tag and html5 with add_theme_support(), and say which ones block themes get automatically</li>
+  <li>Enqueue a stylesheet and a deferred script with wp_enqueue_style() and wp_enqueue_script(), with dependencies and a version that busts browser caches</li>
+  <li>Register a menu location and a widget area, print them with wp_nav_menu() and dynamic_sidebar(), and fill them from WP-CLI</li>
+  <li>Add the accessibility and translation basics every theme needs: a skip link, screen-reader text, labeled navigation and strings WordPress can translate</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>functions.php runs on every request</b> while the theme is active (admin, REST and WP-CLI included): code goes in prefixed callbacks on the right hook.</li>
+  <li><b>Supports</b> on <code class="inline">after_setup_theme</code>: <code class="inline">title-tag</code>, <code class="inline">automatic-feed-links</code>, <code class="inline">post-thumbnails</code>, <code class="inline">responsive-embeds</code>, <code class="inline">html5</code> with an array. Block themes get most of them, and their title, automatically.</li>
+  <li><b>Enqueue</b> on <code class="inline">wp_enqueue_scripts</code>: a prefixed handle, <code class="inline">get_parent_theme_file_uri()</code>, dependencies, the theme's Version; scripts with <code class="inline">'strategy' =&gt; 'defer', 'in_footer' =&gt; true</code>.</li>
+  <li><b>Menus:</b> <code class="inline">register_nav_menus()</code> (locations), the owner assigns, <code class="inline">wp_nav_menu()</code> behind <code class="inline">has_nav_menu()</code>. <b>Widget areas:</b> <code class="inline">register_sidebar()</code> with a fixed id on <code class="inline">widgets_init</code>, <code class="inline">is_active_sidebar()</code> + <code class="inline">dynamic_sidebar()</code>; widgets are blocks since 5.8.</li>
+  <li><b>Accessibility:</b> a skip link, <code class="inline">.screen-reader-text</code> CSS, labeled navigation, real buttons, visible focus. <b>Translation:</b> a literal text domain; 6.8+ loads a theme's languages/ itself.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: what a classic theme leaves in the database</div>
+<p>pagesco-classic is inactive at the end of Lesson 4.3, but what you set up for it is still in the database, in the theme's own option:</p>
+<pre class="code">wp option get theme_mods_pagesco-classic --format=json</pre>
+<pre class="out">{"nav_menu_locations":{"primary":4},"custom_css_post_id":-1,"sidebars_widgets":{"time":1793006210,"data":{"wp_inactive_widgets":["block-2","block-3","block-4","block-5","block-6"],"footer":["block-7"]}}}</pre><p>The menu location (<code class="inline">primary</code> → menu 4) and the widget area's contents (<code class="inline">footer</code> → block-7) are theme mods of pagesco-classic. The menu itself is a term:</p>
+<pre class="code">wp menu list --fields=term_id,name,slug,count</pre>
+<pre class="out">+---------+-----------+-----------+-------+
+| term_id | name      | slug      | count |
++---------+-----------+-----------+-------+
+| 4       | Main menu | main-menu | 3     |
++---------+-----------+-----------+-------+</pre><p>Switch to pagesco-classic again and both come straight back; pagesco's header uses its Navigation block instead, and a block theme has no widget areas.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li><code class="inline">cp -r labs/module-07/l4_3-functions-php/corner_theme_starter wordpress/wp-content/themes/pagesco-lab-corner</code>, then <code class="inline">wp theme activate pagesco-lab-corner</code>.</li>
+  <li><code class="inline">cp labs/module-07/l4_3-functions-php/test_corner_theme.sh wordpress/</code>, then <code class="inline">docker compose run --rm wpcli sh test_corner_theme.sh</code>.</li>
+  <li>Four TODOs in functions.php, one callback each, the test after each.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Job</th><th>Hook</th><th>Function you called</th></tr></thead>
+<tbody>
+<tr><td>title and html5</td><td></td><td></td></tr>
+<tr><td>style and script</td><td></td><td></td></tr>
+<tr><td>menu location</td><td></td><td></td></tr>
+<tr><td>widget area</td><td></td><td></td></tr>
+</tbody>
+</table>
+<ul class="tick">
+  <li>Done when the test shows one <code class="inline">&lt;title&gt;</code>, html5, <code class="inline">style.css?ver=2.0.0</code>, <code class="inline">corner.js?ver=2.0.0, defer</code>, the location and the area. Then <code class="inline">wp theme activate pagesco-classic</code> and remove the folder and the test.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Predict, then run</div>
+<p>Write your prediction first, then run it.</p>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it. (pagesco-classic at the end of Lesson 4.2, before today's functions.php.)</div><pre class="code">wp eval 'var_dump( current_theme_supports( "title-tag" ), current_theme_supports( "menus" ) );'</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it. (pagesco at the end of Lesson 4.3: a block theme that declares no supports.)</div><pre class="code">wp eval 'var_dump( current_theme_supports( "title-tag" ), current_theme_supports( "html5", "search-form" ) );'</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>Finish the Classic Theme, Then Back to pagesco</b> (lesson page). In class: Steps 1 and 3. At home: Step 2.</p>
+<ul class="tick">
+  <li>☐ Step 1: style.css at 1.1.0; the stylesheet URL ends in ?ver=1.1.0</li>
+  <li>☐ Step 2: the per-URL check (one title, the CSS, the current menu item, the widget)</li>
+  <li>☐ Step 3: pagesco/functions.php with the pattern category; the three pattern headers; <b>pagesco active</b></li>
+</ul>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">Which of these actions fires FIRST in a front-end request?</div><div class="opts"><div class="opt">A) <code class="inline">wp_enqueue_scripts</code></div><div class="opt">B) <code class="inline">widgets_init</code></div><div class="opt">C) <code class="inline">after_setup_theme</code></div><div class="opt">D) <code class="inline">wp_head</code></div></div></div>
+<div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">At the end of Lesson 4.3, what does this print, and why does the version column matter for the theme's CSS?</div><pre class="code">wp theme list --name=pagesco-classic --fields=name,status,version</pre><div class="write"></div></div>
+<div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">pagesco-classic enqueued its stylesheet with <code class="inline">get_stylesheet_uri()</code> instead of <code class="inline">get_parent_theme_file_uri( 'style.css' )</code>. A client builds a child theme of it. What happens?</div><div class="opts"><div class="opt">A) The page loads the CHILD's style.css under the parent's handle, and the parent's CSS is gone</div><div class="opt">B) Nothing changes: both functions return the parent's file</div><div class="opt">C) WordPress loads both files automatically</div><div class="opt">D) A notice: get_stylesheet_uri() cannot be used in a parent theme</div></div></div>
+<div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">Why does header.php wrap <code class="inline">wp_nav_menu()</code> in <code class="inline">has_nav_menu( 'primary' )</code>?</div><div class="opts"><div class="opt">A) It makes the menu load faster</div><div class="opt">B) So a location without an assigned menu prints nothing instead of wp_page_menu()'s list of every page</div><div class="opt">C) wp_nav_menu() refuses to run without it</div><div class="opt">D) It registers the location</div></div></div>
+<div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">pagesco-classic ships languages/es_ES.l10n.php and says Requires at least: 6.6. Does it still need load_theme_textdomain()?</div><div class="opts"><div class="opt">A) Yes, every theme needs it on every version</div><div class="opt">B) No, never: translations always load themselves</div><div class="opt">C) Only plugins need it</div><div class="opt">D) Not on WordPress 6.8 and later, which load the active theme's languages/ folder itself; it stays for 6.6 and 6.7</div></div></div>
+<div class="q" data-sc="6" data-kind="short"><div class="qn">Q6</div><div class="qt">A must-use plugin calls wp_enqueue_style() at the top level of its file. What does WordPress say, and what is the real damage?</div><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>Make a two-column table, pagesco and pagesco-classic, with one row per job from this lesson: the page title, the CSS, the menu, the footer content, the skip link, screen-reader text, translations. For each cell, write who does the job (core, theme.json, a template, functions.php, the site owner in an admin screen). Which theme puts more of the work on WordPress, and which gives a developer more control?</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Part 1 Project: The Fernhill Community Garden Theme</h2><span class="rule"></span></div>
+<p>Your brief is <code class="inline">labs/module-08/p1-project/BRIEF.md</code> (requirements, milestones, rules, hand-in, rubric). The client, Odette Marsh, wrote:</p>
+<p>“Our website runs on a free theme from 2019 that nobody dares to touch. We would like our own theme, made for us: green and calm, our news on the front page three at a time, a big welcome at the top, a call for Saturday volunteers, and an autumn look we can switch on in October. Our volunteers write news and edit pages in the editor; none of us writes code. And please: nothing that breaks when WordPress updates itself.”</p>
+<table class="timing">
+<thead><tr><th>Req</th><th>What</th><th>From</th></tr></thead>
+<tbody>
+<tr><td>R1</td><td>Design system</td><td>Lesson 3.2</td></tr>
+<tr><td>R2</td><td>Templates and parts</td><td>Lessons 3.1, 3.2</td></tr>
+<tr><td>R3</td><td>Patterns and the front page</td><td>Lessons 3.3, 1.3</td></tr>
+<tr><td>R4</td><td>Style variation</td><td>Lesson 3.3</td></tr>
+<tr><td>R5</td><td>functions.php</td><td>Lessons 4.3, 2.3</td></tr>
+<tr><td>R6</td><td>The main query</td><td>Lesson 4.2</td></tr>
+<tr><td>R7</td><td>404 page</td><td>Lesson 3.1</td></tr>
+<tr><td>R8</td><td>Quality</td><td>Lessons 1.3, 3.2</td></tr>
+</tbody>
+</table>
+<div class="blk lab"><div class="h">Milestone 1 (in class)</div>
+<pre class="code">cp -r labs/module-08/p1-project/fernhill_starter wordpress/wp-content/themes/fernhill
+wp theme activate fernhill
+cp labs/module-08/p1-project/test_fernhill.php wordpress/
+wp eval-file --use-include test_fernhill.php</pre><ul class="tick">
+  <li>☐ <code class="inline">Checks passed: 1 of 12</code></li>
+  <li>☐ I read every starter file and its TODOs</li>
+  <li>☐ Last thing today: <code class="inline">wp theme activate pagesco</code></li>
+</ul>
+</div>
+<div class="blk"><div class="h">Milestone 2 (start in class, finish at home)</div>
+<ul class="tick">
+  <li>☐ style.css header: Version 1.0.0, Requires at least 7.1, Requires PHP, Tested up to 7.1</li>
+  <li>☐ theme.json: the five role colors in order, defaultPalette off, 680px / 1100px</li>
+  <li>☐ fonts (a serif for text, a sans-serif for headings) and element styles (links, buttons in primary)</li>
+  <li>☐ my self-check after M2: Checks passed: ____ of 12</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Plan Milestone 3: my template map</div>
+<table class="timing">
+<thead><tr><th>Template / part</th><th>Which URLs it draws</th><th>What it contains (landmarks, blocks)</th></tr></thead>
+<tbody>
+<tr><td>index.html</td><td></td><td></td></tr>
+<tr><td>front-page.html</td><td></td><td></td></tr>
+<tr><td>single.html</td><td></td><td></td></tr>
+<tr><td>page.html</td><td></td><td></td></tr>
+<tr><td>404.html</td><td></td><td></td></tr>
+<tr><td>parts/header.html</td><td></td><td></td></tr>
+<tr><td>parts/footer.html</td><td></td><td></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Self-check: project skills</div>
+<div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">Fernhill is a block theme. What is its style.css for?</div><div class="opts"><div class="opt">A) It names the theme: the header fields WordPress reads (Theme Name, Text Domain, Version, Requires at least ...)</div><div class="opt">B) It is the theme's stylesheet, loaded on every page</div><div class="opt">C) It is a fallback when theme.json has an error</div><div class="opt">D) It registers the patterns</div></div></div>
+<div class="q" data-sc="8"><div class="qn">Q8</div><div class="qt">The brief wants links and buttons in the primary color. Where does that go?</div><div class="opts"><div class="opt">A) A hex color typed into each template's markup</div><div class="opt">B) assets/css/fernhill.css</div><div class="opt">C) <code class="inline">theme.json</code>: <code class="inline">styles.elements.link</code> and <code class="inline">styles.elements.button</code> with <code class="inline">var:preset|color|primary</code></div><div class="opt">D) A pattern that wraps every link</div></div></div>
+<div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">R6: the blog home lists three posts per page with working pagination. Which way does the brief want?</div><div class="opts"><div class="opt">A) A Query Loop with <code class="inline">perPage</code> 3 that does not inherit</div><div class="opt">B) A <code class="inline">pre_get_posts</code> callback in functions.php with the three guards: not the admin, the main query only, the blog home only</div><div class="opt">C) Settings > Reading set to 3</div><div class="opt">D) A second WP_Query in the front-page pattern</div></div></div>
+<div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">You tried a header change in the Site Editor and clicked Save. Now your edits to parts/header.html no longer show. What happened, and what do you do?</div><div class="opts"><div class="opt">A) The theme cache needs 30 minutes</div><div class="opt">B) parts/ files are only read on activation: switch themes twice</div><div class="opt">C) theme.json overrides parts</div><div class="opt">D) A wp_template_part copy in the database wins over the file: move the change into header.html, then delete the copy</div></div></div>
+<div class="q" data-sc="11" data-kind="short"><div class="qn">Q11</div><div class="qt">Odette wants the autumn look she can switch on in October (R4). Which file, and what may it change?</div><div class="write"></div></div>
+<div class="q" data-sc="12" data-kind="short"><div class="qn">Q12</div><div class="qt">You stop working on Fernhill for the day. Which command do you run, and why?</div><div class="write"></div></div>
+</div>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">E1</div><div class="qt">Name the hook for each: a theme support, a stylesheet, a widget area.</div><div class="write"></div></div>
+<div class="q"><div class="qn">E2</div><div class="qt">Why does the enqueue use the theme's Version?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E3</div><div class="qt">Which Fernhill requirement will take you longest, and which lesson will you reread for it?</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Notes</h2><span class="rule"></span></div>
+<div class="notes-lines"></div>
+
+  <div class="sec"><h2>Homework Checklist</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ Lesson 4.3: Common Mistakes 2 to 4, the project's Step 2, Exercises 1 to 3, the Quick Quiz, the journal</li>
+  <li>☐ Part 1 project: Milestones 2 and 3 (about 1 hour 45 minutes), the self-check after each work session</li>
+  <li>☐ After each work session: <code class="inline">wp theme activate pagesco</code>; no Site Editor copies left</li>
+  <li>☐ Labs not reached: <code class="inline">menus_widgets_starter.sh</code>, <code class="inline">debug_theme_setup.php</code></li>
+  <li>☐ Bring to Session 8: pagesco active, fernhill with M2 and M3, my last self-check output, my template map, this workbook</li>
+</ul>
+
+  <div class="sec"><h2>Glossary</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code class="inline">after_setup_theme</code></td><td>The action for theme supports and menu locations, right after functions.php is loaded</td></tr>
+<tr><td>theme support</td><td>A feature a classic theme switches on with <code class="inline">add_theme_support()</code> (title-tag, html5 ...)</td></tr>
+<tr><td>enqueue</td><td>Putting a stylesheet or script on WordPress's list with a handle, dependencies and a version</td></tr>
+<tr><td>handle</td><td>The unique, prefixed name of an enqueued file (<code class="inline">pagesco-classic-style</code>; the element id adds -css or -js)</td></tr>
+<tr><td>menu location</td><td>A named place in a template where the owner's menu appears (<code class="inline">register_nav_menus()</code>)</td></tr>
+<tr><td>widget area</td><td>A slot for widgets (<code class="inline">register_sidebar()</code> with an id), printed with <code class="inline">dynamic_sidebar()</code></td></tr>
+<tr><td>skip link</td><td>"Skip to content": the first focusable link, jumping past the header to <code class="inline">&lt;main&gt;</code></td></tr>
+<tr><td><code class="inline">.screen-reader-text</code></td><td>The class for text meant to be heard, not seen; classic themes must style it</td></tr>
+<tr><td>Fernhill</td><td>The Part 1 project: a block theme for the Fernhill Community Garden (a fictional client)</td></tr>
+</tbody>
+</table>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 7 · Participant Workbook · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

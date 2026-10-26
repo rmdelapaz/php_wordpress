@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facilitator Guide: Session 3</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">contains answers &amp; timing · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Facilitator Guide</div>
+    <h1>Session 3: Core Architecture, the Database and Hooks</h1>
+    <p class="sub">How to teach the session where WordPress opens up: the files and the load order, the twelve tables and their key-value pattern read with SQL from the course site, then the hooks system that every theme and plugin is built on, ending with the first file of the course that stays, the Pages &amp; Co. store notice as a must-use plugin with hooks of its own.</p>
+    <div class="meta-row">
+      <span class="chip"><b>2</b> lessons</span>
+      <span class="chip"><b>3 hrs</b> session</span>
+      <span class="chip">Lessons <b>2.2–2.3</b></span>
+      <span class="chip">Session <b>3</b> of 18 · Part 1</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>How to Use This Guide</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Same rhythm for both lessons: frame (the goal and one mental model) → live demo (you type, they type along) → guided lab (a kit lab, new practice on the lesson's ideas) → start the lesson's own project. The lesson exercises, quiz and journal are homework.</li>
+  <li>Type, do not paste (the long grep of wp-settings.php is the exception). Every command below was run to produce the output printed under it, on WordPress 7.1.3, PHP 8.5 and MySQL 9.7, on the site exactly as Lesson 2.1 leaves it: the users maria and devon, the pages About Us, Contact and Events, three News posts. Ask for a prediction before every run.</li>
+  <li>The lessons are the reference. Keep <code class="inline">lesson_05.html</code> and <code class="inline">lesson_06.html</code> open in browser tabs (the table diagram, the action table, the full stack trace of Mistake 2). Labs live in <code class="inline">labs/module-03/</code>: <code class="inline">_starter</code> files are handouts, <code class="inline">_solution</code> files and the <code class="inline">title_parts_solution/</code> folder are yours.</li>
+  <li>Session 3 is the hinge of Part 1. Lesson 2.2 is read-only: the site ends exactly as it started. Lesson 2.3's project, <code class="inline">mu-plugins/pagesco-site.php</code> with the store notice, is the first file of the course that STAYS: Session 4 and every lesson after it assume it. Protect its start in the room.</li>
+  <li>Lesson 2.2 is SQL-heavy. Learners came through MySQL Foundations, so the joins are review; the new ideas are the schema (no foreign keys, the key-value pattern, serialized arrays, autoload) and the rule that follows from them: change WordPress data through WordPress.</li>
+</ul>
+<div class="note warn"><div class="t">The #1 risk of Session 3: the database hour eats the hooks hour</div>
+<p>Lesson 2.2 is the longest lesson so far (140 minutes for a learner alone) and full of queries learners enjoy running; every one invites "what if I also ...". Lesson 2.3 is shorter but it is the lesson the rest of the course stands on, and its project must exist on every machine before Session 4. <b>Hold the line at the break (1:15):</b> the 2.2 demo is 20 minutes and has a cut list (below), the inventory starts with two SQL steps and its PHP half goes home. After the break, the 2.3 project start gets 30 minutes, the longest segment of the day: learners who leave with <code class="inline">pagesco-site.php</code> printing the notice are ready for Session 4; Steps 3 and 4 can be finished at home in 20 minutes.</p>
+</div>
+
+  <div class="sec"><h2>Before the Session</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ <b>Learners' sites:</b> Session 2's homework finished Lesson 2.1's project. Remind them two days before: <code class="inline">wp user list</code> shows maria and devon, <code class="inline">wp post list --post_type=page</code> shows About Us, Contact and Events. A learner who skipped it can build the state in 15 minutes at the start of the break with Lesson 2.1's project steps; until then the 2.2 SQL shows fewer rows (fine) and the labs find no Maria (less fine).</li>
+  <li>☐ <b>Files to hand out:</b> <code class="inline">labs/module-03/</code> without the <code class="inline">*_solution.*</code> files and the <code class="inline">title_parts_solution/</code> folder; the workbook.</li>
+  <li>☐ <b>Run the kit check once:</b> <code class="inline">python3 labs/check_labs.py module-03</code> from this kit's folder (every line PASS; 14 results in about a minute). With your own course project at the end of Lesson 2.1: <code class="inline">WP_LABS_COMPOSE=~/pagesco-dev python3 labs/check_labs.py module-03</code> (labs/README.md).</li>
+  <li>☐ <b>Projector machine:</b> the course site at the end of Lesson 2.1 (the instructor's site follows the lessons too), VS Code open on <code class="inline">pagesco-dev</code> at a large font with <code class="inline">wordpress/wp-content/mu-plugins/</code> expanded, two terminals in the project folder (commands; <code class="inline">tail -f wordpress/wp-content/debug.log</code>), a third for <code class="inline">wp db cli</code>, a browser with http://localhost:8080/hello-world/ and View Source, plus <code class="inline">lesson_05.html</code> and <code class="inline">lesson_06.html</code>.</li>
+  <li>☐ <b>Board, before learners arrive:</b> the load order as a column (database · mu-plugins · plugins · pluggable · theme · user · init · wp() · template); the five table groups (content, taxonomies, users, comments, settings) with the ID arrows; and a two-column box <b>action = a moment, does something · filter = a value, returns it</b>.</li>
+  <li>☐ <b>A safety net for Mistake 3:</b> the demo skips the typo'd callback (it takes the site and WP-CLI down). If a learner's own typo does it in the lab, the fix is <code class="inline">rm</code> of the file in <code class="inline">wordpress/wp-content/mu-plugins/</code> from the host terminal, not WP-CLI (which is down too).</li>
+</ul>
+<div class="blk warn"><div class="h">Known traps in this session</div>
+<table class="timing">
+<thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td><code class="inline">wp db cli</code> greets "Welcome to the MariaDB monitor" and the prompt says <code class="inline">MySQL [wordpress]&gt;</code></td><td>The WP-CLI image's client program is MariaDB's; the server is MySQL 9.7</td><td>Nothing: every query works the same. Leave with <code class="inline">exit</code>.</td></tr>
+<tr><td>The lesson's counts differ from a learner's (more revisions, <code class="inline">_edit_lock</code> rows)</td><td>The learner opened posts in the editor after Lesson 2.1</td><td>Expected; the queries are the answer, not the numbers (the lesson says so).</td></tr>
+<tr><td>A query at the prompt prints nothing and waits</td><td>The semicolon is missing; the prompt shows <code class="inline">-&gt;</code></td><td>Type <code class="inline">;</code> and Enter.</td></tr>
+<tr><td><code class="inline">wp db query</code> output is tab-separated, no table</td><td>wp db query never draws tables; <code class="inline">wp db cli</code> does</td><td>Use the prompt for reading, <code class="inline">wp db query</code> in scripts.</td></tr>
+<tr><td><code class="inline">wp eval-file query-news.php</code>: <code class="inline">File not found</code></td><td>Saved in the project folder instead of <code class="inline">wordpress/</code></td><td>WP-CLI's current folder is the WordPress root: <code class="inline">wordpress/query-news.php</code>.</td></tr>
+<tr><td>A must-use plugin edit takes down every page, the admin AND WP-CLI</td><td>A fatal error in mu-plugins/ (Lesson 2.3, Mistake 3); WordPress cannot pause a must-use plugin</td><td>From the host: <code class="inline">rm wordpress/wp-content/mu-plugins/&lt;file&gt;</code>, read the end of debug.log, fix, copy back.</td></tr>
+<tr><td>The notice does not appear; no message</td><td>The file is in <code class="inline">plugins/</code> instead of <code class="inline">mu-plugins/</code>, or named <code class="inline">.php.txt</code>, or the hook name is misspelled</td><td><code class="inline">wp plugin list --status=must-use</code>; <code class="inline">wp eval 'var_dump( has_action( "wp_body_open", "pagesco_render_store_notice" ) );'</code>.</td></tr>
+<tr><td><code class="inline">curl ... | grep -c</code> exits with an error in a script</td><td>grep -c exits 1 when it counts zero</td><td>Expected (the lesson's Step 4 says so).</td></tr>
+</tbody>
+</table>
+</div>
+
+  <div class="sec"><h2>Session 3 Agenda (3 hours)</h2><span class="rule"></span></div>
+  <table class="timing">
+    <thead><tr><th>Clock</th><th>Minutes</th><th>Segment</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="t">0:00</td><td class="t">10</td><td>Warm-up</td><td>Five retrieval questions on Session 2, and the site check: users 2 and 3, pages 12 to 14, posts 15 to 17.</td></tr>
+      <tr><td class="t">0:10</td><td class="t">10</td><td><b>2.2</b> Frame and mental model</td><td>Opening the shop in the morning; twelve tables in five groups; no foreign keys; the key-value pattern.</td></tr>
+      <tr><td class="t">0:20</td><td class="t">20</td><td><b>2.2</b> Live demo</td><td>wp-config.php and wp-settings.php read live, the tables and a join, the SQL WP_Query writes, meta sorted as text, serialized data broken, what autoload saves.</td></tr>
+      <tr><td class="t">0:40</td><td class="t">20</td><td><b>2.2</b> Guided lab</td><td><code class="inline">labs/module-03/l2_2-core-database/meta_pivot_starter.sh</code> in pairs: key-value rows back into columns, in SQL and with WP-CLI.</td></tr>
+      <tr><td class="t">1:00</td><td class="t">15</td><td><b>2.2</b> Start the lesson project</td><td>The database inventory, Steps 1 and 2 at the wp db cli prompt; Steps 3 and 4 go home.</td></tr>
+      <tr><td class="t">1:15</td><td class="t">10</td><td>Break</td><td>Write the load order on the board for after the break: mu-plugins, plugins, pluggable, theme, user, init.</td></tr>
+      <tr><td class="t">1:25</td><td class="t">10</td><td><b>2.3</b> Frame and mental model</td><td>The radio show with call-ins; actions and filters; the prefix rule; must-use plugins.</td></tr>
+      <tr><td class="t">1:35</td><td class="t">25</td><td><b>2.3</b> Live demo</td><td>A first hook, the order of a request, filters in core and yours, priorities and accepted arguments, removing a hook, asking the site, three mistakes.</td></tr>
+      <tr><td class="t">2:00</td><td class="t">20</td><td><b>2.3</b> Guided lab</td><td><code class="inline">labs/module-03/l2_3-hooks/filter_chain_starter.php</code>: three callbacks on one filter, in the right order.</td></tr>
+      <tr><td class="t">2:20</td><td class="t">30</td><td><b>2.3</b> Start the lesson project</td><td>The store notice in mu-plugins/pagesco-site.php, Steps 1 to 3 (the file stays for the rest of the course); Step 4 if time.</td></tr>
+      <tr><td class="t">2:50</td><td class="t">10</td><td>Wrap-up</td><td>Exit ticket (3 questions), homework, Checkpoint 1 announced for Session 4, bring list.</td></tr>
+      <tr><td class="t"><b>Total</b></td><td class="t"><b>180</b></td><td></td><td>Ends at 3:00.</td></tr>
+    </tbody>
+  </table>
+<p><b>In the room.</b> The lesson pages estimate 140 + 120 = 260 minutes for a learner working alone; after the warm-up, the break and the wrap-up the room has 150. Lesson 2.2 keeps model, demo and lab, and its project starts with the two SQL steps (the prompt is where discussion helps); the PHP half of the inventory and the settings check go home. Lesson 2.3 keeps its full shape and gives its project the longest segment, because the file stays for the rest of the course. Not in the room: Lesson 2.2's drop-ins section and constant table, the indexes and EXPLAIN (the workbook's worked example covers EXPLAIN), Mistakes 2 to 4 of 2.2 (orphans, a typed table name, the third argument: self-check Q4 and the debug handout practice two of them), and 2.3's "Finding the Hook You Need" beyond has_filter() (the second 2.3 lab, <code class="inline">hook_finder_starter.sh</code>).</p>
+<p><b>Goes home (about 2 to 3 hours).</b> The inventory Steps 3 and 4 (the same report from PHP with $wpdb, the settings check, the clean-up); the store notice Step 4 (and Step 3 if it did not fit); each lesson's Hands-on Exercises; both Quick Quizzes; both journal entries; both "Before the Next Lesson" lists; and the review for <b>Checkpoint 1 in Session 4</b> (Modules 1 and 2: Lessons 1.1 to 2.3).</p>
+<p><b>Protect, in this order:</b> the 2.3 project start (pagesco-site.php printing the notice on every machine); the 2.3 demo through removing a hook; the 2.2 demo through "every value is a string"; the 2.2 guided lab. <b>Cut first:</b> the 2.2 autoload step and the 2.3 Mistake 4 step (4 minutes; both are in the lesson and the handouts), then the 2.2 project start (send both SQL steps home: 15 minutes), then the 2.2 lab's Steps 4 and 5 (5 minutes).</p>
+
+  <div class="sec"><h2>Opening Segment</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">0:00</span><h3>Warm-up: Session 2 Revisited</h3><span class="dur">10 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Timing</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">6m</td><td>Five retrieval questions, no notes (workbook Warm-up box), then answers by show of hands</td></tr>
+<tr><td class="t">4m</td><td>Site check: two WP-CLI commands on every machine, the same IDs as the projector</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Retrieval questions and answers</div>
+<ol class="steps">
+  <li>Which escaping function goes around a URL in an href attribute? <b>Answer:</b> <code class="inline">esc_url()</code> (text between tags: <code class="inline">esc_html()</code>, other attribute values: <code class="inline">esc_attr()</code>).</li>
+  <li>Name the four shapes a WordPress callback can take. Which one is hard for anyone else to unhook? <b>Answer:</b> A function name, a closure, <code class="inline">array( $object, 'method' )</code>, a static method (<code class="inline">'Class::method'</code> or <code class="inline">array( 'Class', 'method' )</code>). The closure: nobody else has a handle on it (Lesson 2.3 comes back to this).</li>
+  <li>A page and a post: which table holds each, and which column tells them apart? <b>Answer:</b> Both are rows in <code class="inline">wp_posts</code>; <code class="inline">post_type</code> is <code class="inline">page</code> or <code class="inline">post</code> (Lesson 2.1's filing cabinet).</li>
+  <li>Code must decide whether the current user may publish pages. What does it check, and why not the role? <b>Answer:</b> <code class="inline">current_user_can( 'publish_pages' )</code>: a capability. Roles are bundles that sites change; capabilities are what WordPress checks.</li>
+  <li>What does <code class="inline">wp_parse_args( $args, $defaults )</code> return? <b>Answer:</b> One array: the defaults, overridden by whatever the caller passed in <code class="inline">$args</code>.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Site check (on the projector, then every machine)</div>
+<p>Say: "Today both lessons start from the site Lesson 2.1 left. Check yours is the same." From the project folder:</p>
+<pre class="code">wp post list --post_type=page,post --orderby=ID --order=asc --fields=ID,post_type,post_name,post_author
+wp user list --orderby=ID --fields=ID,user_login,roles</pre><pre class="out">+----+-----------+----------------+-------------+
+| ID | post_type | post_name      | post_author |
++----+-----------+----------------+-------------+
+| 1  | post      | hello-world    | 1           |
+| 2  | page      | sample-page    | 1           |
+| 3  | page      | privacy-policy | 1           |
+| 12 | page      | about          | 2           |
+| 13 | page      | contact        | 2           |
+| 14 | page      | events         | 2           |
+| 15 | post      | welcome        | 2           |
+| 16 | post      | staff-picks    | 3           |
+| 17 | post      | book-club-dune | 2           |
++----+-----------+----------------+-------------+
++----+------------+---------------+
+| ID | user_login | roles         |
++----+------------+---------------+
+| 1  | admin      | administrator |
+| 2  | maria      | editor        |
+| 3  | devon      | author        |
++----+------------+---------------+</pre><ul class="tick">
+  <li><b>Same IDs:</b> ready. Higher IDs or extra revisions are fine (the learner experimented).</li>
+  <li><b>No maria, devon or pages 12 to 14:</b> Lesson 2.1's project was not finished. The learner follows today with a neighbor and builds the content in the break (Lesson 2.1, project Steps 1 to 4, about 15 minutes); the 2.2 queries then match.</li>
+  <li><b>Homework check (one minute):</b> hands up for the 1.3 Book Card Helper passing PHPCS and the 2.1 content in place. Questions from the journals go on a sticky note for the 2.2 frame.</li>
+</ul>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Lesson Plans</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">2.2</span><h3>Core Architecture &amp; the Database</h3><span class="dur">65 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Find your way around a WordPress install: what lives in wp-admin/, wp-includes/ and wp-content/, and what a drop-in is</li>
+  <li>Read wp-config.php and explain its settings, including the table prefix and the security keys</li>
+  <li>Trace how wp-settings.php loads WordPress, and say what is available at each stage</li>
+  <li>Map the twelve wp_* tables, their keys and indexes, and join them with SQL the way WordPress's own queries do</li>
+  <li>Explain the meta (key-value) pattern, serialized values and options autoloading, with their trade-offs</li>
+  <li>Query the Pages &amp; Co. site with wp db cli, wp db query and WP-CLI, and choose the API over raw SQL in your code</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing in the room</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame: opening the shop in the morning; twelve tables; no foreign keys; the key-value pattern</td></tr>
+<tr><td class="t">20m</td><td>Live demo: wp-config.php, wp-settings.php, tables, a join, WP_Query's SQL, meta as text, serialized data, autoload</td></tr>
+<tr><td class="t">20m</td><td>Guided lab: <code class="inline">meta_pivot_starter.sh</code> in pairs</td></tr>
+<tr><td class="t">15m</td><td>Start the lesson project: the database inventory, Steps 1 and 2</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Mental model to say</div>
+<p>Draw on the load-order column from the board: "Think of a bookseller opening Pages &amp; Co. in the morning. First the lights and the till: the database connection and the cache. Then the things that are always there, whatever happens: must-use plugins. Then the departments open today: active plugins. Then the window display: the theme. Only when the staff member on duty has signed in, the current user, does the shop open its doors, init, and serve the first customer, the main query. Code that tries to serve a customer while the lights are still off is the 'too early' bug of the next lesson."</p>
+<p>Then the database in three sentences: "Twelve tables, the same on every WordPress site, linked by ID columns but with <b>no foreign keys</b>: integrity lives in PHP, so you change data through WordPress. Extra fields are <b>rows, not columns</b>: post_id, meta_key, meta_value, the key-value pattern, and every value is text. Arrays are stored <b>serialized</b>, with their lengths inside, so you never edit them as text." Write the rule under the drawing: <b>read with SQL if you like; write through the API.</b></p>
+</div>
+<div class="blk"><div class="h">Live demo (you type, they follow)</div>
+<p>The lesson's own commands on the projector: grep in the WP-CLI container shell, SQL at the <code class="inline">wp db cli</code> prompt, PHP files in <code class="inline">wordpress/</code> run with <code class="inline">wp eval-file</code>. Learners type along on their own site (which is the same one). The site ends the demo exactly as it started.</p>
+<ol class="steps">
+  <li><b>wp-config.php, read as a developer (3m).</b> "Lesson 1.2 said this file reads your compose settings. Now read its skeleton." In the WP-CLI container shell (<code class="inline">docker compose run --rm wpcli sh</code>), the lesson's grep leaves out the secret keys:
+<pre class="code">grep -n "define(\|table_prefix =\|stop editing\|require_once" wp-config.php | grep -v "_KEY\|_SALT"</pre>
+<pre class="out">44:define( 'DB_NAME', getenv_docker('WORDPRESS_DB_NAME', 'wordpress') );
+47:define( 'DB_USER', getenv_docker('WORDPRESS_DB_USER', 'example username') );
+50:define( 'DB_PASSWORD', getenv_docker('WORDPRESS_DB_PASSWORD', 'example password') );
+59:define( 'DB_HOST', getenv_docker('WORDPRESS_DB_HOST', 'mysql') );
+62:define( 'DB_CHARSET', getenv_docker('WORDPRESS_DB_CHARSET', 'utf8mb4') );
+65:define( 'DB_COLLATE', getenv_docker('WORDPRESS_DB_COLLATE', '') );
+102:$table_prefix = getenv_docker('WORDPRESS_TABLE_PREFIX', 'wp_');
+116:define( 'WP_DEBUG', !!getenv_docker('WORDPRESS_DEBUG', '') );
+118:/* Add any custom values between this line and the "stop editing" line. */
+131:/* That's all, stop editing! Happy publishing. */
+135:	define( 'ABSPATH', __DIR__ . '/' );
+139:require_once ABSPATH . 'wp-settings.php';</pre>
+Point at three lines: <code class="inline">$table_prefix</code> (a variable, not a constant: changing it on a running site makes WordPress think it is not installed), the "stop editing" comment, and line 139, the hand-over to the loader. Ask: "what happens to a define() pasted after line 139?" (Too late: self-check Q1.)</li>
+  <li><b>wp-settings.php, the order of the morning (4m).</b> "Lesson 1.1 grepped three lines of this file. Here are its milestones." Type the lesson's grep (or paste it from the page: it is long and the output is the point):
+<pre class="code">grep -n "^require_wp_db\|^wp_start_object_cache\|^foreach ( wp_get_mu_plugins\|^foreach ( wp_get_active_and_valid_plugins\|^require ABSPATH . WPINC . '/pluggable.php'\|^foreach ( wp_get_active_and_valid_themes\|^\$GLOBALS\['wp'\]-&gt;init\|^do_action( '" wp-settings.php</pre>
+<pre class="out">136:require_wp_db();
+151:wp_start_object_cache();
+506:foreach ( wp_get_mu_plugins() as $mu_plugin ) {
+548:do_action( 'muplugins_loaded' );
+582:foreach ( wp_get_active_and_valid_plugins() as $plugin ) {
+612:require ABSPATH . WPINC . '/pluggable.php';
+630:do_action( 'plugins_loaded' );
+643:do_action( 'sanitize_comment_cookies' );
+705:do_action( 'setup_theme' );
+741:foreach ( wp_get_active_and_valid_themes() as $theme ) {
+757:do_action( 'after_setup_theme' );
+766:$GLOBALS['wp']-&gt;init();
+779:do_action( 'init' );
+801:do_action( 'wp_loaded' );</pre>
+Walk it with the shop-opening picture: lights and till (database 136, cache), the things always there (must-use plugins 506), today's departments (plugins 582), then pluggable.php at 612, the window display (theme 741), the staff member signs in (766), doors open (init 779). Ask: "why is pluggable.php after the plugins?" (So a plugin can replace wp_mail() by defining it first.)</li>
+  <li><b>Twelve tables (3m).</b> "Time for SQL." <code class="inline">wp db cli</code> opens the <code class="inline">wp db cli</code> prompt (<code class="inline">MySQL [wordpress]&gt;</code>) with the credentials from wp-config.php (it greets you as the MariaDB monitor: the client is MariaDB's, the server is MySQL 9.7). Type:
+<pre class="code">SELECT TABLE_NAME, ENGINE, TABLE_COLLATION
+FROM information_schema.TABLES
+WHERE TABLE_SCHEMA = DATABASE()
+ORDER BY TABLE_NAME;</pre>
+<pre class="out">+-----------------------+--------+------------------------+
+| TABLE_NAME            | ENGINE | TABLE_COLLATION        |
++-----------------------+--------+------------------------+
+| wp_commentmeta        | InnoDB | utf8mb4_unicode_520_ci |
+| wp_comments           | InnoDB | utf8mb4_unicode_520_ci |
+| wp_links              | InnoDB | utf8mb4_unicode_520_ci |
+| wp_options            | InnoDB | utf8mb4_unicode_520_ci |
+| wp_postmeta           | InnoDB | utf8mb4_unicode_520_ci |
+| wp_posts              | InnoDB | utf8mb4_unicode_520_ci |
+| wp_term_relationships | InnoDB | utf8mb4_unicode_520_ci |
+| wp_term_taxonomy      | InnoDB | utf8mb4_unicode_520_ci |
+| wp_termmeta           | InnoDB | utf8mb4_unicode_520_ci |
+| wp_terms              | InnoDB | utf8mb4_unicode_520_ci |
+| wp_usermeta           | InnoDB | utf8mb4_unicode_520_ci |
+| wp_users              | InnoDB | utf8mb4_unicode_520_ci |
++-----------------------+--------+------------------------+</pre>
+Draw the five groups beside the drawing from Lesson 2.1: content, taxonomies, users, comments, settings. Then leave the prompt (<code class="inline">exit</code>) and show the rule for code: the prefix comes from $wpdb.
+<pre class="code">wp eval 'global $wpdb; echo $wpdb-&gt;prefix, "\n", $wpdb-&gt;posts, "\n", $wpdb-&gt;postmeta, "\n", $wpdb-&gt;options, "\n";'</pre>
+<pre class="out">wp_
+wp_posts
+wp_postmeta
+wp_options</pre></li>
+  <li><b>A join, then the SQL WordPress writes (4m).</b> Back at the prompt, "who wrote each published post and page?" is the join from MySQL Foundations:
+<pre class="code">SELECT p.ID, p.post_type, p.post_title, u.display_name AS author
+FROM wp_posts AS p
+JOIN wp_users AS u ON u.ID = p.post_author
+WHERE p.post_type IN ('post', 'page') AND p.post_status = 'publish'
+ORDER BY p.ID;</pre>
+<pre class="out">+----+-----------+----------------------------------------+-------------+
+| ID | post_type | post_title                             | author      |
++----+-----------+----------------------------------------+-------------+
+|  1 | post      | Hello world!                           | admin       |
+|  2 | page      | Sample Page                            | admin       |
+| 12 | page      | About Us                               | Maria Lopez |
+| 13 | page      | Contact                                | Maria Lopez |
+| 14 | page      | Events                                 | Maria Lopez |
+| 15 | post      | Welcome to the new Pages &amp; Co. website | Maria Lopez |
+| 16 | post      | Staff picks for the season             | Devon Park  |
+| 17 | post      | Book club: Dune                        | Maria Lopez |
++----+-----------+----------------------------------------+-------------+</pre>
+Then save the lesson's <code class="inline">wordpress/query-news.php</code> and run it with <code class="inline">wp eval-file query-news.php</code>: WP_Query shows the SQL it sent.
+<pre class="code"><span class="k">&lt;?php</span>
+<span class="v">$pagesco_query</span> = <span class="k">new</span> WP_Query(
+	<span class="k">array</span>(
+		<span class="s">'category_name'</span> =&gt; <span class="s">'news'</span>,
+		<span class="s">'fields'</span>        =&gt; <span class="s">'ids'</span>,
+	)
+);
+
+<span class="k">echo</span> trim( preg_replace( <span class="s">'/\n\s+/'</span>, <span class="s">"\n"</span>, <span class="v">$pagesco_query</span>-&gt;request ) ), <span class="s">"\n\n"</span>;
+<span class="k">echo</span> <span class="s">'Found: '</span>, implode( <span class="s">', '</span>, <span class="v">$pagesco_query</span>-&gt;posts ), <span class="s">"\n"</span>;</pre>
+<pre class="out">SELECT SQL_CALC_FOUND_ROWS  wp_posts.ID
+FROM wp_posts  LEFT JOIN wp_term_relationships ON (wp_posts.ID = wp_term_relationships.object_id)
+WHERE 1=1  AND (
+wp_term_relationships.term_taxonomy_id IN (2)
+) AND ((wp_posts.post_type = 'post' AND (wp_posts.post_status = 'publish')))
+GROUP BY wp_posts.ID
+ORDER BY wp_posts.post_date DESC
+LIMIT 0, 10
+
+Found: 17, 16, 15</pre>
+Read it like any query: one join instead of three (WordPress looked up the slug first), the defaults nobody asked for (post type, status, newest first, 10 per page), SQL_CALC_FOUND_ROWS for pagination. "Core APIs before SQL: the API knows the schema, the defaults and the caches." <code class="inline">rm query-news.php</code>.</li>
+  <li><b>Every value is a string (3m).</b> "Give the News posts a reading time, as a plugin might, and sort by it."
+<pre class="code">wp post meta add 15 pagesco_reading_minutes 2
+wp post meta add 16 pagesco_reading_minutes 12
+wp post meta add 17 pagesco_reading_minutes 4
+
+SELECT post_id, meta_value
+FROM wp_postmeta
+WHERE meta_key = 'pagesco_reading_minutes'
+ORDER BY meta_value;</pre>
+<pre class="out">Success: Added custom field.
+Success: Added custom field.
+Success: Added custom field.
++---------+------------+
+| post_id | meta_value |
++---------+------------+
+|      16 | 12         |
+|      15 | 2          |
+|      17 | 4          |
++---------+------------+</pre>
+Twelve minutes "before" two: meta_value is LONGTEXT, compared character by character. In SQL a CAST, in WP_Query <code class="inline">'orderby' =&gt; 'meta_value_num'</code>. Keep the three rows until the last step.</li>
+  <li><b>Mistake 1: serialized data edited with SQL (2m).</b> "The shop's details as one array option, and a quick rename with REPLACE()." Ask for a prediction first:
+<pre class="code">wp option add pagesco_demo_shop '{"city":"Springfield","phone":"555-0142"}' --format=json
+wp db query "UPDATE wp_options SET option_value = REPLACE(option_value, 'Springfield', 'Portland') WHERE option_name = 'pagesco_demo_shop'"
+wp db query "SELECT option_value FROM wp_options WHERE option_name = 'pagesco_demo_shop'"
+wp option get pagesco_demo_shop</pre>
+<pre class="out">Success: Added 'pagesco_demo_shop' option.
+Success: Query succeeded. Rows affected: 1
+option_value
+a:2:{s:4:"city";s:11:"Portland";s:5:"phone";s:8:"555-0142";}
+
+Error: Could not get 'pagesco_demo_shop' option. Does it exist?</pre>
+<code class="inline">s:11:"Portland"</code> says eleven characters; Portland has eight. unserialize() fails, WordPress returns false, WP-CLI says the option does not exist. In a theme the address just vanishes. Fix: <code class="inline">wp option patch</code>, <code class="inline">update_option()</code>, and <code class="inline">wp search-replace</code> for whole sites (Lesson 8.4). <code class="inline">wp option delete pagesco_demo_shop</code>.</li>
+  <li><b>What autoload saves (1m).</b> Save the lesson's <code class="inline">options-cost.php</code> and run it: <code class="inline">$wpdb-&gt;num_queries</code> counts queries.
+<pre class="code"><span class="k">&lt;?php</span>
+<span class="k">global</span> <span class="v">$wpdb</span>;
+
+<span class="k">foreach</span> ( <span class="k">array</span>( <span class="s">'blogname'</span>, <span class="s">'fresh_site'</span>, <span class="s">'fresh_site'</span>, <span class="s">'pagesco_no_such_option'</span> ) <span class="k">as</span> <span class="v">$pagesco_name</span> ) {
+	<span class="v">$pagesco_before</span> = <span class="v">$wpdb</span>-&gt;num_queries;
+	<span class="v">$pagesco_value</span>  = get_option( <span class="v">$pagesco_name</span> );
+	printf( <span class="s">"%-24s %-18s queries: %d\n"</span>, <span class="v">$pagesco_name</span>, var_export( <span class="v">$pagesco_value</span>, <span class="k">true</span> ), <span class="v">$wpdb</span>-&gt;num_queries - <span class="v">$pagesco_before</span> );
+}</pre>
+<pre class="out">blogname                 'Pages &amp;amp; Co.'  queries: 0
+fresh_site               '0'                queries: 1
+fresh_site               '0'                queries: 0
+pagesco_no_such_option   false              queries: 1</pre>
+Autoloaded: free. Not autoloaded: one query, then cached. Missing: still one query. Then clean up: <code class="inline">rm options-cost.php</code> and the lesson's three <code class="inline">wp post meta delete</code> lines.</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b>Typing <code class="inline">wp_posts</code> in PHP.</b> It works on the course site and breaks on the first client site with the prefix <code class="inline">pc_</code>. Coach: "Where does the prefix come from?" <code class="inline">{$wpdb-&gt;posts}</code> in code, wp_posts only at the prompt. (The lesson's Mistake 3; <code class="inline">wpdb_report_starter.php</code>.)</li>
+  <li><b>Fixing data with UPDATE or DELETE</b> because it is quicker. Coach with the two broken demos: "Which PHP would have run if you had used wp post delete?" (wp_delete_post()'s four cleanup lines.) The prompt is for reading. (Self-check Q5.)</li>
+  <li><b>Comparing meta as numbers in SQL.</b> <code class="inline">ORDER BY meta_value</code> and <code class="inline">meta_value &gt; 10</code> on text. Coach: "What type is meta_value?" (LONGTEXT.) CAST in SQL, <code class="inline">meta_value_num</code> in WP_Query. Forgetting <code class="inline">true</code> in get_post_meta() is the PHP version of the same surprise (self-check Q4, <code class="inline">debug_meta_report.php</code>).</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<p><b>File:</b> <code class="inline">labs/module-03/l2_2-core-database/meta_pivot_starter.sh</code>; your reference is <code class="inline">labs/module-03/l2_2-core-database/meta_pivot_solution.sh</code>. It practices the key-value pattern from the reading side: wp_usermeta's rows turned back into one row per user with a column per field (the "pivot" every report on meta needs), then the same through WP-CLI, which reads the meta for you.</p>
+<ul class="tick">
+  <li><b>Run it as shipped first (3m).</b> <code class="inline">cp labs/module-03/l2_2-core-database/meta_pivot_starter.sh wordpress/</code> then <code class="inline">docker compose run --rm wpcli sh meta_pivot_starter.sh</code>. Step 1 prints the users; the rest say TODO. Learners develop each query at the <code class="inline">wp db cli</code> prompt (tables are easier to read there), then paste it into the script inside <code class="inline">wp db query "..."</code>.</li>
+  <li><b>Steps 2 and 3 in pairs (12m).</b> Step 2 is the lesson's "key condition in ON" join; Step 3 is new: one join, GROUP BY the user, <code class="inline">MAX(CASE WHEN um.meta_key = 'first_name' THEN um.meta_value END)</code>. Circulate for the key condition in WHERE in Step 3 (it filters to one key and the second column comes out empty), and for single quotes inside the double-quoted <code class="inline">wp db query</code> argument (fine) versus double quotes (they end the argument).</li>
+  <li><b>Steps 4 and 5 (3m).</b> <code class="inline">wp user list</code> with the two meta fields does the pivot for you; the count per user shows how many rows one user costs.</li>
+  <li><b>Expected when done</b> (the site after Lesson 2.1):</li>
+</ul>
+<pre class="out">== Step 1: the users ==
+ID	user_login	display_name
+1	admin	admin
+2	maria	Maria Lopez
+3	devon	Devon Park
+
+== Step 2: first names, one join ==
+ID	user_login	first_name
+1	admin	
+2	maria	Maria
+3	devon	Devon
+
+== Step 3: one row per user, two fields ==
+ID	user_login	first_name	last_name
+1	admin		
+2	maria	Maria	Lopez
+3	devon	Devon	Park
+
+== Step 4: the same through WordPress ==
++----+------------+------------+-----------+
+| ID | user_login | first_name | last_name |
++----+------------+------------+-----------+
+| 1  | admin      |            |           |
+| 2  | maria      | Maria      | Lopez     |
+| 3  | devon      | Devon      | Park      |
++----+------------+------------+-----------+
+== Step 5: meta rows per user ==
+user_id	meta_rows
+1	16
+2	15
+3	16</pre><ul class="tick">
+  <li><b>Debrief (2m):</b> "Each extra field in a report is one more CASE, or one more join. What would twelve book fields cost?" (The price of the key-value pattern; Lesson 5.2 stores book fields as post meta anyway, and 5.5 builds a real table for events.) "Why is admin's first name empty, not NULL?" (The row exists with an empty value: WordPress writes it at install.)</li>
+  <li><b>Fast finishers:</b> <code class="inline">labs/module-03/l2_2-core-database/wpdb_report_starter.php</code> ($wpdb's get_var, get_col and get_row with prepare(), each checked against the API), then <code class="inline">labs/module-03/l2_2-core-database/debug_meta_report.php</code> (two Warnings and a silent wrong answer).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Start the lesson project</div>
+<p>The lesson project is <b>A Database Inventory of Pages &amp; Co.</b>: the same report twice, at the SQL prompt as an auditor would and in PHP with $wpdb as a plugin would, plus a settings check; nothing on the site changes. In the room: Steps 1 and 2 at the prompt (15 minutes).</p>
+<ul class="tick">
+  <li>Step 1 (5m): content by type and status with GROUP BY, then the same numbers from <code class="inline">wp_count_posts()</code>. Ask before running: "how many published pages?" (Four: the Sample Page counts.)</li>
+  <li>Step 2 (10m): who wrote what and where it is filed, with LEFT JOINs to the term tables and GROUP_CONCAT(). The teaching moment is the condition <code class="inline">tt.taxonomy = 'category'</code> in ON rather than WHERE: ask a pair to move it to WHERE and watch the pages disappear.</li>
+  <li><b>Done in the room</b> = both queries return the lesson's rows and are saved in <code class="inline">pagesco-inventory.sql</code> in the learner's notes.</li>
+  <li><b>Goes home:</b> Step 3 (the PHP report with <code class="inline">$wpdb-&gt;prepare()</code> and <code class="inline">get_the_category()</code>) and Step 4 (the largest autoloaded options, the clean-up, the final check).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<p>Ask these out loud during the demo and the lab:</p>
+<ul class="tick">
+  <li>Why can a plugin call <code class="inline">get_option()</code> at the top of its file, but not <code class="inline">wp_get_current_user()</code>? <b>Answer:</b> the database and the options are ready at line 136; pluggable.php (and the current user) come after the plugins.</li>
+  <li>A plugin needs a <code class="inline">featured</code> flag per post. Column, meta, taxonomy or table? <b>Answer:</b> post meta (one value per post; Lesson 2.2 quiz Q1). A taxonomy if it were a shared label to filter by.</li>
+  <li>Where does <code class="inline">$wpdb-&gt;posts</code> get its prefix? <b>Answer:</b> <code class="inline">$table_prefix</code> in wp-config.php.</li>
+  <li>Why does WP_Query's SQL join only one term table? <b>Answer:</b> it looked up the term's ID first and filters on term_taxonomy_id directly.</li>
+</ul>
+<p>Workbook self-check, items Q1 to Q6 (learners do them at the end of the block or at home).</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q1</b> <span data-sc="1">C) It is defined too late: wp-settings.php has already loaded WordPress, so the file editors stay</span>; <b>Q2</b> <span data-sc="2"><code class="inline">db</code>: the name of the database service in compose.yaml (on a typical host it is localhost)</span>; <b>Q3</b> <span data-sc="3">B) Must-use plugins, active plugins, pluggable.php, the theme's functions.php</span>; <b>Q4</b> <span data-sc="4"><pre class="out">array(1) {
+  [0]=&gt;
+  string(5) "Devon"
+}</pre></span>; <b>Q5</b> <span data-sc="5">B) It works, but only because both words have 6 characters: the s:6 length still matches. Change roles through WordPress anyway</span>; <b>Q6</b> <span data-sc="6">D) Nobody chose, and WordPress decided not to autoload it, usually because the value is large (over 150,000 bytes)</span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> learners rusty on joins get the Step 2 query of the lab written on a card with blanks for the ON clause; pair them with someone who did MySQL Foundations recently. For anyone lost in the tables, the workbook's table-groups diagram is the map: point at it before every query.</p>
+<p><b>Stretch:</b> <code class="inline">wpdb_report_starter.php</code> and <code class="inline">debug_meta_report.php</code>; the lesson's Exercise 4 (SAVEQUERIES in a must-use plugin, and why the autoloaded options are missing from it) and the Bonus Challenge (SHORTINIT).</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">2.3</span><h3>The Hooks System</h3><span class="dur">85 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Explain the difference between an action and a filter, and choose the right one for a task</li>
+  <li>Attach callbacks with add_action() and add_filter(), using priorities and the accepted-arguments count correctly</li>
+  <li>Remove a hook someone else added with remove_action() / remove_filter(), and say why a removal silently fails</li>
+  <li>Create your own action and filter hooks with do_action() and apply_filters() so other code can extend yours</li>
+  <li>Find the hook you need: in the core source, with has_filter() and $wp_filter, and from the command line with WP-CLI</li>
+  <li>Build the Pages &amp; Co. store notice as a must-use plugin that others can customize through its own hooks</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing in the room</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame: the radio show with call-ins; actions and filters; must-use plugins; the prefix rule</td></tr>
+<tr><td class="t">25m</td><td>Live demo: a first hook, the order of a request, filters, priorities and accepted arguments, removing, has_filter(), three mistakes</td></tr>
+<tr><td class="t">20m</td><td>Guided lab: <code class="inline">filter_chain_starter.php</code></td></tr>
+<tr><td class="t">30m</td><td>Start the lesson project: the store notice, Steps 1 to 3 (Step 4 if time)</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Mental model to say</div>
+<p>"WordPress is a radio host working through a running order. An <b>action</b> is the host saying 'we are now at the weather, any callers?': callers may talk, and the show goes on the same way afterwards. A <b>filter</b> is the host saying 'here is today's headline, any corrections?': each caller gets the headline, may rewrite it, and hands it to the next caller, and the host reads out whatever comes back from the last one. If a caller keeps the headline and hands back nothing, the host reads out nothing." (That is Mistake 1, the filter that forgets to return: promise it.)</p>
+<p>Then the box on the board: <b>action = a moment, your function does something · filter = a value, your function returns it.</b> Then where hooks live until Module 5: "a must-use plugin, any PHP file in wp-content/mu-plugins/, loaded on every request without activation, before all plugins. You wrote a throwaway one in Lesson 1.2; today you write one that stays." And the prefix rule in one breath: everything you name, <code class="inline">pagesco_</code>.</p>
+</div>
+<div class="blk"><div class="h">Live demo (you type, they follow)</div>
+<p>Files in VS Code (<code class="inline">wordpress/wp-content/mu-plugins/</code> for must-use plugins, <code class="inline">wordpress/</code> for <code class="inline">wp eval-file</code> scripts), checks in the WP-CLI container or the browser's View Source. Outputs below come from the site at the end of Lesson 2.1; your debug.log time stamps differ.</p>
+<ol class="steps">
+  <li><b>Your first hook (3m).</b> "The question for every WordPress task from today: which hook, and is it an action or a filter?" Save the lesson's file in VS Code as <code class="inline">wordpress/wp-content/mu-plugins/pagesco-hello.php</code> (must-use plugins: Lesson 2.2's line 506), reload http://localhost:8080/hello-world/, View Source:
+<pre class="code"><span class="k">&lt;?php</span>
+<span class="c">/**
+ * Plugin Name: Pages &amp; Co. Hello Hooks
+ * Description: Lesson 2.3 demo: prints a line at the bottom of every page.
+ */</span>
+
+<span class="k">function</span> pagesco_hello_footer() {
+	<span class="k">echo</span> <span class="s">'&lt;p class="pagesco-hello"&gt;Hello from a hook!&lt;/p&gt;'</span>;
+}
+add_action( <span class="s">'wp_footer'</span>, <span class="s">'pagesco_hello_footer'</span> );</pre>
+<pre class="out">&lt;p class="pagesco-hello"&gt;Hello from a hook!&lt;/p&gt;</pre>
+Two lines do the work: the function says what, <code class="inline">add_action()</code> says when. The name is a string without parentheses: you are not calling it, you are telling WordPress what to call later. Ask: "why the pagesco_ prefix?" (One shared PHP program: Lesson 1.3.)</li>
+  <li><b>The order of one request (3m).</b> "The load order from before the break, logged by a request." Save the lesson's <code class="inline">pagesco-hook-order.php</code>, reload the post once, and read the new lines of debug.log (a second terminal: <code class="inline">tail -f wordpress/wp-content/debug.log</code>):
+<pre class="code"><span class="k">&lt;?php</span>
+<span class="c">/**
+ * Plugin Name: Pages &amp; Co. Hook Order
+ * Description: Lesson 2.3 demo: logs the order of the main actions of a front-end request.
+ */</span>
+
+<span class="v">$pagesco_hooks</span> = <span class="k">array</span>( <span class="s">'plugins_loaded'</span>, <span class="s">'after_setup_theme'</span>, <span class="s">'init'</span>, <span class="s">'wp_loaded'</span>, <span class="s">'template_redirect'</span>, <span class="s">'wp_head'</span>, <span class="s">'wp_footer'</span>, <span class="s">'shutdown'</span> );
+
+<span class="k">foreach</span> ( <span class="v">$pagesco_hooks</span> <span class="k">as</span> <span class="v">$pagesco_hook</span> ) {
+	add_action(
+		<span class="v">$pagesco_hook</span>,
+		<span class="k">function</span> () {
+			<span class="k">if</span> ( ! is_admin() &amp;&amp; ! wp_doing_cron() &amp;&amp; ! defined( <span class="s">'WP_CLI'</span> ) ) {
+				error_log( <span class="s">'hook order: '</span> . current_action() );
+			}
+		}
+	);
+}</pre>
+<pre class="out">[26-Oct-2026 14:08:26 UTC] hook order: plugins_loaded
+[26-Oct-2026 14:08:26 UTC] hook order: after_setup_theme
+[26-Oct-2026 14:08:26 UTC] hook order: init
+[26-Oct-2026 14:08:26 UTC] hook order: wp_loaded
+[26-Oct-2026 14:08:26 UTC] hook order: template_redirect
+[26-Oct-2026 14:08:26 UTC] hook order: wp_head
+[26-Oct-2026 14:08:26 UTC] hook order: wp_footer
+[26-Oct-2026 14:08:26 UTC] hook order: shutdown</pre>
+Same closure eight times; <code class="inline">current_action()</code> names the hook. Point at template_redirect: the query is done, nothing printed yet, the place for redirects (self-check Q8). Delete the file (<code class="inline">rm wp-content/mu-plugins/pagesco-hook-order.php</code>): a log line per request gets noisy fast.</li>
+  <li><b>A filter, from both sides (4m).</b> "A filter in core: the last line of get_the_title()."
+<pre class="code">grep -n "apply_filters( 'the_title'" wp-includes/post-template.php</pre>
+<pre class="out">174:	return apply_filters( 'the_title', $post_title, $post_id );</pre>
+Then append the lesson's separator filter to pagesco-hello.php and reload: the <code class="inline">&lt;title&gt;</code> in View Source.
+<pre class="code"><span class="k">function</span> pagesco_title_separator( <span class="v">$separator</span> ) {
+	<span class="k">return</span> <span class="s">'|'</span>;
+}
+add_filter( <span class="s">'document_title_separator'</span>, <span class="s">'pagesco_title_separator'</span> );</pre>
+<pre class="out">&lt;title&gt;Hello world! | Pages &amp;amp; Co.&lt;/title&gt;</pre>
+Then the signature on the_content (append it too); the post's content area, as text:
+<pre class="code"><span class="k">function</span> pagesco_content_signature( <span class="v">$content</span> ) {
+	<span class="k">return</span> <span class="v">$content</span> . <span class="s">'&lt;p class="pagesco-signature"&gt;Thanks for reading, from the Pages &amp;amp; Co. team.&lt;/p&gt;'</span>;
+}
+add_filter( <span class="s">'the_content'</span>, <span class="s">'pagesco_content_signature'</span> );</pre>
+<pre class="out">Welcome to WordPress. This is your first post. Edit or delete it, then start writing!
+Thanks for reading, from the Pages &amp; Co. team.</pre>
+"A filter takes the value and returns the value." Under the hood add_action() is one line: <code class="inline">return add_filter( ... );</code>.</li>
+  <li><b>Priorities and accepted arguments (4m).</b> "Who goes first?" Save the lesson's <code class="inline">wordpress/priorities.php</code>, ask for a prediction, <code class="inline">wp eval-file priorities.php</code>:
+<pre class="code"><span class="k">&lt;?php</span>
+add_filter( <span class="s">'pagesco_demo'</span>, <span class="k">fn</span>( <span class="v">$text</span> ) =&gt; <span class="v">$text</span> . <span class="s">' [priority 20]'</span>, <span class="s">20</span> );
+add_filter( <span class="s">'pagesco_demo'</span>, <span class="k">fn</span>( <span class="v">$text</span> ) =&gt; <span class="v">$text</span> . <span class="s">' [priority 5]'</span>, <span class="s">5</span> );
+add_filter( <span class="s">'pagesco_demo'</span>, <span class="k">fn</span>( <span class="v">$text</span> ) =&gt; <span class="v">$text</span> . <span class="s">' [default 10, added first]'</span> );
+add_filter( <span class="s">'pagesco_demo'</span>, <span class="k">fn</span>( <span class="v">$text</span> ) =&gt; <span class="v">$text</span> . <span class="s">' [default 10, added second]'</span> );
+
+<span class="k">echo</span> apply_filters( <span class="s">'pagesco_demo'</span>, <span class="s">'Start:'</span> ), <span class="s">"\n"</span>;</pre>
+<pre class="out">Start: [priority 5] [default 10, added first] [default 10, added second] [priority 20]</pre>
+Lower first; ties in the order added. Then <code class="inline">title-ids.php</code>: the_title passes two values, and <code class="inline">10, 2</code> asks for both.
+<pre class="code"><span class="k">&lt;?php</span>
+<span class="k">function</span> pagesco_title_with_id( <span class="v">$title</span>, <span class="v">$post_id</span> ) {
+	<span class="k">return</span> <span class="s">"{$title} (#{$post_id})"</span>;
+}
+add_filter( <span class="s">'the_title'</span>, <span class="s">'pagesco_title_with_id'</span>, <span class="s">10</span>, <span class="s">2</span> );
+
+<span class="k">echo</span> get_the_title( <span class="s">1</span> ), <span class="s">"\n"</span>;
+<span class="k">echo</span> get_the_title( <span class="s">2</span> ), <span class="s">"\n"</span>;</pre>
+<pre class="out">Hello world! (#1)
+Sample Page (#2)</pre>
+<code class="inline">rm priorities.php title-ids.php</code>.</li>
+  <li><b>Removing a hook, and asking the site (4m).</b> "Every page tells the world your exact version." Append the lesson's one line to pagesco-hello.php and count the generator tags from the container:
+<pre class="code">remove_action( 'wp_head', 'wp_generator' );
+
+curl -s http://localhost:8080/ | grep -c 'name="generator"'</pre>
+<pre class="out">0</pre>
+(grep -c exits with 1 when it counts zero: expected.) The three rules on the board: <b>same priority, after it was added, a handle on the callback</b>. Then ask the running site what is attached:
+<pre class="code">wp eval 'var_dump( has_action( "wp_head", "_wp_render_title_tag" ), has_filter( "the_content", "pagesco_content_signature" ), has_filter( "the_content", "no_such_function" ) );'</pre>
+<pre class="out">int(1)
+int(10)
+bool(false)</pre>
+A number is a priority, false is nothing attached; 0 is a valid priority, so compare with <code class="inline">false !==</code>.</li>
+  <li><b>Mistake 1: a filter that forgets to return (3m).</b> Save the lesson's <code class="inline">mistake-no-return.php</code> in mu-plugins/ and reload /hello-world/: the title is gone. From the container:
+<pre class="code">&lt;?php
+add_filter( 'the_title', function ( $title ) {
+	$title = strtoupper( $title );
+} );
+
+curl -s http://localhost:8080/hello-world/ | head -n 3
+curl -s http://localhost:8080/hello-world/ | grep -c 'wp-block-post-title'</pre>
+<pre class="out">Deprecated: str_replace(): Passing null to parameter #3 ($subject) of type array|string is deprecated in /var/www/html/wp-includes/formatting.php on line 5777
+&lt;!DOCTYPE html&gt;
+0</pre>
+The only message blames core (formatting.php, line 5777): your closure handed null to the next callback on the_title, core's capital_P_dangit() at 11. It sits above &lt;!DOCTYPE html&gt; because a block theme renders the template before the head. "When a notice blames core, look at what your code handed to it." <code class="inline">rm</code> the file.</li>
+  <li><b>Mistake 2: two arguments asked, one registered (2m).</b> Save <code class="inline">mistake-args.php</code> and reload /hello-world/. The page is replaced by the fatal error; read the first line from the left:
+<pre class="code"><span class="k">&lt;?php</span>
+add_filter( <span class="s">'the_title'</span>, <span class="k">function</span> ( <span class="v">$title</span>, <span class="v">$post_id</span> ) {
+	<span class="k">return</span> <span class="s">"{$title} (#{$post_id})"</span>;
+} );</pre>
+<pre class="out">Fatal error: Uncaught ArgumentCountError: Too few arguments to function {closure:/var/www/html/wp-content/mu-plugins/mistake-args.php:2}(), 1 passed in /var/www/html/wp-includes/class-wp-hook.php on line 355 and exactly 2 expected in /var/www/html/wp-content/mu-plugins/mistake-args.php:2</pre>
+Closure named after its file and line (PHP 8.4 and later; PHP 8.3 says only <code class="inline">{closure}</code>), 1 passed, exactly 2 expected. The stack trace below it (in the lesson) is the way back: WP_Hook, apply_filters( 'the_title' ), get_the_title(), the Post Title block. Fix: <code class="inline">10, 2</code>. <code class="inline">rm</code> the file.</li>
+  <li><b>Mistake 4: removing with the wrong priority (2m).</b> "The silent one." Save <code class="inline">mistake-remove.php</code> in the WordPress root and run it:
+<pre class="code"><span class="k">&lt;?php</span>
+var_dump( remove_action( <span class="s">'wp_head'</span>, <span class="s">'_wp_render_title_tag'</span> ) );
+var_dump( remove_action( <span class="s">'wp_head'</span>, <span class="s">'_wp_render_title_tag'</span>, <span class="s">1</span> ) );</pre>
+<pre class="out">bool(false)
+bool(true)</pre>
+False, then true: <code class="inline">_wp_render_title_tag</code> was added at 1. If nobody looks at the return value, the first line "just does not work". <code class="inline">rm mistake-remove.php</code> and the demo plugin pagesco-hello.php: the project starts clean. (Mistake 3, the typo in a callback name, is in the deck and the lesson: it takes the site and WP-CLI down, which is too much drama in front of the room right before the project.)</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b>Echoing in a filter</b> or returning nothing. Coach with the radio host: "What does the host read out if you hand back nothing?" Every path of a filter ends in <code class="inline">return</code>. (Self-check Q11, <code class="inline">debug_price_tag.php</code>.)</li>
+  <li><b>Calling instead of naming:</b> <code class="inline">add_action( 'wp_footer', pagesco_hello_footer() )</code>. The function runs immediately, while plugins load, and WordPress gets its return value (null) as the callback. Coach: "Are you calling it now, or telling WordPress what to call later?" Strings, no parentheses.</li>
+  <li><b>"My removal does nothing."</b> Wrong priority, too early, or a closure. Coach: <code class="inline">var_dump( remove_action( ... ) )</code> first, then the three rules on the board. (Self-check Q9, the lab's TODO 3.)</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<p><b>File:</b> <code class="inline">labs/module-03/l2_3-hooks/filter_chain_starter.php</code>; your reference is <code class="inline">labs/module-03/l2_3-hooks/filter_chain_solution.php</code>. It practices the three rules of a hook with several callbacks on a filter of the bookstore's own: the order (priorities), the values a callback receives (accepted arguments), and taking someone else's callback off (removal with the right priority), checked with has_filter().</p>
+<ul class="tick">
+  <li><b>Run it as shipped (2m).</b> <code class="inline">cp labs/module-03/l2_3-hooks/filter_chain_starter.php wordpress/</code> then <code class="inline">wp eval-file --use-include filter_chain_starter.php</code>:</li>
+</ul>
+<pre class="out">Removed the sale badge: TODO
+pagesco_lab_capitalize: TODO
+Line: fahrenheit 451 [SALE]</pre><ul class="tick">
+  <li><b>TODOs 1 and 2 (8m).</b> Capitalize at 5, the author at the default priority with <code class="inline">10, 2</code>. Circulate for the fatal ArgumentCountError (the demo's Mistake 2, now in their own file: read it from the left together) and for <code class="inline">ucwords</code> at a later priority than the author ("Fahrenheit 451 By Ray Bradbury": ask why By is capitalized).</li>
+  <li><b>TODOs 3 and 4 (6m).</b> <code class="inline">remove_filter()</code> without the 30 returns false and the badge stays: let them find it with var_export(). has_filter() after the removal returns false for the badge.</li>
+  <li><b>Expected when done:</b></li>
+</ul>
+<pre class="out">Removed the sale badge: true
+pagesco_lab_capitalize: 5
+pagesco_lab_add_author: 10
+pagesco_lab_sale_badge: false
+Line: Fahrenheit 451 by Ray Bradbury</pre><ul class="tick">
+  <li><b>Debrief (4m):</b> "Which line would you change if the theme had to add [SALE] after the author?" (Nothing in the theme: its priority 30 already runs after 10.) "What changes if TODO 1 is hooked at 20 instead of 5?" (ucwords then runs after the author was added and capitalizes it too: Fahrenheit 451 By Ray Bradbury.)</li>
+  <li><b>Fast finishers:</b> <code class="inline">labs/module-03/l2_3-hooks/hook_finder_starter.sh</code> (find hooks in core with exact grep patterns, then ask the site), the folder lab <code class="inline">labs/module-03/l2_3-hooks/title_parts_starter/</code> (a must-use plugin on document_title_parts; test with <code class="inline">labs/module-03/l2_3-hooks/test_title_parts.sh</code>), then <code class="inline">labs/module-03/l2_3-hooks/debug_price_tag.php</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Start the lesson project</div>
+<p>The lesson project is <b>The Pages &amp; Co. Store Notice</b>: <code class="inline">wordpress/wp-content/mu-plugins/pagesco-site.php</code>, a notice bar printed from wp_body_open that offers its own hooks (a filter for the text, two actions) and is extended from the outside. <b>This file stays for the rest of the course</b>: Session 4 and every later lesson start from a site that has it. In the room: Steps 1 to 3 (30 minutes).</p>
+<ul class="tick">
+  <li>Step 1 (8m): the plugin header and the notice on wp_body_open, escaped with <code class="inline">esc_html()</code>. Check: View Source, the <code class="inline">&lt;div class="pagesco-notice"&gt;</code> is the first thing inside <code class="inline">&lt;body&gt;</code>.</li>
+  <li>Step 2 (10m): replace the function with the version that offers <code class="inline">pagesco_store_notice</code>, <code class="inline">pagesco_before_store_notice</code> and <code class="inline">pagesco_store_notice_end</code>, each with its DocBlock. Nothing visible changes: "you are building the doors other code will use." Insist on typing the DocBlocks: hooks are a public API.</li>
+  <li>Step 3 (10m): be "another developer": the Thursday hours at priority 20, the events link inside the bar, and the generator removal moved in from the demo file.</li>
+  <li><b>Done in the room</b> = every page starts with <code class="inline">Free shipping on orders over $35. Open until 9 p.m. on Thursdays. See events</code>. Check two or three screens yourself; the rest check with <code class="inline">curl -s http://localhost:8080/ | grep -o '&lt;div class="pagesco-notice"&gt;.*&lt;/div&gt;'</code> in the container.</li>
+  <li><b>Goes home:</b> Step 4 (delete pagesco-hello.php, the has_action and grep checks) and the checklist, including "returning '' hides the bar" (try it, then remove the test). Anyone who did not reach Step 3 finishes it first: Session 4 checks for the full notice.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<p>Ask these out loud during the demo and the lab:</p>
+<ul class="tick">
+  <li>Banner at the top of every page, or excerpts shortened to 20 words: action or filter? <b>Answer:</b> an action (wp_body_open) for the banner, a filter (excerpt_length) for the number.</li>
+  <li>What does <code class="inline">add_action()</code> do with a function name that does not exist? <b>Answer:</b> nothing, until the hook fires; then a fatal TypeError. It stores a string.</li>
+  <li>Two callbacks at priority 10 on one hook: which runs first? <b>Answer:</b> the one added first.</li>
+  <li>Why does the project's filter for the Thursday hours use priority 20? <b>Answer:</b> to add to whatever earlier callbacks produced; a later one (99) could still change it, which is how a "quiet day" filter switches the bar off (the lesson's Exercise 1).</li>
+</ul>
+<p>Workbook self-check, items Q7 to Q12 (learners do them at the end of the block or at home).</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q7</b> <span data-sc="7"><code class="inline">XAb</code></span>; <b>Q8</b> <span data-sc="8">C) <code class="inline">template_redirect</code></span>; <b>Q9</b> <span data-sc="9">A) The plugin ran before the theme added the hook, so there was nothing to remove: remove it on init</span>; <b>Q10</b> <span data-sc="10"><code class="inline">int(9)</code>: do_blocks is attached to the_content at priority 9, before wpautop at 10</span>; <b>Q11</b> <span data-sc="11">A) Your callback does not return the title, so the next callback (core's, at priority 11) received null</span>; <b>Q12</b> <span data-sc="12">D) <code class="inline">do_action( 'pagesco_before_gift_form' );</code> with a DocBlock above it</span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> learners who freeze at an empty file get a card with the two-line pattern (<code class="inline">function pagesco_x() { ... }</code> / <code class="inline">add_action( 'hook', 'pagesco_x' );</code>) and the box from the board. In the project, pair a learner who struggles with the guided lab with one who finished it; the typing stays with the first.</p>
+<p><b>Stretch:</b> <code class="inline">hook_finder_starter.sh</code>, the title-parts folder lab and <code class="inline">debug_price_tag.php</code>; the lesson's Exercise 3 (every callback on the_content, in order) and Exercise 4 (the <code class="inline">all</code> hook counter); the Bonus Challenge (the body_class filter).</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Closing</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Exit ticket (3 questions, no notes, 4 minutes)</div>
+<p>Put the three questions on the slide. Learners answer in the workbook's Exit Ticket box or on a sticky note. Sort the notes before Session 4: question 3's pile tells you how much of the Checkpoint review to give to removing hooks.</p>
+<ol class="steps">
+  <li>Why should code change WordPress data through WordPress (functions or WP-CLI) and not with UPDATE or DELETE? <b>Answer:</b> there are no foreign keys, so WordPress's PHP does the cascading (meta, terms, revisions, comments); serialized values carry their lengths; and the API keeps caches and hooks in step.</li>
+  <li>Action or filter, and which hook: a banner at the very top of every page; the length of every excerpt. <b>Answer:</b> an action on wp_body_open; a filter on excerpt_length (return the number).</li>
+  <li><code class="inline">remove_action()</code> returns false and the hook keeps running. Name two possible reasons. <b>Answer:</b> a different priority than the one it was added with; called before the hook was added (too early); a different callback (a closure or another object).</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Homework (about 2 to 3 hours)</div>
+<ul class="tick">
+  <li><b>Finish both lesson projects.</b> The inventory: Step 3 (the PHP report) and Step 4 (the largest autoloaded options, <code class="inline">rm pagesco-inventory.php</code>, the final check). The store notice: Step 3 if it did not fit, Step 4 and the checklist. Afterwards <code class="inline">mu-plugins/</code> holds exactly <code class="inline">mailpit-smtp.php</code> and <code class="inline">pagesco-site.php</code>, and every page starts with the full notice.</li>
+  <li><b>Lesson exercises.</b> 2.2: Exercises 1 to 3 (the only comment, roles from the database, content without meta); Exercise 4 (SAVEQUERIES) is a stretch. 2.3: Exercises 1 to 3 (the quiet day, the login branding, who is on the_content); Exercise 4 (the <code class="inline">all</code> counter) is a stretch. Each exercise file is deleted afterwards.</li>
+  <li><b>Both Quick Quizzes</b> on the lesson pages (five questions each; answers in the Answer Key).</li>
+  <li><b>Journal:</b> both entries (2.2: your MySQL Foundations bookstore schema next to WordPress's tables; 2.3: a website you use, described as hooks).</li>
+  <li><b>Before the Next Lesson</b> (both lists): no demo or exercise files left in the WordPress root or mu-plugins/; the orphan query returns no rows; skim wp-includes/default-filters.php; read mailpit-smtp.php again and explain its two hooks.</li>
+  <li><b>Prepare for Checkpoint 1</b> (Session 4, 30 minutes, Modules 1 and 2: Lessons 1.1 to 2.3): reread the Key Takeaways of the six lessons and redo the self-checks of Sessions 1 to 3.</li>
+  <li><b>Optional:</b> <code class="inline">labs/module-03/l2_2-core-database/wpdb_report_starter.php</code>, <code class="inline">labs/module-03/l2_2-core-database/debug_meta_report.php</code>, <code class="inline">labs/module-03/l2_3-hooks/hook_finder_starter.sh</code>, the title-parts lab and <code class="inline">labs/module-03/l2_3-hooks/debug_price_tag.php</code> for anyone who did not reach them.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Bring list for Session 4</div>
+<ul class="tick">
+  <li>The course site at the end of Lesson 2.3 (the state Session 4's lessons start from): <code class="inline">wordpress/wp-content/mu-plugins/pagesco-site.php</code> in place, the full notice on every page, no generator tag, <code class="inline">mu-plugins/</code> holding only it and mailpit-smtp.php. Check: <code class="inline">curl -s http://localhost:8080/ | grep -o '&lt;div class="pagesco-notice"&gt;.*&lt;/div&gt;'</code> in the WP-CLI container.</li>
+  <li>The project folder with <code class="inline">labs/</code>; VS Code. Session 4 builds the pagesco block theme in <code class="inline">wordpress/wp-content/themes/</code> (Lessons 3.1 and 3.2) and holds Checkpoint 1.</li>
+  <li>Both journals, <code class="inline">pagesco-inventory.sql</code>, and the workbook.</li>
+</ul>
+</div>
+
+  <div class="sec"><h2>If You Run Long or Short</h2><span class="rule"></span></div>
+<div class="blk warn"><div class="h">Running long: what to protect and what to cut first</div>
+<ul class="tick">
+  <li><b>Protect:</b> the 2.3 project start; the 2.3 demo through removing a hook; the 2.2 demo through "every value is a string"; the 2.2 guided lab.</li>
+  <li><b>Cut first (saves 4m):</b> the 2.2 autoload step and the 2.3 Mistake 4 step.</li>
+  <li><b>Cut second (saves 15m):</b> the 2.2 project start: show the Step 1 query, send Steps 1 to 4 home; give the time to the 2.3 project.</li>
+  <li><b>Cut third (saves 5m):</b> the 2.2 lab's Steps 4 and 5 (the README's expected output shows them).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Running short: what to add</div>
+<ul class="tick">
+  <li>Lesson 2.2's Mistake 2 live (orphans): the DELETE, the LEFT JOIN that finds them, the multi-table DELETE that cleans up. It makes "write through the API" stick.</li>
+  <li>Lesson 2.3's Exercise 1 together (the quiet day at priority 99): it uses the hooks the project just built, from the outside.</li>
+  <li><code class="inline">debug_price_tag.php</code> for everyone, one bug per volunteer.</li>
+</ul>
+</div>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 3 · Facilitator Guide · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

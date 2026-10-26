@@ -1,0 +1,1768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Debugging and testing WordPress code on WordPress 7.1: WP_DEBUG and the debug log, error_log and backtraces, fatal errors and recovery mode, Query Monitor, PHPUnit integration tests with wp-env, and PHPCS with the WordPress Coding Standards, applied to the Pages &amp; Co. Books plugin. PHP and WordPress Development Lesson 8.1.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Debugging &amp; Testing - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 8: Professional Workflow</a></li>
+            <li aria-current="page">Lesson 8.1: Debugging &amp; Testing</li>
+        </ul>
+    </nav>
+
+    <main id="main-content" data-state="after:lesson_25">
+        <div class="container">
+            <header>
+                <h1>🧪 Lesson 8.1: Debugging &amp; Testing</h1>
+                <p class="lead">The Pages &amp; Co. plugin now has twenty features, three blocks, its own REST API, a supplier client and a nightly job. Every lesson so far checked its own work by hand, once. That stops scaling about now: a change to the supplier client could quietly break the daily sync, and nobody would click through every screen to notice. This lesson gives you the professional's two habits. When something goes wrong, find out why with evidence instead of guesses: the debug log, backtraces, recovery mode and Query Monitor. And before anything goes wrong, let machines check the code for you: PHPUnit tests that run the plugin inside a real WordPress, and PHPCS with the WordPress Coding Standards.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Configure <code>WP_DEBUG</code>, the debug log and error display for development and production, and keep the log private</li>
+                        <li>Trace a problem with <code>error_log()</code>, hooks such as <code>http_api_debug</code> and <code>doing_it_wrong_run</code>, and <code>wp_debug_backtrace_summary()</code></li>
+                        <li>Recover from a fatal error with recovery mode and WP-CLI's <code>--skip-plugins</code>, and use Query Monitor to look inside a request</li>
+                        <li>Write PHPUnit integration tests with <code>WP_UnitTestCase</code>, factories and <code>pre_http_request</code>, and run them in a wp-env test environment</li>
+                        <li>Set up PHPCS with the WordPress Coding Standards for a plugin, fix what it finds, and justify the exceptions with a ruleset or <code>phpcs:ignore</code></li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 150 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_25.html">Lesson 7.3: External APIs, Transients &amp; WP-Cron</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> a lint and test setup for <code>pagesco-books</code>: Composer dev dependencies and scripts, a <code>phpcs.xml.dist</code> ruleset with a clean run, a <code>.wp-env.json</code> test environment, and twelve PHPUnit tests for the shortcode, the books route, the supplier client and the daily sync</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5, with PHPUnit 9.6 (what the WordPress 7.1 test library supports), WPCS 3.4 and PHPCS 3.13</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 7.3, the WP-CLI container, Docker for the <code>composer:2</code> image, and Node.js 22.13 or newer for <code>npx @wordpress/env</code>; an internet connection for Query Monitor and the Composer packages</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#toolbox" class="toc-link">The Debugging Toolbox</a></li>
+                        <li><a href="#fatal" class="toc-link">When the Site Goes Down</a></li>
+                        <li><a href="#query-monitor" class="toc-link">Query Monitor</a></li>
+                        <li><a href="#testing" class="toc-link">Automated Tests in WordPress</a></li>
+                        <li><a href="#phpcs" class="toc-link">Coding Standards with PHPCS</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Lint and Test the Plugin</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="toolbox" class="lesson-section">
+                <h2>🔦 The Debugging Toolbox</h2>
+                <p>Debugging is detective work: a symptom ("the Supplier column says not reachable"), a list of suspects, and evidence that rules them out one by one. The worst habit is changing code until the symptom disappears; the best is making the program tell you what it is doing. Since Lesson 1.2 your site has had WordPress's debug settings on. Here is what each one does, and what your site has (from the WP-CLI container):</p>
+                <pre data-cli><code class="language-bash">wp eval 'foreach ( array( "WP_DEBUG", "WP_DEBUG_LOG", "WP_DEBUG_DISPLAY", "SCRIPT_DEBUG" ) as $name ) { printf( "%-17s %s\n", $name, var_export( constant( $name ), true ) ); } printf( "%-17s %s\n%-17s %s\n", "environment", wp_get_environment_type(), "error_log", ini_get( "error_log" ) );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>WP_DEBUG          true
+WP_DEBUG_LOG      true
+WP_DEBUG_DISPLAY  true
+SCRIPT_DEBUG      true
+environment       local
+error_log         /var/www/html/wp-content/debug.log</code></pre>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Constant</th><th>Does</th><th>Local</th><th>Production</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>WP_DEBUG</code></td><td>reports all PHP errors, notices and deprecations, plus WordPress's "called incorrectly" and "deprecated" notices</td><td><code>true</code></td><td><code>false</code> (or <code>true</code> with display off, to log)</td></tr>
+                            <tr><td><code>WP_DEBUG_LOG</code></td><td><code>true</code>: write them to <code>wp-content/debug.log</code>; a path: write them there</td><td><code>true</code></td><td>a path outside the web root, if you log at all</td></tr>
+                            <tr><td><code>WP_DEBUG_DISPLAY</code></td><td>print them into the page (<code>display_errors</code>)</td><td><code>true</code></td><td><code>false</code>, always</td></tr>
+                            <tr><td><code>SCRIPT_DEBUG</code></td><td>load core's unminified JavaScript and CSS (readable stack traces in the browser)</td><td><code>true</code></td><td><code>false</code></td></tr>
+                            <tr><td><code>WP_ENVIRONMENT_TYPE</code></td><td><code>local</code>, <code>development</code>, <code>staging</code> or <code>production</code>; read with <code>wp_get_environment_type()</code></td><td><code>local</code></td><td><code>production</code> (the default)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p><code>WP_DEBUG_DISPLAY</code> prints errors into pages, which helps you and harms visitors: messages break layouts and JSON, and they reveal file paths and code to anyone. On a live site errors go to a log only, if anywhere (Lesson 8.4 sets that up), and Common Mistake 1 shows why the default log location needs care.</p>
+
+                <h3>A case: "Supplier not reachable"</h3>
+                <p>A colleague edits <code>wp-config.php</code> and, a few minutes later, the Books screen says the supplier is not reachable. Reproduce the situation (a one-character typo in the key) and look:</p>
+                <pre data-cli><code class="language-bash">wp config set PAGESCO_BOOKS_SUPPLIER_KEY 'sandbox-7f3a9d'
+wp transient delete pagesco_books_supplier_availability</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Updated the constant 'PAGESCO_BOOKS_SUPPLIER_KEY' in the 'wp-config.php' file with the value 'sandbox-7f3a9d'.
+Success: Transient deleted.</code></pre>
+                </div>
+                <pre data-web="/wp-admin/edit.php?post_type=book&amp;orderby=title&amp;order=asc" data-login="maria" data-select="td.column-pagesco_supplier" data-text><code class="language-text">http://localhost:8080/wp-admin/edit.php?post_type=book&amp;orderby=title&amp;order=asc   (the first Supplier cell)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Supplier not reachable</code></pre>
+                </div>
+                <p><strong>Evidence 1: what the code already recorded.</strong> Lesson 7.3's <code>Availability</code> stores the error message in its transient, which is exactly the place to look first:</p>
+                <pre data-cli><code class="language-bash">wp eval 'echo get_transient( "pagesco_books_supplier_availability" )["error"], "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>The supplier answered 401: Send a valid API key in the X-Api-Key header.</code></pre>
+                </div>
+                <p>A 401: the supplier did not accept the key. When the stored message is not enough, make the code talk. <code>error_log()</code> writes a line to the debug log (with <code>WP_DEBUG_LOG</code> on); <code>wp_json_encode()</code> or <code>print_r( $value, true )</code> turn arrays into text for it. A temporary must-use plugin that logs every outgoing HTTP request with the <code>http_api_debug</code> action from Lesson 7.3:</p>
+                <pre data-file="wp-content/mu-plugins/pagesco-debug-http.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Pages &amp; Co. Debug: HTTP requests (temporary)
+ */
+
+add_action(
+	'http_api_debug',
+	function ( $response, $context, $transport, $args, $url ) {
+		$key = $args['headers']['X-Api-Key'] ?? '';
+		error_log(
+			sprintf(
+				'HTTP %s %s, key %s, answer %s',
+				$args['method'],
+				strtok( $url, '?' ),
+				'' === $key ? 'none' : substr( $key, 0, 8 ) . '…',
+				is_wp_error( $response ) ? $response-&gt;get_error_message() : wp_remote_retrieve_response_code( $response )
+			)
+		);
+	},
+	10,
+	5
+);</code></pre>
+                <p>Notice what it does <em>not</em> log: the whole key. A log is read by more people, and lives longer, than the code that wrote it; the first eight characters are enough to compare. Open the Books screen again (the failure is cached for five minutes, so delete the transient first) and read what the request added to <code>debug.log</code>:</p>
+                <pre data-cli><code class="language-bash">wp transient delete pagesco_books_supplier_availability</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Transient deleted.</code></pre>
+                </div>
+                <pre data-web="/wp-admin/edit.php?post_type=book" data-login="maria" data-log><code class="language-text">http://localhost:8080/wp-admin/edit.php?post_type=book   (then: tail wordpress/wp-content/debug.log)</code></pre>
+                <div class="card card-output">
+                    <h4>Output (the new lines of wp-content/debug.log)</h4>
+                    <pre><code>[26-Oct-2026 04:36:30 UTC] HTTP GET http://localhost:8080/supplier-sandbox/v1/availability, key sandbox-…, answer 401</code></pre>
+                </div>
+                <p>Right URL, a key is sent, the supplier answers 401: so the key is wrong, not the address, the network or the code. <code>wp config get</code> shows it, and the fix is one command. Then remove the temporary plugin: debugging code that stays becomes noise (and a slow leak of information).</p>
+                <pre data-cli><code class="language-bash">wp config get PAGESCO_BOOKS_SUPPLIER_KEY
+wp config set PAGESCO_BOOKS_SUPPLIER_KEY 'sandbox-7f3a9c'
+rm wp-content/mu-plugins/pagesco-debug-http.php
+wp eval 'echo PagesCo\Books\Plugin::instance()-&gt;feature( PagesCo\Books\Supplier\Availability::class )-&gt;refresh()["error"] ?: "no error", "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>sandbox-7f3a9d
+Success: Updated the constant 'PAGESCO_BOOKS_SUPPLIER_KEY' in the 'wp-config.php' file with the value 'sandbox-7f3a9c'.
+no error</code></pre>
+                </div>
+
+                <h3>Who called that? Backtraces</h3>
+                <p>WordPress's "called incorrectly" notices (Lessons 4.1, 4.3, 7.2) name the function that was misused, but not the code that misused it, which on a site with thirty plugins is the real question. The notice fires the action <code>doing_it_wrong_run</code> first, and <code>wp_debug_backtrace_summary()</code> turns the call stack into one line. A plugin that asks a conditional tag too early, and a temporary helper that logs who did it:</p>
+                <pre data-file="wp-content/mu-plugins/pagesco-too-early.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Too Early (a mistake to find)
+ */
+
+if ( is_search() ) {
+	remove_action( 'wp_head', 'wp_generator' );
+}</code></pre>
+                <pre data-file="wp-content/mu-plugins/0-pagesco-debug-backtrace.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Pages &amp; Co. Debug: who did it wrong? (temporary)
+ */
+
+add_action(
+	'doing_it_wrong_run',
+	function ( $function_name ) {
+		error_log( "$function_name called incorrectly. Call stack: " . wp_debug_backtrace_summary() );
+	}
+);</code></pre>
+                <p>The helper's file name starts with <code>0-</code> so that it loads before the other must-use plugins (they load in alphabetical order, Lesson 2.3): a hook added later would miss the notice. One request to the site:</p>
+                <pre data-web="/about/" data-log data-raises="doing_it_wrong"><code class="language-text">http://localhost:8080/about/   (then the new lines of debug.log)</code></pre>
+                <div class="card card-output">
+                    <h4>Output (the new lines of wp-content/debug.log)</h4>
+                    <pre><code>[26-Oct-2026 04:36:30 UTC] is_search called incorrectly. Call stack: require('wp-blog-header.php'), require_once('wp-load.php'), require_once('wp-config.php'), require_once('wp-settings.php'), include_once('/mu-plugins/pagesco-too-early.php'), is_search, _doing_it_wrong, do_action('doing_it_wrong_run'), WP_Hook-&gt;do_action, WP_Hook-&gt;apply_filters, {closure:/var/www/html/wp-content/mu-plugins/0-pagesco-debug-backtrace.php:8}
+[26-Oct-2026 04:36:30 UTC] PHP Notice:  Function is_search was called &lt;strong&gt;incorrectly&lt;/strong&gt;. Conditional query tags do not work before the query is run. Before then, they always return false. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 3.1.0.) in /var/www/html/wp-includes/functions.php on line 6260</code></pre>
+                </div>
+                <p>The first line is the evidence. Read the stack from the outermost call inward: WordPress loading, then <code>include_once('/mu-plugins/pagesco-too-early.php')</code> (paths are shortened, relative to <code>wp-content</code>), then <code>is_search</code>, <code>_doing_it_wrong</code>, and finally our own logging closure. The include names the file that asked too early. Remove both files:</p>
+                <pre data-cli><code class="language-bash">rm wp-content/mu-plugins/pagesco-too-early.php wp-content/mu-plugins/0-pagesco-debug-backtrace.php</code></pre>
+                <div class="card card-info">
+                    <h4>💡 Step debugging with Xdebug</h4>
+                    <p>Logging is the tool that works everywhere, including on a server you only reach over SSH. On your own machine, a step debugger is the other half: with the Xdebug extension and VS Code's PHP Debug extension you set a breakpoint in <code>Client::decode()</code>, load the Books screen, and inspect every variable line by line. The course's <code>wordpress:7.1-php8.5-apache</code> image does not include Xdebug; adding it means a small custom image (<code>pecl install xdebug</code>) and a port for the debugger. Worth an afternoon when you work on complex code; this lesson stays with tools you already have.</p>
+                </div>
+            </section>
+
+            <section id="fatal" class="lesson-section">
+                <h2>💥 When the Site Goes Down</h2>
+                <p>A fatal error stops PHP, and with it the page. Since WordPress 5.2, a <strong>fatal error handler</strong> catches it: visitors see "There has been a critical error on this website." instead of a blank page, and if the error came from a plugin or theme, WordPress emails the site's admin address a <strong>recovery mode</strong> link that logs in with that plugin paused, so you can reach the admin and deactivate it. To see it, a plugin that crashes on every request (the function it calls does not exist). Create <code>wordpress/wp-content/plugins/pagesco-crash/pagesco-crash.php</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-crash/pagesco-crash.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Pages &amp; Co. Crash Test
+ */
+
+add_action( 'init', 'pagesco_crash_test' );
+
+function pagesco_crash_test() {
+	pagesco_crash_missing_function();
+}</code></pre>
+                <p>WordPress activates plugins in a sandbox that refuses one that crashes while it is loading, but this one only crashes later, on <code>init</code>, so activation succeeds. Then the login page, which counts as a "protected" page where WordPress sends the recovery email:</p>
+                <pre data-cli><code class="language-bash">wp plugin activate pagesco-crash</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Plugin 'pagesco-crash' activated.
+Success: Activated 1 of 1 plugins.</code></pre>
+                </div>
+                <pre data-web="/wp-login.php" data-raises="Fatal error"><code class="language-text">http://localhost:8080/wp-login.php</code></pre>
+                <div class="card card-output">
+                    <h4>Error</h4>
+                    <pre><code>Fatal error: Uncaught Error: Call to undefined function pagesco_crash_missing_function() in /var/www/html/wp-content/plugins/pagesco-crash/pagesco-crash.php:9
+Stack trace:
+#0 /var/www/html/wp-includes/class-wp-hook.php(353): pagesco_crash_test('')
+#1 /var/www/html/wp-includes/class-wp-hook.php(377): WP_Hook-&gt;apply_filters(NULL, Array)
+#2 /var/www/html/wp-includes/plugin.php(523): WP_Hook-&gt;do_action(Array)
+#3 /var/www/html/wp-settings.php(779): do_action('init')
+#4 /var/www/html/wp-config.php(142): require_once('/var/www/html/w...')
+#5 /var/www/html/wp-load.php(50): require_once('/var/www/html/w...')
+#6 /var/www/html/wp-login.php(12): require('/var/www/html/w...')
+#7 {main}
+  thrown in /var/www/html/wp-content/plugins/pagesco-crash/pagesco-crash.php on line 9</code></pre>
+                </div>
+                <p>The browser shows PHP's own message, because <code>WP_DEBUG_DISPLAY</code> printed it before the handler could send its page; on a live site with display off, visitors get only the critical-error page, with status 500. The admin's inbox, in Mailpit (<code>http://localhost:8025</code>):</p>
+                <pre data-mail><code class="language-text">Mailpit: the newest message</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>From: WordPress &lt;wordpress@example.com&gt;
+To: wordpress@example.com
+Subject: [Pages &amp; Co.] Your Site is Experiencing a Technical Issue
+
+Howdy!
+
+WordPress has a built-in feature that detects when a plugin or theme causes a fatal error on your site, and notifies you with this automated email.
+
+In this case, WordPress caught an error with one of your plugins, Pages &amp; Co. Crash Test.
+
+First, visit your website (http://localhost:8080/) and check for any visible issues. Next, visit the page where the error was caught (http://localhost:8080/wp-login.php) and check for any visible issues.
+
+Please contact your host for assistance with investigating this issue further.
+
+If your site appears broken and you can't access your dashboard normally, WordPress now has a special "recovery mode". This lets you safely login to your dashboard and investigate further.
+
+...
+
+To keep your site safe, this link will expire in 1 day. Don't worry about that, though: a new link will be emailed to you if the error occurs again after it expires.
+
+When seeking help with this issue, you may be asked for some of the following information:
+WordPress version 7.1.3
+Active theme: Pages &amp;amp; Co. (version 1.0.0)
+Current plugin: Pages &amp; Co. Crash Test (version )
+...
+
+
+
+Error Details
+=============
+An error of type E_ERROR was caused in line 9 of the file /var/www/html/wp-content/plugins/pagesco-crash/pagesco-crash.php. Error message: Uncaught Error: Call to undefined function pagesco_crash_missing_function() in /var/www/html/wp-content/plugins/pagesco-crash/pagesco-crash.php:9
+Stack trace:
+#0 /var/www/html/wp-includes/class-wp-hook.php(353): pagesco_crash_test('')
+#1 /var/www/html/wp-includes/class-wp-hook.php(377): WP_Hook-&gt;apply_filters(NULL, Array)
+#2 /var/www/html/wp-includes/plugin.php(523): WP_Hook-&gt;do_action(Array)
+#3 /var/www/html/wp-settings.php(779): do_action('init')
+#4 /var/www/html/wp-config.php(142): require_once('/var/www/html/w...')
+#5 /var/www/html/wp-load.php(50): require_once('/var/www/html/w...')
+#6 /var/www/html/wp-login.php(12): require('/var/www/html/w...')
+#7 {main}
+  thrown</code></pre>
+                </div>
+                <p>The email names the plugin, the file and line, and carries the recovery link (the <code>...</code> line in the card: <code>http://localhost:8080/wp-login.php?action=enter_recovery_mode&amp;rm_token=…&amp;rm_key=…</code>, different every time; the other <code>...</code> is the PHP version, 8.5.12 on the course's site). The link is valid for one day, and the email is sent at most once a day per error. Whoever has the link and the admin's password can log in with "Pages &amp; Co. Crash Test" paused and deactivate it on the Plugins screen. WP-CLI is no way out at first, because it loads the same plugins as every request:</p>
+                <pre data-cli data-raises="Fatal error,Error"><code class="language-bash">wp plugin deactivate pagesco-crash</code></pre>
+                <div class="card card-output">
+                    <h4>Error</h4>
+                    <pre><code>Fatal error: Uncaught Error: Call to undefined function pagesco_crash_missing_function() in /var/www/html/wp-content/plugins/pagesco-crash/pagesco-crash.php:9
+Stack trace:
+#0 /var/www/html/wp-includes/class-wp-hook.php(353): pagesco_crash_test('')
+#1 /var/www/html/wp-includes/class-wp-hook.php(377): WP_Hook-&gt;apply_filters(NULL, Array)
+#2 /var/www/html/wp-includes/plugin.php(523): WP_Hook-&gt;do_action(Array)
+#3 /var/www/html/wp-settings.php(779): do_action('init')
+...
+  thrown in /var/www/html/wp-content/plugins/pagesco-crash/pagesco-crash.php on line 9
+Error: There has been a critical error on this website.Learn more about troubleshooting WordPress. There has been a critical error on this website.</code></pre>
+                </div>
+                <p>The fatal error (the <code>...</code> line stands for WP-CLI's own stack frames, trimmed), then WP-CLI's <code>Error:</code> line with the handler's visitor message. But <code>--skip-plugins</code> loads WordPress without the named plugins, so the command runs although the plugin is broken:</p>
+                <pre data-cli><code class="language-bash">wp --skip-plugins=pagesco-crash plugin deactivate pagesco-crash
+wp plugin delete pagesco-crash
+wp option delete recovery_mode_email_last_sent recovery_keys</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Plugin 'pagesco-crash' deactivated.
+Success: Deactivated 1 of 1 plugins.
+Deleted 'pagesco-crash' plugin.
+Success: Deleted 1 of 1 plugins.
+Success: Deleted 'recovery_mode_email_last_sent' option.
+Success: Deleted 'recovery_keys' option.</code></pre>
+                </div>
+                <p>(The last command removes the two options recovery mode left behind, so the next test sends a fresh email.) When even that fails, for example after a fatal error in a must-use plugin, which recovery mode cannot pause (Lesson 2.3), rename or move the file: WordPress cannot load what is not there.</p>
+            </section>
+
+            <section id="query-monitor" class="lesson-section">
+                <h2>🔍 Query Monitor</h2>
+                <p>The free <a href="https://wordpress.org/plugins/query-monitor/" target="_blank" rel="noopener">Query Monitor</a> plugin (by John Blackbourn) is the developer tools panel for WordPress: for every page an administrator views, it shows the database queries and which code ran them, PHP errors, hooks and their callbacks, enqueued scripts and styles, HTTP API calls, transients that were set, capability checks, the template and the conditionals. Lessons 2.2 and 2.3 promised it. It is optional for this course (nothing later depends on it) and needs an internet connection to install:</p>
+                <pre data-cli><code class="language-bash">wp plugin install query-monitor --activate</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your version number may differ)</h4>
+                    <pre><code>Installing Query Monitor (4.0.7)
+Downloading installation package from https://downloads.wordpress.org/plugin/query-monitor.4.0.7.zip...
+Unpacking the package...
+Installing the plugin...
+Plugin installed successfully.
+Activating 'query-monitor'...
+Plugin 'query-monitor' activated.
+Success: Installed 1 of 1 plugins.</code></pre>
+                </div>
+                <p>Log in as admin, delete the supplier's transient (<code>wp transient delete pagesco_books_supplier_availability</code>) and open the Books screen. The toolbar gains an entry with the page's generation time, memory, database time and query count; click it, then <strong>HTTP API Calls</strong>:</p>
+                <figure>
+                    <img src="images/lesson_26_query_monitor.png" alt="The Books screen of the WordPress admin with the Query Monitor panel open at HTTP API Calls: one GET request to http://localhost:8080/supplier-sandbox/v1/availability with the shop's ISBNs, flagged in red as Request to a non-HTTPS URL. The toolbar shows 0.05s, 5.1MB, 0.01s and 41Q." width="1100" height="760" loading="lazy">
+                    <figcaption>Query Monitor 4.0 on the Books screen: the supplier request from Lesson 7.3, and a warning that it is not HTTPS (true for the sandbox, never acceptable for the real supplier).</figcaption>
+                </figure>
+                <p>Panels worth knowing: <strong>Database Queries</strong> (with the caller of each query: the first stop when a page is slow, Lesson 8.2), <strong>Hooks &amp; Actions</strong> (what is attached where, the live version of Lesson 2.3's <code>$wp_filter</code>), <strong>Transient Updates</strong>, <strong>Capability Checks</strong> and <strong>Logs</strong>, which shows messages you send with <code>do_action( 'qm/debug', $value )</code> (also <code>qm/info</code>, <code>qm/warning</code>, <code>qm/error</code>): logging into the panel instead of a file. Query Monitor only shows itself to administrators. Even so, it is a development tool: on production, install it briefly to investigate, then remove it. Remove it now:</p>
+                <pre data-cli><code class="language-bash">wp plugin uninstall query-monitor --deactivate
+test -L wp-content/db.php &amp;&amp; echo "left behind: wp-content/db.php -&gt; $(readlink wp-content/db.php)"
+rm wp-content/db.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Deactivating 'query-monitor'...
+Plugin 'query-monitor' deactivated.
+Uninstalled and deleted 'query-monitor' plugin.
+Success: Uninstalled 1 of 1 plugins.
+left behind: wp-content/db.php -&gt; /var/www/html/wp-content/plugins/query-monitor/wp-content/db.php</code></pre>
+                </div>
+                <p>Query Monitor installs a <code>db.php</code> drop-in (Lesson 2.2) as a symbolic link, to see every query with its caller; uninstalling it with WP-CLI left the link behind, pointing nowhere. WordPress ignores a broken link, but a stray drop-in is the kind of thing that confuses the next person: remove it.</p>
+            </section>
+
+            <section id="testing" class="lesson-section">
+                <h2>🤖 Automated Tests in WordPress</h2>
+                <p>An automated test is code that runs your code and checks the result: "the shortcode for a published book contains its price", "a 503 from the supplier becomes a <code>WP_Error</code>". You write it once and run it hundreds of times, after every change, in seconds, and it never forgets a case. Two kinds matter here:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Kind</th><th>Runs</th><th>Good for</th><th>Tools</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><strong>Unit test</strong></td><td>one function or class, without WordPress (WordPress functions replaced by fakes)</td><td>pure logic: calculations, parsing</td><td>PHPUnit, plus Brain Monkey or WP_Mock for the fakes</td></tr>
+                            <tr><td><strong>Integration test</strong></td><td>your code inside a real, freshly installed WordPress with a test database</td><td>code that uses WordPress: posts, meta, REST routes, cron, options</td><td>PHPUnit with WordPress's own test library: <code>WP_UnitTestCase</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Almost everything the plugin does talks to WordPress, so this lesson writes integration tests, the way WordPress tests itself (core has tens of thousands). The test library is the <code>tests/phpunit</code> folder of the <code>wordpress-develop</code> repository, and <code>WP_UnitTestCase</code> gives every test:</p>
+                <ul>
+                    <li><strong>A clean database per test.</strong> Each test runs in a database transaction that is rolled back afterwards: a book one test creates never exists in the next. Hooks you add in a test are removed after it, too.</li>
+                    <li><strong>Factories</strong> to create data in one line: <code>self::factory()-&gt;post-&gt;create( array( 'post_type' =&gt; 'book' ) )</code>, <code>-&gt;term</code>, <code>-&gt;user</code>, <code>-&gt;comment</code>.</li>
+                    <li><strong>WordPress assertions</strong> on top of PHPUnit's: <code>assertWPError()</code>, <code>assertQueryTrue()</code>, <code>assertEqualSets()</code>.</li>
+                </ul>
+                <p>And one rule: <strong>tests never use the network.</strong> A test that calls the real supplier fails when the supplier is down and passes when your code is broken. The <code>pre_http_request</code> filter (Lesson 7.3) answers in place of the network, so a test decides exactly what "the supplier" says, including the bad days that are hard to produce on purpose:</p>
+                <pre data-norun><code class="language-php">add_filter(
+	'pre_http_request',
+	fn() =&gt; array(
+		'headers'  =&gt; array(),
+		'body'     =&gt; '&lt;h1&gt;Service Unavailable&lt;/h1&gt;',
+		'response' =&gt; array( 'code' =&gt; 503, 'message' =&gt; 'Service Unavailable' ),
+		'cookies'  =&gt; array(),
+		'filename' =&gt; null,
+	)
+);</code></pre>
+
+                <div class="mermaid">
+graph TD
+    A["npx @wordpress/env run cli ... vendor/bin/phpunit"] --> B["tests/bootstrap.php"]
+    B --> C["WordPress test library installs WordPress in the test database"]
+    C --> D["your plugin loads on muplugins_loaded"]
+    D --> E["each test: transaction, factories, assertions, rollback"]
+    E --> F["OK, or a list of failures"]
+                </div>
+
+                <h3>Where the tests run: a wp-env test environment</h3>
+                <p>The tests need PHP, a database they may wipe, and the test library for exactly your WordPress version. <strong>wp-env</strong> (<code>npx @wordpress/env</code>, Lesson 1.2) provides all three: its containers include the test library at <code>/wordpress-phpunit</code> (the <code>WP_TESTS_DIR</code> variable points there) and Composer. Version 12 of wp-env asks you to keep tests in an environment of their own (the old automatic "tests environment" is deprecated, and <code>"testsEnvironment": false</code> switches it off), and that is a good idea anyway: the test library <strong>reinstalls the database</strong> of the environment it runs in. So the plugin gets its own small wp-env site on port 8889, used only for tests, while your real site stays on the Docker setup from Lesson 1.2. (If you work in wp-env on port 8888 instead, that site is a different environment and is not touched either.)</p>
+                <div class="card card-info">
+                    <h4>🧩 Version note: PHPUnit versions</h4>
+                    <p>The WordPress 7.1 test library supports PHPUnit up to 9.x (with the Yoast PHPUnit Polyfills 1.1 or newer), not PHPUnit 10 or later. So the plugin requires <code>phpunit/phpunit ^9.6</code> and runs its own copy, <code>vendor/bin/phpunit</code>. The wp-env container also has a global <code>phpunit</code> 10.5, which does not work with the library (Common Mistake 2). wp-env 12 needs Node.js 22.13 or newer.</p>
+                </div>
+            </section>
+
+            <section id="phpcs" class="lesson-section">
+                <h2>📏 Coding Standards with PHPCS</h2>
+                <p>Lesson 1.3 introduced the WordPress Coding Standards (WPCS) and ran PHPCS once, in a throwaway practice folder that was deleted afterwards. Now it becomes part of the plugin: installed as a development dependency, configured in a ruleset file that lives with the code, and run with one command by everyone who works on it, and later by a CI service on every push. PHPCS reads code without running it, so it catches what tests rarely do: output that is not escaped, input that is not sanitized or nonce-checked, SQL that is not prepared, strings with the wrong text domain, names without the prefix, and layout that differs from the rest of WordPress. The <code>WordPress</code> standard combines <code>WordPress-Core</code> (layout), <code>WordPress-Docs</code> (DocBlocks) and <code>WordPress-Extra</code> (security, i18n, database and other best practices).</p>
+                <p>A ruleset, <code>phpcs.xml.dist</code>, tells PHPCS what to check and how. Three kinds of entries do most of the work:</p>
+                <ul>
+                    <li><strong>Configuration</strong> the standard needs from you: the plugin's text domain, its prefixes, the oldest WordPress version it supports. Without prefixes, the prefix rule cannot check anything.</li>
+                    <li><strong>Scope</strong>: which files (<code>vendor/</code>, <code>node_modules/</code> and <code>build/</code> are other people's or generated).</li>
+                    <li><strong>Documented exceptions</strong>: a rule that does not fit a deliberate decision is excluded for those files, with a comment that says why. A single line that is right despite the rule gets a <code>// phpcs:ignore Rule.Name -- reason</code> comment instead (Lesson 1.3 showed one).</li>
+                </ul>
+                <p>Exceptions are not a way to make the report quiet. Each one is a decision someone can read and disagree with in a code review; "ignore everything in this file" without a reason is the opposite. The project goes through the plugin's first real report and sorts every finding into one of three piles: fix it, fix it automatically, or document why it is right.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <h3>1. A debug log anyone can download</h3>
+                <p><code>WP_DEBUG_LOG</code> set to <code>true</code> writes to <code>wp-content/debug.log</code>, inside the web root. From the WP-CLI container, ask for it like a stranger would:</p>
+                <pre data-cli><code class="language-bash">curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/wp-content/debug.log
+curl -s http://localhost:8080/wp-content/debug.log | grep -c 'PHP '</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your count will differ)</h4>
+                    <pre><code>200
+27</code></pre>
+                </div>
+                <p><strong>What it means:</strong> <code>200</code>: the whole log, with every warning, file path and anything a developer ever <code>error_log()</code>ged, is a download for anyone who guesses the most famous file name in WordPress, and bots try it on every site. Locally it does not matter; on a server it does. <strong>Fix:</strong> on any server, give the log a path outside the web root (<code>define( 'WP_DEBUG_LOG', '/home/pagesco/logs/wordpress.log' );</code>), or turn logging off; block <code>.log</code> files in the web server as a second line of defense; and never log secrets (the debugging case above logged eight characters of the key, not the key). Lesson 8.4 configures the live site.</p>
+
+                <h3>2. Running the tests with the wrong PHPUnit</h3>
+                <p>The wp-env container has a global <code>phpunit</code>, so typing just <code>phpunit</code> seems natural (recorded on the project's test environment, trimmed; <code>/home/you</code> stands for your own home folder, which wp-env maps into the container):</p>
+                <pre data-norun><code class="language-bash">npx @wordpress/env run cli --env-cwd=wp-content/plugins/pagesco-books phpunit</code></pre>
+                <div class="card card-output">
+                    <h4>Error</h4>
+                    <pre><code>ℹ Starting 'phpunit' on the cli container.
+
+Installing...
+Running as single site... To run multisite, use -c tests/phpunit/multisite.xml
+...
+
+An error occurred inside PHPUnit.
+
+Message:  Call to undefined method PHPUnit\Framework\TestSuite::empty()
+Location: /home/you/.composer/vendor/phpunit/phpunit/src/TextUI/Configuration/Xml/TestSuiteMapper.php:48
+...
+✖ Command failed with exit code 255</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the global PHPUnit (10.5) started, then met the plugin's autoloader with PHPUnit 9 classes and the WordPress test library written for 9: two versions of the same classes in one process. <strong>Fix:</strong> always run the project's own copy, <code>vendor/bin/phpunit</code> (or <code>composer test</code>), whose version the plugin's <code>composer.json</code> pins.</p>
+
+                <h3>3. Pointing the tests at a site you care about</h3>
+                <p>The test library prints <code>Installing...</code> for a reason: it drops and recreates the tables of the database in its configuration before every run. After a test run, the test environment's site is back to a fresh install, with the plugin not even active (recorded):</p>
+                <pre data-norun><code class="language-bash">npx @wordpress/env run cli wp plugin list --fields=name,status</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>ℹ Starting 'wp plugin list --fields=name,status' on the cli container.
+
+name	status
+akismet	inactive
+hello	inactive
+pagesco-books	inactive
+✔ Ran `wp plugin list --fields=name,status` in 'cli'. (in 0s 926ms)</code></pre>
+                </div>
+                <p><strong>What it means:</strong> harmless here, because port 8889 exists only for tests. Run the same library against your development database (for example by pointing a hand-written <code>wp-tests-config.php</code> at it) and your posts, users and settings are gone. <strong>Fix:</strong> tests get their own environment and their own database, always; treat that site as scratch paper.</p>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Lint and Test the Plugin</h2>
+                <p>The plugin gets the two checks every professional WordPress project has: a coding-standards run that ends with zero findings, and a test suite. Allow about 55 minutes. All commands run in the plugin's folder, <code>wordpress/wp-content/plugins/pagesco-books</code>, unless they say otherwise.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: Development dependencies <span class="step-time">(10 min)</span></h3>
+                    <p>Replace <code>composer.json</code>. New are <code>require-dev</code> (packages for developers, never needed by the live site), the permission for the PHPCS installer plugin (Composer 2.2 and later ask before running plugins), and three <code>scripts</code>, so nobody has to remember paths:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/composer.json"><code class="language-json">{
+	"name": "pagesco/pagesco-books",
+	"description": "The bookstore features of the Pages &amp; Co. website.",
+	"type": "wordpress-plugin",
+	"license": "GPL-2.0-or-later",
+	"require": {
+		"php": "&gt;=8.2"
+	},
+	"require-dev": {
+		"phpunit/phpunit": "^9.6",
+		"wp-coding-standards/wpcs": "^3.4",
+		"yoast/phpunit-polyfills": "^4.0"
+	},
+	"autoload": {
+		"psr-4": {
+			"PagesCo\\Books\\": "src/"
+		}
+	},
+	"config": {
+		"allow-plugins": {
+			"dealerdirect/phpcodesniffer-composer-installer": true
+		}
+	},
+	"scripts": {
+		"lint": "phpcs",
+		"lint:fix": "phpcbf",
+		"test": "phpunit"
+	}
+}</code></pre>
+                    <p>Composer runs in the <code>composer:2</code> container, as in Lessons 1.3 and 5.1. An alias saves typing for the rest of the lesson (run it in the plugin's folder; on Windows PowerShell, write a function as Lesson 1.2 did for <code>wp</code>):</p>
+                    <pre data-norun><code class="language-bash">cd wordpress/wp-content/plugins/pagesco-books
+alias composer='docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD:/app" -w /app composer:2 composer'</code></pre>
+                    <p>Install the packages. <code>composer update</code> resolves the versions and writes <code>composer.lock</code>, which you commit so everyone gets the same versions:</p>
+                    <pre data-composer="wp-content/plugins/pagesco-books"><code class="language-bash">composer update
+composer show --direct</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Composer could not detect the root package (pagesco/pagesco-books) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version
+Loading composer repositories with package information
+...
+Updating dependencies
+Lock file operations: 34 installs, 0 updates, 0 removals
+...
+PHP CodeSniffer Config installed_paths set to ../../phpcsstandards/phpcsextra,../../phpcsstandards/phpcsutils,../../wp-coding-standards/wpcs
+No security vulnerability advisories found.
+Composer could not detect the root package (pagesco/pagesco-books) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version
+phpunit/phpunit          9.6.38 The PHP Unit Testing framework.
+wp-coding-standards/wpcs 3.4.1  PHP_CodeSniffer rules (sniffs) to enforce W...
+yoast/phpunit-polyfills  4.0.0  Set of polyfills for changed PHPUnit functi...</code></pre>
+                    </div>
+                    <p>(Composer's note about the root package version appears on every command: a plugin is not a published package with a version, and the note is harmless.) PHPUnit 9.6, WPCS 3.4 (which brings PHPCS 3.13 and its helper standards) and the polyfills, in <code>vendor/</code>, next to the autoloader from Lesson 5.1. On a live site you install without them: <code>composer install --no-dev</code> (Lesson 8.4).</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: The ruleset, and the first report <span class="step-time">(10 min)</span></h3>
+                    <p>Create <code>phpcs.xml.dist</code> in the plugin's folder (<code>.dist</code> means "the shared default": a developer may override it with a personal <code>phpcs.xml</code>, which stays out of Git):</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/phpcs.xml.dist"><code class="language-html">&lt;?xml version="1.0"?&gt;
+&lt;ruleset name="Pages &amp;amp; Co. Books"&gt;
+	&lt;description&gt;The WordPress Coding Standards, set up for the Pages &amp;amp; Co. Books plugin.&lt;/description&gt;
+
+	&lt;!-- What to check: the plugin's own PHP, not the libraries or the build output. Paths in reports start at the plugin's folder. --&gt;
+	&lt;file&gt;.&lt;/file&gt;
+	&lt;exclude-pattern&gt;/vendor/*&lt;/exclude-pattern&gt;
+	&lt;exclude-pattern&gt;/node_modules/*&lt;/exclude-pattern&gt;
+	&lt;exclude-pattern&gt;/build/*&lt;/exclude-pattern&gt;
+	&lt;arg name="extensions" value="php"/&gt;
+	&lt;arg name="basepath" value="."/&gt;
+
+	&lt;!-- Show the sniff code of each message. --&gt;
+	&lt;arg value="s"/&gt;
+
+	&lt;!-- The whole WordPress standard: Core, Docs and Extra. --&gt;
+	&lt;rule ref="WordPress"/&gt;
+
+	&lt;!-- The oldest WordPress the plugin supports (its Requires at least header). --&gt;
+	&lt;config name="minimum_wp_version" value="6.8"/&gt;
+
+	&lt;!-- Every translatable string must use the plugin's text domain. --&gt;
+	&lt;rule ref="WordPress.WP.I18n"&gt;
+		&lt;properties&gt;
+			&lt;property name="text_domain" type="array"&gt;
+				&lt;element value="pagesco-books"/&gt;
+			&lt;/property&gt;
+		&lt;/properties&gt;
+	&lt;/rule&gt;
+
+	&lt;!-- Every global name must start with one of these prefixes. --&gt;
+	&lt;rule ref="WordPress.NamingConventions.PrefixAllGlobals"&gt;
+		&lt;properties&gt;
+			&lt;property name="prefixes" type="array"&gt;
+				&lt;element value="pagesco_books"/&gt;
+				&lt;element value="PagesCo\Books"/&gt;
+			&lt;/property&gt;
+		&lt;/properties&gt;
+	&lt;/rule&gt;
+
+	&lt;!-- Classes follow PSR-4 (src/Supplier/Client.php), a choice made in Lesson 5.1. --&gt;
+	&lt;rule ref="WordPress.Files.FileName"&gt;
+		&lt;exclude-pattern&gt;/src/*&lt;/exclude-pattern&gt;
+		&lt;exclude-pattern&gt;/tests/*&lt;/exclude-pattern&gt;
+	&lt;/rule&gt;
+&lt;/ruleset&gt;</code></pre>
+                    <p>One exception is already in: the <code>WordPress.Files.FileName</code> rule wants <code>class-client.php</code>, but Lesson 5.1 chose PSR-4 file names for Composer's autoloader, a common and documented choice. Run it, as a summary per file:</p>
+                    <pre data-composer="wp-content/plugins/pagesco-books" data-exit="2"><code class="language-bash">composer lint -- --report=summary</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Composer could not detect the root package (pagesco/pagesco-books) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version
+
+PHP CODE SNIFFER REPORT SUMMARY
+----------------------------------------------------------------------
+FILE                                                  ERRORS  WARNINGS
+----------------------------------------------------------------------
+uninstall.php                                         0       3
+src/EventsTable.php                                   1       5
+src/Plugin.php                                        0       1
+src/blocks/book-filter/render.php                     18      3
+src/blocks/book-list/render.php                       13      2
+src/blocks/book-list/variations.php                   4       0
+src/Rest/BooksEndpoint.php                            3       3
+src/Rest/EventsEndpoint.php                           2       0
+----------------------------------------------------------------------
+A TOTAL OF 41 ERRORS AND 17 WARNINGS WERE FOUND IN 8 FILES
+----------------------------------------------------------------------
+PHPCBF CAN FIX 6 OF THESE SNIFF VIOLATIONS AUTOMATICALLY
+----------------------------------------------------------------------
+
+...
+
+Script phpcs handling the lint event returned with error code 2</code></pre>
+                    </div>
+                    <p>(In these cards, <code>...</code> stands for PHPCS's timing line, which differs on every run. The last line is Composer passing on PHPCS's exit status: 2 means "findings, some fixable".) 58 findings in 8 files, out of thirty: most of the plugin was written to the standard from the start. The same run with <code>--report=source</code> groups them by rule:</p>
+                    <pre data-composer="wp-content/plugins/pagesco-books" data-exit="2"><code class="language-bash">composer lint -- --report=source</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Composer could not detect the root package (pagesco/pagesco-books) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version
+
+PHP CODE SNIFFER VIOLATION SOURCE SUMMARY
+--------------------------------------------------------------------------------
+    SOURCE                                                                 COUNT
+--------------------------------------------------------------------------------
+[ ] WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound  30
+[x] WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound         5
+[ ] WordPress.Security.EscapeOutput.OutputNotEscaped                       5
+[ ] WordPress.DB.DirectDatabaseQuery.DirectQuery                           4
+[ ] WordPress.DB.DirectDatabaseQuery.NoCaching                             3
+[ ] WordPress.DB.SlowDBQuery.slow_db_query_meta_key                        2
+[ ] WordPress.DB.SlowDBQuery.slow_db_query_tax_query                       2
+[ ] WordPress.Security.NonceVerification.Recommended                       2
+[x] Generic.Formatting.MultipleStatementAlignment.NotSameWarning           1
+[ ] Universal.NamingConventions.NoReservedKeywordParameterNames.classFoun  1
+[ ] WordPress.DB.DirectDatabaseQuery.SchemaChange                          1
+[ ] WordPress.DB.PreparedSQL.NotPrepared                                   1
+[ ] WordPress.DB.SlowDBQuery.slow_db_query_meta_query                      1
+--------------------------------------------------------------------------------
+A TOTAL OF 58 SNIFF VIOLATIONS WERE FOUND IN 13 SOURCES
+--------------------------------------------------------------------------------
+PHPCBF CAN FIX THE 2 MARKED SOURCES AUTOMATICALLY (6 VIOLATIONS IN TOTAL)
+--------------------------------------------------------------------------------
+
+...
+
+Script phpcs handling the lint event returned with error code 2</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: Fix, auto-fix, or document <span class="step-time">(15 min)</span></h3>
+                    <p>Go through the rules one by one (run <code>composer lint</code> without options for every message with its file and line):</p>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr><th>Rule</th><th>Where</th><th>Decision</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><code>ArrayDeclarationSpacing</code>, <code>MultipleStatementAlignment</code> [x]</td><td>REST endpoints, book filter</td><td>auto-fix with <code>phpcbf</code></td></tr>
+                                <tr><td><code>NoReservedKeywordParameterNames</code></td><td><code>Plugin::feature( $class )</code></td><td>fix: rename to <code>$class_name</code></td></tr>
+                                <tr><td><code>PrefixAllGlobals</code> (30)</td><td>the blocks' <code>render.php</code> and <code>variations.php</code></td><td>document in the ruleset: WordPress includes these files inside a function, so <code>$count</code> and <code>$books</code> are local variables, not globals (PHPCS cannot know that)</td></tr>
+                                <tr><td><code>EscapeOutput</code> (5)</td><td><code>echo get_block_wrapper_attributes()</code>, <code>echo wp_interactivity_data_wp_context()</code></td><td>document each line with <code>phpcs:ignore</code>: both functions return escaped attributes (Lesson 6.3's core idiom), but PHPCS only knows the <code>esc_*</code> family</td></tr>
+                                <tr><td><code>NonceVerification</code> (2)</td><td><code>$_GET['genre']</code> in the book filter</td><td>document with <code>phpcs:ignore</code>: a read-only filter in the address changes nothing, and it is validated against the genre list (Lesson 6.4)</td></tr>
+                                <tr><td><code>PreparedSQL.NotPrepared</code></td><td><code>EventsTable::find()</code></td><td>document with <code>phpcs:ignore</code>: <code>$sql</code> is the result of <code>$wpdb-&gt;prepare()</code> a few lines up; the rule only sees the variable</td></tr>
+                                <tr><td><code>DirectDatabaseQuery</code> (8 warnings)</td><td><code>EventsTable.php</code>, <code>uninstall.php</code></td><td>document in the ruleset: a custom table has no WordPress API; <code>EventsTable</code> is its query layer (Lesson 5.5)</td></tr>
+                                <tr><td><code>SlowDBQuery</code> (5 warnings)</td><td>books route, Book List block</td><td>document in the ruleset: meta and taxonomy queries are what price order and genre filters are; Lesson 8.2 measures their cost</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p>First the automatic fixes. <code>phpcbf</code> rewrites the files in place (its exit status is 1 when it fixed something):</p>
+                    <pre data-composer="wp-content/plugins/pagesco-books" data-exit="1"><code class="language-bash">composer lint:fix</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Composer could not detect the root package (pagesco/pagesco-books) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version
+
+PHPCBF RESULT SUMMARY
+----------------------------------------------------------------------
+FILE                                                  FIXED  REMAINING
+----------------------------------------------------------------------
+src/blocks/book-filter/render.php                     1      20
+src/Rest/EventsEndpoint.php                           2      0
+src/Rest/BooksEndpoint.php                            3      3
+----------------------------------------------------------------------
+A TOTAL OF 6 ERRORS WERE FIXED IN 3 FILES
+----------------------------------------------------------------------
+
+...
+
+
+Script phpcbf handling the lint:fix event returned with error code 1</code></pre>
+                    </div>
+                    <p>Then the edits by hand. In <code>src/Plugin.php</code>, rename the parameter of <code>feature()</code> (three places: the <code>@param</code> line, the signature, the array key). In the render files, each <code>phpcs:ignore</code> goes at the end of the line it is about, names the exact rule, and gives the reason after <code>--</code>. Inside a PHP tag the comment ends at <code>?&gt;</code>, so the HTML around it is unchanged:</p>
+                    <pre data-norun><code class="language-php">&lt;ul &lt;?php echo get_block_wrapper_attributes(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- core escapes the attributes. ?&gt;&gt;</code></pre>
+                    <p>Make these edits in your editor; here they are as <code>sed</code> commands, from the WordPress folder, followed by the list of comments they added:</p>
+                    <pre data-cli><code class="language-bash">cd wp-content/plugins/pagesco-books
+sed -i 's|\(&lt;?php echo get_block_wrapper_attributes(); \)?&gt;|\1// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- core escapes the attributes. ?&gt;|' src/blocks/book-list/render.php src/blocks/book-filter/render.php
+sed -i 's|^\t\tget_block_wrapper_attributes(),$|&amp;  // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- core escapes the attributes.|' src/blocks/book-list/render.php
+sed -i 's|\(&lt;?php echo wp_interactivity_data_wp_context( .* ); \)?&gt;|\1// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- core escapes the JSON. ?&gt;|' src/blocks/book-filter/render.php
+sed -i "s|^\$selected = isset( \$_GET\['genre'\] ).*|&amp;  // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- a read-only filter, checked against the genres below.|" src/blocks/book-filter/render.php
+sed -i 's|^\t\treturn \$wpdb-&gt;get_results( \$sql );$|&amp;  // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- $sql comes from $wpdb-&gt;prepare() above.|' src/EventsTable.php
+sed -i 's|@param string \$class Fully|@param string $class_name Fully|; s|feature( string \$class )|feature( string $class_name )|; s|features\[ \$class \] ?? null|features[ $class_name ] ?? null|' src/Plugin.php
+grep -c 'phpcs:ignore' src/blocks/book-list/render.php src/blocks/book-filter/render.php src/EventsTable.php
+grep -n 'class_name' src/Plugin.php</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>src/blocks/book-list/render.php:2
+src/blocks/book-filter/render.php:4
+src/EventsTable.php:1
+63:	 * @param string $class_name Fully qualified class name.
+65:	public function feature( string $class_name ): ?Feature {
+66:		return $this-&gt;features[ $class_name ] ?? null;</code></pre>
+                    </div>
+                    <p>The <code>render.php</code> files in <code>src/blocks/</code> are copied into <code>build/</code> by the build (Lesson 6.3), so rebuild to keep the two the same:</p>
+                    <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null</code></pre>
+                    <p>Now the ruleset exceptions. Add these rules to <code>phpcs.xml.dist</code>, before the closing <code>&lt;/ruleset&gt;</code> (the full file replaces the one from Step 2):</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/phpcs.xml.dist"><code class="language-html">&lt;?xml version="1.0"?&gt;
+&lt;ruleset name="Pages &amp;amp; Co. Books"&gt;
+	&lt;description&gt;The WordPress Coding Standards, set up for the Pages &amp;amp; Co. Books plugin.&lt;/description&gt;
+
+	&lt;!-- What to check: the plugin's own PHP, not the libraries or the build output. Paths in reports start at the plugin's folder. --&gt;
+	&lt;file&gt;.&lt;/file&gt;
+	&lt;exclude-pattern&gt;/vendor/*&lt;/exclude-pattern&gt;
+	&lt;exclude-pattern&gt;/node_modules/*&lt;/exclude-pattern&gt;
+	&lt;exclude-pattern&gt;/build/*&lt;/exclude-pattern&gt;
+	&lt;arg name="extensions" value="php"/&gt;
+	&lt;arg name="basepath" value="."/&gt;
+
+	&lt;!-- Show the sniff code of each message. --&gt;
+	&lt;arg value="s"/&gt;
+
+	&lt;!-- The whole WordPress standard: Core, Docs and Extra. --&gt;
+	&lt;rule ref="WordPress"/&gt;
+
+	&lt;!-- The oldest WordPress the plugin supports (its Requires at least header). --&gt;
+	&lt;config name="minimum_wp_version" value="6.8"/&gt;
+
+	&lt;!-- Every translatable string must use the plugin's text domain. --&gt;
+	&lt;rule ref="WordPress.WP.I18n"&gt;
+		&lt;properties&gt;
+			&lt;property name="text_domain" type="array"&gt;
+				&lt;element value="pagesco-books"/&gt;
+			&lt;/property&gt;
+		&lt;/properties&gt;
+	&lt;/rule&gt;
+
+	&lt;!-- Every global name must start with one of these prefixes. --&gt;
+	&lt;rule ref="WordPress.NamingConventions.PrefixAllGlobals"&gt;
+		&lt;properties&gt;
+			&lt;property name="prefixes" type="array"&gt;
+				&lt;element value="pagesco_books"/&gt;
+				&lt;element value="PagesCo\Books"/&gt;
+			&lt;/property&gt;
+		&lt;/properties&gt;
+	&lt;/rule&gt;
+
+	&lt;!-- Classes follow PSR-4 (src/Supplier/Client.php), a choice made in Lesson 5.1. --&gt;
+	&lt;rule ref="WordPress.Files.FileName"&gt;
+		&lt;exclude-pattern&gt;/src/*&lt;/exclude-pattern&gt;
+		&lt;exclude-pattern&gt;/tests/*&lt;/exclude-pattern&gt;
+	&lt;/rule&gt;
+
+	&lt;!--
+		WordPress includes a block's render.php and variations.php inside a function,
+		so their variables are local, not globals: the prefix rule does not apply.
+	--&gt;
+	&lt;rule ref="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound"&gt;
+		&lt;exclude-pattern&gt;/src/blocks/*/render.php&lt;/exclude-pattern&gt;
+		&lt;exclude-pattern&gt;/src/blocks/*/variations.php&lt;/exclude-pattern&gt;
+	&lt;/rule&gt;
+
+	&lt;!-- The events table has no WordPress API: EventsTable is its query layer (Lesson 5.5). --&gt;
+	&lt;rule ref="WordPress.DB.DirectDatabaseQuery"&gt;
+		&lt;exclude-pattern&gt;/src/EventsTable.php&lt;/exclude-pattern&gt;
+		&lt;exclude-pattern&gt;/uninstall.php&lt;/exclude-pattern&gt;
+	&lt;/rule&gt;
+
+	&lt;!-- Meta and taxonomy queries on purpose: price order and genre filters. Lesson 8.2 measures them. --&gt;
+	&lt;rule ref="WordPress.DB.SlowDBQuery"&gt;
+		&lt;exclude-pattern&gt;/src/Rest/BooksEndpoint.php&lt;/exclude-pattern&gt;
+		&lt;exclude-pattern&gt;/src/blocks/book-list/render.php&lt;/exclude-pattern&gt;
+	&lt;/rule&gt;
+&lt;/ruleset&gt;</code></pre>
+                    <p>And the report again:</p>
+                    <pre data-composer="wp-content/plugins/pagesco-books"><code class="language-bash">composer lint; echo "exit status $?"</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Composer could not detect the root package (pagesco/pagesco-books) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version
+exit status 0</code></pre>
+                    </div>
+                    <p>No findings, exit status 0: the state every later change is measured against. From now on a new finding means new code broke a rule, and it is cheap to fix while you still remember the code. And the site still works exactly as before (the edits were comments, layout and a parameter name):</p>
+                    <pre data-web="/find-a-book/?genre=fantasy" data-select="p.wp-block-pagesco-book-filter__count" data-text><code class="language-text">http://localhost:8080/find-a-book/?genre=fantasy   (the count line)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Showing 2 of 11 books</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 4: The test suite <span class="step-time">(20 min)</span></h3>
+                    <p>The test environment: <code>.wp-env.json</code> in the plugin's folder. It pins WordPress 7.1.3 and PHP 8.5 (the course's versions), uses port 8889, turns off the deprecated automatic tests environment, and mounts the folder itself as a plugin (<code>"."</code>):</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/.wp-env.json"><code class="language-json">{
+	"$schema": "https://schemas.wp.org/trunk/wp-env.json",
+	"core": "https://wordpress.org/wordpress-7.1.3.zip",
+	"phpVersion": "8.5",
+	"port": 8889,
+	"testsEnvironment": false,
+	"plugins": [ "." ]
+}</code></pre>
+                    <p>PHPUnit's configuration, <code>phpunit.xml.dist</code>: which bootstrap to run, and that tests are the files ending in <code>Test.php</code> in <code>tests/</code>:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/phpunit.xml.dist"><code class="language-html">&lt;?xml version="1.0"?&gt;
+&lt;phpunit
+	bootstrap="tests/bootstrap.php"
+	colors="true"
+	&gt;
+	&lt;testsuites&gt;
+		&lt;testsuite name="pagesco-books"&gt;
+			&lt;directory suffix="Test.php"&gt;./tests/&lt;/directory&gt;
+		&lt;/testsuite&gt;
+	&lt;/testsuites&gt;
+&lt;/phpunit&gt;</code></pre>
+                    <p>The bootstrap, <code>tests/bootstrap.php</code>, is the same in almost every WordPress plugin: find the test library, load the plugin early, start WordPress. It also defines the supplier constants with an address that is never called:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/tests/bootstrap.php"><code class="language-php">&lt;?php
+/**
+ * Starts WordPress for the plugin's PHPUnit tests. Run them inside wp-env (see .wp-env.json).
+ *
+ * @package PagesCo\Books
+ */
+
+$pagesco_books_tests_dir = getenv( 'WP_TESTS_DIR' );
+
+if ( ! $pagesco_books_tests_dir || ! file_exists( $pagesco_books_tests_dir . '/includes/functions.php' ) ) {
+	echo "The WordPress test library was not found. Run the tests inside wp-env.\n";
+	exit( 1 );
+}
+
+// The plugin's Composer autoloader, which also loads the PHPUnit Polyfills the test library needs.
+require_once dirname( __DIR__ ) . '/vendor/autoload.php';
+
+// The supplier in tests: an address that is never called, because the tests answer for it.
+define( 'PAGESCO_BOOKS_SUPPLIER_URL', 'https://api.riverside.example/v1/' );
+define( 'PAGESCO_BOOKS_SUPPLIER_KEY', 'test-key' );
+
+require_once $pagesco_books_tests_dir . '/includes/functions.php';
+
+// Load the plugin as early as a must-use plugin, before WordPress starts.
+tests_add_filter(
+	'muplugins_loaded',
+	function () {
+		require dirname( __DIR__ ) . '/pagesco-books.php';
+	}
+);
+
+require $pagesco_books_tests_dir . '/includes/bootstrap.php';</code></pre>
+                    <p>Four test classes, one per thing that matters. Test names say what must be true, in plain words, so a failure reads like a bug report. The shortcode (Lesson 5.5): <code>tests/BookShortcodeTest.php</code>:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/tests/BookShortcodeTest.php"><code class="language-php">&lt;?php
+/**
+ * Tests of the [pagesco_book] shortcode.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books\Tests;
+
+use PagesCo\Books\Shortcodes\BookShortcode;
+
+/**
+ * The shortcode prints a published book's card, escaped, and nothing for anything else.
+ */
+final class BookShortcodeTest extends \WP_UnitTestCase {
+
+	/**
+	 * A published book shows its title, author, price and stock.
+	 */
+	public function test_renders_a_published_book(): void {
+		$book_id = self::factory()-&gt;post-&gt;create(
+			array(
+				'post_type'  =&gt; 'book',
+				'post_title' =&gt; 'Emma',
+				'meta_input' =&gt; array(
+					'pagesco_author'   =&gt; 'Jane Austen',
+					'pagesco_price'    =&gt; 9.49,
+					'pagesco_in_stock' =&gt; true,
+				),
+			)
+		);
+
+		$html = ( new BookShortcode() )-&gt;render( array( 'id' =&gt; $book_id ) );
+
+		$this-&gt;assertStringContainsString( '&gt;Emma&lt;/a&gt; by Jane Austen,', $html );
+		$this-&gt;assertStringContainsString( '&lt;span class="pagesco-book__price"&gt;$9.49&lt;/span&gt;', $html );
+		$this-&gt;assertStringContainsString( '&lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;', $html );
+	}
+
+	/**
+	 * Drafts and posts of other types print nothing.
+	 */
+	public function test_prints_nothing_for_drafts_and_pages(): void {
+		$draft = self::factory()-&gt;post-&gt;create(
+			array(
+				'post_type'   =&gt; 'book',
+				'post_status' =&gt; 'draft',
+			)
+		);
+		$page  = self::factory()-&gt;post-&gt;create( array( 'post_type' =&gt; 'page' ) );
+
+		$this-&gt;assertSame( '', ( new BookShortcode() )-&gt;render( array( 'id' =&gt; $draft ) ) );
+		$this-&gt;assertSame( '', ( new BookShortcode() )-&gt;render( array( 'id' =&gt; $page ) ) );
+	}
+
+	/**
+	 * Meta is escaped: markup in an author's name is shown as text.
+	 */
+	public function test_escapes_the_author(): void {
+		$book_id = self::factory()-&gt;post-&gt;create(
+			array(
+				'post_type'  =&gt; 'book',
+				'meta_input' =&gt; array( 'pagesco_author' =&gt; '&lt;script&gt;alert(1)&lt;/script&gt;' ),
+			)
+		);
+
+		$html = ( new BookShortcode() )-&gt;render( array( 'id' =&gt; $book_id ) );
+
+		$this-&gt;assertStringNotContainsString( '&lt;script&gt;', $html );
+		$this-&gt;assertStringContainsString( '&amp;lt;script&amp;gt;', $html );
+	}
+}</code></pre>
+                    <p>The supplier client (Lesson 7.3), with a fake supplier: <code>tests/SupplierClientTest.php</code>. Note that the tests check the exact error codes, not just "an error":</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/tests/SupplierClientTest.php"><code class="language-php">&lt;?php
+/**
+ * Tests of the supplier client, without the network.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books\Tests;
+
+use PagesCo\Books\Supplier\Client;
+
+/**
+ * Every test answers in place of the supplier with the pre_http_request filter.
+ */
+final class SupplierClientTest extends \WP_UnitTestCase {
+
+	/**
+	 * The requests the client tried to send: URL and arguments.
+	 *
+	 * @var array[]
+	 */
+	private array $requests = array();
+
+	/**
+	 * Answers every HTTP request with this status code and body, and records the request.
+	 *
+	 * @param int    $code The HTTP status code.
+	 * @param string $body The response body.
+	 */
+	private function fake_supplier( int $code, string $body ): void {
+		add_filter(
+			'pre_http_request',
+			function ( $preempt, $args, $url ) use ( $code, $body ) {
+				$this-&gt;requests[] = array(
+					'url'  =&gt; $url,
+					'args' =&gt; $args,
+				);
+
+				return array(
+					'headers'  =&gt; array(),
+					'body'     =&gt; $body,
+					'response' =&gt; array(
+						'code'    =&gt; $code,
+						'message' =&gt; get_status_header_desc( $code ),
+					),
+					'cookies'  =&gt; array(),
+					'filename' =&gt; null,
+				);
+			},
+			10,
+			3
+		);
+	}
+
+	/**
+	 * A good answer becomes an array keyed by ISBN, and the request carries the key.
+	 */
+	public function test_reads_availability_by_isbn(): void {
+		$this-&gt;fake_supplier( 200, '{"items":[{"isbn":"9780743273565","available":0,"next_delivery":"2027-11-15"}],"unknown":[]}' );
+
+		$result = ( new Client() )-&gt;availability( array( '9780743273565' ) );
+
+		$this-&gt;assertSame(
+			array(
+				'9780743273565' =&gt; array(
+					'available'     =&gt; 0,
+					'next_delivery' =&gt; '2027-11-15',
+				),
+			),
+			$result
+		);
+		$this-&gt;assertSame( 'https://api.riverside.example/v1/availability?isbns=9780743273565', $this-&gt;requests[0]['url'] );
+		$this-&gt;assertSame( 'test-key', $this-&gt;requests[0]['args']['headers']['X-Api-Key'] );
+	}
+
+	/**
+	 * An error status is a WP_Error with the status in its data, even when the body is HTML.
+	 */
+	public function test_turns_an_error_status_into_a_wp_error(): void {
+		$this-&gt;fake_supplier( 503, '&lt;h1&gt;Service Unavailable&lt;/h1&gt;' );
+
+		$result = ( new Client() )-&gt;availability( array( '9780743273565' ) );
+
+		$this-&gt;assertWPError( $result );
+		$this-&gt;assertSame( 'pagesco_supplier_http_error', $result-&gt;get_error_code() );
+		$this-&gt;assertSame( 503, $result-&gt;get_error_data()['status'] );
+	}
+
+	/**
+	 * A 200 without the expected items is not trusted.
+	 */
+	public function test_rejects_an_answer_without_items(): void {
+		$this-&gt;fake_supplier( 200, '{"supplier":"Riverside Books"}' );
+
+		$result = ( new Client() )-&gt;availability( array( '9780743273565' ) );
+
+		$this-&gt;assertWPError( $result );
+		$this-&gt;assertSame( 'pagesco_supplier_bad_response', $result-&gt;get_error_code() );
+	}
+
+	/**
+	 * No answer at all: the transport's WP_Error comes back unchanged.
+	 */
+	public function test_passes_on_a_network_failure(): void {
+		add_filter(
+			'pre_http_request',
+			function () {
+				return new \WP_Error( 'http_request_failed', 'cURL error 28: Operation timed out' );
+			}
+		);
+
+		$result = ( new Client() )-&gt;availability( array( '9780743273565' ) );
+
+		$this-&gt;assertWPError( $result );
+		$this-&gt;assertSame( 'http_request_failed', $result-&gt;get_error_code() );
+	}
+}</code></pre>
+                    <p>The books route (Lesson 7.2), through <code>rest_do_request()</code>, with the schema check that Lesson 7.2's Exercise 2 said belonged in a test: <code>tests/BooksEndpointTest.php</code>. <code>set_up()</code> runs before each test and makes its own three books:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/tests/BooksEndpointTest.php"><code class="language-php">&lt;?php
+/**
+ * Tests of GET /pagesco/v1/books, through the REST server without HTTP.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books\Tests;
+
+use PagesCo\Books\Plugin;
+use PagesCo\Books\Rest\BooksEndpoint;
+
+/**
+ * The books route filters, sorts and keeps the promise of its schema.
+ */
+final class BooksEndpointTest extends \WP_UnitTestCase {
+
+	/**
+	 * Three books: two fantasy books and Dune.
+	 */
+	public function set_up(): void {
+		parent::set_up();
+
+		$fantasy = self::factory()-&gt;term-&gt;create(
+			array(
+				'taxonomy' =&gt; 'genre',
+				'name'     =&gt; 'Fantasy',
+				'slug'     =&gt; 'fantasy',
+			)
+		);
+
+		$prices = array(
+			'Lord of the Rings' =&gt; 15.99,
+			'The Hobbit'        =&gt; 10.99,
+			'Dune'              =&gt; 14.99,
+		);
+
+		foreach ( $prices as $title =&gt; $price ) {
+			$book_id = self::factory()-&gt;post-&gt;create(
+				array(
+					'post_type'  =&gt; 'book',
+					'post_title' =&gt; $title,
+					'meta_input' =&gt; array( 'pagesco_price' =&gt; $price ),
+				)
+			);
+			if ( 'Dune' !== $title ) {
+				wp_set_object_terms( $book_id, $fantasy, 'genre' );
+			}
+		}
+	}
+
+	/**
+	 * Runs GET /pagesco/v1/books with these query parameters.
+	 *
+	 * @param array $params Query parameters.
+	 * @return \WP_REST_Response
+	 */
+	private function get_books( array $params ): \WP_REST_Response {
+		$request = new \WP_REST_Request( 'GET', '/pagesco/v1/books' );
+		$request-&gt;set_query_params( $params );
+
+		return rest_do_request( $request );
+	}
+
+	/**
+	 * The fantasy books, cheapest first, with the total in a header.
+	 */
+	public function test_filters_by_genre_and_sorts_by_price(): void {
+		$response = $this-&gt;get_books(
+			array(
+				'genre'   =&gt; 'fantasy',
+				'orderby' =&gt; 'price',
+			)
+		);
+
+		$this-&gt;assertSame( 200, $response-&gt;get_status() );
+		$this-&gt;assertSame( array( 'The Hobbit', 'Lord of the Rings' ), wp_list_pluck( $response-&gt;get_data(), 'title' ) );
+		$this-&gt;assertSame( '2', $response-&gt;get_headers()['X-WP-Total'] );
+	}
+
+	/**
+	 * A genre that does not exist is a 400 with the plugin's own error code.
+	 */
+	public function test_rejects_an_unknown_genre(): void {
+		$response = $this-&gt;get_books( array( 'genre' =&gt; 'romance' ) );
+
+		$this-&gt;assertSame( 400, $response-&gt;get_status() );
+		$this-&gt;assertSame( 'pagesco_unknown_genre', $response-&gt;get_data()['data']['details']['genre']['code'] );
+	}
+
+	/**
+	 * Every book the route returns is valid against the route's own schema.
+	 */
+	public function test_every_book_matches_the_schema(): void {
+		$endpoint = Plugin::instance()-&gt;feature( BooksEndpoint::class );
+
+		foreach ( $this-&gt;get_books( array() )-&gt;get_data() as $book ) {
+			$this-&gt;assertTrue( rest_validate_value_from_schema( $book, $endpoint-&gt;get_schema(), 'book' ) );
+		}
+	}
+}</code></pre>
+                    <p>The daily job (Lesson 7.3): <code>tests/DailySyncTest.php</code>. The second test also fakes a supplier that is down, because <code>run()</code> refreshes the supplier's numbers first, and a job must clean up the events even on a bad day:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/tests/DailySyncTest.php"><code class="language-php">&lt;?php
+/**
+ * Tests of the daily WP-Cron job.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books\Tests;
+
+use PagesCo\Books\DailySync;
+use PagesCo\Books\EventsTable;
+
+/**
+ * The job is scheduled once, at 3 a.m., and removes only events that are over.
+ */
+final class DailySyncTest extends \WP_UnitTestCase {
+
+	/**
+	 * Scheduling twice leaves one daily event, at 3:00 in the site's time zone.
+	 */
+	public function test_schedules_one_daily_event_at_three(): void {
+		DailySync::unschedule();
+		DailySync::schedule();
+		DailySync::schedule();
+
+		$events = 0;
+		foreach ( _get_cron_array() as $hooks ) {
+			$events += count( $hooks[ DailySync::HOOK ] ?? array() );
+		}
+
+		$this-&gt;assertSame( 1, $events );
+		$this-&gt;assertSame( 'daily', wp_get_schedule( DailySync::HOOK ) );
+		$this-&gt;assertSame( '03:00', wp_date( 'H:i', wp_next_scheduled( DailySync::HOOK ) ) );
+	}
+
+	/**
+	 * The job deletes past events and keeps the ones still to come, even when the supplier is down.
+	 */
+	public function test_run_removes_only_past_events(): void {
+		add_filter(
+			'pre_http_request',
+			function () {
+				return new \WP_Error( 'http_request_failed', 'The supplier is down.' );
+			}
+		);
+		EventsTable::add( 'Summer reading kickoff', '2025-06-12 18:00:00', 'Reading corner', 0 );
+		EventsTable::add( 'Book club: Emma', '2099-01-14 19:00:00', 'Reading corner', 20 );
+
+		( new DailySync() )-&gt;run();
+
+		$titles = wp_list_pluck( EventsTable::find( 50 ), 'title' );
+		$this-&gt;assertNotContains( 'Summer reading kickoff', $titles );
+		$this-&gt;assertContains( 'Book club: Emma', $titles );
+	}
+}</code></pre>
+                    <p>The tests are code too: lint everything once more, and look at the plugin's new files:</p>
+                    <pre data-composer="wp-content/plugins/pagesco-books" data-checkpoint><code class="language-bash">composer lint; echo "exit status $?"
+ls -A | grep -v -e node_modules -e vendor
+ls tests</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Composer could not detect the root package (pagesco/pagesco-books) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version
+exit status 0
+.wp-env.json
+assets
+build
+composer.json
+composer.lock
+package-lock.json
+package.json
+pagesco-books.php
+phpcs.xml.dist
+phpunit.xml.dist
+src
+tests
+uninstall.php
+BookShortcodeTest.php
+BooksEndpointTest.php
+DailySyncTest.php
+SupplierClientTest.php
+bootstrap.php</code></pre>
+                    </div>
+                    <p>Now run them. Start the test environment from the plugin's folder (the first start downloads images and WordPress and takes about a minute), then run the plugin's PHPUnit inside its <code>cli</code> container. <code>--env-cwd</code> is the folder to run in, relative to the WordPress root in the container. Recorded with wp-env 12.0.0 and Node.js 24 on the plugin exactly as you have it now:</p>
+                    <pre data-norun><code class="language-bash">npx @wordpress/env start</code></pre>
+                    <div class="card card-output">
+                        <h4>Output (your times and MySQL port will differ)</h4>
+                        <pre><code>WordPress development site started at http://localhost:8889
+MySQL is listening on port 45899
+
+ ✔ Done! (in 40s 62ms)</code></pre>
+                    </div>
+                    <pre data-norun><code class="language-bash">npx @wordpress/env run cli --env-cwd=wp-content/plugins/pagesco-books vendor/bin/phpunit</code></pre>
+                    <div class="card card-output">
+                        <h4>Output (your times will differ)</h4>
+                        <pre><code>ℹ Starting 'vendor/bin/phpunit' on the cli container.
+
+Installing...
+Running as single site... To run multisite, use -c tests/phpunit/multisite.xml
+Not running ajax tests. To execute these, use --group ajax.
+Not running ms-files tests. To execute these, use --group ms-files.
+Not running external-http tests. To execute these, use --group external-http.
+PHPUnit 9.6.38 by Sebastian Bergmann and contributors.
+
+............                                                      12 / 12 (100%)
+
+Time: 00:00.095, Memory: 46.50 MB
+
+OK (12 tests, 30 assertions)
+✔ Ran `vendor/bin/phpunit` in 'cli'. (in 2s 20ms)</code></pre>
+                    </div>
+                    <p>Twelve dots, twelve passing tests, in a tenth of a second (plus two for starting): the time it takes to click one admin screen. The lines before PHPUnit's banner come from the test library (<code>Installing...</code> is the fresh database). <code>--testdox</code> prints the test names as sentences, a readable specification of the plugin:</p>
+                    <pre data-norun><code class="language-bash">npx @wordpress/env run cli --env-cwd=wp-content/plugins/pagesco-books vendor/bin/phpunit --testdox</code></pre>
+                    <div class="card card-output">
+                        <h4>Output (from PHPUnit's banner on; your times will differ)</h4>
+                        <pre><code>PHPUnit 9.6.38 by Sebastian Bergmann and contributors.
+
+Book Shortcode (PagesCo\Books\Tests\BookShortcode)
+ ✔ Renders a published book
+ ✔ Prints nothing for drafts and pages
+ ✔ Escapes the author
+
+Books Endpoint (PagesCo\Books\Tests\BooksEndpoint)
+ ✔ Filters by genre and sorts by price
+ ✔ Rejects an unknown genre
+ ✔ Every book matches the schema
+
+Daily Sync (PagesCo\Books\Tests\DailySync)
+ ✔ Schedules one daily event at three
+ ✔ Run removes only past events
+
+Supplier Client (PagesCo\Books\Tests\SupplierClient)
+ ✔ Reads availability by isbn
+ ✔ Turns an error status into a wp error
+ ✔ Rejects an answer without items
+ ✔ Passes on a network failure
+
+Time: 00:00.101, Memory: 46.50 MB
+
+OK (12 tests, 30 assertions)</code></pre>
+                    </div>
+                    <p>A suite that has never failed has not proven anything yet. Break the client on purpose: in <code>src/Supplier/Client.php</code>, change the status check <code>$code &gt; 299</code> to <code>$code &gt; 599</code>, the kind of slip a tired refactoring makes, and run again (recorded):</p>
+                    <pre data-norun><code class="language-bash">npx @wordpress/env run cli --env-cwd=wp-content/plugins/pagesco-books vendor/bin/phpunit</code></pre>
+                    <div class="card card-output">
+                        <h4>Output (from PHPUnit's banner on)</h4>
+                        <pre><code>PHPUnit 9.6.38 by Sebastian Bergmann and contributors.
+
+.........F..                                                      12 / 12 (100%)
+
+Time: 00:00.084, Memory: 46.50 MB
+
+There was 1 failure:
+
+1) PagesCo\Books\Tests\SupplierClientTest::test_turns_an_error_status_into_a_wp_error
+Failed asserting that two strings are identical.
+--- Expected
++++ Actual
+@@ @@
+-'pagesco_supplier_http_error'
++'pagesco_supplier_bad_response'
+
+/var/www/html/wp-content/plugins/pagesco-books/tests/SupplierClientTest.php:85
+
+FAILURES!
+Tests: 12, Assertions: 29, Failures: 1.
+✖ Command failed with exit code 1</code></pre>
+                    </div>
+                    <p>Caught, with the test name, the expected and the actual value, and the line. Look at what the broken code did: it still returned a <code>WP_Error</code> (the HTML body was not JSON), so a test that only asked "is it an error?" would have passed, and the Supplier column would have reported a 503 as "the answer is not JSON". Precise assertions find precise bugs. Change <code>599</code> back to <code>299</code> and the suite is green again. When you are done for the day, <code>npx @wordpress/env stop</code>; <code>npx @wordpress/env destroy --force</code> removes the environment's containers, volumes and images entirely.</p>
+                    <p>In <code>pagesco-plan.txt</code>, under a new heading "Quality", note: "composer lint (PHPCS + WPCS 3.4, phpcs.xml.dist, 0 findings), composer lint:fix. Tests: .wp-env.json (port 8889, tests only), npx @wordpress/env run cli --env-cwd=wp-content/plugins/pagesco-books vendor/bin/phpunit: 12 tests (shortcode, books route, supplier client, daily sync). Run both before every commit."</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>composer.json</code> has <code>require-dev</code> (PHPUnit 9.6, WPCS 3.4, polyfills) and the scripts <code>lint</code>, <code>lint:fix</code>, <code>test</code>; <code>composer.lock</code> exists</li>
+                        <li><code>phpcs.xml.dist</code> sets the text domain, prefixes and minimum WordPress version, and each exception has a comment</li>
+                        <li><code>composer lint</code> reports nothing and exits with 0, and every <code>phpcs:ignore</code> names its rule and a reason</li>
+                        <li><code>.wp-env.json</code>, <code>phpunit.xml.dist</code>, <code>tests/bootstrap.php</code> and four test classes exist</li>
+                        <li>All twelve tests pass in the wp-env test environment on port 8889, and you have seen one fail</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 use the test environment from Step 4; start it with <code>npx @wordpress/env start</code> if it is stopped.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Test the Settings</h3>
+                    <p>Write <code>tests/SettingsTest.php</code> with two tests for Lesson 5.4's <code>Settings</code>: with nothing saved, <code>Settings::get()</code> returns the defaults in their real types; and <code>sanitize()</code> given 99 books per list keeps the saved value (6) and adds a settings error with the code <code>books_per_page</code>. Run only these tests.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>delete_option( Settings::OPTION )</code> makes sure nothing is saved (the transaction restores it afterwards). <code>get_settings_errors( Settings::OPTION )</code> returns the errors <code>add_settings_error()</code> collected. <code>--filter SettingsTest</code> runs one class.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/plugins/pagesco-books/tests/SettingsTest.php"><code class="language-php">&lt;?php
+/**
+ * Tests of the plugin's settings.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books\Tests;
+
+use PagesCo\Books\Settings;
+
+/**
+ * Settings::get() falls back to the defaults, and sanitize() refuses numbers out of range.
+ */
+final class SettingsTest extends \WP_UnitTestCase {
+
+	/**
+	 * With nothing saved, get() returns the defaults, in their real types.
+	 */
+	public function test_get_returns_the_defaults(): void {
+		delete_option( Settings::OPTION );
+
+		$this-&gt;assertSame( 6, Settings::get( 'books_per_page' ) );
+		$this-&gt;assertTrue( Settings::get( 'show_events_link' ) );
+	}
+
+	/**
+	 * 99 books per list is refused: the saved value stays, and the form gets an error.
+	 */
+	public function test_sanitize_keeps_the_saved_value_when_out_of_range(): void {
+		$clean = ( new Settings() )-&gt;sanitize( array( 'books_per_page' =&gt; '99' ) );
+
+		$this-&gt;assertSame( 6, $clean['books_per_page'] );
+		$this-&gt;assertSame( 'books_per_page', get_settings_errors( Settings::OPTION )[0]['code'] );
+	}
+}</code></pre>
+                        <pre data-norun><code class="language-bash">npx @wordpress/env run cli --env-cwd=wp-content/plugins/pagesco-books vendor/bin/phpunit --testdox --filter SettingsTest</code></pre>
+                        <div class="card card-output">
+                            <h4>Output (recorded; from the test names on)</h4>
+                            <pre><code>Settings (PagesCo\Books\Tests\Settings)
+ ✔ Get returns the defaults
+ ✔ Sanitize keeps the saved value when out of range
+
+Time: 00:00.008, Memory: 44.50 MB
+
+OK (2 tests, 4 assertions)</code></pre>
+                        </div>
+                        <p><code>assertSame( 6, … )</code> also proves the type: the setting is the integer 6, not the string <code>"6"</code>, which is what Lesson 5.4's <code>absint()</code> promised. The suite now has fourteen tests. Later lessons count only the project's twelve, so remove the file when you are done (<code>rm tests/SettingsTest.php</code>), or keep it and expect two more in every count.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Test an Ability's Permission (Stretch)</h3>
+                    <p>Write <code>tests/CheckStockAbilityTest.php</code> for Lesson 7.3's <code>pagesco/check-stock</code>: an editor gets the stock of a book you create (with the supplier faked as down, so <code>supplier_available</code> is <code>null</code>), and a subscriber gets a <code>WP_Error</code>. Find out the error's code by running the test first with a guess.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>wp_set_current_user( self::factory()-&gt;user-&gt;create( array( 'role' =&gt; 'editor' ) ) )</code> logs a user in for the test. <code>wp_get_ability( 'pagesco/check-stock' )-&gt;execute( array( 'slug' =&gt; 'emma' ) )</code> runs it with the permission check. Give the book <code>'post_name' =&gt; 'emma'</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/plugins/pagesco-books/tests/CheckStockAbilityTest.php"><code class="language-php">&lt;?php
+/**
+ * Tests of the pagesco/check-stock ability.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books\Tests;
+
+/**
+ * Staff may check a book's stock; subscribers may not.
+ */
+final class CheckStockAbilityTest extends \WP_UnitTestCase {
+
+	/**
+	 * An editor gets the shop's stock; the supplier's numbers come from the (faked) supplier.
+	 */
+	public function test_an_editor_can_check_stock(): void {
+		add_filter(
+			'pre_http_request',
+			function () {
+				return new \WP_Error( 'http_request_failed', 'The supplier is down.' );
+			}
+		);
+		self::factory()-&gt;post-&gt;create(
+			array(
+				'post_type'  =&gt; 'book',
+				'post_title' =&gt; 'Emma',
+				'post_name'  =&gt; 'emma',
+				'meta_input' =&gt; array( 'pagesco_in_stock' =&gt; true ),
+			)
+		);
+		wp_set_current_user( self::factory()-&gt;user-&gt;create( array( 'role' =&gt; 'editor' ) ) );
+
+		$result = wp_get_ability( 'pagesco/check-stock' )-&gt;execute( array( 'slug' =&gt; 'emma' ) );
+
+		$this-&gt;assertSame( 'Emma', $result['title'] );
+		$this-&gt;assertTrue( $result['in_stock'] );
+		$this-&gt;assertNull( $result['supplier_available'] );
+	}
+
+	/**
+	 * A subscriber is refused before the callback runs.
+	 */
+	public function test_a_subscriber_is_refused(): void {
+		wp_set_current_user( self::factory()-&gt;user-&gt;create( array( 'role' =&gt; 'subscriber' ) ) );
+
+		$result = wp_get_ability( 'pagesco/check-stock' )-&gt;execute( array( 'slug' =&gt; 'emma' ) );
+
+		$this-&gt;assertWPError( $result );
+		$this-&gt;assertSame( 'ability_invalid_permissions', $result-&gt;get_error_code() );
+	}
+}</code></pre>
+                        <pre data-norun><code class="language-bash">npx @wordpress/env run cli --env-cwd=wp-content/plugins/pagesco-books vendor/bin/phpunit --testdox --filter CheckStockAbilityTest</code></pre>
+                        <div class="card card-output">
+                            <h4>Output (recorded; from the test names on)</h4>
+                            <pre><code>Check Stock Ability (PagesCo\Books\Tests\CheckStockAbility)
+ ✔ An editor can check stock
+ ✔ A subscriber is refused
+
+Time: 00:00.029, Memory: 44.50 MB
+
+OK (2 tests, 5 assertions)</code></pre>
+                        </div>
+                        <p>The permission callback runs inside <code>execute()</code>, so the subscriber is refused with <code>ability_invalid_permissions</code> before the callback ever looks for the book. With both exercises, the whole suite is sixteen tests; a full run reported <code>OK (16 tests, 39 assertions)</code>. Remove both exercise files afterward (<code>rm tests/SettingsTest.php tests/CheckStockAbilityTest.php</code>) if you want your counts to match the later lessons.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: What PHPCS Sees in Insecure Code</h3>
+                    <p>Save this deliberately bad snippet as <code>scratch-search.php</code> in the plugin's folder and lint only that file. Which findings are security problems, and how would you fix each one? Then delete the file.</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/scratch-search.php"><code class="language-php">&lt;?php
+/**
+ * A search box, written in a hurry.
+ *
+ * @package PagesCo\Books
+ */
+
+function pagesco_books_search_box() {
+	$term = $_GET['q'];
+	echo '&lt;p&gt;Results for ' . $term . '&lt;/p&gt;';
+	echo '&lt;p&gt;' . __( 'No books found.', 'pagesco' ) . '&lt;/p&gt;';
+}</code></pre>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>composer lint -- scratch-search.php</code> checks one file with the project's ruleset. Expect findings about input, output, translation and documentation.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-composer="wp-content/plugins/pagesco-books" data-exit="2"><code class="language-bash">composer lint -- scratch-search.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Composer could not detect the root package (pagesco/pagesco-books) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version
+
+FILE: scratch-search.php
+--------------------------------------------------------------------------------
+FOUND 8 ERRORS AND 1 WARNING AFFECTING 5 LINES
+--------------------------------------------------------------------------------
+  1 | ERROR   | [ ] Missing file doc comment
+    |         |     (Squiz.Commenting.FileComment.Missing)
+  7 | ERROR   | [x] There must be no blank lines between the function comment
+    |         |     and the declaration
+    |         |     (Squiz.Commenting.FunctionComment.SpacingAfter)
+  9 | WARNING | [ ] Processing form data without nonce verification.
+    |         |     (WordPress.Security.NonceVerification.Recommended)
+  9 | ERROR   | [ ] Detected usage of a possibly undefined superglobal array
+    |         |     index: $_GET['q']. Check that the array index exists before
+    |         |     using it.
+    |         |     (WordPress.Security.ValidatedSanitizedInput.InputNotValidated)
+  9 | ERROR   | [ ] $_GET['q'] not unslashed before sanitization. Use
+    |         |     wp_unslash() or similar
+    |         |     (WordPress.Security.ValidatedSanitizedInput.MissingUnslash)
+  9 | ERROR   | [ ] Detected usage of a non-sanitized input variable:
+    |         |     $_GET['q']
+    |         |     (WordPress.Security.ValidatedSanitizedInput.InputNotSanitized)
+ 10 | ERROR   | [ ] All output should be run through an escaping function (see
+    |         |     the Security sections in the WordPress Developer
+    |         |     Handbooks), found '$term'.
+    |         |     (WordPress.Security.EscapeOutput.OutputNotEscaped)
+ 11 | ERROR   | [ ] All output should be run through an escaping function (see
+    |         |     the Security sections in the WordPress Developer
+    |         |     Handbooks), found '__'.
+    |         |     (WordPress.Security.EscapeOutput.OutputNotEscaped)
+ 11 | ERROR   | [ ] Mismatched text domain. Expected 'pagesco-books' but got
+    |         |     'pagesco'. (WordPress.WP.I18n.TextDomainMismatch)
+--------------------------------------------------------------------------------
+PHPCBF CAN FIX THE 1 MARKED SNIFF VIOLATIONS AUTOMATICALLY
+--------------------------------------------------------------------------------
+
+...
+
+Script phpcs handling the lint event returned with error code 2</code></pre>
+                        </div>
+                        <pre data-cli><code class="language-bash">rm wp-content/plugins/pagesco-books/scratch-search.php</code></pre>
+                        <p>The security findings are the input ones (<code>$_GET['q']</code> not validated with <code>isset()</code>, not unslashed, not sanitized, and read without a nonce check) and the output ones (<code>$term</code> and the translated string echoed without escaping: an XSS hole, Lesson 5.3). The fix: <code>$term = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : '';</code>, <code>esc_html( $term )</code>, <code>esc_html__( 'No books found.', 'pagesco-books' )</code> (the right text domain: PHPCS caught the theme's), a DocBlock for the function, and a nonce check if the form changes anything. A search form only reads, so that one finding could be documented with <code>phpcs:ignore</code>, as the Book Filter's is.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> Which settings fit a live shop that still wants a record of PHP warnings?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Displayed errors appear in every visitor's page. Who should see warnings on a live site?">
+                                A) WP_DEBUG true, WP_DEBUG_DISPLAY true, WP_DEBUG_LOG true
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Errors are recorded but never shown, and the log lives where the web server does not serve it, unlike the default wp-content/debug.log.">
+                                B) WP_DEBUG true, WP_DEBUG_DISPLAY false, WP_DEBUG_LOG set to a path outside the web root
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Common Mistake 1: where is wp-content/debug.log, and who can download it?">
+                                C) WP_DEBUG true, WP_DEBUG_DISPLAY false, WP_DEBUG_LOG true
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> A plugin's <code>init</code> callback calls a function that does not exist. What does the administrator receive when the error happens on <code>wp-login.php</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="The fatal error handler finds the plugin from the file in the error and emails a recovery mode link that logs in with that plugin paused.">
+                                A) An email with the plugin's name, the error and a recovery mode link
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Since WordPress 5.2 a handler catches fatal errors. What did Mailpit show?">
+                                B) Nothing: a fatal error stops PHP before WordPress can react
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="WordPress pauses plugins only inside a recovery mode session. Who has to start that session?">
+                                C) A notice that WordPress has deactivated the plugin
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> Why do the supplier client's tests use the <code>pre_http_request</code> filter?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Speed is a bonus. What happens to a test that calls the real supplier on the supplier's bad day?">
+                                A) Only because it is faster than a real request
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The test library has no such rule. What would a network-dependent test measure besides your code?">
+                                B) Because WP_UnitTestCase blocks all HTTP requests
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The filter answers in place of the network, so each test decides exactly what the supplier says, including 503s and broken JSON, and the result depends only on your code.">
+                                C) So that the test controls the answer, including failures, and does not depend on the network
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> PHPCS reports <code>OutputNotEscaped</code> for <code>&lt;ul &lt;?php echo get_block_wrapper_attributes(); ?&gt;&gt;</code> in a block's <code>render.php</code>. What is the right response?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The function already returns escaped attributes. What would escaping the whole string again do to its quotes?">
+                                A) Wrap it in esc_html()
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That would also hide real unescaped output in every other file. How narrow can an exception be?">
+                                B) Exclude WordPress.Security.EscapeOutput for the whole plugin
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The output is escaped by core, which PHPCS cannot know; an ignore comment for exactly that rule on exactly that line, with the reason, documents the decision.">
+                                C) A phpcs:ignore comment for that rule on that line, with the reason
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> Why does the plugin's test environment run on its own wp-env site (port 8889) instead of the site you develop on?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="The test library drops and reinstalls the tables of the database it is configured with on every run, so it must never be a database you care about.">
+                                A) The test library reinstalls that site's database on every run
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="PHPUnit can run anywhere PHP runs. What does Installing... at the start of each run do?">
+                                B) PHPUnit cannot run inside Docker Compose
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Port numbers have nothing to do with it. What happens to the site's data during a run?">
+                                C) Tests are slower on port 8080
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>How many tests should a plugin have?</summary>
+                    <p>Enough that you dare to change the code. Start where a bug would hurt most or hide best: anything that handles money, permissions, external services, or data other code relies on (the REST shape, the cron job). Each bug you fix gets a test that would have caught it, so it never comes back. A coverage report (PHPUnit's <code>--coverage-text</code>, which needs Xdebug or PCOV) shows which lines no test ran; use it to find gaps, not as a score to maximize.</p>
+                </details>
+                <details>
+                    <summary>What about testing the blocks and the JavaScript?</summary>
+                    <p><code>@wordpress/scripts</code> includes Jest for JavaScript unit tests (<code>wp-scripts test-unit-js</code>) and Playwright for end-to-end tests that drive a real browser through the editor (<code>wp-scripts test-playwright</code>, with the <code>@wordpress/e2e-test-utils-playwright</code> helpers core uses). End-to-end tests are the slowest and most fragile kind, so keep them for the few flows that must never break, such as "insert a Book List and publish". The render side of a dynamic block is plain PHP and can be tested here: <code>render_block( parse_blocks( '&lt;!-- wp:pagesco/book-list {"count":2} /--&gt;' )[0] )</code> in a <code>WP_UnitTestCase</code>.</p>
+                </details>
+                <details>
+                    <summary>Can the checks run automatically?</summary>
+                    <p>Yes, and on a team they should. A continuous integration (CI) service such as GitHub Actions runs <code>composer lint</code> and the tests on every push and pull request, and marks a change red before anyone reviews it. GitHub's runners have Docker and Node, so the same <code>npx @wordpress/env start</code> and <code>run cli … vendor/bin/phpunit</code> commands work there. Locally, a Git pre-commit hook can run the linter. Lesson 8.4 sets up the Git side of the project.</p>
+                </details>
+                <details>
+                    <summary>Should I fix every PHPCS warning in old code I inherit?</summary>
+                    <p>Not in one go. A thousand findings in a legacy plugin are a project of their own, and reformatting everything makes the history unreadable. Fix the security findings first, add PHPCS so new code is clean, and clean old files when you work on them anyway. PHPCS can also run only on changed lines with additional tools, or on a "baseline" of accepted findings.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Add the PHP compatibility check: <code>phpcompatibility/phpcompatibility-wp</code> as a dev dependency, <code>&lt;rule ref="PHPCompatibilityWP"/&gt;</code> and <code>&lt;config name="testVersion" value="8.2-"/&gt;</code> in the ruleset (the plugin says <code>Requires PHP: 8.2</code>). Does the plugin use anything newer than PHP 8.2? Then write a test for the Book List block's render side that inserts two books, renders <code>&lt;!-- wp:pagesco/book-list {"count":1,"orderBy":"price"} /--&gt;</code> with <code>render_block()</code>, and asserts that only the cheaper book appears.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Think of the last bug you chased, in any project. Write down how you found it and how long it took. Which tool from today (the log, a hook that logs, a backtrace, Query Monitor) would have shortened the hunt, and which test would have caught it before it happened? Then list three behaviors of the Pages &amp; Co. plugin that have no test yet, and which one you would write first.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Debug with evidence: <code>WP_DEBUG</code> and the log, <code>error_log()</code> from hooks such as <code>http_api_debug</code>, and <code>wp_debug_backtrace_summary()</code> on <code>doing_it_wrong_run</code> to name the code behind a notice; remove debugging code afterwards, and never log secrets</li>
+                        <li>Display errors only locally; on servers log to a path outside the web root, because <code>wp-content/debug.log</code> is downloadable</li>
+                        <li>Fatal errors in plugins trigger recovery mode emails; <code>wp --skip-plugins=…</code> repairs a site from the command line</li>
+                        <li>Query Monitor shows queries, hooks, HTTP calls, transients and capability checks for each page; use it to investigate, remove it afterwards (and its <code>db.php</code>)</li>
+                        <li>Integration tests run the plugin in a real WordPress: <code>WP_UnitTestCase</code>, factories, a rollback per test, <code>pre_http_request</code> instead of the network, in a wp-env test environment of their own with the project's PHPUnit 9.6</li>
+                        <li>PHPCS with WPCS checks security, i18n and style; a <code>phpcs.xml.dist</code> sets the text domain, prefixes and scope, and every exception is narrow and explained</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>A line in the log</td><td><code>error_log( 'context: ' . wp_json_encode( $value ) );</code></td></tr>
+                            <tr><td>Who called it</td><td><code>wp_debug_backtrace_summary()</code></td></tr>
+                            <tr><td>WP-CLI despite a broken plugin</td><td><code>wp --skip-plugins=pagesco-crash plugin deactivate pagesco-crash</code></td></tr>
+                            <tr><td>Lint, and auto-fix</td><td><code>composer lint</code>, <code>composer lint:fix</code></td></tr>
+                            <tr><td>An exception for one line</td><td><code>// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- reason</code></td></tr>
+                            <tr><td>Start the test environment</td><td><code>npx @wordpress/env start</code> (in the plugin's folder)</td></tr>
+                            <tr><td>Run the tests</td><td><code>npx @wordpress/env run cli --env-cwd=wp-content/plugins/pagesco-books vendor/bin/phpunit [--testdox] [--filter Name]</code></td></tr>
+                            <tr><td>A test with data</td><td><code>self::factory()-&gt;post-&gt;create( array( 'post_type' =&gt; 'book', 'meta_input' =&gt; … ) )</code></td></tr>
+                            <tr><td>A fake HTTP answer</td><td><code>add_filter( 'pre_http_request', fn() =&gt; array( 'response' =&gt; array( 'code' =&gt; 503 ), … ) )</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You found a broken configuration from logs instead of guesses, and traced a notice to the file that caused it</li>
+                        <li>You took a site down with a fatal error, got the recovery email, and repaired it from the command line</li>
+                        <li>You looked inside a request with Query Monitor</li>
+                        <li>You brought the whole plugin to zero coding-standards findings, with every exception explained</li>
+                        <li>You wrote the plugin's first twelve tests, watched them catch a bug, and can run them in seconds</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>The tests prove the shop works; they do not say whether it is fast. In <a href="lesson_27.html"><strong>Lesson 8.2: Performance &amp; Caching</strong></a> you measure before you optimize: what queries really cost (with <code>SAVEQUERIES</code> and a query report of your own), the object cache and a persistent one, transients revisited with numbers, asset loading, and Core Web Vitals, and you will look again at the meta and taxonomy queries PHPCS warned about today.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Run <code>composer lint</code> and the test suite once more; both should be clean</li>
+                    <li>Stop the test environment (<code>npx @wordpress/env stop</code>) so it does not use memory while you work on the main site</li>
+                    <li>Make sure the temporary must-use plugins from today are gone: <code>wp plugin list --status=must-use</code> should list only <code>mailpit-smtp</code> and <code>pagesco-site</code></li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Nobody enjoys their first PHPCS report or their first red test; both feel like being graded. They are the opposite: a colleague who reads every line you write, never gets tired, and tells you about the problem while it is still small. Professionals do not write code without bugs; they write code that tells them about its bugs early. Today your plugin learned to do that, and the habit you practiced, collecting evidence before changing anything, will serve you on every project you ever debug.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_25.html" class="prev-lesson">← Previous: External APIs, Transients &amp; WP-Cron</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_27.html" class="next-lesson">Next: Performance &amp; Caching →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

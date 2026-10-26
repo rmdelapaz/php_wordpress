@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Key: Session 7</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">answers &amp; solutions · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Answer Key</div>
+    <h1>Session 7: functions.php: Supports, Assets, Menus &amp; Widgets</h1>
+    <p class="sub">Answers and reasoning for every Session 7 item: the warm-up, the self-check (Lesson 4.3 and the Part 1 project skills), the predict-then-run items, the Part 1 kickoff outputs, the lab reference outputs, the lesson page's own quiz and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Session <b>7</b></span>
+      <span class="chip"><b>12</b> self-check items</span>
+      <span class="chip">Confidential</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Start Here · Warm-up</h2><span class="rule"></span></div>
+<p>Session 6 retrieval, not graded. W5's output on a site ready for today:</p>
+<pre class="code">wp theme list --status=active --field=name
+curl -s http://localhost:8080/ | grep -c 'class="entry-title"'</pre><pre class="out">pagesco-classic
+3</pre><ol class="steps">
+  <li><b>W1</b> What does the Loop do, and what does the_post() do inside it? <b>Answer:</b> It walks the posts the main query already found; the_post() moves to the next one and sets the global $post (Lesson 4.1).</li>
+  <li><b>W2</b> the_title() or get_the_title() inside echo '&lt;h2&gt;' . ... . '&lt;/h2&gt;'? <b>Answer:</b> get_the_title(), escaped: the_title() prints on the spot and leaves an empty heading.</li>
+  <li><b>W3</b> posts_per_page 2, three matches: post_count, found_posts, max_num_pages on page 1? <b>Answer:</b> 2, 3, 2 (Lesson 4.2).</li>
+  <li><b>W4</b> Name the three guards of a pre_get_posts callback that changes the blog home. <b>Answer:</b> is_admin(), $query-&gt;is_main_query(), $query-&gt;is_home().</li>
+  <li><b>W5</b> Run the two commands on the slide. What should a site ready for today print? <b>Answer:</b> pagesco-classic (active since Lesson 4.1), then 3: three news items on the home page (the 4.2 callback).</li>
+</ol>
+
+  <div class="sec"><h2>4.3 · functions.php: Supports, Assets, Menus &amp; Widgets: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">Which of these actions fires FIRST in a front-end request?</div><div class="opts"><div class="opt">A) <code class="inline">wp_enqueue_scripts</code></div><div class="opt">B) <code class="inline">widgets_init</code></div><div class="opt correct">C) <code class="inline">after_setup_theme</code></div><div class="opt">D) <code class="inline">wp_head</code></div></div><div class="why"><b>Why:</b> The order of Lesson 4.3's timeline: the theme's functions.php is included, after_setup_theme fires (supports, menu locations), then init with widgets_init at priority 1, then the main query and the template, and wp_head runs wp_enqueue_scripts at priority 1.<br><b>A</b> is wrong: It runs inside wp_head, after the query.<br><b>B</b> is wrong: It runs on init, after after_setup_theme.<br><b>D</b> is wrong: wp_head is printed by the template, near the end.</div></div>
+  <div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">At the end of Lesson 4.3, what does this print, and why does the version column matter for the theme's CSS?</div><pre class="code">wp theme list --name=pagesco-classic --fields=name,status,version</pre><div class="opts"><div class="opt correct"><code class="inline">pagesco-classic | inactive | 1.1.0</code>: pagesco is active again; 1.1.0 is the Version the stylesheet is enqueued with (style.css?ver=1.1.0), so raising it on a release makes every browser fetch the new CSS</div></div><div class="why"><b>Why:</b> The enqueue reads the version from the theme header (wp_get_theme( get_template() )->get( 'Version' )), never a typed number.</div></div>
+  <div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">pagesco-classic enqueued its stylesheet with <code class="inline">get_stylesheet_uri()</code> instead of <code class="inline">get_parent_theme_file_uri( 'style.css' )</code>. A client builds a child theme of it. What happens?</div><div class="opts"><div class="opt correct">A) The page loads the CHILD's style.css under the parent's handle, and the parent's CSS is gone</div><div class="opt">B) Nothing changes: both functions return the parent's file</div><div class="opt">C) WordPress loads both files automatically</div><div class="opt">D) A notice: get_stylesheet_uri() cannot be used in a parent theme</div></div><div class="why"><b>Why:</b> get_stylesheet_uri() is the ACTIVE (child) theme's style.css; get_parent_theme_file_uri() always the theme that holds the code (Lesson 3.4's template and stylesheet). The same reasoning picks wp_get_theme( get_template() ) for the version.<br><b>B</b> is wrong: Without a child they are the same, which is why the mistake hides.<br><b>C</b> is wrong: Only what is enqueued loads.<br><b>D</b> is wrong: There is no such notice; the mistake is silent.</div></div>
+  <div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">Why does header.php wrap <code class="inline">wp_nav_menu()</code> in <code class="inline">has_nav_menu( 'primary' )</code>?</div><div class="opts"><div class="opt">A) It makes the menu load faster</div><div class="opt correct">B) So a location without an assigned menu prints nothing instead of wp_page_menu()'s list of every page</div><div class="opt">C) wp_nav_menu() refuses to run without it</div><div class="opt">D) It registers the location</div></div><div class="why"><b>Why:</b> With no menu in the location, wp_nav_menu() calls its fallback, wp_page_menu(), which lists all published pages, Sample Page included (Lesson 4.3, Common Mistakes 3). The guard (or 'fallback_cb' => false) keeps the header empty until the owner assigns a menu.<br><b>A</b> is wrong: It saves nothing measurable.<br><b>C</b> is wrong: It runs fine; that is the problem.<br><b>D</b> is wrong: register_nav_menus() registers locations, on after_setup_theme.</div></div>
+  <div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">pagesco-classic ships languages/es_ES.l10n.php and says Requires at least: 6.6. Does it still need load_theme_textdomain()?</div><div class="opts"><div class="opt">A) Yes, every theme needs it on every version</div><div class="opt">B) No, never: translations always load themselves</div><div class="opt">C) Only plugins need it</div><div class="opt correct">D) Not on WordPress 6.8 and later, which load the active theme's languages/ folder itself; it stays for 6.6 and 6.7</div></div><div class="why"><b>Why:</b> Since 6.8 wp-settings.php calls $wp_theme->load_textdomain() for the active theme (the lesson's version note, checked in the 6.7 and 6.8 images). A theme that supports older versions keeps the call; on 7.1 it is harmless.<br><b>A</b> is wrong: Measured otherwise on 6.8+.<br><b>B</b> is wrong: Not before 6.8.<br><b>C</b> is wrong: Plugins and themes follow the same rule since 6.8.</div></div>
+  <div class="q" data-sc="6" data-kind="short"><div class="qn">Q6</div><div class="qt">A must-use plugin calls wp_enqueue_style() at the top level of its file. What does WordPress say, and what is the real damage?</div><div class="opts"><div class="opt correct">A "called incorrectly" notice naming the handle (scripts and styles should not be enqueued until wp_enqueue_scripts...), plus two follow-on notices; the real damage: top-level code runs on every request, so the CSS also loads on admin screens and the login page</div></div><div class="why"><b>Why:</b> Lesson 4.3's Common Mistake 1. Read the first notice; wrap the call in a function on wp_enqueue_scripts.</div></div>
+
+  <div class="sec"><h2>4.3 · functions.php: Supports, Assets, Menus &amp; Widgets: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'var_dump( current_theme_supports( "title-tag" ), current_theme_supports( "menus" ) );'</pre><div class="opts"><div class="opt correct"><pre class="out">bool(false)
+bool(false)</pre></div></div><div class="why"><b>Why:</b> Neither: pagesco-classic declares no supports yet and registers no location. Registering a location (Lesson 4.3) is what switches menus on; nobody needs add_theme_support( 'menus' ).</div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'var_dump( current_theme_supports( "title-tag" ), current_theme_supports( "html5", "search-form" ) );'</pre><div class="opts"><div class="opt correct"><pre class="out">bool(false)
+bool(true)</pre></div></div><div class="why"><b>Why:</b> pagesco declares nothing, yet html5 search-form is true: _add_default_theme_supports() adds it for block themes. title-tag is false although every page has a title: block themes print it unconditionally (the lesson's Exercise 3).</div></div>
+
+  <div class="sec"><h2>Part 1 Project: self-check (project skills)</h2><span class="rule"></span></div>
+  <div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">Fernhill is a block theme. What is its style.css for?</div><div class="opts"><div class="opt correct">A) It names the theme: the header fields WordPress reads (Theme Name, Text Domain, Version, Requires at least ...)</div><div class="opt">B) It is the theme's stylesheet, loaded on every page</div><div class="opt">C) It is a fallback when theme.json has an error</div><div class="opt">D) It registers the patterns</div></div><div class="why"><b>Why:</b> Block themes do not load style.css on the front end (Lesson 3.2's FAQ); the design lives in theme.json, and extra CSS is enqueued (R5: <code class="inline">fernhill-style</code>). The header is R1 and the self-check's first line.<br><b>B</b> is wrong: Not in a block theme; Fernhill enqueues assets/css/fernhill.css instead.<br><b>C</b> is wrong: A broken theme.json is just ignored, with a decode notice.<br><b>D</b> is wrong: Pattern files register themselves from patterns/.</div></div>
+  <div class="q" data-sc="8"><div class="qn">Q8</div><div class="qt">The brief wants links and buttons in the primary color. Where does that go?</div><div class="opts"><div class="opt">A) A hex color typed into each template's markup</div><div class="opt">B) assets/css/fernhill.css</div><div class="opt correct">C) <code class="inline">theme.json</code>: <code class="inline">styles.elements.link</code> and <code class="inline">styles.elements.button</code> with <code class="inline">var:preset|color|primary</code></div><div class="opt">D) A pattern that wraps every link</div></div><div class="why"><b>Why:</b> The design system lives in theme.json (Lesson 3.2): one preset, used everywhere, and a style variation (Autumn, R4) can recolor it without touching a template. Hard-coded hex in markup costs a rubric point.<br><b>A</b> is wrong: The rubric's Partly column names exactly this.<br><b>B</b> is wrong: Possible, but not where a variation can change it.<br><b>D</b> is wrong: Patterns hold sections, not global styles.</div></div>
+  <div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">R6: the blog home lists three posts per page with working pagination. Which way does the brief want?</div><div class="opts"><div class="opt">A) A Query Loop with <code class="inline">perPage</code> 3 that does not inherit</div><div class="opt correct">B) A <code class="inline">pre_get_posts</code> callback in functions.php with the three guards: not the admin, the main query only, the blog home only</div><div class="opt">C) Settings > Reading set to 3</div><div class="opt">D) A second WP_Query in the front-page pattern</div></div><div class="why"><b>Why:</b> One main query, changed before it runs, so the Query Loop that inherits it, the pagination and the 404 decision all agree (Lesson 4.2). The self-check's line 11 counts 3 on / and 1 on /page/2/.<br><b>A</b> is wrong: A non-inheriting Query Loop runs a second query; /page/2/ then disagrees.<br><b>C</b> is wrong: That is the owner's setting, not the theme's, and it changes every list.<br><b>D</b> is wrong: The second-query mistake of Lesson 4.2.</div></div>
+  <div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">You tried a header change in the Site Editor and clicked Save. Now your edits to parts/header.html no longer show. What happened, and what do you do?</div><div class="opts"><div class="opt">A) The theme cache needs 30 minutes</div><div class="opt">B) parts/ files are only read on activation: switch themes twice</div><div class="opt">C) theme.json overrides parts</div><div class="opt correct">D) A wp_template_part copy in the database wins over the file: move the change into header.html, then delete the copy</div></div><div class="why"><b>Why:</b> Lesson 3.2's Mistake 3 and 3.3's loop: list the template, template-part and global-styles posts (wp post list), find the change, put it in the file, delete the copy. A copy left behind is also missing from the zip you hand in (R8).<br><b>A</b> is wrong: That cache is for pattern files, and development mode is on.<br><b>B</b> is wrong: Parts are read on every request.<br><b>C</b> is wrong: theme.json declares part areas; it does not replace markup.</div></div>
+  <div class="q" data-sc="11" data-kind="short"><div class="qn">Q11</div><div class="qt">Odette wants the autumn look she can switch on in October (R4). Which file, and what may it change?</div><div class="opts"><div class="opt correct"><code class="inline">styles/autumn.json</code>, titled Autumn, without blockTypes: the same five color slugs with autumn values, nothing else</div></div><div class="why"><b>Why:</b> A style variation is a layer over theme.json (Lesson 3.3); keeping the slugs means every template and pattern recolors by itself. With blockTypes it would be a section style instead.</div></div>
+  <div class="q" data-sc="12" data-kind="short"><div class="qn">Q12</div><div class="qt">You stop working on Fernhill for the day. Which command do you run, and why?</div><div class="opts"><div class="opt correct"><code class="inline">wp theme activate pagesco</code>: the labs, Session 8's assessment and Part 2 (Lesson 5.1) expect pagesco active, the state at the end of Lesson 4.3</div></div><div class="why"><b>Why:</b> The self-check switches nothing; you activate fernhill yourself and switch back yourself (the brief's rules).</div></div>
+
+  <div class="sec"><h2>Part 1 Project: what the kickoff shows</h2><span class="rule"></span></div>
+<p>Milestone 1, the self-check on the starter:</p>
+<pre class="out">Success: Switched to 'Fernhill' theme.
+Fernhill self-check (Part 1 project, BRIEF.md)
+TODO  1  Theme header: Fernhill 1.0.0, text domain fernhill, requires WordPress 7.1 and a PHP version
+OK    2  A block theme with a valid theme.json, version 3
+TODO  3  Palette: base, contrast, primary, secondary, accent (in that order); the default palette off
+TODO  4  Layout: content 680px, wide 1100px
+TODO  5  Templates: index, front-page, single, page, 404 (missing: front-page, single, page, 404)
+TODO  6  Template parts: header (area header) and footer (area footer)
+TODO  7  Patterns: fernhill/hero and fernhill/volunteer-call in the fernhill category; every string translatable with fernhill
+TODO  8  Style variation: Autumn
+TODO  9  Front page: header, main, the hero heading, the volunteer heading, footer
+TODO 10  Stylesheet: fernhill-style, assets/css/fernhill.css?ver=1.0.0
+TODO 11  Main query: 3 posts on the front page, 1 on /page/2/ (now: 4 and 0)
+TODO 12  404: status 404 and the heading "This path is overgrown"
+Checks passed: 1 of 12</pre><p>After the room's Milestone 2 time (the starter with the model solution's style.css and theme.json): <code class="inline">Checks passed: 4 of 12</code>. The model solution, for comparison (never handed out before the feedback):</p>
+<pre class="out">Success: Switched to 'Fernhill' theme.
+Fernhill self-check (Part 1 project, BRIEF.md)
+OK    1  Theme header: Fernhill 1.0.0, text domain fernhill, requires WordPress 7.1 and a PHP version
+OK    2  A block theme with a valid theme.json, version 3
+OK    3  Palette: base, contrast, primary, secondary, accent (in that order); the default palette off
+OK    4  Layout: content 680px, wide 1100px
+OK    5  Templates: index, front-page, single, page, 404
+OK    6  Template parts: header (area header) and footer (area footer)
+OK    7  Patterns: fernhill/hero and fernhill/volunteer-call in the fernhill category; every string translatable with fernhill
+OK    8  Style variation: Autumn
+OK    9  Front page: header, main, the hero heading, the volunteer heading, footer
+OK   10  Stylesheet: fernhill-style, assets/css/fernhill.css?ver=1.0.0
+OK   11  Main query: 3 posts on the front page, 1 on /page/2/ (now: 3 and 1)
+OK   12  404: status 404 and the heading "This path is overgrown"
+Checks passed: 12 of 12</pre><p>The rubric, the scoring guidance and the model solution notes are in the Part 1 section of <code class="inline">final-assessment.html</code> (Session 8). The learners' brief is <code class="inline">labs/module-08/p1-project/BRIEF.md</code>.</p>
+
+  <div class="sec"><h2>Lab Reference Solutions</h2><span class="rule"></span></div>
+<p>Every output below is real: the lab files run exactly as <code class="inline">labs/check_labs.py</code> runs them, on a course site at the state each file declares (WordPress 7.1.3, PHP 8.5, MySQL 9.7, WP-CLI 2.12).</p>
+<div class="blk lab"><div class="h">Lab 4.3-A (guided): labs/module-07/l4_3-functions-php/corner_theme_starter/ → corner_theme_solution/ with test_corner_theme.sh</div>
+<p>The test with the starter:</p>
+<pre class="out">Success: Switched to 'Pages &amp;amp; Co. Lab: Reading Corner' theme.
+&lt;title&gt;:      0
+search form:  xhtml (id="searchform")
+style:        (not enqueued)
+script:       (not enqueued)
+menu places:  (none)
+widget areas: (none)</pre><p>With the solution:</p>
+<pre class="out">Success: Switched to 'Pages &amp;amp; Co. Lab: Reading Corner' theme.
+&lt;title&gt;:      1
+search form:  html5 (type="search")
+style:        style.css?ver=2.0.0
+script:       corner.js?ver=2.0.0, defer
+menu places:  corner (Reading corner menu)
+widget areas: corner-footer</pre><p>Reading it: no title at all until title-tag (the header has no hand-written one: the lesson's two-titles mistake cannot happen); the xhtml form until html5 with an ARRAY; the stylesheet and the deferred script carry the theme's Version 2.0.0 read from the header; registering the location and the area is enough for WP-CLI to list them (they stay empty until the owner fills them, which is why the templates guard with has_nav_menu() and is_active_sidebar()). Accept the menu and the supports in one callback; insist on one function per hook family and the prefix.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 4.3-B: labs/module-07/l4_3-functions-php/menus_widgets_starter.sh → menus_widgets_solution.sh</div>
+<p>As shipped:</p>
+<pre class="out">Success: Switched to 'Pages &amp;amp; Co. Classic' theme.
+== locations ==
++----------+--------------+
+| location | description  |
++----------+--------------+
+| primary  | Primary menu |
++----------+--------------+
+Second menu: TODO
+Second widget: TODO
+footer widgets after cleanup: block-7
+Success: Switched to 'Pages &amp;amp; Co.' theme.</pre><p>The solution prints:</p>
+<pre class="out">Success: Switched to 'Pages &amp;amp; Co. Classic' theme.
+== locations ==
++----------+--------------+
+| location | description  |
++----------+--------------+
+| primary  | Primary menu |
++----------+--------------+
+== a second menu ==
+Success: Created menu 5.
+Success: Menu item added.
+Success: Menu item added.
++------------+--------------------------------+
+| title      | link                           |
++------------+--------------------------------+
+| Events     | http://localhost:8080/events/  |
+| Gift cards | http://localhost:8080/contact/ |
++------------+--------------------------------+
+== one more widget ==
+Success: Added widget to sidebar.
++-------+---------+----------+
+| name  | id      | position |
++-------+---------+----------+
+| block | block-8 | 1        |
+| block | block-7 | 2        |
++-------+---------+----------+
+== cleanup ==
+Success: Deleted 1 of 1 widgets.
+Deleted menu 'shop-links'.
+Success: Deleted 1 of 1 menus.
+footer widgets after cleanup: block-7
+Success: Switched to 'Pages &amp;amp; Co.' theme.</pre><p>Menu and item IDs come from the site's counters (5, and the posts after it): a learner's numbers may differ. <code class="inline">wp widget add</code> with position 1 puts the search widget before the lesson's block-7; the cleanup deletes it by the first id of the list, then the menu (wp menu delete also removes its items).</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-07/l4_3-functions-php/debug_theme_setup.php (deliberately broken)</div>
+<p>As shipped:</p>
+<pre class="out">Notice: Function register_sidebar was called &lt;strong&gt;incorrectly&lt;/strong&gt;. No &lt;code&gt;id&lt;/code&gt; was set in the arguments array for the "Shop footer" sidebar. Defaulting to "sidebar-2". Manually set the &lt;code&gt;id&lt;/code&gt; to "sidebar-2" to silence this notice and keep existing sidebar content. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 4.2.0.) in /var/www/html/wp-includes/functions.php on line 6260
+widget area id: sidebar-2
+Notice: Function add_theme_support( 'html5' ) was called &lt;strong&gt;incorrectly&lt;/strong&gt;. You need to pass an array of types. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 3.6.1.) in /var/www/html/wp-includes/functions.php on line 6260
+html5 for: comment-form, comment-list, search-form, gallery, caption, style, script
+stylesheet: ?ver=7.1.3 (the theme is at 1.0.0)</pre><ol class="steps">
+  <li><b>doing_it_wrong notice, line 20:</b> register_sidebar() without an id: WordPress numbers it (sidebar-N, depending on what was registered before) and says so. Give it <code class="inline">'id' =&gt; 'footer-shop'</code>.</li>
+  <li><b>doing_it_wrong notice, line 24:</b> add_theme_support( 'html5', 'search-form' ): "You need to pass an array of types", and the call is ignored (pagesco, a block theme, has html5 by default anyway, which is why the list looks fine). Pass <code class="inline">array( 'search-form' )</code>.</li>
+  <li><b>Silent, line 28:</b> wp_enqueue_style() without a version: <code class="inline">?ver=7.1.3</code>, WordPress's own version, which changes only with core updates. Pass the theme's Version.</li>
+</ol>
+<p>Fixed, it prints:</p>
+<pre class="out">widget area id: footer-shop
+html5 for: comment-form, comment-list, search-form, gallery, caption, style, script, search-form
+stylesheet: ?ver=1.0.0 (the theme is at 1.0.0)</pre></div>
+
+  <div class="sec"><h2>The Lesson Page's Own Quick Quiz</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Lesson 4.3 · functions.php: Supports, Assets, Menus &amp; Widgets</div>
+<ol class="steps" data-lesson-quiz="4.3">
+  <li><b>B</b> In a functions.php callback hooked to after_setup_theme: Theme supports are declared on after_setup_theme, which fires right after functions.php is included and long before any template runs.</li>
+  <li><b>C</b> ?ver=7.1.3: Without a version WordPress adds its own, 7.1.3, which does not change when your CSS does, so browsers keep the old file. Pass the theme's Version instead.</li>
+  <li><b>A</b> A list of all published pages, from the fallback wp_page_menu(): With no menu found, wp_nav_menu calls its default fallback, wp_page_menu, which lists every published page. fallback_cb false or a has_nav_menu check prevents it.</li>
+  <li><b>B</b> widgets_init: widgets_init fires during init (at priority 1), the moment WordPress sets up widgets, on every request including the admin's Widgets screen.</li>
+  <li><b>C</b> Add the standard .screen-reader-text CSS that clips it visually but keeps it for screen readers: Core marks text meant for screen readers with screen-reader-text and expects the theme to hide it visually only. Block themes get this CSS from core; classic themes must add it.</li>
+</ol>
+</div>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>Hooks:</b> after_setup_theme (supports, menu locations); wp_enqueue_scripts (styles and scripts); widgets_init (widget areas).</li>
+  <li><b>The version:</b> it ends the file's URL (?ver=), so a new release means a new URL and every browser and cache fetches the new file; the theme's Version changes exactly when you ship.</li>
+  <li><b>Personal.</b> Use the answers to plan the Session 8 studio: group learners by the requirement they named.</li>
+</ol>
+
+  <div class="sec"><h2>Common Wrong Answers and What They Reveal</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li><b>Q1 A or D.</b> Thinks assets come first because they are "the theme". Redraw the timeline.</li>
+  <li><b>Q3 B.</b> Has never built a child theme of a classic theme; tie it to Lesson 3.4's template/stylesheet.</li>
+  <li><b>Q5 A.</b> Copied from older tutorials; show the 6.8 version note.</li>
+  <li><b>Q7 B.</b> Still thinks a block theme loads style.css: Lesson 3.2's FAQ and Lesson 3.4's "stylesheet nobody loads".</li>
+  <li><b>Q9 A.</b> A non-inheriting Query Loop: the most common Fernhill bug in the studio; /page/2/ gives it away.</li>
+</ul>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 7 · Answer Key · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

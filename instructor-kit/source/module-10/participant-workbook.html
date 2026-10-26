@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Workbook: Session 10</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Student workbook —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">write in it · bring it to every session</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Participant Workbook</div>
+    <h1>Session 10: Security and the Settings API</h1>
+    <p class="sub">Your workbook for Session 10: the warm-up, the key ideas of Lessons 5.3 and 5.4, worked examples, the guided labs, predict-then-run practice, a self-check for each lesson, and your exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Lessons <b>5.3–5.4</b></span>
+      <span class="chip">Session <b>10</b> · 3 hours</span>
+      <span class="chip">Name: ____________________</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Session Goals</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Apply WordPress's four security habits everywhere data crosses a boundary: sanitize what comes in, escape what goes out, check the nonce, check the capability; and $wpdb-&gt;prepare() for SQL by hand.</li>
+  <li>Name the common vulnerabilities (XSS, CSRF, SQL injection, broken access control) and the defense against each.</li>
+  <li>Harden the book meta box save and add a safe "Mark sold out" action.</li>
+  <li>Store a plugin's settings as one option with defaults, and build its settings page with the Settings API.</li>
+  <li>Trace what happens between Save Changes and the database, and let the store notice read the settings.</li>
+</ul>
+
+  <div class="sec"><h2>Start Here: Warm-up</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Five questions on Session 9</div>
+<p>Two minutes alone, then compare with a neighbor.</p>
+<div class="q"><div class="qn">W1</div><div class="qt">A new feature for pagesco-books: which three places does it touch?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W2</div><div class="qt">Why does <code class="inline">Activator::activate()</code> register the book type itself before it flushes?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W3</div><div class="qt"><code class="inline">get_post_meta( 33, 'pagesco_in_stock', true )</code> on The Great Gatsby returns what?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W4</div><div class="qt">Where did Lesson 5.2's meta box already use a nonce?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W5</div><div class="qt">Deactivating pagesco-books: what happens to the eleven books?</div><div class="write"></div></div>
+</div>
+<div class="blk lab"><div class="h">Homework check</div>
+<ul class="tick">
+  <li>☐ <code class="inline">wp post list --post_type=book --format=count</code> prints 11</li>
+  <li>☐ <code class="inline">grep -c '::class,' wordpress/wp-content/plugins/pagesco-books/src/Plugin.php</code> prints 6</li>
+  <li>☐ The Book details box shows when I open a book in wp-admin (if not: copy BookMetaBox.php and BookColumns.php from Lesson 5.2 at the break)</li>
+</ul>
+</div>
+
+  <div class="sec"><h2>Lessons</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">5.3</span><h3>Security in WordPress</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Sanitize input on the way in and escape output on the way out, choosing the right function for each context</li>
+  <li>Protect every state change with a nonce and a current_user_can() capability check</li>
+  <li>Write safe database queries with $wpdb-&gt;prepare() and explain how SQL injection works</li>
+  <li>Name the common WordPress vulnerabilities (XSS, CSRF, SQL injection, broken access control) and the defense against each</li>
+  <li>Harden a real save handler and an admin action in the pagesco-books plugin</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>One data flow:</b> request → genuine? (<b>nonce</b>) → allowed? (<b>capability</b>) → <b>sanitize</b> → store → <b>escape</b> → page.</li>
+  <li><b>Escape late, for the context:</b> <code class="inline">esc_html()</code> text, <code class="inline">esc_attr()</code> attributes, <code class="inline">esc_url()</code> links, <code class="inline">wp_kses_post()</code> HTML that may keep safe tags; even for data you sanitized.</li>
+  <li><b>Sanitize and validate on the way in:</b> <code class="inline">sanitize_text_field()</code>, <code class="inline">absint()</code>, a cast; a value with a shape (a date) is validated and rejected if wrong.</li>
+  <li><b>Nonces</b> (<code class="inline">wp_nonce_field()</code>, <code class="inline">wp_nonce_url()</code>, <code class="inline">check_admin_referer()</code>) stop forged requests (CSRF); <b>capabilities</b> (<code class="inline">current_user_can( 'edit_post', $id )</code>) stop the wrong user. You need both.</li>
+  <li><b><code class="inline">$wpdb-&gt;prepare()</code></b> with <code class="inline">%s</code>, <code class="inline">%d</code>, <code class="inline">%f</code>, <code class="inline">%i</code>: no variable ever goes directly into SQL.</li>
+  <li><b>Database functions trust their caller:</b> <code class="inline">wp_insert_post()</code> and <code class="inline">update_post_meta()</code> check nothing; guard every write yourself. save_post handlers skip autosaves and revisions.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: one value, three destinations</div>
+<p>One value with tags, an ampersand and quotes, escaped for three destinations:</p>
+<pre class="code">wp eval '$v = "Dune: &lt;b&gt;signed&lt;/b&gt; &amp; \"rare\"";
+echo esc_html( $v ), "\n", esc_attr( $v ), "\n", wp_kses_post( $v ), "\n";'</pre>
+<pre class="out">Dune: &amp;lt;b&amp;gt;signed&amp;lt;/b&amp;gt; &amp;amp; &amp;quot;rare&amp;quot;
+Dune: &amp;lt;b&amp;gt;signed&amp;lt;/b&amp;gt; &amp;amp; &amp;quot;rare&amp;quot;
+Dune: &lt;b&gt;signed&lt;/b&gt; &amp;amp; "rare"</pre><p>esc_html() and esc_attr() both turn the value into text (the quotes too, so it cannot end an attribute); wp_kses_post() keeps the tags a post may contain and escapes the rest. The function is chosen by the destination: text, attribute, or HTML that may keep safe tags. An unknown value printed into a page is never echoed raw.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>From the project folder: <code class="inline">cp labs/module-10/l5_3-security/staff_note_starter.php wordpress/</code>, then <code class="inline">wp eval-file --use-include staff_note_starter.php</code>.</li>
+  <li>Read the four lines it prints. Which request should a real site refuse, and why?</li>
+  <li>TODOs 1 to 4 in <code class="inline">wordpress/staff_note_starter.php</code>, one at a time; run again after each.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Request</th><th>Which box of the flow stops it?</th></tr></thead>
+<tbody>
+<tr><td>no token</td><td></td></tr>
+<tr><td>forged token</td><td></td></tr>
+<tr><td>real token, as Devon</td><td></td></tr>
+<tr><td>real token, as Maria, with a script tag</td><td></td></tr>
+</tbody>
+</table>
+<ul class="tick">
+  <li>Done when the output matches "Expected when done". Then <code class="inline">rm wordpress/staff_note_starter.php</code>.</li>
+  <li>Finished early? <code class="inline">prepared_search_starter.php</code>, then <code class="inline">debug_book_search.php</code> in the same folder.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Predict, then run</div>
+<p>Write your prediction on the line first, then run it on your site from the project folder. A wrong prediction you can explain afterward is worth more than a right guess.</p>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it. (A link that is not a link.)</div><pre class="code">wp eval 'echo esc_url( "javascript:alert(1)" ) === "" ? "(empty)" : "kept", "\n";'</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it. (Tags, an ampersand and whitespace.)</div><pre class="code">wp eval 'echo sanitize_text_field( "  Pages &lt;b&gt;&amp;&lt;/b&gt; Co.\n\tBooks  " ), "|\n";'</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>Harden the Plugin</b> (lesson page, "Project: Harden the Plugin"). In class: Steps 1 and 2. At home: Step 3.</p>
+<ul class="tick">
+  <li>☐ Step 1: the hardened BookMetaBox.php; <code class="inline">php -l</code> clean; the box still registered</li>
+  <li>☐ Step 2: StockAction.php listed; the editor sees the link, the author does not</li>
+  <li>☐ Step 3: the forged request answers 403 "The link you followed has expired."; Dune still in stock; a real click works</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">A book title goes into a link's tooltip: <code class="inline">&lt;a href="/books/dune/" title="..."&gt;</code>. Which function escapes it there?</div><div class="opts"><div class="opt">A) <code class="inline">esc_html()</code></div><div class="opt">B) <code class="inline">esc_url()</code></div><div class="opt">C) <code class="inline">esc_attr()</code></div><div class="opt">D) <code class="inline">sanitize_text_field()</code></div></div></div>
+<div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">What does this print?</div><pre class="code">wp eval 'echo esc_html( "Pride &amp; Prejudice &lt;2nd ed.&gt;" ), "\n";'</pre><div class="write"></div></div>
+<div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">A form handler calls check_admin_referer() and it passes. What does that prove?</div><div class="opts"><div class="opt">A) The user is allowed to make the change</div><div class="opt">B) The request came from a page this site served to this user, for this action, recently</div><div class="opt">C) The submitted values are safe to store</div><div class="opt">D) The request was not sent by a script</div></div></div>
+<div class="q" data-sc="4" data-kind="short"><div class="qn">Q4</div><div class="qt">What does this print?</div><pre class="code">wp eval 'global $wpdb; echo $wpdb-&gt;prepare( "SELECT ID FROM {$wpdb-&gt;posts} WHERE post_title = %s", "Ender\x27s Game" ), "\n";'</pre><div class="write"></div></div>
+<div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">This handler is reached from a link on the Books screen. Which defense is missing?</div><pre class="code"><span class="v">$book_id</span> = absint( <span class="v">$_GET</span>[<span class="s">'book'</span>] );
+check_admin_referer( <span class="s">'pagesco_books_feature_'</span> . <span class="v">$book_id</span> );
+update_post_meta( <span class="v">$book_id</span>, <span class="s">'pagesco_featured'</span>, <span class="s">1</span> );</pre><div class="opts"><div class="opt">A) <code class="inline">current_user_can( 'edit_post', $book_id )</code> before the update</div><div class="opt">B) A nonce check</div><div class="opt">C) <code class="inline">esc_html()</code> on the book ID</div><div class="opt">D) <code class="inline">$wpdb-&gt;prepare()</code> around the update</div></div></div>
+<div class="q" data-sc="6"><div class="qn">Q6</div><div class="qt">The meta box's "First published" field receives <code class="inline">soon</code>. What keeps it out of the database?</div><div class="opts"><div class="opt">A) <code class="inline">sanitize_text_field()</code>: it removes words that are not dates</div><div class="opt">B) <code class="inline">esc_attr()</code> when the box prints the value</div><div class="opt">C) <code class="inline">absint()</code>, which turns it into 0</div><div class="opt">D) Validating it: DateTime::createFromFormat( 'Y-m-d', $v ) must give back exactly $v, else store ''</div></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>Pick one handler you have written in this course (the meta box save, the stock action, or the store notice from Lesson 2.3) and trace a single untrusted value through it: where does it enter, where is it checked (nonce, capability), where is it sanitized, and where is it escaped on the way out? Note any gap. Then write the one security habit you are most likely to forget, and how you will remember it.</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">5.4</span><h3>Admin Pages, Settings API &amp; Options</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Store a plugin's settings as one array option with defaults, and read it safely with get_option() and wp_parse_args()</li>
+  <li>Add an admin page with add_options_page() (or a top-level menu) protected by the right capability</li>
+  <li>Build a settings form with the Settings API: register_setting(), sections, fields, settings_fields() and do_settings_sections()</li>
+  <li>Validate submitted values in a sanitize callback and report problems with add_settings_error()</li>
+  <li>Trace what happens between Save Changes and the database: options.php, the nonce, the allowed options list</li>
+  <li>Decide what uninstall.php removes, and remove the plugin's own settings</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>One array option per plugin</b> (<code class="inline">pagesco_books_settings</code>), read through one class that knows the name, the defaults (<code class="inline">wp_parse_args()</code>) and the cleaning.</li>
+  <li><b><code class="inline">register_setting( $group, $option, $args )</code></b> on init: type, <code class="inline">sanitize_callback</code>, <code class="inline">default</code> (handed out while the row is missing).</li>
+  <li><b>Admin pages</b> hang off <code class="inline">admin_menu</code>: <code class="inline">add_options_page()</code> under Settings; the capability (<code class="inline">manage_options</code>) guards the menu item and the URL.</li>
+  <li><b>The Settings API</b> describes the form as data (<code class="inline">add_settings_section()</code>, <code class="inline">add_settings_field()</code> with <code class="inline">label_for</code>) and prints it (<code class="inline">settings_fields( $group )</code>, <code class="inline">do_settings_sections( $page )</code>, <code class="inline">submit_button()</code>).</li>
+  <li><b>options.php</b> checks the nonce, the capability and the allowed options list, then saves through your callback. The callback returns the COMPLETE value, treats a missing checkbox as off, and refuses bad values with <code class="inline">add_settings_error()</code> (keeping the old one).</li>
+  <li><b>uninstall.php</b> deletes the plugin's own data (the option, the role) and keeps the shop's content (the books).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: defaults without a row</div>
+<p>The setting is registered with a default, and nothing has been saved since the lesson's uninstall test. Is <code class="inline">get_option()</code> handing out the defaults?</p>
+<pre class="code">wp eval 'var_dump( get_option( "pagesco_books_settings" ) === PagesCo\Books\Settings::defaults() );'</pre>
+<pre class="out">bool(true)</pre><p>And is there a row?</p>
+<pre class="code">wp db query "SELECT COUNT(*) AS rows_named FROM wp_options WHERE option_name = 'pagesco_books_settings'"</pre>
+<pre class="out">rows_named
+0</pre><p>Exactly the defaults, and no row: register_setting()'s default applies while the row is missing. That is why the notice looks the same after a reactivation, and why Settings::get() still fills keys from defaults() for sites that saved an older array.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>From the project folder: <code class="inline">cp labs/module-10/l5_4-settings-api/newsletter_settings_starter/pagesco-lab-newsletter.php wordpress/wp-content/mu-plugins/</code> and <code class="inline">cp labs/module-10/l5_4-settings-api/test_newsletter_settings.sh wordpress/</code>.</li>
+  <li><code class="inline">docker compose run --rm wpcli sh test_newsletter_settings.sh</code>, and open Settings &gt; Newsletter in your browser.</li>
+  <li>TODOs 1 to 3 in <code class="inline">wordpress/wp-content/mu-plugins/pagesco-lab-newsletter.php</code>; run the test after each.</li>
+</ul>
+<div class="write tall"></div>
+<ul class="tick">
+  <li>Done when the test prints <code class="inline">rows: 3</code>, <code class="inline">Frequency must be weekly or monthly.</code> and the cleaned option. Then <code class="inline">rm wordpress/test_newsletter_settings.sh wordpress/wp-content/mu-plugins/pagesco-lab-newsletter.php</code>.</li>
+  <li>Finished early? <code class="inline">debug_newsletter_sanitize.php</code>; after the project, <code class="inline">settings_probe_starter.php</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Predict, then run</div>
+<p>Write your prediction on the line first, then run it on your site from the project folder. A wrong prediction you can explain afterward is worth more than a right guess.</p>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it. (An option that does not exist, with a default.)</div><pre class="code">wp eval 'var_dump( get_option( "pagesco_no_such_option", array() ) );'</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it. (The sanitize callback, fed a string.)</div><pre class="code">wp eval 'echo wp_json_encode( sanitize_option( "pagesco_books_settings", "not an array" ) ), "\n";'</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>Settings the Shop Can Change</b> (lesson page, "Project: Settings the Shop Can Change"). In class: Steps 1 and 2. At home: Step 3.</p>
+<ul class="tick">
+  <li>☐ Settings and Admin\SettingsPage listed (nine features); the page has two sections and four fields; Maria gets a 403</li>
+  <li>☐ Step 1: StoreNotice reads the settings; the notice looks exactly as before</li>
+  <li>☐ Step 2: the notice changed from the admin (tags stripped, link off), then changed back</li>
+  <li>☐ Step 3: uninstall.php deletes the option; the uninstall test; <code class="inline">rm pagesco-save.sh</code></li>
+</ul>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">An administrator presses Save Changes on Settings > Pages & Co. Books. Which code checks the nonce and the capability?</div><div class="opts"><div class="opt">A) Core's own handler, wp-admin/options.php, before it calls your sanitize callback</div><div class="opt">B) Your SettingsPage::render() method</div><div class="opt">C) Your Settings::sanitize() method</div><div class="opt">D) Nothing: the Settings API has no nonce</div></div></div>
+<div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt">On the finished Lesson 5.4 site (the uninstall test deleted the row; nothing was saved since), what does this print?</div><pre class="code">wp option get pagesco_books_settings --format=json</pre><div class="write"></div></div>
+<div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">The Events link checkbox is unticked when the form is saved. What does options.php receive for it?</div><div class="opts"><div class="opt">A) <code class="inline">show_events_link=0</code></div><div class="opt">B) <code class="inline">show_events_link=false</code></div><div class="opt">C) Nothing: an unticked checkbox is not sent at all</div><div class="opt">D) <code class="inline">show_events_link=off</code></div></div></div>
+<div class="q" data-sc="10" data-kind="short"><div class="qn">Q10</div><div class="qt">On the finished Lesson 5.4 site, what does this print, and why is the notice sentence empty?</div><pre class="code">wp eval 'echo wp_json_encode( sanitize_option( "pagesco_books_settings",
+    array( "books_per_page" =&gt; "0", "events_limit" =&gt; "7" ) ) ), "\n";'</pre><div class="write"></div></div>
+<div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">Maria, an editor, opens options-general.php?page=pagesco-books and gets a 403. Which line decided that?</div><div class="opts"><div class="opt">A) The current_user_can() check inside render()</div><div class="opt">B) The nonce in settings_fields()</div><div class="opt">C) register_setting()'s type 'object'</div><div class="opt">D) The manage_options capability passed to add_options_page()</div></div></div>
+<div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">Which value deserves its own option instead of a key in the pagesco_books_settings array?</div><div class="opts"><div class="opt">A) The notice sentence</div><div class="opt">B) A counter of page views, updated on every request</div><div class="opt">C) Books per list</div><div class="opt">D) Whether the notice shows the events link</div></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>List everything Pages &amp; Co. now stores: content (posts, pages, books), terms, meta, options, a role. For each, write who owns it (the shop or the plugin) and what should happen to it when the plugin is deactivated and when it is deleted. Add the list to pagesco-plan.txt; you add the events table to it in Session 11. Then note one setting you would add for a real client, and which section of the page it would go in.</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<p>Three questions, no notes. Write your answers, hand them in or keep them: they tell you and your instructor what to revisit.</p>
+<div class="q"><div class="qn">E1</div><div class="qt">Name the four checks a handler that changes data makes, in order.</div><div class="write"></div></div>
+<div class="q"><div class="qn">E2</div><div class="qt">What does options.php do between Save Changes and the database?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E3</div><div class="qt">Your sanitize callback refuses a value. What should it store, and how does the user find out?</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Notes</h2><span class="rule"></span></div>
+<div class="notes-lines"></div>
+
+  <div class="sec"><h2>Homework Checklist</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ 5.3 project Step 3 (the forged request, the checkpoint) and a real "Mark sold out" click</li>
+  <li>☐ 5.4 project Step 3 (uninstall.php, the uninstall test, <code class="inline">rm pagesco-save.sh</code>): nine features</li>
+  <li>☐ Lesson 5.3 Hands-on Exercises 1 to 3 (Exercise 4 is a stretch)</li>
+  <li>☐ Lesson 5.4 Hands-on Exercises 1 to 3 (Exercise 4 is a stretch)</li>
+  <li>☐ Both Quick Quizzes on the lesson pages</li>
+  <li>☐ Both journal entries</li>
+  <li>☐ Labs I did not reach: <code class="inline">prepared_search_starter.php</code>, <code class="inline">debug_book_search.php</code>, <code class="inline">debug_newsletter_sanitize.php</code>, <code class="inline">settings_probe_starter.php</code></li>
+  <li>☐ For Session 11: Node 24 (<code class="inline">node --version</code> prints v24) or <code class="inline">docker pull node:24</code></li>
+</ul>
+
+  <div class="sec"><h2>Glossary</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>XSS (cross-site scripting)</td><td>Someone else's HTML or script printed into your page; stopped by escaping on output</td></tr>
+<tr><td>CSRF (cross-site request forgery)</td><td>A forged request riding a logged-in user's session; stopped by a nonce</td></tr>
+<tr><td>SQL injection</td><td>A crafted value that rewrites your query; stopped by <code class="inline">$wpdb-&gt;prepare()</code></td></tr>
+<tr><td>broken access control</td><td>A user doing what their role should forbid; stopped by <code class="inline">current_user_can()</code></td></tr>
+<tr><td>nonce</td><td>A token tied to a user, an action and a few hours; proves a request is genuine</td></tr>
+<tr><td>capability</td><td>A permission such as <code class="inline">edit_post</code> or <code class="inline">manage_options</code>, granted through roles</td></tr>
+<tr><td>sanitize / validate</td><td>Clean a value / accept or reject it by its shape</td></tr>
+<tr><td>escape</td><td>Make a value safe for where it is printed: text, attribute, URL, allowed HTML</td></tr>
+<tr><td>option</td><td>A named row in wp_options; <code class="inline">pagesco_books_settings</code> holds the shop's settings as one array</td></tr>
+<tr><td>Settings API</td><td>register_setting(), sections and fields, settings_fields(); saved by options.php</td></tr>
+<tr><td>sanitize callback</td><td>Your function that cleans a setting before it is stored and returns the complete value</td></tr>
+<tr><td>admin-post.php</td><td>Core's endpoint for your own form handlers and admin actions (<code class="inline">admin_post_&lt;action&gt;</code>)</td></tr>
+</tbody>
+</table>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 10 · Participant Workbook · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

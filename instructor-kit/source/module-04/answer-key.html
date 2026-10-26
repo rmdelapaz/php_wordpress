@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Key: Session 4</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">answers &amp; solutions · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Answer Key</div>
+    <h1>Session 4: Theme Anatomy and Building a Block Theme</h1>
+    <p class="sub">Answers and reasoning for every Session 4 item: the warm-up, Checkpoint 1's model answer and rubric, both self-checks, the predict-then-run items, the lab reference outputs, the lesson pages' own quizzes and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Session <b>4</b></span>
+      <span class="chip"><b>12</b> self-check items</span>
+      <span class="chip">Checkpoint <b>1</b></span>
+      <span class="chip">Confidential</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Warm-up</h2><span class="rule"></span></div>
+<p>Real output on the site of Lesson 2.3.</p>
+<div class="q"><div class="qn">W1</div><div class="qt">Session 3: priorities: What does this print on the site of Lesson 2.3?</div><pre class="code">wp eval 'echo has_filter( "pagesco_store_notice", "pagesco_notice_late_opening" ), "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">20</pre></div></div><div class="why"><b>Why:</b> The priority: <code class="inline">has_filter()</code> returns the priority of that callback on that hook, or false. pagesco-site.php adds the late-opening text at 20, so it runs after a callback at the default 10.</div></div>
+<div class="q"><div class="qn">W2</div><div class="qt">Session 3: must-use plugins: Which two names does this list on your site, and why does neither need activating?</div><pre class="code">wp plugin list --status=must-use --fields=name,status</pre><div class="opts"><div class="opt correct"><pre class="out">+--------------+----------+
+| name         | status   |
++--------------+----------+
+| mailpit-smtp | must-use |
+| pagesco-site | must-use |
++--------------+----------+</pre></div></div><div class="why"><b>Why:</b> mailpit-smtp (Lesson 1.2) and pagesco-site (Lesson 2.3). Every PHP file in wp-content/mu-plugins/ runs on every request, before the normal plugins (the load order of Lesson 2.2).</div></div>
+<div class="q"><div class="qn">W3</div><div class="qt">Session 3: removing a hook: Why does this print 0?</div><pre class="code">curl -s http://localhost:8080/about/ | grep -c 'name="generator"'</pre><div class="opts"><div class="opt correct"><pre class="out">0</pre></div></div><div class="why"><b>Why:</b> pagesco-site.php calls <code class="inline">remove_action( 'wp_head', 'wp_generator' )</code>, so the generator meta tag is never printed (and grep -c with no match exits 1).</div></div>
+
+  <div class="sec"><h2>Checkpoint 1 · Model Answer</h2><span class="rule"></span></div>
+<p>The task is on the workbook's Checkpoint 1 page; the starter is <code class="inline">labs/module-04/checkpoint-1/checkpoint_starter/pagesco-checkpoint.php</code>. The model answer, <code class="inline">labs/module-04/checkpoint-1/checkpoint_solution/pagesco-checkpoint.php</code>:</p>
+<pre class="code"><span class="k">&lt;?php</span>
+<span class="c">/**
+ * Plugin Name: Pages &amp; Co. Checkpoint 1
+ * Description: Checkpoint 1 (Modules 1 and 2), model answer: three small additions to the store notice and the footer.
+ */</span>
+
+<span class="c">/**
+ * (a) Adds the newest News post to the store notice.
+ *
+ * @param string $text The notice text so far (plain text).
+ * @return string
+ */</span>
+<span class="k">function</span> pagesco_checkpoint_latest_news( <span class="v">$text</span> ) {
+	<span class="v">$posts</span> = get_posts(
+		<span class="k">array</span>(
+			<span class="s">'category_name'</span> =&gt; <span class="s">'news'</span>,
+			<span class="s">'numberposts'</span>   =&gt; <span class="s">1</span>,
+		)
+	);
+
+	<span class="k">if</span> ( ! <span class="v">$posts</span> ) {
+		<span class="k">return</span> <span class="v">$text</span>;
+	}
+
+	<span class="k">return</span> <span class="v">$text</span> . <span class="s">' Latest news: '</span> . get_the_title( <span class="v">$posts</span>[<span class="s">0</span>] ) . <span class="s">'.'</span>;
+}
+add_filter( <span class="s">'pagesco_store_notice'</span>, <span class="s">'pagesco_checkpoint_latest_news'</span>, <span class="s">30</span> );
+
+<span class="c">/**
+ * (b) Prints a link to Maria's author archive inside the notice bar.
+ */</span>
+<span class="k">function</span> pagesco_checkpoint_ask_link() {
+	<span class="v">$user</span> = get_user_by( <span class="s">'login'</span>, <span class="s">'maria'</span> );
+
+	<span class="k">if</span> ( ! <span class="v">$user</span> ) {
+		<span class="k">return</span>;
+	}
+
+	<span class="k">echo</span> <span class="s">' · &lt;a href="'</span> . esc_url( get_author_posts_url( <span class="v">$user</span>-&gt;ID ) ) . <span class="s">'"&gt;'</span> . esc_html( <span class="s">'Ask '</span> . <span class="v">$user</span>-&gt;display_name ) . <span class="s">'&lt;/a&gt;'</span>;
+}
+add_action( <span class="s">'pagesco_store_notice_end'</span>, <span class="s">'pagesco_checkpoint_ask_link'</span>, <span class="s">20</span> );
+
+<span class="c">/**
+ * (c) Prints the number of published pages in the footer.
+ */</span>
+<span class="k">function</span> pagesco_checkpoint_page_count() {
+	<span class="k">global</span> <span class="v">$wpdb</span>;
+
+	<span class="v">$count</span> = (<span class="k">int</span>) <span class="v">$wpdb</span>-&gt;get_var(
+		<span class="v">$wpdb</span>-&gt;prepare(
+			<span class="s">"SELECT COUNT(*) FROM {$wpdb-&gt;posts} WHERE post_type = %s AND post_status = %s"</span>,
+			<span class="s">'page'</span>,
+			<span class="s">'publish'</span>
+		)
+	);
+
+	<span class="k">echo</span> <span class="s">'&lt;p class="pagesco-pages"&gt;Published pages: '</span> . esc_html( <span class="v">$count</span> ) . <span class="s">'&lt;/p&gt;'</span>;
+}
+add_action( <span class="s">'wp_footer'</span>, <span class="s">'pagesco_checkpoint_page_count'</span> );</pre><p><code class="inline">test_checkpoint.sh</code> with the model answer in mu-plugins/:</p>
+<pre class="out">notice bar:
+&lt;div class="pagesco-notice"&gt;Free shipping on orders over $35. Open until 9 p.m. on Thursdays. Latest news: Book club: Dune. &lt;a href="http://localhost:8080/events/"&gt;See events&lt;/a&gt; · &lt;a href="http://localhost:8080/author/maria/"&gt;Ask Maria Lopez&lt;/a&gt;&lt;/div&gt;
+footer line:
+&lt;p class="pagesco-pages"&gt;Published pages: 4&lt;/p&gt;</pre><p>With the starter as handed out (only the two <code class="inline">add_action</code> lines are there, so (a) does not run yet):</p>
+<pre class="out">notice bar:
+&lt;div class="pagesco-notice"&gt;Free shipping on orders over $35. Open until 9 p.m. on Thursdays. &lt;a href="http://localhost:8080/events/"&gt;See events&lt;/a&gt; · TODO&lt;/div&gt;
+footer line:
+&lt;p class="pagesco-pages"&gt;Published pages: TODO&lt;/p&gt;</pre><div class="blk"><div class="h">Rubric (2 / 1 / 0 per row, 10 points)</div>
+<table class="rubric">
+<thead><tr><th>Criterion</th><th>2 · Meets</th><th>1 · Partly</th><th>0 · Not yet</th></tr></thead>
+<tbody>
+<tr><td class="crit">Hooks, names and priorities</td><td><code class="inline">add_filter( 'pagesco_store_notice', ..., 30 )</code> and <code class="inline">add_action( 'pagesco_store_notice_end', ..., 20 )</code> with the callbacks named as strings; the filter RETURNS the text; the order in the bar is late opening, latest news, events link, Ask Maria.</td><td>Works, but a priority is off (Ask Maria before See events) or the filter is attached with add_action.</td><td>The filter echoes instead of returning (the notice text disappears), or a hook name is misspelled.</td></tr>
+<tr><td class="crit">WordPress functions with arguments</td><td><code class="inline">get_posts()</code> with an arguments array (<code class="inline">category_name</code> news, <code class="inline">numberposts</code> 1); <code class="inline">get_user_by( 'login', 'maria' )</code>; <code class="inline">get_author_posts_url()</code>; each result checked before use.</td><td>Right answer by a detour (all posts fetched and filtered in PHP, the URL typed by hand, the title or name hard-coded).</td><td>The newest post or Maria's link is wrong or missing.</td></tr>
+<tr><td class="crit">Escaping at output</td><td><code class="inline">esc_url()</code> on the link and <code class="inline">esc_html()</code> on its text; the filter returns PLAIN text, because the notice escapes it (Lesson 2.3).</td><td>One part unescaped, or the filter's text escaped a second time.</td><td>User data printed with no escaping at all.</td></tr>
+<tr><td class="crit">A prepared query</td><td>ONE <code class="inline">$wpdb-&gt;get_var( $wpdb-&gt;prepare( ... ) )</code> on <code class="inline">{$wpdb-&gt;posts}</code> with <code class="inline">%s</code> for page and publish; the count printed as a number.</td><td>Correct count, but the values are written into the SQL string, or the table name is typed as wp_posts.</td><td>No query (a number typed in, or the count of the wrong post type).</td></tr>
+<tr><td class="crit">Clean, standard code</td><td>The test prints the three expected lines and NO message in the page or in debug.log; every function has the pagesco_ prefix and a DocBlock; WordPress spacing and tabs.</td><td>One message, or the prefix or DocBlocks missing on some functions.</td><td>The site shows a warning or a critical error, or the work is unfinished.</td></tr>
+</tbody>
+</table>
+</div>
+<ul class="tick">
+  <li><b>Equally good:</b> <code class="inline">get_posts()</code> with <code class="inline">'category'</code> and the term ID 2, or <code class="inline">'posts_per_page' =&gt; 1</code>; <code class="inline">WP_Query</code> with <code class="inline">'no_found_rows' =&gt; true</code>; <code class="inline">wp_count_posts( 'page' )-&gt;publish</code> for (c) is correct WordPress but misses the point of the task (rubric row 4: 1 point, "no prepared query"). Any order of escaping inside the link is fine as long as both parts are escaped once.</li>
+  <li><b>Common wrong answers:</b> the filter echoes (the notice loses its text; row 1: 0); priority 10 on (b) ("Ask Maria" before "See events", because pagesco-checkpoint.php loads before pagesco-site.php: mu-plugins load alphabetically); <code class="inline">esc_html()</code> on the returned notice text (<code class="inline">&amp;amp;</code> would show twice if a title had one; row 3: 1); <code class="inline">"... WHERE post_type = 'page'"</code> without <code class="inline">prepare()</code> (row 4: 1); a hard-coded "Book club: Dune" (row 2: 0, and it breaks with the next News post).</li>
+</ul>
+
+  <div class="sec"><h2>3.1 · Theme Anatomy &amp; the Template Hierarchy: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">Twenty Twenty-Five is active. Which candidate list does WordPress build for the About page, <code class="inline">/about/</code> (page ID 12)?</div><div class="opts"><div class="opt">A) <code class="inline">about, page, index</code></div><div class="opt correct">B) <code class="inline">page-about, page-12, page, singular, index</code></div><div class="opt">C) <code class="inline">single-page-about, single-page, single, singular, index</code></div><div class="opt">D) <code class="inline">page-12, page-about, page, index</code></div></div><div class="why"><b>Why:</b> Pages go slug first, then ID, then <code class="inline">page</code>, <code class="inline">singular</code> and <code class="inline">index</code>; Lesson 3.1's template-map log shows exactly <code class="inline">page-about.php, page-12.php, page.php</code> and then the fall-through to singular and index.<br><b>A</b> is wrong: Hierarchy names are type-slug, never the slug alone.<br><b>C</b> is wrong: single-{type}-{slug} is the chain of posts and custom post types; pages have their own.<br><b>D</b> is wrong: The slug comes before the ID, and singular is missing.</div></div>
+  <div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">What does this print on the course site?</div><pre class="code">wp eval 'echo implode( ", ", get_template_hierarchy( "author-devon" ) ), "\n";'</pre><div class="opts"><div class="opt correct"><code class="inline">author-devon, author, archive, index</code></div></div><div class="why"><b>Why:</b> Devon is user 3, but <code class="inline">get_template_hierarchy()</code> works from the slug alone, so the ID-based name <code class="inline">author-3</code> that a real request adds is missing (Lesson 3.1, Exercise 1). Every archive passes through <code class="inline">archive</code>; every list ends in <code class="inline">index</code>.</div></div>
+  <div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">A client's classic theme has <code class="inline">wp_head()</code> in header.php and <code class="inline">wp_footer()</code> in footer.php, but no <code class="inline">wp_body_open()</code>. What happens to the Pages &amp; Co. store notice?</div><div class="opts"><div class="opt">A) A PHP warning names the missing function</div><div class="opt">B) WordPress calls wp_body_open itself, as it does for block themes</div><div class="opt">C) The notice moves to the footer</div><div class="opt correct">D) It disappears, with no message anywhere</div></div><div class="why"><b>Why:</b> pagesco-site.php adds its callback to <code class="inline">wp_body_open</code>, and in a classic theme only the theme fires that action. Nobody fires it, so nothing is printed and nothing is wrong as far as PHP knows (Lesson 3.1, Common Mistakes 3).<br><b>A</b> is wrong: A hook that never fires is not an error.<br><b>B</b> is wrong: Only template-canvas.php, for block themes, fires it on the theme's behalf.<br><b>C</b> is wrong: A callback runs only on the hook it was added to.</div></div>
+  <div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">Every function in Twenty Twenty-Five's functions.php is wrapped in <code class="inline">if ( ! function_exists( ... ) )</code>. Why?</div><div class="opts"><div class="opt correct">A) So a child theme can define a function of the same name first and replace it</div><div class="opt">B) So WordPress can load functions.php twice</div><div class="opt">C) PHP 8.5 requires it for theme functions</div><div class="opt">D) So the functions run only in the block editor</div></div><div class="why"><b>Why:</b> A child theme's functions.php is loaded BEFORE its parent's. If it defines twentytwentyfive_editor_style(), the parent skips its own: that is how a theme someone else maintains is customized without editing it (Lesson 3.4).<br><b>B</b> is wrong: Loading it twice would still be a mistake; the guard is about replacing, not repeating.<br><b>C</b> is wrong: PHP has no such rule; redeclaring a function is simply a fatal error.<br><b>D</b> is wrong: function_exists() says nothing about where code runs.</div></div>
+  <div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">Settings > Reading shows the latest posts on the front page. The theme has front-page.html, home.html and index.html. Which template draws http://localhost:8080/?</div><div class="opts"><div class="opt">A) home.html</div><div class="opt">B) index.html</div><div class="opt correct">C) front-page.html</div><div class="opt">D) The theme cannot have both front-page.html and home.html</div></div><div class="why"><b>Why:</b> The front page's list is <code class="inline">front-page, home, index</code>: front-page comes first whatever the front page shows. home is only the list of latest posts, used here when the theme has no front-page.<br><b>A</b> is wrong: home would win only without a front-page template.<br><b>B</b> is wrong: index is the last resort.<br><b>D</b> is wrong: Both are normal: front-page for the front page, home for the blog index wherever it lives.</div></div>
+  <div class="q" data-sc="6" data-kind="short"><div class="qn">Q6</div><div class="qt">Name the filter that changes the list of candidate templates for category archives, before WordPress looks for files.</div><div class="opts"><div class="opt correct"><code class="inline">category_template_hierarchy</code></div></div><div class="why"><b>Why:</b> Each type has its own <code class="inline">{$type}_template_hierarchy</code> filter (template.php line 62); Lesson 3.1's template-map tool hooks all eighteen. <code class="inline">template_include</code> is the other hook: it filters the final file path, after the choice.</div></div>
+
+  <div class="sec"><h2>3.1 · Theme Anatomy &amp; the Template Hierarchy: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'echo implode( ", ", get_template_hierarchy( "front-page" ) ), "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">front-page, home, index</pre></div></div><div class="why"><b>Why:</b> front-page first whatever the front page shows, then home (the latest posts), then index. With a static front page the chain after front-page is the page chain instead (Lesson 3.1, Mistake 2).</div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'echo count( get_block_templates( array(), "wp_template_part" ) ), "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">7</pre></div></div><div class="why"><b>Why:</b> Twenty Twenty-Five has seven parts: header, vertical-header, header-large-title, footer, footer-columns, footer-newsletter and sidebar. <code class="inline">get_block_templates( array(), 'wp_template_part' )</code> lists parts instead of templates.</div></div>
+
+  <div class="sec"><h2>3.2 · Building a Block Theme: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="7" data-kind="short"><div class="qn">Q7</div><div class="qt">On the course site after Lesson 3.2 (pagesco active), what does this print?</div><pre class="code">wp eval 'echo wp_get_global_settings( array( "layout", "wideSize" ) ), "\n";'</pre><div class="opts"><div class="opt correct"><code class="inline">1180px</code></div></div><div class="why"><b>Why:</b> <code class="inline">wp_get_global_settings()</code> reads the merged theme.json data (core, theme, Site Editor) by path: <code class="inline">settings.layout.wideSize</code> is pagesco's 1180px. Code that needs a design value asks for it instead of repeating the number.</div></div>
+  <div class="q" data-sc="8"><div class="qn">Q8</div><div class="qt">In theme.json, <code class="inline">"fontSize": "var:preset|font-size|large"</code> under styles. What does WordPress print in the page's CSS?</div><div class="opts"><div class="opt">A) <code class="inline">font-size: large</code></div><div class="opt">B) <code class="inline">font-size: 1.75rem</code></div><div class="opt correct">C) <code class="inline">font-size: var(--wp--preset--font-size--large)</code></div><div class="opt">D) <code class="inline">font-size: var(--large)</code></div></div><div class="why"><b>Why:</b> The shorthand points at the preset, and the preset is a CSS custom property, so a style variation or the Styles panel can change the size in one place. Lesson 3.2's body rule shows the same for colors: <code class="inline">background-color: var(--wp--preset--color--paper)</code>.<br><b>A</b> is wrong: That would be the CSS keyword large, not your preset.<br><b>B</b> is wrong: The value is never copied in: that is the point of presets.<br><b>D</b> is wrong: Custom properties from theme.json always carry the --wp--preset--TYPE-- prefix (here --wp--preset--font-size--).</div></div>
+  <div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">Which of these blocks is written SELF-CLOSING in a template file, with no HTML of its own?</div><div class="opts"><div class="opt">A) Group</div><div class="opt">B) Heading</div><div class="opt">C) Paragraph</div><div class="opt correct">D) Post Title</div></div><div class="why"><b>Why:</b> Post Title is dynamic: PHP renders it on every request from the post being viewed, so the file holds only <code class="inline">&lt;!-- wp:post-title {"level":1} /--&gt;</code>. Group, Heading and Paragraph are static: their exact saved HTML sits between the comments.<br><b>A</b> is wrong: Group is static: its <code class="inline">&lt;div&gt;</code> (or <code class="inline">&lt;main&gt;</code>) is in the file.<br><b>B</b> is wrong: Heading is static, with its <code class="inline">&lt;h1&gt;</code> in the file.<br><b>C</b> is wrong: Paragraph is static, with its <code class="inline">&lt;p&gt;</code> in the file.</div></div>
+  <div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">A live site (WP_DEBUG off) gets a theme.json with a trailing comma. What do visitors see?</div><div class="opts"><div class="opt correct">A) The site in core's default design: the theme's colors, fonts and sizes are gone, with no message</div><div class="opt">B) A critical error page</div><div class="opt">C) The notice wp_json_file_decode(): Syntax error at the top of every page</div><div class="opt">D) Nothing changes: WordPress skips the bad line</div></div><div class="why"><b>Why:</b> WordPress cannot parse the file, so it uses no theme.json at all (zero oxblood variables in Lesson 3.2's Mistake 1). The Notice exists, but only with WP_DEBUG on, in the page and in debug.log. The notice names the file, not the line: <code class="inline">$schema</code> in VS Code finds it.<br><b>B</b> is wrong: It is a Notice, not a fatal error: the page still renders.<br><b>C</b> is wrong: Only with WP_DEBUG and WP_DEBUG_DISPLAY on, as on the course site.<br><b>D</b> is wrong: JSON is parsed as a whole; one syntax error loses the whole file.</div></div>
+  <div class="q" data-sc="11" data-kind="short"><div class="qn">Q11</div><div class="qt">A template contains <code class="inline">&lt;!-- wp:template-part {"slug":"footer","tagName":"footer"} /--&gt;</code>. Which file of the theme does it include, and what does the tagName do?</div><div class="opts"><div class="opt correct"><code class="inline">parts/footer.html</code>; it wraps the part in a <code class="inline">&lt;footer&gt;</code> element (the contentinfo landmark)</div></div><div class="why"><b>Why:</b> The slug is the file name in parts/ without .html (a typo such as <code class="inline">heder</code> renders nothing for visitors). tagName gives screen-reader users the header, main and footer landmarks; Lesson 3.2 checks them with curl.</div></div>
+  <div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">What does <code class="inline">"defaultPalette": false</code> in settings.color do?</div><div class="opts"><div class="opt">A) Deletes the theme's own palette</div><div class="opt correct">B) Hides WordPress's own palette from the editors, so they choose from the theme's colors</div><div class="opt">C) Turns off all color controls</div><div class="opt">D) Removes --wp--preset--color--black and --white from the page</div></div><div class="why"><b>Why:</b> The editors then offer only Paper, Ink, Oxblood, Sage and Slate. Core still prints black and white as custom properties (Lesson 3.2's preset grep shows both). Turning off the free color picker is a different setting, custom: false (the lesson's quiz Q4).<br><b>A</b> is wrong: Your palette is what remains.<br><b>C</b> is wrong: Controls stay; only the default swatches go.<br><b>D</b> is wrong: Both are still printed: the lesson's output starts with them.</div></div>
+
+  <div class="sec"><h2>3.2 · Building a Block Theme: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it.</div><pre class="code">curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/nothing-here/</pre><div class="opts"><div class="opt correct"><pre class="out">404</pre></div></div><div class="why"><b>Why:</b> pagesco's 404.html draws the page, and WordPress still answers with status 404 so search engines do not index it. Lesson 3.2's verification loop checks exactly this.</div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it.</div><pre class="code">curl -s http://localhost:8080/ | grep -o '\.has-oxblood-color{[^}]*}'</pre><div class="opts"><div class="opt correct"><pre class="out">.has-oxblood-color{color: var(--wp--preset--color--oxblood) !important;}</pre></div></div><div class="why"><b>Why:</b> Every palette color produces a class rule using its custom property, with <code class="inline">!important</code> so a color chosen for one block beats the theme's other rules.</div></div>
+
+  <div class="sec"><h2>Lab Reference Solutions</h2><span class="rule"></span></div>
+<p>Every output below is real: the lab files run exactly as <code class="inline">labs/check_labs.py</code> runs them, on the course site at the state each file names (WordPress 7.1.3, PHP 8.5, MySQL 9.7, WP-CLI 2.12): the 3.1 labs on the site of Lesson 2.3, the 3.2 labs on the site of Lesson 3.1. Paths show <code class="inline">/var/www/html/...</code>, which is the learner's <code class="inline">wordpress/</code> folder.</p>
+<div class="blk lab"><div class="h">Lab 3.1-A (guided): labs/module-04/l3_1-theme-anatomy/which_template_starter.php → which_template_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">/tag/staff-picks/   tag-staff-picks &gt; tag &gt; archive &gt; index
+                    =&gt; TODO
+/author/devon/      author-devon &gt; author &gt; archive &gt; index
+                    =&gt; TODO
+/hello-world/       single-post-hello-world &gt; single-post &gt; single &gt; singular &gt; index
+                    =&gt; TODO
+/?s=dune            search &gt; index
+                    =&gt; TODO</pre><p>The solution prints:</p>
+<pre class="out">/tag/staff-picks/   tag-staff-picks &gt; tag &gt; archive &gt; index
+                    =&gt; archive
+/author/devon/      author-devon &gt; author &gt; archive &gt; index
+                    =&gt; archive
+/hello-world/       single-post-hello-world &gt; single-post &gt; single &gt; singular &gt; index
+                    =&gt; single
+/?s=dune            search &gt; index
+                    =&gt; search
+/                   front-page &gt; home &gt; index
+                    =&gt; home
+/contact/           page-contact &gt; page &gt; singular &gt; index
+                    =&gt; page</pre><p>Accept any loop that stops at the first match. Without <code class="inline">break</code> the last match wins and every row says <code class="inline">index</code>: the most instructive bug of the lab. On a site where pagesco is active, <code class="inline">/</code> answers <code class="inline">index</code> (pagesco has no home template), which is the template map's "index doubles as home".</p>
+</div>
+<div class="blk lab"><div class="h">Lab 3.1-B: labs/module-04/l3_1-theme-anatomy/theme_inspector_starter.sh → theme_inspector_solution.sh</div>
+<p>The solution prints:</p>
+<pre class="out">== twentytwentyfive 1.5
+  Requires at least: 6.7
+  kind: block
+  templates: 8  parts: 7  patterns: 98
+  functions.php: yes
+== twentytwentyfour 1.6
+  Requires at least: 6.4
+  kind: block
+  templates: 11  parts: 4  patterns: 57
+  functions.php: yes
+== twentytwentythree 1.7
+  Requires at least: 6.1
+  kind: block
+  templates: 9  parts: 4  patterns: 7
+  functions.php: no</pre><p>All three default themes are block themes; Twenty Twenty-Three has no functions.php at all, which shows that PHP is optional in a block theme. The pattern counts change whenever a default theme updates. <code class="inline">grep -m 1</code> matters: some style.css files repeat a field in their description.</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-04/l3_1-theme-anatomy/debug_theme_report.php (deliberately broken)</div>
+<p>As shipped, PHP prints:</p>
+<pre class="out">Theme: Twenty Twenty-Five
+Needs WordPress: 
+Block theme: yes
+Warning: Undefined array key "colors" in /var/www/html/debug_theme_report.php on line 21
+Warning: Trying to access array offset on null in /var/www/html/debug_theme_report.php on line 21
+Warning: foreach() argument must be of type array|object, null given in /var/www/html/debug_theme_report.php on line 21
+Colors in the palette: Warning: Undefined variable $pagesco_count in /var/www/html/debug_theme_report.php on line 25
+[new lines in wp-content/debug.log]
+[26-Oct-2026 12:33:39 UTC] PHP Warning:  Undefined array key "colors" in /var/www/html/debug_theme_report.php on line 21
+[26-Oct-2026 12:33:39 UTC] PHP Warning:  Trying to access array offset on null in /var/www/html/debug_theme_report.php on line 21
+[26-Oct-2026 12:33:39 UTC] PHP Warning:  foreach() argument must be of type array|object, null given in /var/www/html/debug_theme_report.php on line 21
+[26-Oct-2026 12:33:39 UTC] PHP Warning:  Undefined variable $pagesco_count in /var/www/html/debug_theme_report.php on line 25</pre><ol class="steps">
+  <li><b>Silent, line 17:</b> <code class="inline">get( 'Requires at least' )</code> asks for a header by its style.css label; <code class="inline">WP_Theme::get()</code> wants the key, <code class="inline">RequiresWP</code> (others: <code class="inline">RequiresPHP</code>, <code class="inline">TextDomain</code>, <code class="inline">Version</code>). It returns false, so the line prints nothing after the colon.</li>
+  <li><b>Warnings, line 21:</b> the key is <code class="inline">color</code>, not <code class="inline">colors</code> (Lesson 3.1's outline printed <code class="inline">color, spacing, typography</code>). One wrong key gives three warnings: the missing key, an offset on null, and a foreach over null.</li>
+  <li><b>Warning, line 25:</b> <code class="inline">$pagesco_count++</code> on a variable that was never set. Hidden while bug 2 stops the loop from running; start the counter at 0 before the loop.</li>
+</ol>
+<p>Fixed, it prints:</p>
+<pre class="out">Theme: Twenty Twenty-Five
+Needs WordPress: 6.7
+Block theme: yes
+  base      #FFFFFF
+  contrast  #111111
+  accent-1  #FFEE58
+  accent-2  #F6CFF4
+  accent-3  #503AA8
+  accent-4  #686868
+  accent-5  #FBFAF3
+  accent-6  color-mix(in srgb, currentColor 20%, transparent)
+Colors in the palette: 8</pre></div>
+<div class="blk lab"><div class="h">Lab 3.2-A (guided): labs/module-04/l3_2-block-theme/book_fair_starter/ → book_fair_solution/ with test_book_fair.sh</div>
+<p>The test with the starter installed as <code class="inline">pagesco-fair</code>:</p>
+<pre class="out">Success: Switched to 'Pages &amp;amp; Co. Book Fair' theme.
+active theme: pagesco-fair
+palette:
+--wp--preset--color--night: #1b1f3b
+--wp--preset--color--cream: #fff8e7
+lantern: (missing)
+page colors: (none: theme.json has no styles.color)
+posts listed: 0
+header parts: 1
+footer parts: 0
+footer text: (none)</pre><p>With the solution:</p>
+<pre class="out">Success: Switched to 'Pages &amp;amp; Co. Book Fair' theme.
+active theme: pagesco-fair
+palette:
+--wp--preset--color--night: #1b1f3b
+--wp--preset--color--cream: #fff8e7
+--wp--preset--color--lantern: #f2b134
+page colors: body{background-color: var(--wp--preset--color--cream);color: var(--wp--preset--color--night);
+posts listed: 4
+header parts: 1
+footer parts: 1
+footer text: Book fair weekend · 12 Market Street</pre><p>What each line shows: the palette lines come from settings (TODO 1); the page colors from styles, pointing at presets (TODO 2: the test only matches <code class="inline">var(--wp--preset--...)</code>, never a hex value); <code class="inline">posts listed</code> from the Query Loop with <code class="inline">inherit</code> (TODO 3); the footer from the part (TODO 4). Before TODO 1 the header's <code class="inline">has-lantern-background-color</code> class had no rule, so the band was transparent: a class is only as good as its preset. Links are night because lantern on cream is far below 4.5:1.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 3.2-B: labs/module-04/l3_2-block-theme/theme_json_reader_starter.php → theme_json_reader_solution.php</div>
+<p>The solution prints:</p>
+<pre class="out">twentytwentyfive: theme.json version 3
+content width: 645px  wide width: 1340px
+palette: base, contrast, accent-1, accent-2, accent-3, accent-4, accent-5, accent-6
+font sizes: small, medium, large, x-large, xx-large
+page background: var:preset|color|base  text: var:preset|color|contrast
+text as CSS: var(--wp--preset--color--contrast)</pre><p>The file holds the shorthand (<code class="inline">var:preset|color|contrast</code>); the page holds the custom property; <code class="inline">wp_get_global_settings()</code> / <code class="inline">wp_get_global_styles()</code> return the MERGED data (core, theme, the owner's Site Editor changes), which is what code should read in practice. With <code class="inline">$pagesco_slug = 'pagesco'</code> the lines are pagesco's (680px and 1180px, paper to slate, <code class="inline">var(--wp--preset--color--ink)</code>).</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-04/l3_2-block-theme/debug_cafe_theme/ with test_debug_cafe_theme.sh (deliberately broken)</div>
+<p>As shipped, installed as <code class="inline">pagesco-cafe</code>, the test prints:</p>
+<pre class="out">Success: Switched to 'Pages &amp;amp; Co. Cafe' theme.
+messages in the page (how many of each):
+      1 Deprecated: str_replace(): Passing null to parameter #3 ($subject) of type array|string is deprecated in /var/www/html/wp-includes/formatting.php on line 5777
+      2 Notice: wp_json_file_decode(): Error when decoding a JSON file at path /var/www/html/wp-content/themes/pagesco-cafe/theme.json: Syntax error in /var/www/html/wp-includes/functions.php on line 6260
+palette: 
+header parts: 0
+titles:
+[new lines in wp-content/debug.log]
+[26-Oct-2026 12:34:21 UTC] PHP Notice:  wp_json_file_decode(): Error when decoding a JSON file at path /var/www/html/wp-content/themes/pagesco-cafe/theme.json: Syntax error in /var/www/html/wp-includes/functions.php on line 6260
+[26-Oct-2026 12:34:21 UTC] PHP Deprecated:  str_replace(): Passing null to parameter #3 ($subject) of type array|string is deprecated in /var/www/html/wp-includes/formatting.php on line 5777
+[26-Oct-2026 12:34:21 UTC] PHP Notice:  wp_json_file_decode(): Error when decoding a JSON file at path /var/www/html/wp-content/themes/pagesco-cafe/theme.json: Syntax error in /var/www/html/wp-includes/functions.php on line 6260</pre><ol class="steps">
+  <li><b>Notice (theme.json):</b> a comma after the last palette entry (<code class="inline">"#fdf6ec" },</code>). WordPress ignores the whole file: no espresso or foam variables, no page colors.</li>
+  <li><b>Deprecated (functions.php):</b> <code class="inline">pagesco_cafe_title_cup()</code> assigns <code class="inline">$title</code> and returns nothing, so the filter hands null to the next callback and core's <code class="inline">capital_P_dangit()</code> complains in formatting.php: the message blames core (Lesson 2.3, Mistake 1). Every title is empty. Fix: <code class="inline">return '☕ ' . $title;</code>.</li>
+  <li><b>Silent (templates/index.html):</b> <code class="inline">"slug":"heder"</code>: no part with that slug, so no header for visitors and no message (<code class="inline">header parts: 0</code>). Logged in, the page says "Template part has been deleted or is unavailable: heder".</li>
+</ol>
+<p>Fixed, the same test prints:</p>
+<pre class="out">messages in the page (how many of each):
+palette: --wp--preset--color--espresso: #3b2a20 --wp--preset--color--foam: #fdf6ec
+header parts: 1
+titles:
+☕ Hello world!
+☕ Book club: Dune
+☕ Staff picks for the season
+☕ Welcome to the new Pages &amp;#038; Co. website</pre><p>Clean up: switch back to your theme and <code class="inline">wp theme delete pagesco-cafe</code>. The lesson in it: a block theme fails quietly; the messages that do exist appear only with WP_DEBUG on.</p>
+</div>
+
+  <div class="sec"><h2>The Lesson Pages' Own Quick Quizzes</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Lesson 3.1 · Theme Anatomy &amp; the Template Hierarchy</div>
+<ol class="steps" data-lesson-quiz="3.1">
+  <li><b>A</b> singular.html: The page chain is page-about, page-12, page, singular, index. The theme has no page template, so the first match is singular.html.</li>
+  <li><b>C</b> A hybrid: PHP templates plus a theme.json: No templates/index.html, so it is not a block theme, but it has a theme.json: a classic theme with block features, a hybrid.</li>
+  <li><b>B</b> page.html: There is no front-page.html, and with a static front page WordPress follows the page chain next, so page.html draws it.</li>
+  <li><b>C</b> Her save stored a copy as a wp_template post, and that copy wins over the file: Saving in the Site Editor stores a wp_template post with the source custom, and that copy wins over the theme file until it is reset.</li>
+  <li><b>B</b> add_filter( 'single_template_hierarchy', ... ) returning a changed array: single_template_hierarchy is the filter WordPress applies to the candidate list for single posts; a callback receives the array and returns the list to search.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Lesson 3.2 · Building a Block Theme</div>
+<ol class="steps" data-lesson-quiz="3.2">
+  <li><b>B</b> --wp--preset--color--oxblood: Every palette color becomes --wp--preset--color--SLUG in the global styles, which is what var:preset|color|oxblood stands for.</li>
+  <li><b>A</b> style.css and templates/index.html: style.css carries the theme header and templates/index.html is the template every request can fall back to. theme.json and functions.php are optional.</li>
+  <li><b>C</b> The page without a footer, and no message: The Template Part block finds no part with that slug and renders nothing. Only logged-in users see a hint, so check slugs while logged in.</li>
+  <li><b>A</b> In settings.color: the palette, plus custom set to false: What the editors offer is a setting: settings.color.palette lists the colors and settings.color.custom set to false removes the free picker.</li>
+  <li><b>B</b> Decide which version is right, then reset or delete the saved copy (exporting it first if it should be kept): The post is a Site Editor copy that wins over the file. Reset it in the Site Editor or delete it with wp post delete ID --force, after exporting it if the owner's change should be kept.</li>
+</ol>
+</div>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>archive.html.</b> The candidates are author-maria, author-2, author, archive, index; the theme has none of the first three, so archive answers. (index would answer only without archive.)</li>
+  <li><b>Palette:</b> <code class="inline">settings.color.palette</code> (what editors may choose from). <b>Background:</b> <code class="inline">styles.color.background</code>, written <code class="inline">var:preset|color|paper</code> so it follows the preset.</li>
+  <li><b>Two of:</b> a template-part slug that matches no file in parts/ (silent for visitors; logged in you see "Template part has been deleted or is unavailable"); a Site Editor copy (<code class="inline">wp_template</code> or <code class="inline">wp_template_part</code> post) that wins over the file. A JSON syntax error removes the styles, not the header.</li>
+</ol>
+
+  <div class="sec"><h2>Common Wrong Answers and What They Reveal</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li><b>Q1 C (single-page-...).</b> Applies the post chain to pages. Pages have their own chain; show the demo's log for /about/.</li>
+  <li><b>Q3 A (a warning).</b> Expects PHP to complain about a hook nobody fires. A hook that never fires is silent by design.</li>
+  <li><b>Q5 A (home.html).</b> The most common hierarchy mistake of all: home is the latest-posts list. front-page comes first.</li>
+  <li><b>Q8 B (1.75rem).</b> Thinks presets are copied in. They are referenced: that is what makes style variations possible (Lesson 3.3).</li>
+  <li><b>Q10 B or C.</b> Confuses the course site (WP_DEBUG on) with a live site. On a live site the design just goes plain.</li>
+  <li><b>Q12 D.</b> Has not looked at the preset grep: black and white are always printed.</li>
+</ul>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 4 · Answer Key · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

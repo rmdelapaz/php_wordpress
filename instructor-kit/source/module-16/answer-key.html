@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Key: Session 16</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">answers &amp; solutions · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Answer Key</div>
+    <h1>Session 16: Distribution and Deployment</h1>
+    <p class="sub">Answers and reasoning for every Session 16 item: the warm-up, both self-checks, the predict-then-run items, the lab reference outputs, the lessons' recorded cards, the lesson pages' own quizzes and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Session <b>16</b></span>
+      <span class="chip"><b>12</b> self-check items</span>
+      <span class="chip">Confidential</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Warm-up</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>W1 (Lesson 8.1).</b> To a log outside the web root (or the server's log), display always off: wp-content/debug.log is a public download (200 for anyone).</li>
+  <li><b>W2 (Lesson 8.1).</b> npx @wordpress/env run cli --env-cwd=wp-content/plugins/pagesco-books vendor/bin/phpunit, in the plugin's own wp-env test site on port 8889, never in the site you develop on.</li>
+  <li><b>W3 (Lesson 8.2).</b> N+1 queries; update_postmeta_cache( $ids ) before the loop loads all the meta in one query.</li>
+  <li><b>W4 (Lesson 8.2).</b> add() calls flush_cache(), which renews wp_cache_get_last_changed( 'pagesco_events' ), and that value is part of every key.</li>
+  <li><b>W5 (Lesson 8.2).</b> The Image block's aspectRatio (CLS 0.101 to 0.001: the space is reserved) and a preload with fetchpriority high in wp_preload_resources (LCP a little earlier).</li>
+</ol>
+
+  <div class="sec"><h2>8.3 · Internationalization, Accessibility &amp; Distribution: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">make-pot prints <code class="inline">Warning: Multiple placeholders should be ordered.</code> for <code class="inline">__( 'Showing %s of %s books', 'pagesco-books' )</code>. What is the fix?</div><div class="opts"><div class="opt">A) Nothing: it is only a warning, and the POT file was written</div><div class="opt">B) Split it into two strings, one per number</div><div class="opt correct">C) Numbered placeholders, <code class="inline">'Showing %1$s of %2$s books'</code>, with a translators comment naming both</div><div class="opt">D) Use <code class="inline">_n()</code> instead of <code class="inline">__()</code></div></div><div class="why"><b>Why:</b> With %1$s and %2$s a language can put the numbers in another order (the lab's Spanish translation does: "De %2$s libros, se muestran %1$s"); the comment tells the translator what each number is. make-pot writes the file anyway and exits 0, which is why its warnings scroll by unnoticed.<br><b>A</b> is wrong: The string ships untranslatable in languages with another word order.<br><b>B</b> is wrong: Fragments are worse: a translator cannot know how they join.<br><b>D</b> is wrong: _n() chooses a plural form; it does not number placeholders.</div></div>
+  <div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">The Book Card's editor script is <code class="inline">build/blocks/book-card/index.js</code>. In the WP-CLI container this prints its hash. Which file holds its Spanish strings?</div><pre class="code">printf '%s' 'build/blocks/book-card/index.js' | md5sum | cut -d' ' -f1</pre><div class="opts"><div class="opt correct"><code class="inline">languages/pagesco-books-es_ES-f9065c2ff2c4d291b5b56d1be2a45f3f.json</code></div></div><div class="why"><b>Why:</b> WordPress looks for the JSON whose name contains the MD5 of the script's path relative to the plugin; make-json computes it from the PO's #: references, which is why the POT must point at the built file (--exclude=src/blocks). Lesson 8.3's languages/ folder has exactly this file.</div></div>
+  <div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">The contrast script printed <code class="inline">slate    on paper      5.8:1  AA</code>. What does that allow?</div><div class="opts"><div class="opt correct">A) Normal-size text in slate on paper meets WCAG AA (4.5:1), but not AAA (7:1)</div><div class="opt">B) Only large text: normal text needs 7:1</div><div class="opt">C) Nothing: anything under 7:1 fails WCAG</div><div class="opt">D) Slate is safe on every background of the palette</div></div><div class="why"><b>Why:</b> AA needs 4.5:1 for normal text and 3:1 for large text and control outlines; 7:1 is AAA. The pair passes AA, which is what most contracts mean. Exercise 2 shows slate failing on ink and on oxblood: a ratio belongs to a pair, not to a color.<br><b>B</b> is wrong: 4.5:1 is the AA limit for normal text; 3:1 for large.<br><b>C</b> is wrong: AAA is the stricter level; AA is the usual target.<br><b>D</b> is wrong: Slate on ink is 2.4:1 and slate on oxblood 1.5:1 (Exercise 2).</div></div>
+  <div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">Why does the new uninstall.php read the opt-in with <code class="inline">get_option( 'pagesco_books_settings', array() )</code> and not with <code class="inline">Settings::get( 'delete_data' )</code>?</div><div class="opts"><div class="opt">A) get_option() is faster</div><div class="opt">B) Settings::get() would translate the value</div><div class="opt">C) uninstall.php runs after the option is deleted</div><div class="opt correct">D) During uninstall the plugin is not loaded: its classes, post type and taxonomy are not there</div></div><div class="why"><b>Why:</b> WordPress runs uninstall.php without booting the plugin. That is also why the file registers the genre taxonomy before get_terms() (Common Mistake 2: invalid_taxonomy, and five orphaned genres). An empty row means delete_data is missing, which means off.<br><b>A</b> is wrong: Both read the same autoloaded row; speed is not the point.<br><b>B</b> is wrong: Settings::get() translates nothing about delete_data.<br><b>C</b> is wrong: uninstall.php reads the option first and deletes it near the end.</div></div>
+  <div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">Which of these must NOT be in the release ZIP of Pages &amp; Co. Books?</div><div class="opts"><div class="opt">A) <code class="inline">build/blocks/blocks-manifest.php</code></div><div class="opt correct">B) <code class="inline">phpcs.xml.dist</code></div><div class="opt">C) <code class="inline">languages/pagesco-books-es_ES.l10n.php</code></div><div class="opt">D) <code class="inline">vendor/autoload.php</code></div></div><div class="why"><b>Why:</b> Development files (rulesets, phpunit.xml.dist, .wp-env.json, tests/) do not ship: Plugin Check reports them (application_detected, hidden_files), and the lab release_check.sh fails a ZIP that contains them. The build, the translations and the autoloader are what the plugin runs.<br><b>A</b> is wrong: Without the manifest no block is registered.<br><b>C</b> is wrong: The Spanish translation is part of the release.<br><b>D</b> is wrong: The plugin requires it on every load; only the development packages must stay out.</div></div>
+  <div class="q" data-sc="6" data-kind="short"><div class="qn">Q6</div><div class="qt">What does <code class="inline">--no-purge</code> change in <code class="inline">wp i18n make-json pagesco-books-es_ES.po --no-purge</code>?</div><div class="opts"><div class="opt correct">It keeps the JavaScript strings in the PO file; without it make-json moves them into the JSON files and removes them from the PO</div></div><div class="why"><b>Why:</b> Strings used in both PHP and JavaScript ("Mark sold out") would otherwise go missing from the next .mo, and the source PO loses entries.</div></div>
+
+  <div class="sec"><h2>8.3 · Internationalization, Accessibility &amp; Distribution: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'echo get_locale(), " ", determine_locale(), "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">en_US en_US</pre></div></div><div class="why"><b>Why:</b> Both en_US: the site language is English, and in WP-CLI determine_locale() has no user or request to change it. After Lesson 8.3 installs es_ES the site stays English until <code class="inline">wp site switch-language es_ES</code>; a user's locale applies to wp-admin only.</div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it.</div><pre class="code">printf '%s' 'build/blocks/book-card/index.js' | md5sum | cut -d' ' -f1</pre><div class="opts"><div class="opt correct"><pre class="out">f9065c2ff2c4d291b5b56d1be2a45f3f</pre></div></div><div class="why"><b>Why:</b> The MD5 of the path relative to the plugin: the long part of the Book Card's Spanish JSON file name (self-check Q2).</div></div>
+
+  <div class="sec"><h2>8.4 · Deployment &amp; Maintenance: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">Maria changed the header in the live site's Site Editor. You deploy theme 1.2.0 with a new parts/header.html. What do visitors see?</div><div class="opts"><div class="opt">A) The new header from the theme's file</div><div class="opt correct">B) Maria's header: Site Editor changes are saved in the database, and they win over the theme's files</div><div class="opt">C) Both headers, one above the other</div><div class="opt">D) An error until someone resets the template part</div></div><div class="why"><b>Why:</b> Code goes up, content comes down: an edit in the Site Editor on the live site is content (a wp_template_part post). Changes that should become code are exported into the theme, committed and deployed (Lesson 3.3); then the database copy is reset.<br><b>A</b> is wrong: Only if the template part had never been edited on the live site.<br><b>C</b> is wrong: WordPress uses one version of a template part.<br><b>D</b> is wrong: Nothing is broken; the database version simply wins.</div></div>
+  <div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt">On the course site after Lesson 8.3: what does this print, and which table makes the difference?</div><pre class="code">echo "$(wp db tables | wc -l) $(wp db tables --all-tables-with-prefix | wc -l)"</pre><div class="opts"><div class="opt correct"><code class="inline">12 13</code>: <code class="inline">wp_pagesco_events</code>, the plugin's own table, which WordPress does not register</div></div><div class="why"><b>Why:</b> wp db tables and wp search-replace work on the registered (core) tables by default; --all-tables-with-prefix adds the plugin's table. A launch export without it has 12 tables, and the live Events page says "No events are scheduled" (Common Mistake 2; the debug handout debug_launch_check.sh).</div></div>
+  <div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">Why does every migration command in Lesson 8.4 say <code class="inline">--skip-columns=guid</code>?</div><div class="opts"><div class="opt correct">A) The GUID is an identifier feed readers use to recognize posts, not a link: it must not change</div><div class="opt">B) GUID columns are serialized and would break</div><div class="opt">C) The guid column is too long for search-replace</div><div class="opt">D) WordPress rewrites GUIDs itself on the first request</div></div><div class="why"><b>Why:</b> http://localhost:8080/?p=30 looks like a URL but identifies the post; changing it makes feed readers show every post as new. The launch database keeps 34 GUIDs with the old address, and that is right.<br><b>B</b> is wrong: The guid column holds plain strings.<br><b>C</b> is wrong: Length is not the issue.<br><b>D</b> is wrong: WordPress never rewrites GUIDs.</div></div>
+  <div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">The project's .gitignore says <code class="inline">!/themes/</code>, then <code class="inline">/themes/*</code>, then <code class="inline">!/themes/pagesco/</code>. Why not just <code class="inline">!/themes/pagesco/</code> after <code class="inline">/*</code>?</div><div class="opts"><div class="opt">A) Git reads .gitignore from the bottom up</div><div class="opt">B) The order does not matter; it is only for readability</div><div class="opt">C) Without the first line Git would also track Twenty Twenty-Five</div><div class="opt correct">D) Git cannot let a file back in when its folder is ignored: the folder is let in, its contents ignored again, then the one subfolder let in</div></div><div class="why"><b>Why:</b> /* ignores the themes folder itself, so a rule for something inside it is never even read. The three-line pattern is the documented way. <code class="inline">git check-ignore -v</code> names the line that ignores a file when you wonder why it is missing.<br><b>A</b> is wrong: Git reads it top to bottom; the last matching rule wins.<br><b>B</b> is wrong: With only the last line, themes/pagesco/ stays ignored.<br><b>C</b> is wrong: Twenty Twenty-Five is ignored by /themes/* either way.</div></div>
+  <div class="q" data-sc="11" data-kind="short"><div class="qn">Q11</div><div class="qt">In a clean copy of the tagged plugin (git archive), which Composer command builds the production autoloader, and what does it leave out?</div><div class="opts"><div class="opt correct"><code class="inline">composer install --no-dev --optimize-autoloader</code>: the development packages (PHPUnit, PHPCS), so vendor/composer has no autoload_files.php that requires them</div></div><div class="why"><b>Why:</b> The working copy's autoloader requires files from development packages on every load (<code class="inline">deep_copy.php</code>, PHPUnit's Functions.php, the polyfills); a ZIP without those packages dies with "Failed opening required" (Lesson 8.3's Mistake 3). --optimize-autoloader writes a class map.</div></div>
+  <div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">On the rehearsal server the account pagesco_app has no LOCK TABLES right. What happens to <code class="inline">wp db export "$BACKUP"</code>?</div><div class="opts"><div class="opt">A) It works: WP-CLI locks nothing</div><div class="opt">B) It asks for the root password</div><div class="opt correct">C) It fails with error 1044, and leaves a small header-only file under the backup's name</div><div class="opt">D) It exports only the tables the account may lock</div></div><div class="why"><b>Why:</b> mariadb-dump locks each table while it reads it. The recorded run shows the error and an 831-byte file: a file in the backup folder is not a backup; its size and a restore test are what count. The lesson grants exactly LOCK TABLES, as root, and then proves the backup by restoring a deleted book.<br><b>A</b> is wrong: wp db export runs mariadb-dump, which uses LOCK TABLES.<br><b>B</b> is wrong: WP-CLI uses wp-config.php's account and asks nothing.<br><b>D</b> is wrong: It stops at the first table it cannot lock.</div></div>
+
+  <div class="sec"><h2>8.4 · Deployment &amp; Maintenance: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp db tables | wc -l</pre><div class="opts"><div class="opt correct"><pre class="out">12</pre></div></div><div class="why"><b>Why:</b> The twelve tables WordPress registers; the plugin's wp_pagesco_events is not among them (--all-tables-with-prefix adds it).</div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp search-replace 'http://localhost:8080' 'https://www.pagesco.example' --all-tables-with-prefix --skip-columns=guid --dry-run --format=count</pre><div class="opts"><div class="opt correct"><pre class="out">9</pre></div></div><div class="why"><b>Why:</b> Nine replacements, as for 8081: the address counts, not its length. --format=count prints only the number.</div></div>
+
+  <div class="sec"><h2>Lab Reference Solutions</h2><span class="rule"></span></div>
+<p>Every output below is real: the lab files run exactly as <code class="inline">labs/check_labs.py</code> runs them, on a fresh course site at the state each declares (WordPress 7.1.3, PHP 8.5, MySQL 9.7, WP-CLI 2.12).</p>
+<div class="blk lab"><div class="h">Lab 8.3-A (guided): labs/module-16/l8_3-i18n-a11y-distribution/plural_strings_starter.php → plural_strings_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">en  1 book in stock | 9 books in stock
+en  Showing 3 of 11 books
+en  Order | Order
+en  Books in Fantasy
+es  1 book in stock | 9 books in stock
+es  Showing 3 of 11 books
+es  Order | Order
+es  Books in Fantasy
+TODO 1 to 4: every es line should be Spanish</pre><p>The solution prints:</p>
+<pre class="out">en  1 book in stock | 9 books in stock
+en  Showing 3 of 11 books
+en  Order | Order
+en  Books in Fantasy
+es  1 libro disponible | 9 libros disponibles
+es  De 11 libros, se muestran 3
+es  Orden | Pedido
+es  Libros de Fantasy</pre><p>Why each starter string fails: (1) two fragments and no plural form; (2) unnumbered placeholders, so the translator's reordered string never matches the msgid; (3) one msgid for two meanings, so the file's two contexts never match; (4) a fragment with the genre glued on. The translation file stays unchanged: the code changes. Context keys in the file are "context\x04msgid", exactly what make-php writes.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 8.3-B: labs/module-16/l8_3-i18n-a11y-distribution/a11y_scan_starter.sh → a11y_scan_solution.sh</div>
+<p>As shipped:</p>
+<pre class="out">/              lang=en-US  main=1  h1=TODO  img-no-alt=TODO  skip-link=TODO  notice-landmark=TODO  nested-list=TODO
+/books/dune/   lang=en-US  main=1  h1=TODO  img-no-alt=TODO  skip-link=TODO  notice-landmark=TODO  nested-list=TODO
+/find-a-book/  lang=en-US  main=1  h1=TODO  img-no-alt=TODO  skip-link=TODO  notice-landmark=TODO  nested-list=TODO
+/events/       lang=en-US  main=1  h1=TODO  img-no-alt=TODO  skip-link=TODO  notice-landmark=TODO  nested-list=TODO
+Not checked here, and never by a machine alone: alt texts that describe, focus you can see, a screen reader.</pre><p>The solution, on the site as Lesson 8.2 leaves it:</p>
+<pre class="out">/              lang=en-US  main=1  h1=1  img-no-alt=0  skip-link=yes  notice-landmark=no  nested-list=yes
+/books/dune/   lang=en-US  main=1  h1=1  img-no-alt=0  skip-link=yes  notice-landmark=no  nested-list=yes
+/find-a-book/  lang=en-US  main=1  h1=1  img-no-alt=0  skip-link=yes  notice-landmark=no  nested-list=yes
+/events/       lang=en-US  main=1  h1=1  img-no-alt=0  skip-link=yes  notice-landmark=no  nested-list=yes
+Not checked here, and never by a machine alone: alt texts that describe, focus you can see, a screen reader.</pre><p>And on the site as Lesson 8.3's project leaves it (the notice a region, the navigation as links):</p>
+<pre class="out">/              lang=en-US  main=1  h1=1  img-no-alt=0  skip-link=yes  notice-landmark=yes  nested-list=no
+/books/dune/   lang=en-US  main=1  h1=1  img-no-alt=0  skip-link=yes  notice-landmark=yes  nested-list=no
+/find-a-book/  lang=en-US  main=1  h1=1  img-no-alt=0  skip-link=yes  notice-landmark=yes  nested-list=no
+/events/       lang=en-US  main=1  h1=1  img-no-alt=0  skip-link=yes  notice-landmark=yes  nested-list=no
+Not checked here, and never by a machine alone: alt texts that describe, focus you can see, a screen reader.</pre><p><code class="inline">tr '\n' ' '</code> first: WordPress breaks some tags over lines. The two columns that change are axe's two findings; what no grep can check is in the last line.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 8.3-C: labs/module-16/l8_3-i18n-a11y-distribution/release_check_starter.sh → release_check_solution.sh</div>
+<p>As shipped:</p>
+<pre class="out">versions agree: 1.1.0 1.1.0 1.1.0 1.1.0
+requires WordPress: TODO
+translations: TODO
+the ZIP: TODO
+release check: 0 problems</pre><p>The solution prints (after Lesson 8.3):</p>
+<pre class="out">versions agree: 1.1.0 1.1.0 1.1.0 1.1.0
+requires WordPress 6.9 in both
+translations: ./languages/pagesco-books.pot
+the ZIP: 72 entries
+release check: 0 problems</pre><p>With Lesson 8.4's version bump the four values must all say 1.1.1 (Step 7 changes them with sed); a learner who forgets package.json sees VERSIONS DIFFER.</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-16/l8_3-i18n-a11y-distribution/debug_seats_spanish.php (deliberately broken)</div>
+<p>As shipped:</p>
+<pre class="out">Warning: Undefined property: stdClass::$seats in /var/www/html/debug_seats_spanish.php on line 32
+Book club: Dune                              entrada libre
+Warning: Undefined variable $pagesco_total in /var/www/html/debug_seats_spanish.php on line 37
+Warning: Undefined property: stdClass::$seats in /var/www/html/debug_seats_spanish.php on line 32
+Story time: The Hobbit                       entrada libre
+An evening with Ana Ruiz                     entrada libre
+75 seats in the next 3 events</pre><ol class="steps">
+  <li><b>Warning, line 32:</b> <code class="inline">-&gt;seats</code> does not exist (<code class="inline">capacity</code>): null is falsy, so every event prints "entrada libre" although it has seats.</li>
+  <li><b>Warning, line 37:</b> <code class="inline">$pagesco_total</code> is added to before it exists; start it at 0.</li>
+  <li><b>Silent, line 41:</b> the total uses the text domain <code class="inline">pagesco-books</code>, whose translations know no such string: it stays English with no message. The translator's file is for <code class="inline">pagesco-lab</code>.</li>
+</ol>
+<p>Fixed:</p>
+<pre class="out">Book club: Dune                              20 plazas
+Story time: The Hobbit                       15 plazas
+An evening with Ana Ruiz                     40 plazas
+75 plazas en los próximos 3 eventos</pre></div>
+<div class="blk lab"><div class="h">Lab 8.4-A (guided): labs/module-16/l8_4-deployment-maintenance/migration_preview_starter.sh → migration_preview_solution.sh</div>
+<p>As shipped:</p>
+<pre class="out">tables WordPress registers: 12, all with the prefix: 13
+the tables only the second list has: wp_pagesco_events
+dry run, every table with the prefix, GUIDs left alone: TODO
+export without --all-tables-with-prefix: TODO
+export with --all-tables-with-prefix: TODO
+new address in the export: TODO
+options with the address inside a serialized value: TODO
+the database still says: http://localhost:8080</pre><p>The solution prints:</p>
+<pre class="out">tables WordPress registers: 12, all with the prefix: 13
+the tables only the second list has: wp_pagesco_events
+dry run, every table with the prefix, GUIDs left alone: 9 replacements
+export without --all-tables-with-prefix: 12 tables
+export with --all-tables-with-prefix: 13 tables
+new address in the export: 15, old address left (the GUIDs): 34
+options with the address inside a serialized value: 0
+the database still says: http://localhost:8080</pre><p>Nothing changed: dry runs and exports only. 9 replacements for any new address; 15 new addresses in the export because --export processes every column in PHP; 34 GUIDs left on purpose.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 8.4-B: labs/module-16/l8_4-deployment-maintenance/restore_drill_starter.sh → restore_drill_solution.sh</div>
+<p>As shipped:</p>
+<pre class="out">marker post created
+backup: 13 tables, events table included: 1
+after the accident: TODO
+after the restore: TODO
+drill over: 0 "Restore drill" posts, the dump deleted</pre><p>The solution prints:</p>
+<pre class="out">marker post created
+backup: 13 tables, events table included: 1
+after the accident: 0 "Restore drill" posts
+after the restore: 1 "Restore drill" post
+drill over: 0 "Restore drill" posts, the dump deleted</pre><p><code class="inline">wp cache flush</code> after the import matters with a persistent object cache, which would still remember the deleted post. The marker's ID stays used.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 8.4-C: labs/module-16/l8_4-deployment-maintenance/cron_audit_starter.php → cron_audit_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">scheduled events: 13
+  daily        6
+  hourly       1
+  twicedaily   4
+  weekly       2
+the shop's job: TODO
+WP-Cron spawning on page views: TODO
+on the live server, its crontab needs:
+TODO</pre><p>The solution prints:</p>
+<pre class="out">scheduled events: 13
+  daily        6
+  hourly       1
+  twicedaily   4
+  weekly       2
+the shop's job: pagesco_books_daily_sync, daily, next run scheduled: yes
+WP-Cron spawning on page views: on (the development default)
+on the live server, its crontab needs:
+*/5 * * * * cd /var/www/html &amp;&amp; wp cron event run --due-now --quiet</pre><p>The crontab line uses the site's own folder (here the container's /var/www/html; on a server something like /var/www/pagesco). The shop's job's next time is not printed: it depends on the day the site was saved.</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-16/l8_4-deployment-maintenance/debug_launch_check.sh (deliberately broken)</div>
+<p>As shipped:</p>
+<pre class="out">== Pre-launch report ==
+Error: Could not get 'homeurl' option. Does it exist?
+Site address: 
+Error: The constant or variable 'PAGESCO_BOOKS_SUPPLIER_ULR' is not defined in the 'wp-config.php' file.
+Did you mean 'PAGESCO_BOOKS_SUPPLIER_URL'?
+Supplier address: 
+Tables in the launch export: 12
+== End of report ==</pre><ol class="steps">
+  <li><b>Error, line 16:</b> the option is <code class="inline">home</code> (or <code class="inline">siteurl</code>), not <code class="inline">homeurl</code>.</li>
+  <li><b>Error, line 17:</b> a typo, <code class="inline">ULR</code>; WP-CLI even suggests the right name.</li>
+  <li><b>Silent, line 18:</b> no <code class="inline">--all-tables-with-prefix</code>, so the launch export has 12 tables: the events table is missing, the Common Mistake 2 of the lesson. "Success" and a plausible number.</li>
+</ol>
+<p>Fixed:</p>
+<pre class="out">== Pre-launch report ==
+Site address: http://localhost:8080
+Supplier address: http://localhost:8080/supplier-sandbox/v1/
+Tables in the launch export: 13
+== End of report ==</pre><p>The supplier's address it prints is the sandbox's: the report's job is to show that it must change for the live site.</p>
+</div>
+
+  <div class="sec"><h2>Recorded in the Lessons (quote, do not run in class)</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Lesson 8.3: the Spanish front end</div>
+<pre class="out">Success: Language activated.
+&lt;html lang="es"
+&lt;div class="pagesco-notice"&gt;Free shipping on orders over $35. Abierto hasta las 21:00 los jueves. &lt;a href="http://localhost:8080/events/"&gt;Ver eventos&lt;/a&gt;&lt;/div&gt;
+&lt;span class="pagesco-event__where"&gt;Reading corner, 20 plazas
+&lt;span class="pagesco-event__where"&gt;Children&amp;#039;s corner, 15 plazas
+Success: Language activated.</pre></div>
+<div class="blk"><div class="h">Lesson 8.4: launch-day clean-up on the rehearsal server (your passwords differ)</div>
+<pre class="out">Reset password for admin.
+Password: 4Zpd(Zbyl3*P@LS3d@lk^w0^
+Reset password for maria.
+Password: jh@XhNgavQVNted*dcZ22ine
+Reset password for devon.
+Password: I#3CzKYQuLy!$PKH16WqAmpf
+Success: Passwords reset for 3 users.
+Success: Deleted all application passwords.
+Success: 4 transients deleted from the database.
+Success: Deleted post 1.
+Success: Deleted post 2.
+Deleted 'akismet' plugin.
+Deleted 'hello' plugin.
+Success: Deleted 2 of 2 plugins.
+Deleted 'twentytwentythree' theme.
+Deleted 'twentytwentyfour' theme.
+Success: Deleted 2 of 2 themes.</pre></div>
+<div class="blk"><div class="h">Lesson 8.4: the first backup, refused</div>
+<pre class="out">mariadb-dump: Got error: 1044: "Access denied for user 'pagesco_app'@'%' to database 'pagesco'" when using LOCK TABLES
+total 4
+-rw-r--r--    1 1000     1000           831 Oct 26 06:54 pagesco-20261026-0654.sql</pre></div>
+<div class="blk"><div class="h">Lesson 8.4: release 2 deployed</div>
+<pre class="out">Unpacking the package...
+Installing the plugin...
+Removing the old version of the plugin...
+Plugin updated successfully.
+Success: Installed 1 of 1 plugins.
+Unpacking the package...
+Installing the theme...
+Removing the old version of the theme...
+Theme updated successfully.
+Success: Installed 1 of 1 themes.
++---------------+--------+---------+
+| name          | status | version |
++---------------+--------+---------+
+| pagesco-books | active | 1.1.1   |
++---------------+--------+---------+
++---------+--------+---------+
+| name    | status | version |
++---------+--------+---------+
+| pagesco | active | 1.1.1   |
++---------+--------+---------+</pre></div>
+
+  <div class="sec"><h2>The Lesson Pages' Own Quick Quizzes</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Lesson 8.3 · Internationalization, Accessibility &amp; Distribution</div>
+<ol class="steps" data-lesson-quiz="8.3">
+  <li><b>C</b> 'Showing %1$s of %2$s books' with a translators comment naming both numbers: A whole sentence with numbered placeholders and a translators comment: the translator sees what each part is and may change the order.</li>
+  <li><b>A</b> The MD5 hash of the script's path in the plugin, assets/js/stock-widget.js: WordPress hashes the path of the script it is about to print, relative to the plugin, and looks for a JSON file with that hash; make-json takes the paths from the PO references.</li>
+  <li><b>B</b> The page passed the rules a machine can check; keyboard and screen reader tests are still needed: Automated rules catch a part of the problems, such as markup and contrast; focus visibility, meaningful alternative text, reading order and screen reader experience need people to test.</li>
+  <li><b>C</b> Because the plugin is not loaded, so the genre taxonomy is not registered: During uninstall the plugin is not loaded, so its taxonomy is not registered, and get_terms() rejects unregistered taxonomies with invalid_taxonomy; register it in uninstall.php first.</li>
+  <li><b>B</b> Because the development autoloader requires files from packages the ZIP does not contain: With development packages installed, the autoloader requires some of their files on every load; the ZIP does not contain them, so the plugin would die with a fatal error on the client's site.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Lesson 8.4 · Deployment &amp; Maintenance</div>
+<ol class="steps" data-lesson-quiz="8.4">
+  <li><b>B</b> Only the plugin ZIP built from the release tag: Code goes up, content comes down: after the launch the live database is the original, so an update deploys only the release files built from the new tag.</li>
+  <li><b>C</b> The plugin's own events table: By default WP-CLI works on the tables WordPress registers; the plugin's wp_pagesco_events table is not one of them, so the export silently leaves it out.</li>
+  <li><b>A</b> The new pattern stays unknown until the cached pattern list expires: Without development mode WordPress caches the theme's pattern list in a site transient for the current Version, for up to 30 minutes; a new Version makes the cache invalid at once.</li>
+  <li><b>C</b> Read and change the shop's database, and nothing beyond it: Least privilege limits the damage: the account can read and change the shop's own database, which is serious, but it reaches no other database and cannot manage users or the server.</li>
+  <li><b>B</b> It never runs: the event stays scheduled and nothing starts it: With page-view spawning off, nothing runs due events until something calls wp-cron.php or wp cron event run: the job waits, scheduled, forever.</li>
+</ol>
+</div>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>Code, content, configuration:</b> the plugin or theme (Git, a tagged release, a ZIP deployed: up); the books, events and pages (the database: once at launch, then created live; copies come down); wp-config.php's secrets and the supplier's key (written per environment, never copied).</li>
+  <li><b>String rules:</b> any two of: whole sentences with placeholders; numbered placeholders when there are several; a translators comment; <code class="inline">_n()</code> for counts; <code class="inline">_x()</code> for ambiguous words; literal strings only; escape the translation.</li>
+  <li><b>Hard requirements:</b> accept any honest pair with the right layer; the brief's own table ("Where each requirement is handled") is the reference for the conversation in Session 17.</li>
+</ol>
+
+  <div class="sec"><h2>Common Wrong Answers and What They Reveal</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li><b>Q1 A ("only a warning").</b> Treats warnings as noise. Show the lab's Spanish line that reorders the numbers.</li>
+  <li><b>Q3 C ("under 7:1 fails").</b> Mixes AA and AAA.</li>
+  <li><b>Q5 A or D.</b> Thinks build/ or the autoloader are development files; they are what runs.</li>
+  <li><b>Q7 A ("the new header").</b> The code/content split has not landed: show Lesson 3.2's wp_template_part posts.</li>
+  <li><b>Q9 B ("serialized").</b> Confuses GUIDs with options; the guid column is a plain string.</li>
+  <li><b>Q12 A ("it works").</b> Has never restored a backup; <code class="inline">restore_drill</code> is the cure.</li>
+</ul>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 16 · Answer Key · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

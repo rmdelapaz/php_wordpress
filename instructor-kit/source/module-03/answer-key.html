@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Key: Session 3</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">answers &amp; solutions · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Answer Key</div>
+    <h1>Session 3: Core Architecture, the Database and Hooks</h1>
+    <p class="sub">Answers and reasoning for every Session 3 item: the warm-up, both self-checks, the predict-then-run items, the lab reference outputs, the lesson pages' own quizzes and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Session <b>3</b></span>
+      <span class="chip"><b>12</b> self-check items</span>
+      <span class="chip">Confidential</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Warm-up · Session 2 Revisited</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>W1</b> Which escaping function goes around a URL in an href attribute? <b>Answer:</b> <code class="inline">esc_url()</code> (text between tags: <code class="inline">esc_html()</code>, other attribute values: <code class="inline">esc_attr()</code>).</li>
+  <li><b>W2</b> Name the four shapes a WordPress callback can take. Which one is hard for anyone else to unhook? <b>Answer:</b> A function name, a closure, <code class="inline">array( $object, 'method' )</code>, a static method (<code class="inline">'Class::method'</code> or <code class="inline">array( 'Class', 'method' )</code>). The closure: nobody else has a handle on it (Lesson 2.3 comes back to this).</li>
+  <li><b>W3</b> A page and a post: which table holds each, and which column tells them apart? <b>Answer:</b> Both are rows in <code class="inline">wp_posts</code>; <code class="inline">post_type</code> is <code class="inline">page</code> or <code class="inline">post</code> (Lesson 2.1's filing cabinet).</li>
+  <li><b>W4</b> Code must decide whether the current user may publish pages. What does it check, and why not the role? <b>Answer:</b> <code class="inline">current_user_can( 'publish_pages' )</code>: a capability. Roles are bundles that sites change; capabilities are what WordPress checks.</li>
+  <li><b>W5</b> What does <code class="inline">wp_parse_args( $args, $defaults )</code> return? <b>Answer:</b> One array: the defaults, overridden by whatever the caller passed in <code class="inline">$args</code>.</li>
+</ol>
+<p>The site check prints, on a site where Lesson 2.1's project was finished:</p>
+<pre class="out">+----+-----------+----------------+-------------+
+| ID | post_type | post_name      | post_author |
++----+-----------+----------------+-------------+
+| 1  | post      | hello-world    | 1           |
+| 2  | page      | sample-page    | 1           |
+| 3  | page      | privacy-policy | 1           |
+| 12 | page      | about          | 2           |
+| 13 | page      | contact        | 2           |
+| 14 | page      | events         | 2           |
+| 15 | post      | welcome        | 2           |
+| 16 | post      | staff-picks    | 3           |
+| 17 | post      | book-club-dune | 2           |
++----+-----------+----------------+-------------+
++----+------------+---------------+
+| ID | user_login | roles         |
++----+------------+---------------+
+| 1  | admin      | administrator |
+| 2  | maria      | editor        |
+| 3  | devon      | author        |
++----+------------+---------------+</pre>
+  <div class="sec"><h2>2.2 · Core Architecture &amp; the Database: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">A tutorial says to add <code class="inline">define( 'DISALLOW_FILE_EDIT', true );</code> to wp-config.php. You paste it as the very last line of the file, after <code class="inline">require_once ABSPATH . 'wp-settings.php';</code>. What happens?</div><div class="opts"><div class="opt">A) It works: wp-config.php is read on every request, so the position does not matter</div><div class="opt">B) PHP stops with a parse error</div><div class="opt correct">C) It is defined too late: wp-settings.php has already loaded WordPress, so the file editors stay</div><div class="opt">D) WordPress moves the line above the "stop editing" comment the next time it saves the file</div></div><div class="why"><b>Why:</b> The require_once on line 139 hands over to the loader, and WordPress reads its settings while it loads. Anything after it is defined when the decisions have been made. That is what "That's all, stop editing!" means: custom lines go between the two comments above it.<br><b>A</b> is wrong: The position is the whole point: wp-config.php runs top to bottom, and the last line loads WordPress.<br><b>B</b> is wrong: It is valid PHP; it simply comes too late.<br><b>D</b> is wrong: WordPress never rewrites wp-config.php by itself.</div></div>
+  <div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">What does this print on the course site, and what is that value?</div><pre class="code">wp config get DB_HOST</pre><div class="opts"><div class="opt correct"><code class="inline">db</code>: the name of the database service in compose.yaml (on a typical host it is localhost)</div></div><div class="why"><b>Why:</b> wp-config.php reads it with getenv_docker('WORDPRESS_DB_HOST', ...) from the container's environment, which compose.yaml sets. Containers on one Compose network reach each other by service name. <code class="inline">wp config get</code> reads wp-config.php for you, so a script never needs the password.</div></div>
+  <div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">In which order does wp-settings.php load these on every request?</div><div class="opts"><div class="opt">A) The theme's functions.php, active plugins, must-use plugins, pluggable.php</div><div class="opt correct">B) Must-use plugins, active plugins, pluggable.php, the theme's functions.php</div><div class="opt">C) pluggable.php, must-use plugins, the theme's functions.php, active plugins</div><div class="opt">D) Active plugins, must-use plugins, the theme's functions.php, pluggable.php</div></div><div class="why"><b>Why:</b> Must-use plugins at line 506, active plugins at 582, pluggable.php at 612, the theme at 741 (WordPress 7.1.3). Pluggable functions come after the plugins so a plugin can replace one by defining it first; that is also why calling one at the top of a plugin file fails.<br><b>A</b> is wrong: That is the order backwards: the theme comes last of the four.<br><b>C</b> is wrong: pluggable.php waits for the plugins, on purpose.<br><b>D</b> is wrong: Must-use plugins always come before normal plugins.</div></div>
+  <div class="q" data-sc="4" data-kind="short"><div class="qn">Q4</div><div class="qt">Devon's first name is stored once in wp_usermeta. What does this print?</div><pre class="code">wp eval 'var_dump( get_user_meta( 3, "first_name" ) );'</pre><div class="opts"><div class="opt correct"><pre class="out">array(1) {
+  [0]=&gt;
+  string(5) "Devon"
+}</pre></div></div><div class="why"><b>Why:</b> Without the third argument (<code class="inline">true</code>) the metadata API returns EVERY value of the key, as an array, because a key may be stored several times. With <code class="inline">true</code> it returns the single value, the string "Devon". Lesson 2.2, Common Mistakes 4.</div></div>
+  <div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">Someone runs <code class="inline">UPDATE wp_usermeta SET meta_value = REPLACE(meta_value, 'author', 'editor')</code> on Devon's <code class="inline">a:1:{s:6:"author";b:1;}</code>. What happens?</div><div class="opts"><div class="opt">A) The value breaks: unserialize() fails and Devon loses every role</div><div class="opt correct">B) It works, but only because both words have 6 characters: the s:6 length still matches. Change roles through WordPress anyway</div><div class="opt">C) MySQL refuses: the column holds serialized PHP</div><div class="opt">D) WordPress recomputes the lengths when it reads the value</div></div><div class="why"><b>Why:</b> Serialized values store each string's length. Same length, still valid; "Springfield" to "Portland" was not (Lesson 2.2, Common Mistakes 1). It is still the wrong tool: it skips WordPress's caches and hooks, and the next REPLACE may not be so lucky. <code class="inline">wp user set-role devon editor</code> or <code class="inline">$user-&gt;set_role()</code> is the API.<br><b>A</b> is wrong: That happens when the length changes; here it does not.<br><b>C</b> is wrong: To MySQL it is just LONGTEXT.<br><b>D</b> is wrong: WordPress trusts the stored lengths; a mismatch makes unserialize() fail.</div></div>
+  <div class="q" data-sc="6"><div class="qn">Q6</div><div class="qt">An option's autoload column says <code class="inline">auto-off</code>. What does that mean?</div><div class="opts"><div class="opt">A) The code that saved it passed false</div><div class="opt">B) It is loaded on every request</div><div class="opt">C) The option is broken and will be deleted</div><div class="opt correct">D) Nobody chose, and WordPress decided not to autoload it, usually because the value is large (over 150,000 bytes)</div></div><div class="why"><b>Why:</b> on/off = the code said true/false; auto = nobody said, WordPress's default (loaded today); auto-on/auto-off = WordPress decided by itself. Lesson 2.2's autoload demo: a 200,000-byte option became auto-off. Rule for your plugins: pass <code class="inline">true</code> for small settings you read on every page, <code class="inline">false</code> for anything big or rare.<br><b>A</b> is wrong: Passing false gives off.<br><b>B</b> is wrong: auto-off is NOT in the list wp_autoload_values_to_autoload() returns.<br><b>C</b> is wrong: Nothing about it is broken; it is read on demand, with one query.</div></div>
+
+  <div class="sec"><h2>2.2 · Core Architecture &amp; the Database: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'var_dump( get_option( "pagesco_no_such_option" ), get_option( "pagesco_no_such_option", "none" ) );'</pre><div class="opts"><div class="opt correct"><pre class="out">bool(false)
+string(4) "none"</pre></div></div><div class="why"><b>Why:</b> An option that does not exist returns false, or the default you pass as the second argument. Both reads cost a query (WordPress cannot know an option is missing without asking; the lesson's options-cost.php measured it).</div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp db query "SELECT option_value FROM wp_options WHERE option_name = 'active_plugins'"</pre><div class="opts"><div class="opt correct"><pre class="out">option_value
+a:0:{}</pre></div></div><div class="why"><b>Why:</b> <code class="inline">a:0:{}</code> is a serialized empty array: no active plugins. <code class="inline">wp db query</code> prints the column name, then the raw value; <code class="inline">get_option( 'active_plugins' )</code> would return <code class="inline">array()</code>.</div></div>
+
+  <div class="sec"><h2>2.3 · The Hooks System: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="7" data-kind="short"><div class="qn">Q7</div><div class="qt">What does this print when run with wp eval-file?</div><pre class="code"><span class="k">&lt;?php</span>
+add_filter( <span class="s">'pagesco_q7'</span>, <span class="k">fn</span>( <span class="v">$text</span> ) =&gt; <span class="v">$text</span> . <span class="s">'b'</span>, <span class="s">20</span> );
+add_filter( <span class="s">'pagesco_q7'</span>, <span class="k">fn</span>( <span class="v">$text</span> ) =&gt; strtoupper( <span class="v">$text</span> ) );
+add_filter( <span class="s">'pagesco_q7'</span>, <span class="k">fn</span>( <span class="v">$text</span> ) =&gt; <span class="v">$text</span> . <span class="s">'a'</span>, <span class="s">5</span> );
+
+<span class="k">echo</span> apply_filters( <span class="s">'pagesco_q7'</span>, <span class="s">'x'</span> ), <span class="s">"\n"</span>;</pre><div class="opts"><div class="opt correct"><code class="inline">XAb</code></div></div><div class="why"><b>Why:</b> Priority 5 runs first (<code class="inline">xa</code>), then the callback at the default 10 (<code class="inline">XA</code>), then 20 (<code class="inline">XAb</code>). The order in which the lines were written does not matter across priorities; only ties at the same priority keep their added order.</div></div>
+  <div class="q" data-sc="8"><div class="qn">Q8</div><div class="qt">A members page must send visitors who are not logged in to the login screen. On which action do you call wp_safe_redirect() and exit?</div><div class="opts"><div class="opt">A) <code class="inline">plugins_loaded</code></div><div class="opt">B) <code class="inline">wp_footer</code></div><div class="opt correct">C) <code class="inline">template_redirect</code></div><div class="opt">D) <code class="inline">shutdown</code></div></div><div class="why"><b>Why:</b> template_redirect fires when WordPress knows which page was asked for (conditional tags work) and before any HTML is printed, so headers can still be sent. Lesson 2.3's table of actions.<br><b>A</b> is wrong: Too early: the request has not been parsed, so you cannot know which page it is.<br><b>B</b> is wrong: Too late: the page has been printed, headers are gone.<br><b>D</b> is wrong: Far too late: the response is finished.</div></div>
+  <div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">A theme adds <code class="inline">add_action( 'wp_head', 'pagesco_theme_banner' )</code> inside its after_setup_theme callback. Your plugin calls <code class="inline">remove_action( 'wp_head', 'pagesco_theme_banner' )</code> at the top of its main file, and the banner stays. Why?</div><div class="opts"><div class="opt correct">A) The plugin ran before the theme added the hook, so there was nothing to remove: remove it on init</div><div class="opt">B) remove_action() only works on core's hooks</div><div class="opt">C) The priority is wrong: it must be 1</div><div class="opt">D) Plugins cannot change what a theme does</div></div><div class="why"><b>Why:</b> Removal rule 2 of Lesson 2.3: remove after it was added. Plugins load at line 582 of wp-settings.php, the theme at 741 and its after_setup_theme callbacks after that; init (line 779) comes later. remove_action() returned false, silently.<br><b>B</b> is wrong: It works on any hook, if the hook, callback and priority match and the hook exists already.<br><b>C</b> is wrong: The theme added it at the default 10, so 10 (the default) is right.<br><b>D</b> is wrong: They can, with hooks; that is the point of them.</div></div>
+  <div class="q" data-sc="10" data-kind="short"><div class="qn">Q10</div><div class="qt">What does this print, and what does the value mean?</div><pre class="code">wp eval 'var_dump( has_filter( "the_content", "do_blocks" ) );'</pre><div class="opts"><div class="opt correct"><code class="inline">int(9)</code>: do_blocks is attached to the_content at priority 9, before wpautop at 10</div></div><div class="why"><b>Why:</b> has_filter() with a callback returns its priority, or false when it is not attached. do_blocks turns block markup into HTML before the paragraph filter runs (Lesson 2.1 named it; Exercise 3 of 2.3 lists them all). Test the result with <code class="inline">false !== has_filter( ... )</code>: 0 is a valid priority.</div></div>
+  <div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">After a new the_title filter, posts have no titles and the only message is <code class="inline">Deprecated: str_replace(): Passing null to parameter #3 ... in .../wp-includes/formatting.php on line 5777</code>. What is the likely bug?</div><div class="opts"><div class="opt correct">A) Your callback does not return the title, so the next callback (core's, at priority 11) received null</div><div class="opt">B) A bug in WordPress 7.1's formatting.php: update core</div><div class="opt">C) PHP 8.5 deprecated str_replace()</div><div class="opt">D) The filter needs 2 accepted arguments</div></div><div class="why"><b>Why:</b> A filter must return the value. Null went down the chain to capital_P_dangit(), which handed it to str_replace(), so the message points into core. When a message blames a core file, look at what YOUR code handed to it (Lesson 2.3, Common Mistakes 1).<br><b>B</b> is wrong: Core is fine; it received a null it did not expect.<br><b>C</b> is wrong: str_replace() is fine; passing null to it is deprecated.<br><b>D</b> is wrong: That mistake is a fatal ArgumentCountError, not a Deprecated notice.</div></div>
+  <div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">Your plugin prints a gift-card form. Other developers should be able to print a line of their own just BEFORE the form. What do you add right before you print it?</div><div class="opts"><div class="opt">A) <code class="inline">apply_filters( 'pagesco_before_gift_form', '' );</code></div><div class="opt">B) <code class="inline">add_action( 'pagesco_before_gift_form', 'pagesco_print_form' );</code></div><div class="opt">C) <code class="inline">do_action( 'before_gift_form' );</code></div><div class="opt correct">D) <code class="inline">do_action( 'pagesco_before_gift_form' );</code> with a DocBlock above it</div></div><div class="why"><b>Why:</b> A moment others may act at is an action; you fire it with do_action(), prefixed and documented like core's (the project's pagesco_before_store_notice). A value others may change would be a filter.<br><b>A</b> is wrong: A filter is for a value; nobody is asked to change one here.<br><b>B</b> is wrong: add_action() attaches a callback; it does not create the moment.<br><b>C</b> is wrong: Unprefixed: another plugin's before_gift_form would collide with it.</div></div>
+
+  <div class="sec"><h2>2.3 · The Hooks System: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'add_filter( "pagesco_p", "strrev" ); echo apply_filters( "pagesco_p", "Dune" ), " ", apply_filters( "pagesco_other", "Dune" ), "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">enuD Dune</pre></div></div><div class="why"><b>Why:</b> <code class="inline">strrev</code> is a callback by name: PHP's own function, which takes one value and returns one, the shape a filter needs. A hook nobody filters returns the value unchanged, which is why calling apply_filters() costs nothing when no plugin uses it.</div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'add_action( "pagesco_p", function () { echo "ran "; } ); var_dump( do_action( "pagesco_p" ) );'</pre><div class="opts"><div class="opt correct"><pre class="out">ran NULL</pre></div></div><div class="why"><b>Why:</b> The action ran its callback (<code class="inline">ran </code>), and do_action() returns nothing: <code class="inline">var_dump()</code> of nothing is NULL. Actions are moments, not values; if you need an answer back, offer a filter.</div></div>
+
+  <div class="sec"><h2>Lab Reference Solutions</h2><span class="rule"></span></div>
+<p>Every output below is real: the lab files run exactly as <code class="inline">labs/check_labs.py</code> runs them, on the course site at the end of Lesson 2.1 (WordPress 7.1.3, PHP 8.5, MySQL 9.7, WP-CLI 2.12), copied into the WordPress root and run with <code class="inline">wp eval-file --use-include</code> (PHP labs) or <code class="inline">sh</code> in the WP-CLI container (shell labs). Paths show <code class="inline">/var/www/html/...</code>, which is the learner's <code class="inline">wordpress/</code> folder.</p>
+<div class="blk lab"><div class="h">Lab 2.2-A (guided): labs/module-03/l2_2-core-database/meta_pivot_starter.sh → meta_pivot_solution.sh</div>
+<p>As shipped:</p>
+<pre class="out">== Step 1: the users ==
+ID	user_login	display_name
+1	admin	admin
+2	maria	Maria Lopez
+3	devon	Devon Park
+
+== Step 2: first names, one join ==
+Step 2: TODO
+== Step 3: one row per user, two fields ==
+Step 3: TODO
+== Step 4: the same through WordPress ==
+Step 4: TODO
+== Step 5: meta rows per user ==
+Step 5: TODO</pre><p>The solution prints:</p>
+<pre class="out">== Step 1: the users ==
+ID	user_login	display_name
+1	admin	admin
+2	maria	Maria Lopez
+3	devon	Devon Park
+
+== Step 2: first names, one join ==
+ID	user_login	first_name
+1	admin	
+2	maria	Maria
+3	devon	Devon
+
+== Step 3: one row per user, two fields ==
+ID	user_login	first_name	last_name
+1	admin		
+2	maria	Maria	Lopez
+3	devon	Devon	Park
+
+== Step 4: the same through WordPress ==
++----+------------+------------+-----------+
+| ID | user_login | first_name | last_name |
++----+------------+------------+-----------+
+| 1  | admin      |            |           |
+| 2  | maria      | Maria      | Lopez     |
+| 3  | devon      | Devon      | Park      |
++----+------------+------------+-----------+
+== Step 5: meta rows per user ==
+user_id	meta_rows
+1	16
+2	15
+3	16</pre><p>The key query is Step 3: one join without a key condition gives every meta row of every user; GROUP BY folds them into one row per user, and each <code class="inline">MAX(CASE WHEN um.meta_key = 'x' THEN um.meta_value END)</code> keeps the one non-NULL value of its key (MAX of one value is that value). Common wrong turns: the key condition in WHERE (then only one key survives the join and the other column is NULL); a second join per field (also correct: one join per field, the shape WP_Query writes for two meta conditions). admin's names are empty strings, not NULL: the rows exist. Step 5's counts grow when a learner changes screen options or opens the editor (WordPress stores per-user preferences as meta).</p>
+</div>
+<div class="blk lab"><div class="h">Lab 2.2-B: labs/module-03/l2_2-core-database/wpdb_report_starter.php → wpdb_report_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">Prefix: wp_
+Comments (SQL): TODO
+Comments (API): TODO
+Maria's pages: TODO
+permalink_structure: TODO
+Autoload values WordPress loads: TODO</pre><p>The solution prints:</p>
+<pre class="out">Prefix: wp_
+Comments (SQL): 1
+Comments (API): 1
+Maria's pages: about, contact, events
+permalink_structure: /%postname%/ (autoload on)
+Autoload values WordPress loads: yes, on, auto-on, auto</pre><p>Accept <code class="inline">get_var()</code> with a string literal for TODO 1 (no value goes in, so prepare() has nothing to do) but not a typed <code class="inline">wp_comments</code>. TODO 3: the 2 goes in through <code class="inline">%d</code> even though it is a constant here; the habit is the point (Lesson 5.5). TODO 4: <code class="inline">get_row()</code> returns an object with one property per selected column. TODO 5 is the list from the lesson's version note: what <code class="inline">wp_load_alloptions()</code> loads; <code class="inline">auto-off</code> is not in it.</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-03/l2_2-core-database/debug_meta_report.php (deliberately broken)</div>
+<p>As shipped, PHP prints:</p>
+<pre class="out">Post 15 waiting for pings: no
+Warning: foreach() argument must be of type array|object, string given in /var/www/html/debug_meta_report.php on line 26
+Published pages: Warning: Undefined property: stdClass::$published in /var/www/html/debug_meta_report.php on line 32
+[new lines in wp-content/debug.log]
+[26-Oct-2026 14:09:36 UTC] PHP Warning:  foreach() argument must be of type array|object, string given in /var/www/html/debug_meta_report.php on line 26
+[26-Oct-2026 14:09:36 UTC] PHP Warning:  Undefined property: stdClass::$published in /var/www/html/debug_meta_report.php on line 32</pre><ol class="steps">
+  <li><b>Silent, line 21:</b> <code class="inline">get_post_meta( 15, '_pingme' )</code> without <code class="inline">true</code> returns an array (<code class="inline">array( '1' )</code>), never identical to the string '1', so the answer is "no" although the row exists. Pass <code class="inline">true</code> (Lesson 2.2, Common Mistakes 4).</li>
+  <li><b>Warning, line 26 (the bug is on line 25):</b> the meta key is <code class="inline">wp_capabilities</code>, with the table prefix. <code class="inline">get_user_meta()</code> of a key that does not exist returns '' with <code class="inline">true</code>, and foreach() on a string warns. In code the key is <code class="inline">$wpdb-&gt;prefix . 'capabilities'</code> (the prefix can be anything); better still, <code class="inline">get_userdata( 2 )-&gt;roles</code>.</li>
+  <li><b>Warning, line 32:</b> wp_count_posts() names its properties after the statuses: <code class="inline">publish</code>, not <code class="inline">published</code>.</li>
+</ol>
+<p>Fixed, it prints:</p>
+<pre class="out">Post 15 waiting for pings: yes
+Maria's role: editor
+Published pages: 4</pre><p>Two of the three bugs are the lesson's own lessons in disguise (the third argument, the prefix); the third is the most ordinary bug in PHP: a guessed property name. <code class="inline">wp db query "SELECT meta_key FROM wp_usermeta WHERE user_id = 2"</code> answers the second one in one line.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 2.3-A (guided): labs/module-03/l2_3-hooks/filter_chain_starter.php → filter_chain_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">Removed the sale badge: TODO
+pagesco_lab_capitalize: TODO
+Line: fahrenheit 451 [SALE]</pre><p>The solution prints:</p>
+<pre class="out">Removed the sale badge: true
+pagesco_lab_capitalize: 5
+pagesco_lab_add_author: 10
+pagesco_lab_sale_badge: false
+Line: Fahrenheit 451 by Ray Bradbury</pre><p>What each TODO shows: (1) priority 5 runs before the default 10, so the title is capitalized before the author is added; (2) <code class="inline">10, 2</code> hands the callback the hook's second value, the author (without it: the fatal ArgumentCountError of Lesson 2.3, Mistake 2); (3) the badge was added at 30, so only <code class="inline">remove_filter( ..., 30 )</code> removes it, and the true says so; (4) has_filter() returns the priority, and false for the removed badge. Accept <code class="inline">ucwords</code> written inside the author callback only if the learner can say why the separate callback is better (another plugin can remove or reorder it).</p>
+</div>
+<div class="blk lab"><div class="h">Lab 2.3-B: labs/module-03/l2_3-hooks/hook_finder_starter.sh → hook_finder_solution.sh</div>
+<p>As shipped:</p>
+<pre class="out">== 1. Where core fires wp_head ==
+wp-includes/general-template.php:3441:	do_action( 'wp_head' );
+== 2. Who adds the generator tag ==
+2. TODO
+== 3. Where the excerpt length is filtered ==
+3. TODO
+== 4. Asked of the running site ==
+4. TODO
+== 5. Callbacks on wp_head ==
+5. TODO</pre><p>The solution prints:</p>
+<pre class="out">== 1. Where core fires wp_head ==
+wp-includes/general-template.php:3441:	do_action( 'wp_head' );
+== 2. Who adds the generator tag ==
+362:add_action( 'wp_head', 'wp_generator' );
+== 3. Where the excerpt length is filtered ==
+wp-includes/formatting.php:4081:		$excerpt_length = (int) apply_filters( 'excerpt_length', $excerpt_length );
+wp-includes/blocks/latest-posts.php:167:				$excerpt_length = (int) apply_filters( 'excerpt_length', $block_core_latest_posts_excerpt_length );
+== 4. Asked of the running site ==
+wpautop on the_content: 10
+== 5. Callbacks on wp_head ==
+30</pre><p>Patterns must be exact: <code class="inline">grep -rn wp_head wp-includes/</code> returns every line that mentions it (callbacks attached to it, comments, the function wp_head() itself). With the quotes and spaces core's coding standard uses, <code class="inline">do_action( 'wp_head' )</code> is found once, at line 3441 of general-template.php, and the generator at line 362 of default-filters.php. Step 3 finds two callers: wp_trim_excerpt() in formatting.php (the automatic excerpt) and the Latest Posts block, which is why one filter changes both. Step 5's 30 counts the callbacks on wp_head of a WP-CLI run on this site; a front-end request can differ, because themes and plugins add their own. Line numbers move between releases; the pattern is the skill.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 2.3-C: labs/module-03/l2_3-hooks/title_parts_starter/ → title_parts_solution/ with test_title_parts.sh</div>
+<p>The test with the starter's <code class="inline">pagesco-title.php</code> in mu-plugins/:</p>
+<pre class="out">/                 &lt;title&gt;Pages &amp;amp; Co. &amp;#8211; TODO&lt;/title&gt;
+/book-club-dune/  &lt;title&gt;Book club: Dune &amp;#8211; Pages &amp;amp; Co.&lt;/title&gt;
+/hello-world/     &lt;title&gt;Hello world! &amp;#8211; Pages &amp;amp; Co.&lt;/title&gt;
+/about/           &lt;title&gt;About Us &amp;#8211; Pages &amp;amp; Co.&lt;/title&gt;</pre><p>With the solution's:</p>
+<pre class="out">/                 &lt;title&gt;Pages &amp;amp; Co. &amp;#8211; Independent bookstore since 1998&lt;/title&gt;
+/book-club-dune/  &lt;title&gt;News: Book club: Dune &amp;#8211; Pages &amp;amp; Co.&lt;/title&gt;
+/hello-world/     &lt;title&gt;Hello world! &amp;#8211; Pages &amp;amp; Co.&lt;/title&gt;
+/about/           &lt;title&gt;About Us &amp;#8211; Pages &amp;amp; Co.&lt;/title&gt;</pre><p>Reading it: document_title_parts passes an array (title, page, tagline, site) and the callback returns the array, changed or not; WordPress then joins the parts with the separator and escapes them, so <code class="inline">&amp;</code> arrives as <code class="inline">&amp;amp;</code>. The front page is the blog home here (Settings &gt; Reading: your latest posts), so its parts are the site name and the tagline. <code class="inline">in_category( 'news' )</code> takes the slug and only Book club: Dune of the four tested pages is a News post; Hello world! (Uncategorized) and About Us stay as they were. The TODO 3 trap: a <code class="inline">return</code> only inside the if, which empties every other title. Remove the file afterwards (<code class="inline">rm wordpress/wp-content/mu-plugins/pagesco-title.php</code>).</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-03/l2_3-hooks/debug_price_tag.php (deliberately broken)</div>
+<p>As shipped, PHP prints:</p>
+<pre class="out">Deprecated: number_format(): Passing null to parameter #1 ($num) of type float is deprecated in /var/www/html/debug_price_tag.php on line 26
+Warning: Undefined variable $pagesco_shop_name in /var/www/html/debug_price_tag.php on line 36
+ price: $0.00 (holiday price)</pre><ol class="steps">
+  <li><b>Deprecated, line 26 (the bug is on line 21):</b> pagesco_lab_round_price() assigns the rounded price and returns nothing, so the next callback receives null and number_format() complains. The message points at an innocent line, the pattern of Lesson 2.3's Mistake 1. Fix: <code class="inline">return round( $price, 2 );</code>.</li>
+  <li><b>Warning, line 36:</b> a function cannot see variables from outside it, so <code class="inline">$pagesco_shop_name</code> is undefined inside the callback and the label starts with nothing. Fix: the name inside the function (or a constant). <code class="inline">global $pagesco_shop_name;</code> does NOT help here: a file run by <code class="inline">wp eval-file</code> is included inside a WP-CLI method, so its top-level variables are local to that method, not globals. Measured with a three-line probe, <code class="inline">global</code> gives:</li>
+  <li><b>Silent, line 41:</b> the markup was added at priority 15, so <code class="inline">remove_filter()</code> without the 15 looks at 10, finds nothing and returns false; "(holiday price)" stays. Fix: pass 15, and <code class="inline">var_dump()</code> the result while you debug.</li>
+</ol>
+<pre class="out">NULL</pre><p>Fixed (all three, with the removal's result printed), it prints:</p>
+<pre class="out">bool(true)
+Pages &amp; Co. price: $14.99</pre><p>Fixing bug 1 first changes the Deprecated message into a correct price, which makes the silent bug easy to spot: the markup is visible on a real number. That order is worth asking learners to explain.</p>
+</div>
+
+  <div class="sec"><h2>The Lesson Pages' Own Quick Quizzes</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Lesson 2.2 · Core Architecture &amp; the Database</div>
+<ol class="steps" data-lesson-quiz="2.2">
+  <li><b>A</b> A row in wp_postmeta with the post's ID, a meta_key and a meta_value: Extra fields of a post are rows in wp_postmeta: post_id, meta_key, meta_value. That is what update_post_meta writes.</li>
+  <li><b>B</b> 10, 100, 9: meta_value is LONGTEXT, so the values are compared as text, character by character: 1 sorts before 9. Cast them, or use meta_value_num in WP_Query, for numeric order.</li>
+  <li><b>C</b> auto: With no decision from the code and a small value, WordPress stores auto, which is autoloaded today. Large values become auto-off.</li>
+  <li><b>B</b> It stays in wp_postmeta as orphaned rows: WordPress tables have no foreign keys, so MySQL neither refuses nor cascades. The meta and term rows stay as orphans; wp_delete_post would have removed them.</li>
+  <li><b>C</b> pluggable.php, which defines it, loads only after all plugins: wp_get_current_user lives in pluggable.php, which wp-settings.php loads after all plugins so they can replace its functions. Call it from a hook such as init instead.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Lesson 2.3 · The Hooks System</div>
+<ol class="steps" data-lesson-quiz="2.3">
+  <li><b>B</b> add_filter( 'the_title', ... ) with a callback that returns the title and an asterisk: the_title is a filter: WordPress passes the title in and displays whatever your callback returns, so the callback returns the title with an asterisk added.</li>
+  <li><b>C</b> CBDA: C has priority 5 and runs first. B and D both have the default 10 and run in the order they were added, then A at 20.</li>
+  <li><b>A</b> remove_filter( 'excerpt_length', 'pagesco_excerpt_length', 15 );: Removal needs the same hook, the same callback and the same priority it was added with, here 15.</li>
+  <li><b>C</b> ArgumentCountError: Too few arguments to function {closure}(), 1 passed ... and exactly 2 expected: add_filter defaults to one accepted argument, so the closure is called with only the title and PHP throws ArgumentCountError for the missing $id. Registering with 10, 2 fixes it.</li>
+  <li><b>A</b> $count = apply_filters( 'pagesco_featured_count', 3 );: A prefixed, documented filter on the value is exactly the extension point: the other developer hooks pagesco_featured_count and returns a different number.</li>
+</ol>
+</div>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>Through WordPress:</b> WordPress's tables have no foreign keys, so PHP does what ON DELETE CASCADE would do (wp_delete_post() removes meta, term links, revisions and comments); serialized values carry their lengths, which a text REPLACE breaks; and the API keeps the object cache and every hook in step. A DELETE at the prompt leaves orphans; an UPDATE skips the caches.</li>
+  <li><b>Banner and excerpts:</b> a banner at the top of every page is a moment: an action on <code class="inline">wp_body_open</code> (the project's store notice). The excerpt length is a value: a filter on <code class="inline">excerpt_length</code> whose callback returns a number.</li>
+  <li><b>remove_action() false:</b> the priority differs from the one used in add_action(); it ran before the hook was added (a theme's after_setup_theme callback, removed from the top of a plugin file); or the callback is not the same one (a closure, or a method of a different object).</li>
+</ol>
+
+  <div class="sec"><h2>Common Wrong Answers and What They Reveal</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li><b>Q1 A ("position does not matter").</b> Sees wp-config.php as a list of settings, not a program that ends by loading WordPress. Show line 139 again.</li>
+  <li><b>Q3 A or D.</b> Remembers that the theme is "the outside" and plugins "the inside" but not the order. Redraw the shop: lights, always-there things, today's departments, window display.</li>
+  <li><b>Q4 with <code class="inline">string(5) "Devon"</code>.</b> Expects one value because there is one row. The metadata API always returns a list unless you ask for one value: <code class="inline">true</code>.</li>
+  <li><b>Q5 A.</b> Correct instinct (never edit serialized text), wrong mechanism: count the letters. The answer's second half (use the API anyway) is the part to keep.</li>
+  <li><b>Q7 with <code class="inline">XbA</code> or <code class="inline">xaB</code>.</b> Ran the lines in the order written. Ask: "which priority runs first?"</li>
+  <li><b>Q9 C.</b> Blames the priority, the most common removal bug, but this one is timing. Ask: "when did the theme add it, and when did your line run?"</li>
+  <li><b>Q11 D.</b> Mixes up the two the_title mistakes: a missing return is a Deprecated notice and an empty title; two arguments asked and one registered is a fatal error.</li>
+</ul>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 3 · Answer Key · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

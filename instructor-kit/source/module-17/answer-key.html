@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Key: Session 17</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">answers &amp; solutions · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Answer Key</div>
+    <h1>Session 17: Final Project Kickoff and Studio I</h1>
+    <p class="sub">Answers and reasoning for every Session 17 item: the brief by layer, the self-check, the predict-then-run items, the studio reference outputs for Milestones 1 to 4, the lab reference solutions and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Session <b>17</b></span>
+      <span class="chip"><b>12</b> self-check items</span>
+      <span class="chip">Confidential</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Start Here · The Brief by Layer</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>#</th><th>Requirement</th><th>Layer and class (the lesson's map)</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Reserve, three days, expired</td><td><code class="inline">Holds::place()</code> computes <code class="inline">pickup_by</code> from the setting; <code class="inline">Holds::status()</code> computes "expired"</td></tr>
+<tr><td>2</td><td>Limits, duplicates, sold out, settings</td><td><code class="inline">Holds::place()</code>; settings <code class="inline">hold_days</code> and <code class="inline">max_holds</code> on Settings &gt; Pages &amp; Co. Books</td></tr>
+<tr><td>3</td><td>My holds, cancel, only your own</td><td>the My Holds block; <code class="inline">HoldsTable::finish()</code> with the user ID in its <code class="inline">WHERE</code>; a "not found" for anyone else's hold</td></tr>
+<tr><td>4</td><td>Staff list and "collected"</td><td>Books &gt; Holds (<code class="inline">Admin\HoldsPage</code>), the collect handler, capability <code class="inline">edit_others_posts</code></td></tr>
+<tr><td>5</td><td>The email</td><td>the plugin's own action <code class="inline">pagesco_books_hold_placed</code>, and <code class="inline">Holds\HoldMail</code> listening to it</td></tr>
+<tr><td>6</td><td>No JavaScript, screen readers, no reload</td><td>forms that post to <code class="inline">admin-post.php</code>; an Interactivity API store that sends the same form to the REST API; <code class="inline">role="status"</code> messages</td></tr>
+<tr><td>7</td><td>Live prices on the home page</td><td>the <code class="inline">pagesco/book</code> binding source learns a book's slug; the theme's staff picks pattern binds its prices</td></tr>
+<tr><td>8</td><td>Personal data, tested, safe deploys</td><td>the daily job deletes holds 30 days after their pickup date; uninstall drops the table; lint, tests, smoke test; a code-only deploy with a backup first</td></tr>
+</tbody>
+</table>
+
+  <div class="sec"><h2>9.1 · Self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">Why does the reference solution keep holds in a custom table rather than a post type?</div><div class="opts"><div class="opt">A) A post type cannot store a date</div><div class="opt correct">B) A hold is one customer, one book, a status and a date: typed columns with indexes answer "this customer's holds" and "what is waiting" directly, and old rows can be deleted cleanly</div><div class="opt">C) Custom tables are always faster than wp_posts</div><div class="opt">D) Post types cannot be private</div></div><div class="why"><b>Why:</b> Lesson 9.1, "The data: why a custom table": a hold has no title, content, URL or revisions; as posts every question would be a meta query, and holds would leak into places built for content (exports, search, the posts routes).<br><b>A</b> is wrong: Post meta can store any date; the problem is querying it.<br><b>C</b> is wrong: Not always: the point is the shape of the data and the two questions the shop asks.<br><b>D</b> is wrong: They can (public => false); that is not the reason.</div></div>
+  <div class="q" data-sc="2"><div class="qn">Q2</div><div class="qt">Where does the reference solution keep the status <code class="inline">expired</code>?</div><div class="opts"><div class="opt">A) In the status column, set by the daily cron job</div><div class="opt">B) In a post meta field on the book</div><div class="opt">C) In a transient that expires after hold_days</div><div class="opt correct">D) Nowhere: <code class="inline">Holds::status()</code> computes it from <code class="inline">pickup_by</code> and today's date every time a hold is shown</div></div><div class="why"><b>Why:</b> A stored "expired" needs a job to update it and is wrong between the moment it should change and the moment the job runs. The table stores waiting, collected or cancelled; expired is derived.<br><b>A</b> is wrong: The daily job deletes old holds 30 days after pickup; it never marks them.<br><b>B</b> is wrong: Holds are not book data, and a book can have many holds.<br><b>C</b> is wrong: A transient could vanish at any time (Lesson 7.3): never the only home of data.</div></div>
+  <div class="q" data-sc="3" data-kind="short"><div class="qn">Q3</div><div class="qt">On the course site at the end of Lesson 8.4, what does this print? And after Milestone 4?</div><pre class="code">grep -c '::class,' wp-content/plugins/pagesco-books/src/Plugin.php</pre><div class="opts"><div class="opt correct"><code class="inline">20</code> (twenty features); <code class="inline">25</code> after Milestone 4 (five new features, one line each)</div></div><div class="why"><b>Why:</b> Lesson 5.1's rule: one class in src/, one line in Plugin::feature_classes(). Add each line together with its file: a line for a class that does not exist yet stops every request with "Class not found".</div></div>
+  <div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">The plugin is already active on your development site. You add <code class="inline">Holds\HoldsTable::install()</code> to <code class="inline">Activator::activate()</code>. When is the holds table created on YOUR site?</div><div class="opts"><div class="opt correct">A) On the next request that loads WordPress: <code class="inline">maybe_upgrade()</code> runs on init, finds no version option and installs it</div><div class="opt">B) Never, until you deactivate and reactivate the plugin</div><div class="opt">C) When you run <code class="inline">wp db query</code></div><div class="opt">D) At 3 a.m., with the daily job</div></div><div class="why"><b>Why:</b> An active plugin's activation hook does not run again, and neither does it on an update (Lesson 8.4). Milestone 2's check proves it: <code class="inline">wp db query</code> (which does not start WordPress) sees no table, one <code class="inline">curl</code> later the table and version 1 exist. The same happens on the live site in Milestone 9.<br><b>B</b> is wrong: That would work too, but the design makes it unnecessary, and it is impossible on a live update.<br><b>C</b> is wrong: wp db query talks to MySQL without loading WordPress: no PHP of yours runs.<br><b>D</b> is wrong: The daily job deletes old holds; it does not create tables.</div></div>
+  <div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">A reviewer finds these lines in Holds::cancel() (the reference has one call on one line). What can a logged-in customer now do?</div><pre class="code"><span class="v">$done</span> = HoldsTable::finish(
+	<span class="v">$hold_id</span>,
+	<span class="s">'cancelled'</span>
+);
+<span class="k">if</span> ( ! <span class="v">$user_id</span> || ! <span class="v">$done</span> ) {</pre><div class="opts"><div class="opt">A) Nothing new: the $user_id check still stops it</div><div class="opt">B) Cancel only their own holds, as before</div><div class="opt correct">C) Cancel ANY customer's waiting hold by sending its ID</div><div class="opt">D) Collect holds as staff</div></div><div class="why"><b>Why:</b> finish() puts the user ID into the SQL WHERE only when it is passed. Without it, the WHERE is id and status: any logged-in customer cancels anyone's hold. This is the insecure direct object reference of the Security and Privacy Checklist; HoldsTest's test_only_the_customer catches it (Milestone 7).<br><b>A</b> is wrong: $user_id only proves someone is logged in, not that the hold is theirs.<br><b>B</b> is wrong: That needs the owner in the query, which this line no longer passes.<br><b>D</b> is wrong: Collecting is another method and another capability.</div></div>
+  <div class="q" data-sc="6"><div class="qn">Q6</div><div class="qt">Why does <code class="inline">Holds::place()</code> answer the limit, a duplicate and a sold-out book with status 409, not 400 or 403?</div><div class="opts"><div class="opt">A) 409 is the only status WordPress allows in a WP_Error</div><div class="opt correct">B) The request is well formed and the customer is allowed to ask; the shop's current state says no (Conflict)</div><div class="opt">C) 403 would log the customer out</div><div class="opt">D) 409 makes the browser retry automatically</div></div><div class="why"><b>Why:</b> 400 means a malformed request (a missing or wrong argument, which the REST route's args catch), 401/403 who is asking, 404 no such thing. Every door passes the status in the error's data on, so the REST route and the form handler answer the same.<br><b>A</b> is wrong: Any status can go in the data array.<br><b>C</b> is wrong: No status logs anyone out.<br><b>D</b> is wrong: Browsers do not retry on 409.</div></div>
+  <div class="q" data-sc="7" data-kind="short"><div class="qn">Q7</div><div class="qt">Common Mistake 2, run as Devon (an author) about Maria's post 15. What does it print, and which check belongs in a handler?</div><pre class="code">wp eval 'var_dump( current_user_can( "delete_posts" ), current_user_can( "delete_post", 15 ) );' --user=devon</pre><div class="opts"><div class="opt correct"><code class="inline">bool(true)</code> then <code class="inline">bool(false)</code>: the meta capability with the ID, <code class="inline">delete_post</code>, 15</div></div><div class="why"><b>Why:</b> delete_posts asks "may this user delete posts at all?" (his own, yes). A handler must ask about THIS post. Holds are not posts and have no meta capability, so there ownership goes into the SQL WHERE with the user ID from the login.</div></div>
+  <div class="q" data-sc="8"><div class="qn">Q8</div><div class="qt">Why does the confirmation email live in <code class="inline">HoldMail</code>, listening to <code class="inline">pagesco_books_hold_placed</code>, instead of a <code class="inline">wp_mail()</code> call inside <code class="inline">Holds::place()</code>?</div><div class="opts"><div class="opt">A) wp_mail() cannot be called from a class</div><div class="opt">B) Actions run faster than function calls</div><div class="opt">C) Emails must be sent from a must-use plugin</div><div class="opt correct">D) The rules class knows nothing about email: others (an SMS, a staff notice in Exercise 2) attach to the same moment without changing the rules</div></div><div class="why"><b>Why:</b> An action is an extension point for a moment others may want to act at (Lesson 2.3). The rules class stays one job; Exercise 2 adds the shop's email at priority 20 from outside the plugin.<br><b>A</b> is wrong: Any PHP code can call wp_mail().<br><b>B</b> is wrong: do_action() adds a little work, not speed.<br><b>C</b> is wrong: Any plugin can send email.</div></div>
+  <div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">Which line computes the last day of pickup, three days from today, the way the reference does?</div><div class="opts"><div class="opt correct">A) <code class="inline">wp_date( 'Y-m-d', time() + $days * DAY_IN_SECONDS )</code></div><div class="opt">B) <code class="inline">date( 'Y-m-d', time() + $days * DAY_IN_SECONDS )</code></div><div class="opt">C) <code class="inline">current_time( 'mysql', true )</code></div><div class="opt">D) <code class="inline">gmdate( 'Y-m-d' ) . ' + 3'</code></div></div><div class="why"><b>Why:</b> pickup_by is a date in the shop's time zone (the counter's calendar): wp_date() formats a timestamp in the site's time zone. date() and gmdate() use PHP's own zone (UTC in WordPress), which moves the day near midnight.<br><b>B</b> is wrong: date() ignores the site's time zone setting.<br><b>C</b> is wrong: That is now, in UTC, as a datetime: what created_at stores.<br><b>D</b> is wrong: String concatenation, not date arithmetic.</div></div>
+  <div class="q" data-sc="10" data-kind="short"><div class="qn">Q10</div><div class="qt"><code class="inline">HoldsTable::waiting()</code> uses this trick. What does it print, and what does it mean for the query?</div><pre class="code">wp eval 'global $wpdb; echo $wpdb-&gt;prepare( "WHERE ( %d = 0 OR user_id = %d )", 0, 0 ), "\n";'</pre><div class="opts"><div class="opt correct"><code class="inline">WHERE ( 0 = 0 OR user_id = 0 )</code>: always true, so the user filter is switched off (all customers); with 4 it becomes <code class="inline">( 4 = 0 OR user_id = 4 )</code></div></div><div class="why"><b>Why:</b> One prepared statement serves every combination of filters: a 0 turns its filter off, any other value keeps it, and every value still goes through prepare().</div></div>
+  <div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">Milestone 4 sends a forged "Mark collected" from Maria's own logged-in session, but without the form's nonce. What does admin-post.php answer?</div><div class="opts"><div class="opt">A) 303, back to Books > Holds with ?pagesco_hold=collected</div><div class="opt">B) 401: Maria is not logged in</div><div class="opt correct">C) 403 with <code class="inline">The link you followed has expired.</code></div><div class="opt">D) 400: the action is unknown</div></div><div class="why"><b>Why:</b> check_admin_referer() fails without a valid nonce for pagesco_books_collect_hold_5, and WordPress dies with Lesson 5.3's message and 403. The nonce is what tells a real button press from a request another page sent with Maria's cookies.<br><b>A</b> is wrong: That is what the real button gets.<br><b>B</b> is wrong: Her cookies are valid: that is what makes the forgery dangerous.<br><b>D</b> is wrong: The handler exists; 400 is what admin-post.php answers when no handler does.</div></div>
+  <div class="q" data-sc="12" data-kind="short"><div class="qn">Q12</div><div class="qt">The lesson's mental model is the shop's counter. Name its three layers and the one job of each.</div><div class="opts"><div class="opt correct">the data (a table class that only stores), the rules (one class, Holds, that only decides), the doors (REST routes, forms, blocks that only check who is asking and pass the question on)</div></div><div class="why"><b>Why:</b> When a rule changes, it changes in one place and every door follows. The guide's requirement map shows which layer handles each line of the brief.</div></div>
+
+  <div class="sec"><h2>9.1 · Predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'var_dump( current_user_can( "edit_post", 15 ), current_user_can( "edit_posts" ) );' --user=devon</pre><div class="opts"><div class="opt correct"><pre class="out">bool(false)
+bool(true)</pre></div></div><div class="why"><b>Why:</b> Same lesson as Q7, other verb: <code class="inline">edit_post</code> with the ID asks about Maria's post (no), <code class="inline">edit_posts</code> asks about posts in general (yes: his own). Every "may I change THIS?" check takes the ID.</div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it.</div><pre class="code">grep -c '::class,' wp-content/plugins/pagesco-books/src/Plugin.php</pre><div class="opts"><div class="opt correct"><pre class="out">20</pre></div></div><div class="why"><b>Why:</b> Twenty features before the project; Milestone 2 makes it 21, Milestone 3 22, Milestone 4 25 (Q3).</div></div>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'echo get_option( "date_format" ), " | ", wp_date( get_option( "date_format" ), strtotime( "2026-11-05 12:00:00" ) ), "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">F j, Y | November 5, 2026</pre></div></div><div class="why"><b>Why:</b> <code class="inline">Holds::label()</code> formats <code class="inline">pickup_by</code> with the site's <code class="inline">date_format</code> option through <code class="inline">wp_date()</code>; the date is read at noon so no time zone can move it to the day before.</div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'global $wpdb; echo $wpdb-&gt;prepare( "WHERE ( %d = 0 OR user_id = %d )", 4, 4 ), "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">WHERE ( 4 = 0 OR user_id = 4 )</pre></div></div><div class="why"><b>Why:</b> With a real ID the condition keeps the filter: only user 4's rows. With 0 it is always true (Q10).</div></div>
+
+  <div class="sec"><h2>Studio Reference Outputs (Milestones 1 to 4)</h2><span class="rule"></span></div>
+<p>The lesson's own files and checks, run in page order on a site at the end of Lesson 8.4. Every output here equals the lesson's output card (the generator compares them); the lines the lesson prints as <code class="inline">...</code> (the phpcs time, the pickup date) change with every run. Use them at the check-ins.</p>
+<div class="blk"><div class="h">Milestone 1: the baseline</div>
+<pre class="out">Success: Added the constant 'SAVEQUERIES' to the 'wp-config.php' file with the raw value 'true'.
+[26-Oct-2026 12:57:28 UTC] /: 22 queries; missing options: can_compress_scripts, site_logo
+[26-Oct-2026 12:57:28 UTC] /books/dune/: 25 queries; missing options: can_compress_scripts, site_logo
+[26-Oct-2026 12:57:28 UTC] /find-a-book/: 25 queries; missing options: can_compress_scripts, site_logo
+Success: Deleted the constant 'SAVEQUERIES' from the 'wp-config.php' file.</pre></div>
+<div class="blk"><div class="h">Milestone 2: the line count, the table on the first request, the settings</div>
+<pre class="out">21</pre><pre class="out">holds_tables
+0
+
+COLUMN_NAME	COLUMN_TYPE
+id	bigint unsigned
+book_id	bigint unsigned
+user_id	bigint unsigned
+status	varchar(20)
+pickup_by	date
+created_at	datetime
+
+1</pre><pre class="out">int(3)
+int(3)</pre><pre class="out">&lt;h2 id="wp-settings-section-pagesco_books_notice-1"&gt;Store notice&lt;/h2&gt;
+&lt;h2 id="wp-settings-section-pagesco_books_lists-2"&gt;Catalog and events&lt;/h2&gt;
+&lt;h2 id="wp-settings-section-pagesco_books_holds-3"&gt;Reserve &amp; Pick Up&lt;/h2&gt;
+&lt;h2 id="wp-settings-section-pagesco_books_uninstall-4"&gt;Uninstall&lt;/h2&gt;</pre></div>
+<div class="blk"><div class="h">Milestone 3: holds-check.php, the newest email, the table</div>
+<pre class="out">Jordan reserves Dune                 hold 1: waiting
+Jordan reserves Dune again           pagesco_hold_duplicate
+Jordan reserves The Great Gatsby     pagesco_hold_sold_out
+Jordan reserves 1984                 hold 2: waiting
+Jordan reserves The Hobbit           hold 3: waiting
+Jordan reserves Animal Farm          pagesco_hold_limit
+Priya cancels hold 1                 pagesco_hold_not_found
+Jordan cancels hold 1                hold 1: cancelled
+Jordan reserves Animal Farm          hold 4: waiting
+A visitor reserves Dune              pagesco_hold_login_required
+Animal Farm waits until: 3 days from today</pre><pre class="out">From: WordPress &lt;wordpress@example.com&gt;
+To: jordan@example.com
+Subject: Your hold at Pages &amp; Co.: Animal Farm
+
+Hello Jordan,
+
+We have put Animal Farm aside for you. Pick it up at the counter by:
+...
+
+Your holds: http://localhost:8080/my-holds/
+
+See you soon at Pages &amp; Co.</pre><pre class="out">+----+---------+---------+-----------+
+| id | book_id | user_id | status    |
++----+---------+---------+-----------+
+|  1 |      30 |       4 | cancelled |
+|  2 |      31 |       4 | waiting   |
+|  3 |      35 |       4 | waiting   |
+|  4 |      40 |       4 | waiting   |
++----+---------+---------+-----------+</pre></div>
+<div class="blk"><div class="h">Milestone 4: the routes and the doors</div>
+<p>The routes, then a visitor:</p>
+<pre class="out">/pagesco/v1/holds
+/pagesco/v1/holds/(?P&lt;id&gt;\d+)</pre><pre class="out">{
+  "code": "rest_forbidden",
+  "message": "Log in to reserve books.",
+  "data": {
+    "status": 401
+  }
+}</pre><p>Jordan (three waiting) and Priya:</p>
+<pre class="out">{
+  "code": "pagesco_hold_limit",
+  "message": "You already have 3 books waiting. Collect or cancel one first.",
+  "data": {
+    "status": 409
+  }
+}</pre><pre class="out">HTTP/1.1 201 Created
+
+{
+  "id": 5,
+  "book": 30,
+  "title": "Dune",
+  "status": "waiting"
+}</pre><p>Jordan's DELETE of Priya's hold 5, then Jordan's list:</p>
+<pre class="out">{
+  "code": "pagesco_hold_not_found",
+  "message": "You have no waiting hold with that ID.",
+  "data": {
+    "status": 404
+  }
+}</pre><pre class="out">[
+  {
+    "id": 4,
+    "title": "Animal Farm",
+    "status": "waiting"
+  },
+  {
+    "id": 3,
+    "title": "The Hobbit",
+    "status": "waiting"
+  },
+  {
+    "id": 2,
+    "title": "1984",
+    "status": "waiting"
+  },
+  {
+    "id": 1,
+    "title": "Dune",
+    "status": "cancelled"
+  }
+]</pre><p>Books &gt; Holds as Maria (the headings), as Devon, and the forged POST:</p>
+<pre class="out">Book
+Customer
+Pick up by
+Action</pre><pre class="out">Sorry, you are not allowed to access this page.</pre><pre class="out">HTTP/1.1 403 Forbidden
+
+&lt;div class="wp-die-message"&gt;The link you followed has expired.&lt;/div&gt;</pre><p>The commit:</p>
+<pre class="out">Reserve &amp; Pick Up: holds table, settings, rules, email, REST routes, form handlers, staff screen</pre></div>
+
+  <div class="sec"><h2>Lab Reference Solutions</h2><span class="rule"></span></div>
+<p>Every output below is real: the lab files run exactly as <code class="inline">labs/check_labs.py</code> runs them, on a site at the end of Lesson 8.4 (<code class="inline">after:lesson_29</code>), copied into the WordPress root and run with <code class="inline">wp eval-file --use-include</code>.</p>
+<div class="blk lab"><div class="h">Lab 9.1-A (guided): labs/module-17/l9_1-final-project/ownership_sql_starter.php → ownership_sql_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">Devon closes wish 1          TODO
+Devon closes wish 3          TODO
+Maria closes wish 1          TODO
+Maria closes wish 1 again    TODO
+A visitor closes wish 2      TODO
+Maria's wishes, newest first:
+  TODO (pagesco_lab_wishes_of() returns nothing yet)</pre><p>The solution prints:</p>
+<pre class="out">Devon closes wish 1          pagesco_wish_not_found (404)
+Devon closes wish 3          closed
+Maria closes wish 1          closed
+Maria closes wish 1 again    pagesco_wish_not_found (404)
+A visitor closes wish 2      pagesco_wish_not_found (404)
+Maria's wishes, newest first:
+  wish 2: The Hobbit, open
+  wish 1: Dune, closed</pre><p>What to look for: the owner in the update's WHERE (three keys, three formats), <code class="inline">1 ===</code> on <code class="inline">$wpdb-&gt;update()</code> (it returns the number of rows changed, 0 when nothing matched, false on an error), the user from <code class="inline">get_current_user_id()</code>, one error for all refusals. Maria's second attempt is also a 404: the wish is no longer open, the same "not found" as Lesson 9.1's cancel of a hold that is not waiting.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 9.1-B: labs/module-17/l9_1-final-project/rsvp_rules_starter.php → rsvp_rules_solution.php</div>
+<p>As shipped (the duplicate and the limit are not checked yet, the status says TODO):</p>
+<pre class="out">A visitor books event 1          pagesco_rsvp_login_required (401)
+Jordan books event 99            pagesco_rsvp_no_event (404)
+Jordan books event 2             Story time: The Hobbit
+Jordan books Story time again    Story time: The Hobbit
+Jordan books event 5             Book club: Fahrenheit 451
+Jordan books event 7             Book club: Pride and Prejudice
+Priya books event 7              Book club: Pride and Prejudice
+Book club: Dune on 2027-11-04    TODO
+Book club: Dune on 2027-11-05    TODO</pre><p>The solution prints:</p>
+<pre class="out">A visitor books event 1          pagesco_rsvp_login_required (401)
+Jordan books event 99            pagesco_rsvp_no_event (404)
+Jordan books event 2             Story time: The Hobbit
+Jordan books Story time again    pagesco_rsvp_duplicate (409)
+Jordan books event 5             Book club: Fahrenheit 451
+Jordan books event 7             pagesco_rsvp_limit (409)
+Priya books event 7              Book club: Pride and Prejudice
+Book club: Dune on 2027-11-04    upcoming
+Book club: Dune on 2027-11-05    past</pre><p>The order of the rules matters: who is asking first (no query for visitors), then whether the thing exists, then the shop's state. Count the existing seats BEFORE adding (<code class="inline">&gt;= 2</code>); a learner who counts after adding refuses the second seat. The computed status compares two strings of the same format, as <code class="inline">Holds::status()</code> does with dates.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 9.1-C: labs/module-17/l9_1-final-project/own_action_starter/ → own_action_solution/ with test_own_action.php</div>
+<p>With the starter's <code class="inline">pagesco-lab-requests.php</code> in mu-plugins/:</p>
+<pre class="out">Listeners on the action: 1
+Listeners heard: nothing yet (TODO 1)</pre><p>With the solution's:</p>
+<pre class="out">Listeners on the action: 2
+10 customer note: Dune for jordan
+20 shop note: order "Dune" (request 1)
+10 customer note: Emma for priya
+20 shop note: order "Emma" (request 2)</pre><p>The customer's note at 10 runs before the shop's at 20 for each request; the shop's listener needs <code class="inline">20, 2</code> (priority, accepted arguments): without the 2, PHP stops with an ArgumentCountError the moment the action fires (worth letting a learner see once). Remove the file afterwards: <code class="inline">rm wordpress/wp-content/mu-plugins/pagesco-lab-requests.php</code>.</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-17/l9_1-final-project/debug_trash_door.php (deliberately broken)</div>
+<p>As shipped, PHP and WordPress print:</p>
+<pre class="out">Notice: Function wpdb::prepare was called &lt;strong&gt;incorrectly&lt;/strong&gt;. The query does not contain the correct number of placeholders (3) for the number of arguments passed (2). Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 4.8.3.) in /var/www/html/wp-includes/functions.php on line 6260
+devon may trash "3": yes
+Reason: Warning: Undefined array key "why" in /var/www/html/debug_trash_door.php on line 36
+[new lines in wp-content/debug.log]
+[26-Oct-2026 12:59:26 UTC] PHP Notice:  Function wpdb::prepare was called &lt;strong&gt;incorrectly&lt;/strong&gt;. The query does not contain the correct number of placeholders (3) for the number of arguments passed (2). Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 4.8.3.) in /var/www/html/wp-includes/functions.php on line 6260
+[26-Oct-2026 12:59:26 UTC] PHP Warning:  Undefined array key "why" in /var/www/html/debug_trash_door.php on line 36</pre><ol class="steps">
+  <li><b>doing_it_wrong (a Notice), line 32:</b> three placeholders (<code class="inline">%i</code>, <code class="inline">%d</code>, <code class="inline">%s</code>) and two values. <code class="inline">prepare()</code> refuses and returns an empty string, and <code class="inline">$wpdb-&gt;get_var( '' )</code> returns the PREVIOUS query's answer: the <code class="inline">"3"</code> is Devon's user ID from <code class="inline">get_user_by()</code>. Add the third value, <code class="inline">'post'</code>.</li>
+  <li><b>Warning, line 36:</b> the request has <code class="inline">reason</code>, the code reads <code class="inline">why</code>. Read keys from the place that defines them.</li>
+  <li><b>Silent, line 28:</b> <code class="inline">current_user_can( 'delete_posts' )</code> asks whether Devon may delete posts at all (his own: yes). The door must ask about this post: <code class="inline">current_user_can( 'delete_post', $pagesco_post_id )</code>. Lesson 9.1's Common Mistake 2; the dangerous one, because nothing announces it.</li>
+</ol>
+<p>Fixed, it prints:</p>
+<pre class="out">devon may trash "Welcome to the new Pages &amp; Co. website": no
+Reason: duplicate</pre></div>
+
+  <div class="sec"><h2>Opening: Readiness</h2><span class="rule"></span></div>
+<p>There is no graded warm-up. The readiness check's correct state: <code class="inline">git tag -n</code> lists release-1 ("First launch") and release-2 ("Plugin 1.1.1, theme 1.1.1"), the working copy is clean, the plugin is 1.1.1 and pagesco-live's three services run. Learners who were not there leave with a note on the board and fix it before Session 18.</p>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>Three layers:</b> data (HoldsTable: the table and its queries, no rules), rules (Holds: every rule, the status, the messages), doors (HoldActions for the forms, HoldsEndpoint for REST, the Reserve and My Holds blocks; HoldsPage is the staff's screen).</li>
+  <li><b>Priya's DELETE:</b> <code class="inline">404 pagesco_hold_not_found</code> ("You have no waiting hold with that ID."). <code class="inline">Holds::cancel()</code> calls <code class="inline">HoldsTable::finish( $hold_id, 'cancelled', $user_id )</code> with her ID from the login; the update's WHERE matches no row.</li>
+  <li><b>Next milestone:</b> any honest answer with the lesson's done-when; Milestone 4's is the forged request answered 403 and the commit, Milestone 5's the smoke test's eight ok lines.</li>
+</ol>
+
+  <div class="sec"><h2>Common Wrong Answers and What They Reveal</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li><b>Q1 C ("tables are faster").</b> Speed is not the argument; the shape of the data and its two questions are. Ask what a hold's title would be.</li>
+  <li><b>Q2 A ("the cron job marks them").</b> Thinks of a status as something stored. Ask: what does the page show between midnight and the job's run?</li>
+  <li><b>Q4 B ("reactivate").</b> Has not yet met the update path; it matters on the live site, where nobody reactivates (Milestone 9).</li>
+  <li><b>Q5 A.</b> Confuses "logged in" with "owns it". The guided lab separates the two.</li>
+  <li><b>Q6 C or D.</b> Guessing at statuses: hand out the five used (200/201, 401, 403, 404, 409) as a card.</li>
+  <li><b>Q9 B ("date()").</b> Works on most days and moves the pickup day near midnight. Show <code class="inline">wp_timezone_string()</code> on their site.</li>
+  <li><b>Q11 A.</b> Thinks the logged-in cookie is enough: exactly why forgeries work without a nonce.</li>
+</ul>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 17 · Answer Key · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

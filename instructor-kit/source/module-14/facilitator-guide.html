@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facilitator Guide: Session 14</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">contains answers &amp; timing · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Facilitator Guide</div>
+    <h1>Session 14: Custom Endpoints, External APIs and Cron</h1>
+    <p class="sub">How to teach the session where the shop opens API counters of its own and starts calling another company's: routes with arguments, schemas, errors and permission checks, then a careful HTTP client, transients that survive a broken supplier, WP-Cron jobs scheduled once, and an ability for assistants.</p>
+    <div class="meta-row">
+      <span class="chip"><b>2</b> lessons</span>
+      <span class="chip"><b>3 hrs</b> session</span>
+      <span class="chip">Lessons <b>7.2–7.3</b></span>
+      <span class="chip">Session <b>14</b> of 18 · Part 2</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>How to Use This Guide</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Same rhythm for both lessons: frame (the goal and one mental model) → live demo (you type, they type along) → guided lab (a kit lab, new practice on the lesson's ideas) → start the lesson's own project. The lesson exercises, quiz and journal are homework.</li>
+  <li>Every command below was run on WordPress 7.1.3 / PHP 8.5 to produce the output printed under it: Lesson 7.2's demo on the site after Lesson 7.1 (<code class="inline">after:lesson_23</code>), Lesson 7.3's on the site after Lesson 7.2 (<code class="inline">after:lesson_24</code>). REST requests shown as <code class="inline">curl --user "maria:$PASS"</code> were sent with a real application password. Timing outputs (the timeout demo) differ by a few milliseconds on every run.</li>
+  <li>No internet is needed: the supplier is the course's sandbox inside the site, and the kit's 7.3 labs call the site's own pagesco/v1 API over HTTP, as if it were another company's. Only the lesson's last exercise (Open Library) needs a connection.</li>
+  <li>Labs live in <code class="inline">labs/module-14/</code>: <code class="inline">_starter</code> files and folders are handouts, <code class="inline">_solution</code> files and folders are yours.</li>
+  <li>Part 2, Session 6 of 10. Teal blocks are hands-on, amber blocks are watch-outs. Lesson codes (7.2, 7.3) match the course site.</li>
+</ul>
+<div class="note warn"><div class="t">The #1 risk of Session 14: two long lessons of PHP classes</div>
+<p>Lessons 7.2 and 7.3 are written for 145 and 150 minutes and are the plugin's longest files so far (BooksEndpoint, EventsEndpoint, Client, Availability, DailySync, Abilities). Typing them in the room would take the whole session. <b>Paste the classes, read them aloud, and type only the commands and the curl requests</b>: the skill is reading answers and errors, not typing arrays. Both projects' later steps go home (7.2 Steps 3 and 4, 7.3 Steps 3 and 4); say so at 0:00.</p>
+</div>
+
+  <div class="sec"><h2>Before the Session</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ <b>Projector site at <code class="inline">after:lesson_23</code></b> (the end of Lesson 7.1, the Stock at a glance widget). Keep Maria's "Inventory script" password in <code class="inline">PASS</code> and Devon's "Test" password in <code class="inline">DEVON_PASS</code> in the WP-CLI container shell (<code class="inline">docker compose run --rm wpcli sh</code>), never in a file under wordpress/.</li>
+  <li>☐ <b>Rehearse</b> 7.2's two versions of BooksEndpoint and the EventsEndpoint, and 7.3's sandbox, Client and Availability, on a scratch copy; have the lesson pages open to paste from.</li>
+  <li>☐ <b>Files to hand out:</b> <code class="inline">labs/module-14/</code> WITHOUT the <code class="inline">*_solution.*</code> files and the <code class="inline">opening_hours_solution/</code> folder. <b>Run the kit check once:</b> <code class="inline">python3 labs/check_labs.py module-14</code> (15 results, about two minutes).</li>
+  <li>☐ <b>Checkpoint 2:</b> bring the scored rubrics and give each learner a minute in the warm-up with their weakest row.</li>
+  <li>☐ <b>Board, before learners arrive:</b> the four desks <b>validate → sanitize → permission → callback</b>; <b>phone = wp_remote_get · sticky note = transient · closing checklist = WP-Cron</b>.</li>
+</ul>
+<div class="blk warn"><div class="h">Known traps of this session</div>
+<table class="timing">
+<thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td>A route answers, but <code class="inline">X-WP-DoingItWrong</code> in the headers</td><td>No permission_callback</td><td>Always write the key; <code class="inline">__return_true</code> only for public reads (Mistake 1).</td></tr>
+<tr><td>per_page=500 accepted</td><td>A custom sanitize_callback replaced the schema's checks</td><td>Keep <code class="inline">'validate_callback' =&gt; 'rest_validate_request_arg'</code> next to it (Mistake 2).</td></tr>
+<tr><td>500 Internal Server Error with <code class="inline">"data":null</code></td><td>A WP_Error without a status</td><td><code class="inline">array( 'status' =&gt; 404 )</code> on every WP_Error a callback returns (Mistake 3).</td></tr>
+<tr><td>"REST API routes must be registered on the rest_api_init action"</td><td>register_rest_route() on init</td><td>Hook rest_api_init.</td></tr>
+<tr><td><code class="inline">Trying to access array offset on null</code> after a remote call</td><td>Only is_wp_error() was checked; the body was HTML or an error</td><td>Check the status and the decoded shape too (Lesson 7.3, Mistake 1).</td></tr>
+<tr><td>Pages hang for seconds</td><td>A remote call on page views, with the default 5-second timeout</td><td>Read a transient; call from a cron job; set a short timeout.</td></tr>
+<tr><td>The job ran four times</td><td>wp_schedule_event() on every request</td><td>Schedule on activation, guarded with wp_next_scheduled() (Mistake 2).</td></tr>
+<tr><td>The job "ran" but did nothing</td><td>The callback was added only inside is_admin()</td><td>Add cron callbacks unconditionally (Mistake 3).</td></tr>
+</tbody>
+</table>
+</div>
+
+  <div class="sec"><h2>Session 14 Agenda (3 hours)</h2><span class="rule"></span></div>
+  <table class="timing">
+    <thead><tr><th>Clock</th><th>Minutes</th><th>Segment</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="t">0:00</td><td class="t">10</td><td>Warm-up</td><td>Five retrieval questions on Lessons 6.4 and 7.1, homework check (the widget), Checkpoint 2 returned or announced.</td></tr>
+      <tr><td class="t">0:10</td><td class="t">10</td><td><b>7.2</b> Frame and mental model</td><td>A window with a printed menu: route, arguments, schema, and the staff-only sign.</td></tr>
+      <tr><td class="t">0:20</td><td class="t">25</td><td><b>7.2</b> Live demo</td><td>A first route; arguments, schema and errors the schema writes; pages and 404s; a route without permission_callback.</td></tr>
+      <tr><td class="t">0:45</td><td class="t">20</td><td><b>7.2</b> Guided lab</td><td><code class="inline">labs/module-14/l7_2-custom-endpoints/opening_hours_starter/</code>: a route of your own with an enum argument.</td></tr>
+      <tr><td class="t">1:05</td><td class="t">15</td><td><b>7.2</b> Start the lesson project</td><td>Steps 1 and 2: the events route, read by anyone.</td></tr>
+      <tr><td class="t">1:20</td><td class="t">10</td><td>Break</td><td>Leave the projector on the Events API's 401 and 403.</td></tr>
+      <tr><td class="t">1:30</td><td class="t">10</td><td><b>7.3</b> Frame and mental model</td><td>The phone, the sticky note and the closing checklist.</td></tr>
+      <tr><td class="t">1:40</td><td class="t">30</td><td><b>7.3</b> Live demo</td><td>The sandbox and its key; three ways to fail and a timeout; transients and the read-through; WP-Cron's list.</td></tr>
+      <tr><td class="t">2:10</td><td class="t">20</td><td><b>7.3</b> Guided lab</td><td><code class="inline">labs/module-14/l7_3-external-apis-cron/remote_answers_starter.php</code>: one careful client, five kinds of answer.</td></tr>
+      <tr><td class="t">2:30</td><td class="t">20</td><td><b>7.3</b> Start the lesson project</td><td>Steps 1 and 2: the ISBNs, the client and the cached Supplier column.</td></tr>
+      <tr><td class="t">2:50</td><td class="t">10</td><td>Wrap-up</td><td>Exit ticket (3 questions), homework, bring list for Session 15.</td></tr>
+      <tr><td class="t"><b>Total</b></td><td class="t"><b>180</b></td><td></td><td>Ends at 3:00.</td></tr>
+    </tbody>
+  </table>
+<p><b>In the room.</b> The lesson pages estimate 145 + 150 = 295 minutes for a learner working alone; after the warm-up, the break and the wrap-up the room has 150. Lesson 7.2 gets 70 minutes: a route, its arguments and errors, a lab with a route of the learner's own, and the events route's read side. Lesson 7.3 gets 80: the sandbox and the three failures, transients and cron, a lab of five answers, and the client with its cached column.</p>
+<p><b>Goes home (about 2 to 3 hours).</b> Lesson 7.2's project Steps 3 and 4 (the refused POSTs, then event 7 through the API) and the section "Calling It from the Front End" to read; Lesson 7.3's project Steps 3 and 4 (the daily sync with activation, the check-stock ability) and the Abilities section; both lessons' Hands-on Exercises, Quick Quizzes and journal entries; Before the Next Lesson for both.</p>
+<p><b>Protect, in this order:</b> what the schema turns away and the order of the four desks; Mistake 1 (a route without permission_callback); the three ways to fail; the read-through and its brief failure cache. <b>Cut first:</b> the Abilities step of the 7.3 demo, then the transients CLI step (the lab does it), then the 7.2 project start (Steps 1 and 2 go home).</p>
+
+  <div class="sec"><h2>Opening Segment</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">0:00</span><h3>Warm-up: Lessons 6.4 and 7.1</h3><span class="dur">10 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Timing</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">6m</td><td>Five retrieval questions (workbook Warm-up box), answers out loud</td></tr>
+<tr><td class="t">4m</td><td>Homework check: the Stock at a glance widget on every laptop; the scored Checkpoint 2 rubrics handed back</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Questions and answers</div>
+<ol class="steps">
+  <li><b>W1 (Lesson 6.4).</b> curl asks /find-a-book/?genre=fantasy. How many books does the server send with the hidden attribute? <b>Answer:</b> <code class="inline">9</code> of eleven: the server evaluated data-wp-bind--hidden for each book (two fantasy books stay visible).</li>
+  <li><b>W2 (Lesson 6.4).</b> Why does selectGenre need <code class="inline">withSyncEvent()</code>? <b>Answer:</b> It calls event.preventDefault(); since 6.8 actions may run after the event, too late to stop the link.</li>
+  <li><b>W3 (Lesson 7.1).</b> A client gets 403 rest_cannot_edit. Fix the request, the credentials or the role? <b>Answer:</b> The role: 403 means "I know you, and no" (Devon on Maria's book). 401 would be the credentials.</li>
+  <li><b>W4 (Lesson 7.1).</b> How does a client learn how many pages the catalog has at per_page=5, without reading the books? <b>Answer:</b> A HEAD request (<code class="inline">curl -I</code>) and the header: <code class="inline">X-WP-TotalPages: 3</code> on the projector site.</li>
+  <li><b>W5 (Lesson 7.1).</b> Why can the Stock at a glance widget POST to /wp/v2/books with plain apiFetch, and an outside script cannot? <b>Answer:</b> apiFetch sends Maria's cookie AND the page's wp_rest nonce; a script has neither, so it needs an application password.</li>
+</ol>
+<p>The projector site's answers to W1 and W4:</p>
+<pre class="code">curl -s 'http://localhost:8080/find-a-book/?genre=fantasy' | grep -c '&lt;li hidden'</pre><pre class="out">9</pre><pre class="code">curl -s -I 'http://localhost:8080/wp-json/wp/v2/books?per_page=5' | grep -i '^X-WP-TotalPages'</pre><pre class="out">X-WP-TotalPages: 3</pre></div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Lesson Plans</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">7.2</span><h3>Custom REST Endpoints</h3><span class="dur">70 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Register routes with register_rest_route() on rest_api_init, as a feature class of the plugin</li>
+  <li>Declare arguments with types, defaults, limits and enums, and add your own validate_callback and sanitize_callback without losing the built-in checks</li>
+  <li>Describe responses with a JSON Schema, and return WP_REST_Response objects with headers and status codes</li>
+  <li>Return errors as WP_Error with the right status, and know what WordPress does with one that has none</li>
+  <li>Write a real permission_callback for every route, and explain why __return_true is only for public reads</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing in the room</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame: a window with a printed menu; route, arguments, schema, permission; the four desks</td></tr>
+<tr><td class="t">25m</td><td>Live demo: a first route, OPTIONS, fantasy by price, four 400s, 400 and 404, Mistake 1</td></tr>
+<tr><td class="t">20m</td><td>Guided lab: the <code class="inline">opening_hours_starter/</code> plugin</td></tr>
+<tr><td class="t">15m</td><td>Start the lesson project: the events route, Steps 1 and 2</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Mental model to say</div>
+<p>"Core's counter handles everything for everyone, so its menu is long and its packages are big. The shop opens a window of its own with a short printed menu: 'books, by genre or stock, sorted three ways, ten details each' and 'events: read them, or add one if you work here'. The menu is the route and its arguments; the card describing each package is the schema; the sign 'staff only' on the second item is the permission callback. A window without such a sign serves anyone who walks up."</p>
+<p>Then the four desks on the board, in order: <b>validate</b> (types, ranges, enums, your validate_callback) → <b>sanitize</b> (strings become integers, defaults fill in) → <b>permission</b> (may this user?) → <b>callback</b> (gets clean, typed values). "A request that fails at a desk never reaches the next."</p>
+</div>
+<div class="blk"><div class="h">Live demo (you type, they follow)</div>
+<p>From the site as Lesson 7.1 left it. Paste the classes from the lesson; type the commands. The container shell is where curl runs.</p>
+<ol class="steps">
+  <li><b>A first route (5m).</b> "A counter of the shop's own." Save the lesson's first <code class="inline">src/Rest/BooksEndpoint.php</code> (one route, <code class="inline">__return_true</code>, <code class="inline">prepare_book()</code> with casts), register it as the sixteenth feature and ask the index:
+<pre class="code">sed -i '/\t\t\tAdmin\\StockWidget::class,/a\			Rest\\BooksEndpoint::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+grep -c "::class," wp-content/plugins/pagesco-books/src/Plugin.php
+curl -s http://localhost:8080/wp-json/ | grep -o '"namespaces":\[[^]]*\]'</pre>
+<pre class="out">16
+"namespaces":["oembed\/1.0","pagesco\/v1","wp\/v2","wp-site-health\/v1","wp-block-editor\/v1","wp-abilities\/v1"]</pre>
+<code class="inline">pagesco/v1</code> is in the list. <code class="inline">GET /wp-json/pagesco/v1/books</code> answers 6 books (the Books per list setting), ten typed fields each, in about the size core needed for one book. Then the full version of the class from the lesson: two routes, <code class="inline">collection_args()</code>, <code class="inline">validate_genre()</code>, the schema.</li>
+  <li><b>The menu: OPTIONS (3m).</b> "Clients read the menu from the route itself."
+<pre class="code">curl -s -X OPTIONS http://localhost:8080/wp-json/pagesco/v1/books | php -r '$route = json_decode( stream_get_contents( STDIN ), true ); foreach ( $route["endpoints"][0]["args"] as $name =&gt; $arg ) { printf( "%-9s %-8s %s\n", $name, $arg["type"], $arg["description"] ); } echo "schema: ", implode( ", ", array_keys( $route["schema"]["properties"] ) ), "\n";'</pre>
+<pre class="out">page      integer  The page of results.
+per_page  integer  Books per page. Default: the Books per list setting.
+genre     string   Only books in this genre (a genre slug).
+in_stock  boolean  true: only books in stock; false: only sold-out books.
+orderby   string   The order of the books.
+schema: id, title, slug, link, author, price, in_stock, pages, published, genres</pre>
+Every argument with its type and description, and the schema's fields: documentation for free.</li>
+  <li><b>Questions core could not answer (3m).</b> The fantasy books, cheapest first (title and price of each):
+<pre class="code">curl -s 'http://localhost:8080/wp-json/pagesco/v1/books?genre=fantasy&amp;orderby=price'</pre>
+<pre class="out">[
+  {
+    "title": "The Hobbit",
+    "price": 10.99
+  },
+  {
+    "title": "Lord of the Rings",
+    "price": 15.99
+  }
+]</pre></li>
+  <li><b>What the schema turns away (5m).</b> "Four requests, each wrong in a different way. Predict which needed code of yours."
+<pre class="code">curl -s 'http://localhost:8080/wp-json/pagesco/v1/books?genre=romance'; echo
+curl -s 'http://localhost:8080/wp-json/pagesco/v1/books?per_page=500'; echo
+curl -s 'http://localhost:8080/wp-json/pagesco/v1/books?orderby=pages'; echo
+curl -s 'http://localhost:8080/wp-json/pagesco/v1/books?in_stock=maybe'; echo</pre>
+<pre class="out">{"code":"rest_invalid_param","message":"Invalid parameter(s): genre","data":{"status":400,"params":{"genre":"genre must be the slug of an existing genre."},"details":{"genre":{"code":"pagesco_unknown_genre","message":"genre must be the slug of an existing genre.","data":null}}}}
+{"code":"rest_invalid_param","message":"Invalid parameter(s): per_page","data":{"status":400,"params":{"per_page":"per_page must be between 1 (inclusive) and 100 (inclusive)"},"details":{"per_page":{"code":"rest_out_of_bounds","message":"per_page must be between 1 (inclusive) and 100 (inclusive)","data":null}}}}
+{"code":"rest_invalid_param","message":"Invalid parameter(s): orderby","data":{"status":400,"params":{"orderby":"orderby is not one of title, newest, and price."},"details":{"orderby":{"code":"rest_not_in_enum","message":"orderby is not one of title, newest, and price.","data":null}}}}
+{"code":"rest_invalid_param","message":"Invalid parameter(s): in_stock","data":{"status":400,"params":{"in_stock":"in_stock is not of type boolean."},"details":{"in_stock":{"code":"rest_invalid_type","message":"in_stock is not of type boolean.","data":{"param":"in_stock"}}}}}</pre>
+Only the genre: validate_genre(). The other three WordPress wrote from the schema, before the callback ran. Then pages and the two kinds of not-found:
+<pre class="code">curl -s 'http://localhost:8080/wp-json/pagesco/v1/books?page=9'; echo
+curl -s -i http://localhost:8080/wp-json/pagesco/v1/books/14 | sed -n '1p;$p'; echo</pre>
+<pre class="out">{"code":"pagesco_invalid_page","message":"The page number is larger than the number of pages.","data":{"status":400}}
+HTTP/1.1 404 Not Found
+{"code":"pagesco_book_not_found","message":"No book was found with that ID.","data":{"status":404}}</pre>
+"Book 14 is the Events page. The 404 does not say so: never tell visitors what exists behind an ID they may not see."</li>
+  <li><b>Mistake 1: a route without permission_callback (5m).</b> Save the lesson's scratch must-use plugin (a /hours route with no permission_callback) and look at the headers:
+<pre class="code">curl -s -i http://localhost:8080/wp-json/pagesco/v1/hours | grep -E '^(HTTP|X-WP-DoingItWrong)'
+curl -s http://localhost:8080/wp-json/pagesco/v1/hours; echo</pre>
+<pre class="out">HTTP/1.1 200 OK
+X-WP-DoingItWrong: register_rest_route (since 5.5.0; The REST API route definition for &lt;code&gt;pagesco/v1/hours&lt;/code&gt; is missing the required &lt;code&gt;permission_callback&lt;/code&gt; argument. For REST API routes that are intended to be public, use &lt;code&gt;__return_true&lt;/code&gt; as the permission callback.)
+{"thursday":"9 a.m. to 9 p.m."}</pre>
+It works, and the only sign is a header nobody reads. Outside a REST request the notice prints as usual:
+<pre class="code">wp eval 'rest_get_server();'</pre>
+<pre class="out">Notice: Function register_rest_route was called &lt;strong&gt;incorrectly&lt;/strong&gt;. The REST API route definition for &lt;code&gt;pagesco/v1/hours&lt;/code&gt; is missing the required &lt;code&gt;permission_callback&lt;/code&gt; argument. For REST API routes that are intended to be public, use &lt;code&gt;__return_true&lt;/code&gt; as the permission callback. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 5.5.0.) in /var/www/html/wp-includes/functions.php on line 6260</pre>
+Remove the file. Then the rule on the board: <b>__return_true only for public reads; every write checks a capability.</b> Show the lesson's <code class="inline">can_manage_events()</code> fragment.</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b>No permission_callback, or __return_true on a write.</b> Coach: "Who may call this, and what stops everyone else?" Look at the response headers of your own routes. (Self-check Q5.)</li>
+  <li><b>A sanitize_callback that switches the schema off</b> (absint on per_page). Coach: "Which function checks the maximum now?" Keep <code class="inline">rest_validate_request_arg</code> as the validate_callback. (The debug handout.)</li>
+  <li><b>A WP_Error without a status, or an error that leaks existence.</b> Coach: "What status does a client see? What does the message tell a stranger?" (Self-check Q6.)</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<p><b>Folder:</b> <code class="inline">labs/module-14/l7_2-custom-endpoints/opening_hours_starter/</code>, a plugin with <code class="inline">GET /pagesco/v1/opening-hours</code>: the route is registered with its permission (a public read); the learner adds the argument (a type and an enum, NO default: "not sent" means the whole week) and the callback's two answers. Your reference is <code class="inline">labs/module-14/l7_2-custom-endpoints/opening_hours_solution/</code>; the test is <code class="inline">labs/module-14/l7_2-custom-endpoints/test_opening_hours.sh</code>.</p>
+<ul class="tick">
+  <li><b>Install and run as shipped (4m):</b> <code class="inline">cp -r labs/module-14/l7_2-custom-endpoints/opening_hours_starter wordpress/wp-content/plugins/pagesco-opening-hours</code>, <code class="inline">wp plugin activate pagesco-opening-hours</code>, copy the test into wordpress/ and <code class="inline">docker compose run --rm wpcli sh test_opening_hours.sh</code>: every request answers the TODO object.</li>
+  <li><b>TODOs 1 to 3 (12m).</b> Circulate for a default of '' in the enum (the error then reads "is not one of , monday") and for <code class="inline">$request-&gt;get_param()</code> versus <code class="inline">$request['day']</code> (both fine).</li>
+  <li><b>Expected when done:</b></li>
+</ul>
+<pre class="out">Plugin 'pagesco-opening-hours' activated.
+Success: Activated 1 of 1 plugins.
+== Saturday
+{"day":"saturday","closed":false,"opens":"10:00","closes":"16:00"}
+== Sunday
+{"day":"sunday","closed":true}
+== A day that does not exist
+{"code":"rest_invalid_param","message":"Invalid parameter(s): day","data":{"status":400,"params":{"day":"day is not one of monday, tuesday, wednesday, thursday, friday, saturday, and sunday."},"details":{"day":{"code":"rest_not_in_enum","message":"day is not one of monday, tuesday, wednesday, thursday, friday, saturday, and sunday.","data":null}}}}
+== The whole week: how many days, and Thursday
+7
+{"day":"thursday","closed":false,"opens":"9:00","closes":"21:00"}
+== What OPTIONS says about the argument
+"day":{"description":"One day of the week, in lowercase English. Without it: the whole week."</pre><ul class="tick">
+  <li><b>Debrief (4m):</b> "Which line of yours produced the 400?" (None: the enum.) "What does an argument without a default hold when the client does not send it?" (null.) Then deactivate and remove the plugin.</li>
+  <li><b>Fast finishers:</b> <code class="inline">labs/module-14/l7_2-custom-endpoints/schema_rules_starter.php</code> (what the schema accepts and turns query strings into), then <code class="inline">labs/module-14/l7_2-custom-endpoints/debug_staff_picks_route.php</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Start the lesson project</div>
+<p>The lesson project is <b>The Events API</b>: GET and POST /pagesco/v1/events on Lesson 5.5's table, through EventsTable. In the room: Steps 1 and 2 (15 minutes).</p>
+<ul class="tick">
+  <li>Step 1: paste <code class="inline">src/Rest/EventsEndpoint.php</code>, read <code class="inline">can_manage_events()</code>, <code class="inline">validate_starts_at()</code> and <code class="inline">prepare_event()</code> aloud, register it as the seventeenth feature.</li>
+  <li>Step 2: read the events (the lesson's request, id, title and starts_at of each):</li>
+</ul>
+<pre class="out">[
+  {
+    "id": 1,
+    "title": "Book club: Dune",
+    "starts_at": "2027-11-04T19:00:00"
+  },
+  {
+    "id": 2,
+    "title": "Story time: The Hobbit",
+    "starts_at": "2027-11-06T10:30:00"
+  },
+  {
+    "id": 3,
+    "title": "An evening with Ana Ruiz",
+    "starts_at": "2027-11-11T18:30:00"
+  },
+  {
+    "id": 4,
+    "title": "Poetry open mic",
+    "starts_at": "2027-11-18T19:30:00"
+  },
+  {
+    "id": 5,
+    "title": "Book club: Fahrenheit 451",
+    "starts_at": "2027-12-02T19:00:00"
+  }
+]</pre><ul class="tick">
+  <li><b>Goes home:</b> Step 3 (anonymous 401, Devon 403, Maria's bad date: one error at a time) and Step 4 (event 7 through the API, 201, and the checks).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<p>Ask these out loud during the demo and the lab:</p>
+<ul class="tick">
+  <li>In which order do the desks run? <b>Answer:</b> validate, sanitize, permission, callback.</li>
+  <li>Why WP_Query and not get_posts() in get_books()? <b>Answer:</b> found_posts and max_num_pages for the X-WP-Total headers.</li>
+  <li>What does rest_authorization_required_code() return? <b>Answer:</b> 401 when nobody is logged in, 403 when someone is.</li>
+  <li>What does a WP_Error without a status become? <b>Answer:</b> a 500 with "data":null (lesson quiz Q5).</li>
+</ul>
+<p>Workbook self-check, items Q1 to Q6 (learners do them at the end of the block or at home).</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q1</b> <span data-sc="1">B) POST</span>; <b>Q2</b> <span data-sc="2"><code class="inline">200 6 2</code></span>; <b>Q3</b> <span data-sc="3">A) 400 rest_missing_callback_param: arguments are validated before the permission check</span>; <b>Q4</b> <span data-sc="4">D) validate_callbacks run first; the schema checks of the other arguments run in the sanitizing step, which a failed validation never reaches</span>; <b>Q5</b> <span data-sc="5">C) A check of <code class="inline">current_user_can( 'edit_others_posts' )</code> that returns a WP_Error with rest_authorization_required_code()</span>; <b>Q6</b> <span data-sc="6">An endpoint must not tell visitors what exists behind an ID they may not see: drafts, private books and other post types all get the same 404</span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> the board's four desks and one route skeleton (methods, callback, permission_callback, args) to copy; in the lab, TODO 1's argument array on the board.</p>
+<p><b>Stretch:</b> <code class="inline">schema_rules_starter.php</code> and <code class="inline">debug_staff_picks_route.php</code>; the lesson's Exercise 1 (rest_do_request) and Exercise 3 (DELETE an event); the Bonus Challenge (PATCH a book's price).</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">7.3</span><h3>External APIs, Transients &amp; WP-Cron</h3><span class="dur">80 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Call an external API with wp_remote_get() and wp_remote_post(), and handle each way it can fail: no answer, an error status, or an answer that is not what you expected</li>
+  <li>Keep API keys in wp-config.php and choose wp_safe_remote_get() when a URL comes from a user</li>
+  <li>Cache answers in transients, explain where they are stored and how a persistent object cache changes that, and cache failures briefly too</li>
+  <li>Schedule recurring work with WP-Cron, start and stop it on activation and deactivation, and inspect and run it with WP-CLI</li>
+  <li>Register an ability with the Abilities API and run it over the REST API</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing in the room</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame: the phone, the sticky note, the closing checklist</td></tr>
+<tr><td class="t">30m</td><td>Live demo: the sandbox, three ways to fail, transients, WP-Cron, abilities</td></tr>
+<tr><td class="t">20m</td><td>Guided lab: <code class="inline">remote_answers_starter.php</code></td></tr>
+<tr><td class="t">20m</td><td>Start the lesson project: Steps 1 and 2</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Mental model to say</div>
+<p>"When a bookseller wants to know whether the distributor has more copies of The Great Gatsby, she calls. Sometimes the line is busy, sometimes nobody answers, sometimes the person reads the wrong list. A good bookseller writes the answer on a sticky note with the time, so the next colleague does not call again, and at closing time somebody works through a checklist."</p>
+<p>Then the three pieces on the board: <b>the phone</b> = wp_remote_get() and friends; <b>the sticky note</b> = a transient, which may fall off the wall early, so you always check; <b>the closing checklist</b> = WP-Cron, which WordPress works through when the next visitor walks in after closing time. "A page that shows supplier data never waits for the supplier when a fresh note exists, and the nightly job keeps the note fresh."</p>
+</div>
+<div class="blk"><div class="h">Live demo (you type, they follow)</div>
+<p>From the site as Lesson 7.2 left it. Scratch scripts are saved in wordpress/ and run with <code class="inline">wp eval-file</code>; delete them at the end of the demo (the lesson's <code class="inline">rm</code> line).</p>
+<ol class="steps">
+  <li><b>A supplier to call (5m).</b> "Riverside Books is fictional, so the course gives you its sandbox: three files in wordpress/supplier-sandbox/, plain PHP." Paste the lesson's .htaccess, availability.php and orders.php; then the key and the address go into wp-config.php, never into code:
+<pre class="code">wp config set PAGESCO_BOOKS_SUPPLIER_URL 'http://localhost:8080/supplier-sandbox/v1/'
+wp config set PAGESCO_BOOKS_SUPPLIER_KEY 'sandbox-7f3a9c'</pre>
+<pre class="out">Success: Added the constant 'PAGESCO_BOOKS_SUPPLIER_URL' to the 'wp-config.php' file with the value 'http://localhost:8080/supplier-sandbox/v1/'.
+Success: Added the constant 'PAGESCO_BOOKS_SUPPLIER_KEY' to the 'wp-config.php' file with the value 'sandbox-7f3a9c'.</pre>
+Try the sandbox with curl first, as with any documentation open:
+<pre class="code">curl -s -i 'http://localhost:8080/supplier-sandbox/v1/availability?isbns=9780743273565' | sed -n '1p;$p'; echo
+curl -s -H 'X-Api-Key: sandbox-7f3a9c' 'http://localhost:8080/supplier-sandbox/v1/availability?isbns=9780743273565,9780316769488,9780000000000'; echo</pre>
+<pre class="out">HTTP/1.1 401 Unauthorized
+{"error":"invalid_api_key","message":"Send a valid API key in the X-Api-Key header."}
+
+{"supplier":"Riverside Books (sandbox)","items":[{"isbn":"9780743273565","available":0,"next_delivery":"2027-11-15"},{"isbn":"9780316769488","available":5,"next_delivery":null}],"unknown":["9780000000000"]}</pre></li>
+  <li><b>wp_remote_get and its answer (4m).</b> The lesson's <code class="inline">supplier-ask.php</code> (<code class="inline">wp eval-file supplier-ask.php</code>):
+<pre class="code"><span class="k">&lt;?php</span>
+<span class="v">$response</span> = wp_remote_get(
+	<span class="s">'http://localhost:8080/supplier-sandbox/v1/availability?isbns=9780743273565'</span>,
+	<span class="k">array</span>(
+		<span class="s">'timeout'</span> =&gt; <span class="s">5</span>,
+		<span class="s">'headers'</span> =&gt; <span class="k">array</span>( <span class="s">'X-Api-Key'</span> =&gt; PAGESCO_BOOKS_SUPPLIER_KEY ),
+	)
+);
+
+<span class="k">if</span> ( is_wp_error( <span class="v">$response</span> ) ) {
+	<span class="k">echo</span> <span class="s">'No answer: '</span>, <span class="v">$response</span>-&gt;get_error_message(), <span class="s">"\n"</span>;
+	<span class="k">return</span>;
+}
+
+<span class="k">echo</span> implode( <span class="s">', '</span>, array_keys( <span class="v">$response</span> ) ), <span class="s">"\n"</span>;
+<span class="k">echo</span> wp_remote_retrieve_response_code( <span class="v">$response</span> ), <span class="s">' '</span>, wp_remote_retrieve_response_message( <span class="v">$response</span> ), <span class="s">"\n"</span>;
+<span class="k">echo</span> wp_remote_retrieve_header( <span class="v">$response</span>, <span class="s">'content-type'</span> ), <span class="s">"\n"</span>;
+
+<span class="v">$data</span> = json_decode( wp_remote_retrieve_body( <span class="v">$response</span> ), <span class="k">true</span> );
+print_r( <span class="v">$data</span>[<span class="s">'items'</span>][<span class="s">0</span>] );</pre>
+<pre class="out">headers, body, response, cookies, filename, http_response
+200 OK
+application/json; charset=utf-8
+Array
+(
+    [isbn] =&gt; 9780743273565
+    [available] =&gt; 0
+    [next_delivery] =&gt; 2027-11-15
+)</pre>
+An array, read with the wp_remote_retrieve_*() helpers; the body is a string you decode and check.</li>
+  <li><b>Three ways to fail (6m).</b> "The supplier will have bad days. Provoke all three." The lesson's <code class="inline">supplier-failures.php</code>:
+<pre class="out">Wrong key:  response 401 {"error":"invalid_api_key","message":"Send a valid API key in the X-Api-Key header."}
+Down:       503, Retry-After 120, JSON: NULL
+No host:    WP_Error http_request_failed: cURL error 6: Could not resolve host: supplier.invalid (Domain name not found)</pre>
+A 401 and a 503 are normal responses, not WP_Errors; the 503 is HTML, so json_decode() gives NULL; only the missing host is a WP_Error. Then the slow cousin (<code class="inline">supplier-slow.php</code>, a 2-second timeout against a 4-second answer): <code class="inline">cURL error 28: Operation timed out after 2066 milliseconds</code> (your milliseconds differ) and 1.9 seconds lost for nothing. Pages read caches; jobs call.</li>
+  <li><b>Transients (6m).</b> "A sticky note with an expiry date." With WP-CLI, see where it lives:
+<pre class="code">wp transient set pagesco_books_demo 'Gatsby: back November 15' 600
+wp transient get pagesco_books_demo
+wp db query "SELECT option_name, autoload FROM wp_options WHERE option_name LIKE '%pagesco_books_demo'"
+wp transient delete pagesco_books_demo
+wp transient get pagesco_books_demo</pre>
+<pre class="out">Success: Transient added.
+Gatsby: back November 15
+option_name	autoload
+_transient_timeout_pagesco_books_demo	off
+_transient_pagesco_books_demo	off
+
+Success: Transient deleted.
+Warning: Transient with key "pagesco_books_demo" is not set.</pre>
+Two rows in wp_options, not autoloaded; the last command warns on purpose. No persistent object cache here (<code class="inline">wp_using_ext_object_cache()</code> prints NULL), so transients live in the database; with Redis they would live in memory and could vanish early. Then the read-through: the lesson's <code class="inline">cache-demo.php</code> makes one request for three views:
+<pre class="out">View 1: next delivery 2027-11-15, HTTP requests so far: 1
+View 2: next delivery 2027-11-15, HTTP requests so far: 1
+View 3: next delivery 2027-11-15, HTTP requests so far: 1</pre>
+"Cache failures too, briefly, and never store false."</li>
+  <li><b>WP-Cron (6m).</b> "The closing checklist, worked through by the next visitor." Core's events, sorted by recurrence (WP-CLI lists them by next run, which changes):
+<pre class="code">wp cron event list --fields=recurrence,hook --format=csv | sed 1d | sort
+wp cron schedule list
+wp cron test</pre>
+<pre class="out">"1 day",delete_expired_transients
+"1 day",recovery_mode_clean_expired_keys
+"1 day",wp_privacy_personal_data_cleanup_requests
+"1 day",wp_scheduled_auto_draft_delete
+"1 day",wp_scheduled_delete
+"1 hour",wp_privacy_delete_old_export_files
+"1 week",wp_delete_temp_updater_backups
+"1 week",wp_site_health_scheduled_check
+"12 hours",wp_update_plugins
+"12 hours",wp_update_themes
+"12 hours",wp_update_user_counts
+"12 hours",wp_version_check
++------------+-------------+----------+
+| name       | display     | interval |
++------------+-------------+----------+
+| hourly     | Once Hourly | 3600     |
+| twicedaily | Twice Daily | 43200    |
+| daily      | Once Daily  | 86400    |
+| weekly     | Once Weekly | 604800   |
++------------+-------------+----------+
+Success: WP-Cron spawning is working as expected.</pre>
+Three rules on the board: <b>times are earliest times · no visitors, no jobs (system cron in 8.4) · jobs run without a user</b>. And the warning: <code class="inline">wp cron event run</code> moves a recurring event; fire the hook with <code class="inline">do_action()</code> instead.</li>
+  <li><b>The Abilities API, in one look (3m).</b> "A third way to open the shop to programs, for assistants." Core's three:
+<pre class="code">wp eval 'foreach ( wp_get_abilities() as $ability ) { echo $ability-&gt;get_name(), ": ", $ability-&gt;get_label(), "\n"; }'</pre>
+<pre class="out">core/get-site-info: Get Site Information
+core/get-user-info: Get User Information
+core/get-environment-info: Get Environment Info</pre>
+The project adds pagesco/check-stock (Step 4, at home).</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b>Trusting the answer:</b> only is_wp_error() checked, then <code class="inline">$data['items']</code> on a maintenance page: two Warnings and a confident "0 copies". Coach: "Which of the three failures does this line handle?" (The guided lab, the debug handout.)</li>
+  <li><b>Scheduling on every request:</b> four daily events after three commands. Coach: "Where does a plugin do things exactly once?" Activation, guarded by wp_next_scheduled(). (The cron lab.)</li>
+  <li><b>A cache that never hits:</b> storing false, or checking <code class="inline">if ( $cached )</code> for a value that can be 0. Coach: "What does get_transient() return when nothing is there?" (Self-check Q8, the debug handout.)</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<p><b>File:</b> <code class="inline">labs/module-14/l7_3-external-apis-cron/remote_answers_starter.php</code>; your reference is <code class="inline">labs/module-14/l7_3-external-apis-cron/remote_answers_solution.php</code>. One careful client function, <code class="inline">pagesco_lab_ask()</code>, against five answers: the shop's own pagesco/v1 (Lesson 7.2) called over HTTP like a stranger's API (data, a 400, a 404), a web page that is not JSON, and a host that does not exist. It is the lesson's Client::decode() written by the learner, on an API they know inside out.</p>
+<ul class="tick">
+  <li><b>Run it as shipped (2m):</b> five lines of <code class="inline">pagesco_todo</code>.</li>
+  <li><b>TODOs 1 to 4 (14m).</b> Circulate for the status check written as <code class="inline">!== 200</code> (fine here) and for the message taken from the JSON only (the HTML page has none: fall back to wp_remote_retrieve_response_message()).</li>
+  <li><b>Expected when done:</b></li>
+</ul>
+<pre class="out">genre=fantasy     2 books: The Hobbit, Lord of the Rings
+genre=romance     pagesco_remote_http_error (400): Invalid parameter(s): genre
+books/99          pagesco_remote_http_error (404): No book was found with that ID.
+a web page        pagesco_remote_bad_response: The answer is not JSON.
+shop.invalid      http_request_failed: cURL error 6: Could not resolve host: shop.invalid (Domain name not found)</pre><ul class="tick">
+  <li><b>Debrief (4m):</b> "Which of the five is a WP_Error before your code touches it?" (Only shop.invalid.) "Which would a page view wait longest for?" (A timeout: 3 seconds here.)</li>
+  <li><b>Fast finishers:</b> <code class="inline">labs/module-14/l7_3-external-apis-cron/events_cache_starter.php</code> (a read-through transient that also caches a failure), <code class="inline">labs/module-14/l7_3-external-apis-cron/cron_plan_starter.sh</code>, then <code class="inline">labs/module-14/l7_3-external-apis-cron/debug_event_counts.php</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Start the lesson project</div>
+<p>The lesson project is <b>The Supplier Sync</b>: ISBNs, a client, a cached Supplier column, a nightly job and an ability. In the room: Steps 1 and 2 (20 minutes).</p>
+<ul class="tick">
+  <li>Step 1: <code class="inline">pagesco-isbns.php</code> gives the eleven books their ISBNs (run once, then delete it).</li>
+  <li>Step 2: paste <code class="inline">src/Supplier/Client.php</code> and <code class="inline">src/Supplier/Availability.php</code>, register Availability, ask the supplier once (the lesson's <code class="inline">refresh()</code> command), then the Books screen as Maria. The Supplier cells, in title order:</li>
+</ul>
+<pre class="out">31 copies
+22 copies
+7 copies
+24 copies
+15 copies
+3 copies
+18 copies
+5 copies
+None; next delivery November 15, 2027
+9 copies
+12 copies</pre><ul class="tick">
+  <li><b>Done in the room</b> = Gatsby says "None; next delivery November 15, 2027" and Catcher "5 copies".</li>
+  <li><b>Goes home:</b> Step 3 (DailySync, Activator, deactivate and activate, the past event removed) and Step 4 (the check-stock ability over REST, Maria yes, Devon no).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<p>Ask these out loud during the demo and the lab:</p>
+<ul class="tick">
+  <li>A 503 from the supplier: WP_Error or array? <b>Answer:</b> an array; only no answer at all is a WP_Error (lesson quiz Q1).</li>
+  <li>Where does a transient live on this site, and on one with Redis? <b>Answer:</b> two non-autoloaded rows in wp_options; in the object cache, where it may be evicted early.</li>
+  <li>A job due at 3:00 on a shop without night visitors: when does it run? <b>Answer:</b> with the first request after 3:00.</li>
+  <li>Why does the cron callback check no capability? <b>Answer:</b> cron runs without a user, and nobody can trigger it with input of their own.</li>
+</ul>
+<p>Workbook self-check, items Q7 to Q12 (learners do them at the end of the block or at home).</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q7</b> <span data-sc="7">D) An empty string</span>; <b>Q8</b> <span data-sc="8"><code class="inline">bool(false)</code></span>; <b>Q9</b> <span data-sc="9">A) <code class="inline">wp_safe_remote_get()</code>: it refuses private networks and odd ports</span>; <b>Q10</b> <span data-sc="10">B) <code class="inline">wp eval 'do_action( "pagesco_books_daily_sync" );'</code></span>; <b>Q11</b> <span data-sc="11">C) In wp-config.php (or an environment variable it reads), on each site</span>; <b>Q12</b> <span data-sc="12"><code class="inline">| pagesco_books_daily_sync | 1 day      |</code></span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> a card with the three checks in order (is_wp_error, the status, the shape) and the three transient functions. In the lab, TODO 2 and 3 on the projector.</p>
+<p><b>Stretch:</b> <code class="inline">events_cache_starter.php</code>, <code class="inline">cron_plan_starter.sh</code>, <code class="inline">debug_event_counts.php</code>; the lesson's Exercise 2 (invalidate the note when an ISBN changes) and Exercise 3 (a six-hour recurrence); the Bonus Challenge (a Reorder row action).</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Closing</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Exit ticket (3 questions, no notes, 4 minutes)</div>
+<p>Learners answer in the workbook's Exit Ticket box or on a sticky note.</p>
+<ol class="steps">
+  <li>Name the four desks a REST request passes, in order. <b>Answer:</b> validate, sanitize, permission, callback.</li>
+  <li>Name the three ways a call to another server can fail. <b>Answer:</b> no answer (WP_Error: DNS, refused, timeout); an error status (a normal response); a body that is not the data you expect.</li>
+  <li>Where does a plugin schedule its daily job, and what guards it? <b>Answer:</b> in the activation callback, guarded by wp_next_scheduled(); cleared on deactivation.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Homework (about 2 to 3 hours)</div>
+<ul class="tick">
+  <li><b>Finish both lesson projects.</b> 7.2: Steps 3 and 4 (event 7 through the API). 7.3: Steps 3 and 4 (the daily sync, the check-stock ability) and the checks.</li>
+  <li><b>Lesson exercises.</b> 7.2: Exercises 1 and 2 (rest_do_request, the schema check); Exercise 3 is a stretch. 7.3: Exercises 1 to 3 (an order through the client, invalidation, a six-hour recurrence); Exercise 4 needs the internet.</li>
+  <li><b>Both Quick Quizzes</b> on the lesson pages (answers are in the Answer Key).</li>
+  <li><b>Journal:</b> both entries (an endpoint the shop does not have yet; a real service for a client's site).</li>
+  <li><b>Before the Next Lesson (7.3):</b> the Supplier column and one daily event; no scratch scripts or must-use plugins left (<code class="inline">ls wordpress wordpress/wp-content/mu-plugins</code>); Node 22.13 or newer for wp-env in Lesson 8.1 (<code class="inline">node --version</code>).</li>
+  <li><b>Optional:</b> <code class="inline">labs/module-14/l7_2-custom-endpoints/schema_rules_starter.php</code>, <code class="inline">labs/module-14/l7_3-external-apis-cron/events_cache_starter.php</code>, <code class="inline">labs/module-14/l7_3-external-apis-cron/cron_plan_starter.sh</code> and both debug handouts.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Bring list for Session 15</div>
+<ul class="tick">
+  <li>A site at the end of Lesson 7.3 (twenty features, the sandbox, one daily event) and Node 22.13+ for wp-env.</li>
+  <li>The project folder with <code class="inline">labs/</code>; pagesco-plan.txt, the journal and the workbook.</li>
+</ul>
+</div>
+
+  <div class="sec"><h2>If You Run Long or Short</h2><span class="rule"></span></div>
+<div class="blk warn"><div class="h">Running long: what to protect and what to cut first</div>
+<ul class="tick">
+  <li><b>Protect:</b> the four 400s and the four desks; Mistake 1; the three ways to fail; the read-through.</li>
+  <li><b>Cut first (saves 3m):</b> the Abilities step of the 7.3 demo (Step 4 at home).</li>
+  <li><b>Cut second (saves 6m):</b> the transients CLI step: <code class="inline">events_cache</code> and the read-through show the same.</li>
+  <li><b>Cut third (saves 15m):</b> the 7.2 project start: Steps 1 and 2 go home with 3 and 4.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Running short: what to add</div>
+<ul class="tick">
+  <li>Lesson 7.2's Exercise 1 live: rest_do_request() for a genre and a missing book.</li>
+  <li>Lesson 7.3's Common Mistake 2 live: three wp commands, four events, then wp_clear_scheduled_hook().</li>
+  <li>Run <code class="inline">debug_staff_picks_route.php</code> together; the silent bug (absint switching off the maximum) is the best discussion.</li>
+</ul>
+</div>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 14 · Facilitator Guide · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

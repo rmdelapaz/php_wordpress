@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en" style="font-size:14px">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quick Setup — PHP and WordPress Development</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="kit.css">
+</head>
+<body style="font-size:13.5px">
+
+<div class="toolbar">
+  <span class="lbl">Student handout —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">the two-page version · send it with the full Setup Guide for anyone who gets stuck</span>
+</div>
+
+<div class="sheet">
+
+<header class="mast">
+<div class="kit-eyebrow">PHP and WordPress Development · Quick Setup</div>
+<h1>Get Ready in Under an Hour</h1>
+<p class="sub">Before the first session: install <b>Docker</b>, unpack the course project <b>pagesco-dev</b>, start it, install <b>WordPress 7.1 on PHP 8.5</b>, run the check. You need a laptop with 8 GB of memory, about 10 GB free, and a code editor (VS Code). The first start downloads about 3 GB: do it at home. Stuck? The full <b>Setup Guide</b> covers every problem, the offline images and the Part 2 setup (Node 24, Composer, the Part 2 starting site).</p>
+</header>
+
+<div class="sec"><h2>1 · Install Docker (pick one)</h2><span class="rule"></span></div>
+<ul class="tick">
+<li><b>Windows 10/11:</b> in PowerShell as administrator <code class="inline">wsl --install</code>, restart, create your Ubuntu user. Install <b>Docker Desktop</b> (WSL 2 backend), then Settings ▸ Resources ▸ WSL integration ▸ switch on Ubuntu. Use the <b>Ubuntu</b> app for every command and keep the project in <code class="inline">~</code>, never under <code class="inline">/mnt/c/</code> (many times slower).</li>
+<li><b>macOS:</b> install <b>Docker Desktop for Mac</b> (Apple silicon or Intel), start it once.</li>
+<li><b>Linux:</b> Docker Engine + the Compose plugin from docs.docker.com/engine/install, then <code class="inline">sudo usermod -aG docker "$USER"</code> and log out and in.</li>
+</ul>
+<p>Check: <code class="inline">docker compose version</code> (with a space) prints version 2 or newer.</p>
+
+<div class="sec"><h2>2 · Get the project</h2><span class="rule"></span></div>
+<pre class="code">cd ~
+curl -LO https://rays-php-wordpress.netlify.app/downloads/pagesco-dev.zip
+unzip pagesco-dev.zip
+cd pagesco-dev</pre>
+<p>No <code class="inline">unzip</code> on Ubuntu/WSL? <code class="inline">sudo apt install unzip</code>. <b>Linux and WSL only, before the first start</b> (so the files in <code class="inline">wordpress/</code> are yours, not uid 33's):</p>
+<pre class="code">printf 'PAGESCO_UID=%s\nPAGESCO_GID=%s\n' "$(id -u)" "$(id -g)" &gt; .env
+cp config/compose.linux.yaml compose.override.yaml
+mkdir wordpress</pre>
+
+<div class="sec"><h2>3 · Start it and install WordPress</h2><span class="rule"></span></div>
+<pre class="code" style="white-space:pre-wrap;overflow-wrap:anywhere">docker compose up -d
+docker compose run --rm wpcli wp core install --url=http://localhost:8080 --title="Pages &amp; Co." --admin_user=admin --admin_password=password --admin_email=wordpress@example.com --skip-email
+docker compose run --rm wpcli wp rewrite structure '/%postname%/'</pre>
+<p>Open <b>http://localhost:8080</b> (log in at <code class="inline">/wp-admin/</code> as admin / password). Then the <b>wp shortcut</b>; add the same line to <code class="inline">~/.bashrc</code> (macOS: <code class="inline">~/.zshrc</code>):</p>
+<pre class="code">alias wp='docker compose --progress quiet run --rm wpcli wp'</pre>
+
+<div class="sec"><h2>4 · Email and labs</h2><span class="rule"></span></div>
+<pre class="code">mkdir -p wordpress/wp-content/mu-plugins
+cp config/mailpit-smtp.php wordpress/wp-content/mu-plugins/</pre>
+<p>Mailpit shows the site's email at <b>http://localhost:8025</b>. Copy the <code class="inline">labs/</code> folder from your instructor into <code class="inline">pagesco-dev</code>, next to <code class="inline">compose.yaml</code> (not inside <code class="inline">wordpress/</code>).</p>
+
+<div class="sec"><h2>5 · Run the check</h2><span class="rule"></span></div>
+<pre class="code">bash labs/module-01/l1_0-orientation/check_environment.sh</pre>
+<div class="note lab"><div class="t">✅ Done when the last line says READY for PHP and WordPress Development</div><p>Send that line to your instructor. <b>READY WITH NOTES</b> is fine (read the CHECK lines: PHP 8.4, or a project on the Windows drive). <b>NOT READY</b>? Fix the FIX lines from the top (each names the step), run it again; still stuck: the full guide's problems table, or bring the output to Session 1's install clinic.</p></div>
+
+<div class="sec"><h2>If something goes wrong</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>You see…</th><th>Try this</th></tr></thead>
+<tbody>
+<tr><td><code class="inline">port is already allocated</code></td><td>Another container or server uses 8080 or 8025: <code class="inline">docker ps</code>, stop it.</td></tr>
+<tr><td><code class="inline">Permission denied</code> in <code class="inline">wordpress/wp-content</code></td><td>Linux/WSL setup of step 2 missing: the Setup Guide's repair box.</td></tr>
+<tr><td><code class="inline">no configuration file provided</code></td><td>Not in the project folder: <code class="inline">cd ~/pagesco-dev</code>. Anything else: the Setup Guide, or the course's troubleshooting.html and common-errors.html pages (rays-php-wordpress.netlify.app).</td></tr>
+</tbody>
+</table>
+
+<div class="foot" style="margin-top:12px;padding-top:8px">
+    <div class="who"><span class="bio">PHP and WordPress Development · Quick Setup</span></div>
+    <div class="ver">Quick Setup · v1.0 · &copy; 2026 Ray de la Paz</div>
+  </div>
+
+</div>
+</body>
+</html>

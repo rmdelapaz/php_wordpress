@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Workbook: Session 5</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Student workbook —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">write in it · bring it to every session</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Participant Workbook</div>
+    <h1>Session 5: Patterns, Style Variations and Child Themes</h1>
+    <p class="sub">Your workbook for Session 5: the warm-up, the key ideas of Lessons 3.3 and 3.4, worked examples, the guided labs, predict-then-run practice, a self-check for each lesson, and your exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Lessons <b>3.3–3.4</b></span>
+      <span class="chip">Session <b>5</b> · 3 hours</span>
+      <span class="chip">Name: ____________________</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Session Goals</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Write pattern files with the right header, translatable text and theme URLs, and use them in a template by slug.</li>
+  <li>Choose between a theme pattern, a synced pattern and a template part, and explain why a theme never ships a synced pattern.</li>
+  <li>Tell a section style from a style variation, and follow a Site Editor change from the database back into the right file.</li>
+  <li>Build a child theme: the Template header, theme.json merged (preset lists replaced), the stylesheet enqueued, functions.php's load order.</li>
+  <li>Decide whether a change belongs in the Site Editor, a child theme, your own theme or a plugin.</li>
+</ul>
+
+  <div class="sec"><h2>Start Here: Warm-up and Readiness</h2><span class="rule"></span></div>
+<div class="blk lab"><div class="h">Warm-up (Session 4)</div>
+<p>Answer W1 to W4 from memory, then run W5's two commands on your site. Your instructor goes through the answers.</p>
+<div class="q"><div class="qn">W1</div><div class="qt">In theme.json, what is the difference between settings and styles?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W2</div><div class="qt">The front page shows the latest posts. In a block theme, which templates does WordPress look for, in order?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W3</div><div class="qt">The manager changed the Single Posts template in the Site Editor. Where is that change, and which version does a visitor see?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W4</div><div class="qt">A template part is included as {"slug":"heder"}. What do visitors see? And a logged-in administrator?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W5</div><div class="qt">Run the two commands on the slide. What should a site ready for today print?</div><pre class="code">wp eval 'var_dump( wp_is_block_theme(), wp_theme_has_theme_json() );'
+wp post list --post_type=wp_template,wp_template_part,wp_global_styles --format=count</pre><div class="write"></div></div>
+<p>If W5's second line is not <code class="inline">0</code>, you have Site Editor copies: list them with <code class="inline">wp post list --post_type=wp_template,wp_template_part,wp_global_styles --fields=ID,post_type,post_name</code> and delete each with <code class="inline">wp post delete &lt;ID&gt; --force</code> before the demo.</p>
+</div>
+
+  <div class="sec"><h2>Lessons</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">3.3</span><h3>Patterns, Style Variations &amp; the Site Editor</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Write PHP pattern files with the right header fields, translatable text and escaped theme URLs, and place them in templates with the Pattern block</li>
+  <li>Explain the difference between theme patterns, synced patterns and template parts, and create a synced pattern that updates every page it is used on</li>
+  <li>Define section styles and a style variation as JSON files in styles/ and read what the Site Editor saves when someone chooses one</li>
+  <li>Bundle a web font with fontFace in theme.json, checking that its license allows redistribution</li>
+  <li>Bring Site Editor changes back into the theme's files with Export and WP-CLI, then reset the database copies</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>Three tools:</b> a theme pattern (a PHP file in patterns/, copied when inserted), a synced pattern (a <code class="inline">wp_block</code> post, one original shown everywhere), a template part (parts/, included by slug).</li>
+  <li><b>A pattern file</b> = a header (Title and Slug required; Categories, Keywords, Description, Post Types, Template Types, Block Types, Inserter) + block markup. PHP makes it translatable (<code class="inline">esc_html_e()</code>), portable (<code class="inline">get_theme_file_uri()</code>, <code class="inline">home_url()</code>) and escaped.</li>
+  <li><b>The pattern-file list is cached</b> for 30 minutes, keyed on the theme's Version. <code class="inline">WP_DEVELOPMENT_MODE</code> = <code class="inline">theme</code> switches the theme caches off: local sites only.</li>
+  <li><b>Templates use patterns by slug</b>: <code class="inline">&lt;!-- wp:pattern {"slug":"pagesco/hero"} /--&gt;</code>. <code class="inline">front-page.html</code> is above home and index for the front page.</li>
+  <li><b>Synced patterns are content</b>, referenced by ID (<code class="inline">&lt;!-- wp:block {"ref":20} /--&gt;</code>): never in theme files.</li>
+  <li><b>styles/*.json</b> with <code class="inline">blockTypes</code> = a section style (<code class="inline">is-style-&lt;slug&gt;</code>); without it = a style variation for the whole site. Choosing one in the Site Editor saves user global styles (a <code class="inline">wp_global_styles</code> post).</li>
+  <li><b>fontFace</b> bundles a web font (<code class="inline">file:./assets/fonts/...</code>): only fonts whose license allows redistribution (OFL 1.1).</li>
+  <li><b>The Site Editor expands patterns when it saves.</b> List copies with <code class="inline">wp post list --post_type=wp_template,wp_template_part,wp_global_styles</code>, move each change into the right file, delete the copy.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: where the front page's design lives</div>
+<p>At the end of Lesson 3.3 the design of the front page comes from three different places. Ask WordPress about each. First the theme's patterns, with their categories and the post types they are offered in:</p>
+<pre class="code">wp eval 'foreach ( WP_Block_Patterns_Registry::get_instance()-&gt;get_all_registered() as $p ) { if ( str_starts_with( $p["name"], "pagesco/" ) ) { echo $p["name"], " | ", implode( ", ", $p["categories"] ), " | ", implode( ", ", $p["postTypes"] ?? array( "(any)" ) ), "\n"; } }'</pre>
+<pre class="out">pagesco/call-to-action | call-to-action | (any)
+pagesco/featured-books | featured | (any)
+pagesco/hero | banner, featured | wp_template</pre><p>Only the hero says <code class="inline">wp_template</code>: it is offered only in the Site Editor's templates, because inserted into a page its <code class="inline">&lt;h1&gt;</code> would compete with the page title. Then the synced pattern, which is not in the theme at all:</p>
+<pre class="code">wp post list --post_type=wp_block --fields=ID,post_title,post_name</pre>
+<pre class="out">+----+---------------+---------------+
+| ID | post_title    | post_name     |
++----+---------------+---------------+
+| 20 | Opening hours | opening-hours |
++----+---------------+---------------+</pre><p>A post of type <code class="inline">wp_block</code>, in the database. Is it synced? An unsynced user pattern carries the meta key <code class="inline">wp_pattern_sync_status</code>; count its meta:</p>
+<pre class="code">wp post meta list 20 --format=count</pre>
+<pre class="out">0</pre><p>No meta, so synced: every page that references it by ID shows the one original. Files for the theme's design, posts for the owner's content.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>From the project folder: <code class="inline">cp -r labs/module-05/l3_3-patterns-style-variations/hours_band_starter wordpress/wp-content/themes/pagesco-lab-hours</code>, then <code class="inline">wp theme activate pagesco-lab-hours</code> (a one-file child theme of pagesco: your own theme stays untouched).</li>
+  <li><code class="inline">cp labs/module-05/l3_3-patterns-style-variations/test_hours_band.php wordpress/</code>, then <code class="inline">wp eval-file --use-include test_hours_band.php</code>. Open <code class="inline">wordpress/wp-content/themes/pagesco-lab-hours/patterns/hours-band.php</code> in VS Code.</li>
+  <li>Do TODOs 1 to 5, running the test after each. The test translates the child's strings into capitals and moves the site to pagesandco.example: lower case means not translatable, localhost means broken on the live site.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>Which text domain made the heading change case, and why that one?</td><td></td></tr>
+<tr><td>What would the hard-coded link have done on the live site?</td><td></td></tr>
+<tr><td>Which header field decides where the inserter files the pattern?</td><td></td></tr>
+</tbody>
+</table>
+<ul class="tick">
+  <li>Done when the heading prints <code class="inline">VISIT THE SHOP</code> and the button links to <code class="inline">https://pagesandco.example/contact/</code>. Then <code class="inline">wp theme activate pagesco</code> and remove the folder and the test.</li>
+  <li>Finished early? <code class="inline">debug_pattern_files.sh</code> in the same folder (<code class="inline">docker compose run --rm wpcli sh debug_pattern_files.sh</code>). At home, after the Evening section: <code class="inline">variation_contrast_starter.php</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Predict, then run</div>
+<p>Write your prediction first, then run it on your site (<code class="inline">wp ...</code> from the project folder, <code class="inline">curl</code> in the WP-CLI container shell). The site is the one at the end of the lesson. A wrong prediction you can explain afterward is worth more than a right guess.</p>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it. (The hero pattern's Post Types header, as WordPress stored it.)</div><pre class="code">wp eval 'var_dump( WP_Block_Patterns_Registry::get_instance()-&gt;get_registered( "pagesco/hero" )["postTypes"] );'</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it. (A page that uses the synced pattern: what reaches the browser?)</div><pre class="code">curl -s http://localhost:8080/about/ | grep -c 'wp:block'</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>The Pages &amp; Co. Front Page</b> (lesson page, "Project: The Pages &amp; Co. Front Page"). In class: Step 1 and the start of Step 2. At home, FIRST the lesson's Evening and web-font sections (Step 4's check expects the font), then the rest.</p>
+<ul class="tick">
+  <li>☐ Step 1: <code class="inline">patterns/featured-books.php</code> registered; the loop prints Dune, The Hobbit, Fahrenheit 451</li>
+  <li>☐ Step 2: <code class="inline">styles/sections/section-ink.json</code> and <code class="inline">patterns/call-to-action.php</code></li>
+  <li>☐ Step 3: the final <code class="inline">templates/front-page.html</code> (hero, staff picks, call to action, news)</li>
+  <li>☐ Step 4: <code class="inline">screenshot.png</code> (1200 × 900), the registered patterns, the file list, no Site Editor copies, the per-URL loop</li>
+</ul>
+<div class="write"></div>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">The live site has no <code class="inline">WP_DEVELOPMENT_MODE</code>. You deploy pagesco with a new <code class="inline">patterns/gift-cards.php</code>, and the inserter does not show it for half an hour. What makes WordPress read the patterns folder again at once, as part of every release?</div><div class="opts"><div class="opt">A) Raise the theme's Version in style.css</div><div class="opt">B) Call <code class="inline">register_block_pattern()</code> for the file in functions.php</div><div class="opt">C) Run <code class="inline">wp cache flush</code></div><div class="opt">D) Rename <code class="inline">patterns/</code> and back</div></div></div>
+<div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">On the site at the end of Lesson 3.3, what does this print, and what are the two numbers?</div><pre class="code">wp eval 'echo count( WP_Theme_JSON_Resolver::get_style_variations() ), " ", count( WP_Theme_JSON_Resolver::get_style_variations( "block" ) ), "\n";'</pre><div class="write"></div></div>
+<div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">Which of these lines should never be written into a template file in a theme?</div><div class="opts"><div class="opt">A) <code class="inline">&lt;!-- wp:pattern {"slug":"pagesco/hero"} /--&gt;</code></div><div class="opt">B) <code class="inline">&lt;!-- wp:template-part {"slug":"footer"} /--&gt;</code></div><div class="opt">C) <code class="inline">&lt;!-- wp:block {"ref":20} /--&gt;</code></div><div class="opt">D) <code class="inline">&lt;!-- wp:query {"query":{"inherit":true}} --&gt;</code></div></div></div>
+<div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">After the shop manager saved the front page in the Site Editor, the <code class="inline">wp_template</code> copy contains <code class="inline">"patternName":"pagesco/hero"</code> and <code class="inline">src="http://localhost:8080/..."</code>. What does that tell you?</div><div class="opts"><div class="opt">A) The copy still refers to hero.php, so changes to the file will show up</div><div class="opt">B) The Site Editor could not read the pattern file and left a placeholder</div><div class="opt">C) Nothing: patternName is only used for the inserter's preview</div><div class="opt">D) The pattern was expanded before saving: its PHP already ran, so the URL is hard-coded and the strings are frozen in English</div></div></div>
+<div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">You move <code class="inline">section-ink.json</code> from <code class="inline">styles/sections/</code> up into <code class="inline">styles/</code>. What changes?</div><div class="opts"><div class="opt">A) It becomes a style variation for the whole site</div><div class="opt">B) Nothing: it is still a section style, because it has <code class="inline">blockTypes</code></div><div class="opt">C) WordPress ignores it: section styles must be in styles/sections/</div><div class="opt">D) It replaces <code class="inline">evening.json</code>, because both are in styles/ now</div></div></div>
+<div class="q" data-sc="6" data-kind="short"><div class="qn">Q6</div><div class="qt">The page source announces Vollkorn in a @font-face rule, but every browser shows the fallback serif, and debug.log is empty. Where do you look first, and for what?</div><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>Today the design of Pages &amp; Co. lives in four places: theme files, synced patterns, user global styles and Site Editor template copies. For each, write who should be allowed to change it (you, the shop manager, any editor) and how you would notice if it changed. Where would you draw the line between "the developer's design" and "the owner's content" for this shop?</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">3.4</span><h3>Child Themes &amp; Customizing Existing Themes</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Create and activate a child theme with the Template header, and explain the template and stylesheet options it sets</li>
+  <li>Predict how a child's theme.json, templates, template parts, patterns and style variations combine with the parent's</li>
+  <li>Use a child functions.php to enqueue the child's stylesheet, replace a pluggable parent function and remove a parent hook at the right time</li>
+  <li>Build a classic child theme and explain how get_stylesheet_directory(), get_template_directory() and locate_template() choose files</li>
+  <li>Choose between the Site Editor, a child theme, your own theme and a plugin for a requested change</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>A child theme</b> is a theme folder whose style.css says <code class="inline">Template: &lt;parent folder&gt;</code>. WordPress looks in the child first and falls back to the parent; the parent stays untouched and can be updated.</li>
+  <li><b>Two options:</b> <code class="inline">template</code> = the parent, <code class="inline">stylesheet</code> = the child. <code class="inline">get_template_directory()</code> vs <code class="inline">get_stylesheet_directory()</code>; <code class="inline">get_theme_file_path()</code> / <code class="inline">_uri()</code> = the child's copy if it exists, else the parent's.</li>
+  <li><b>theme.json is merged</b> (core, parent, child, user), single values key by key, but <b>preset lists are replaced whole</b>: repeat every slug, change only values.</li>
+  <li><b>Same name replaces:</b> templates, parts, classic PHP templates, styles/ files (by file name only); <b>same slug replaces</b> patterns.</li>
+  <li><b>functions.php:</b> both run, the child's FIRST. A block child's style.css loads only when enqueued (depend on the parent's real handle). Pluggable parent functions (<code class="inline">function_exists()</code>) can be replaced; parent hooks are removed on <code class="inline">after_setup_theme</code>.</li>
+  <li><b>Classic child themes</b> work the same with PHP templates (<code class="inline">locate_template()</code>, <code class="inline">get_header()</code>); never <code class="inline">@import</code> the parent's CSS. One level only: no grandchildren.</li>
+  <li><b>Which tool?</b> Site Editor (owner, database) · child theme (lasting design changes to someone else's theme) · your own theme · a plugin (features that must survive a theme switch).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: what a child theme overrides, and what it inherits</div>
+<p>The child theme of Lesson 3.4 has five files. Everything else comes from the parent:</p>
+<pre class="code">find wp-content/themes/pagesco-tt5-child -type f | sort</pre>
+<pre class="out">wp-content/themes/pagesco-tt5-child/functions.php
+wp-content/themes/pagesco-tt5-child/patterns/footer.php
+wp-content/themes/pagesco-tt5-child/style.css
+wp-content/themes/pagesco-tt5-child/templates/single.html
+wp-content/themes/pagesco-tt5-child/theme.json</pre><p>Which theme serves each template? <code class="inline">get_block_templates()</code> names them all after the active theme, so ask core's internal <code class="inline">_get_block_template_file()</code> (fine for checking, not for theme code), with the child switched on for a moment:</p>
+<pre class="code">wp theme activate pagesco-tt5-child
+wp eval 'foreach ( array( "single", "page", "404" ) as $slug ) { echo $slug, ": ", _get_block_template_file( "wp_template", $slug )["theme"], "\n"; }'
+wp theme activate pagesco</pre>
+<pre class="out">Success: Switched to 'Pages &amp;amp; Co. TT5 Child' theme.
+single: pagesco-tt5-child
+page: twentytwentyfive
+404: twentytwentyfive
+Success: Switched to 'Pages &amp;amp; Co.' theme.</pre><p><code class="inline">single</code> is the child's copy (the one without comments); <code class="inline">page</code> and <code class="inline">404</code> are the parent's, and keep receiving Twenty Twenty-Five's updates. Override as little as you can.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li><code class="inline">cp -r labs/module-05/l3_4-child-themes/tt4_child_starter wordpress/wp-content/themes/pagesco-lab-tt4-child</code>, then <code class="inline">wp theme activate pagesco-lab-tt4-child</code>.</li>
+  <li><code class="inline">cp labs/module-05/l3_4-child-themes/test_tt4_child.sh wordpress/</code>, then <code class="inline">docker compose run --rm wpcli sh test_tt4_child.sh</code>.</li>
+  <li>Before TODO 1, open the PARENT: <code class="inline">wp-content/themes/twentytwentyfour/theme.json</code> (the palette), <code class="inline">functions.php</code> (handles, pluggable functions) and <code class="inline">parts/footer.html</code> (which pattern it shows).</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Inheritance rule</th><th>What you changed in the child</th><th>The test line that proves it</th></tr></thead>
+<tbody>
+<tr><td>theme.json palette</td><td></td><td></td></tr>
+<tr><td>style.css loaded</td><td></td><td></td></tr>
+<tr><td>pattern by slug</td><td></td><td></td></tr>
+<tr><td>pluggable function</td><td></td><td></td></tr>
+</tbody>
+</table>
+<ul class="tick">
+  <li>Done when the test shows <code class="inline">#7a2e2e</code>, <code class="inline">child CSS:   1</code>, the shop's footer and only the checkmark list style. Then <code class="inline">wp theme activate pagesco</code> and remove the folder and the test.</li>
+  <li>Finished early? <code class="inline">merge_layers_starter.php</code>, then <code class="inline">debug_child_theme.sh</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Predict, then run</div>
+<p>Write your prediction first, then run it on your site (<code class="inline">wp ...</code> from the project folder, <code class="inline">curl</code> in the WP-CLI container shell). The site is the one at the end of the lesson. A wrong prediction you can explain afterward is worth more than a right guess.</p>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it. (The child has no assets/ folder. Which image URL?)</div><pre class="code">wp theme activate pagesco-tt5-child
+wp eval 'echo get_theme_file_uri( "assets/images/book-image.webp" ), "\n";'
+wp theme activate pagesco</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it. (Whose post-format function ran?)</div><pre class="code">wp theme activate pagesco-tt5-child
+wp eval 'var_dump( function_exists( "twentytwentyfive_post_format_setup" ), get_theme_support( "post-formats" )[0] );'
+wp theme activate pagesco</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>Finish pagesco-tt5-child</b> (lesson page, "Project: Finish pagesco-tt5-child"). In class: Steps 1 and 2. At home: Steps 3 and 4.</p>
+<ul class="tick">
+  <li>☐ Step 1: <code class="inline">patterns/footer.php</code> with the slug <code class="inline">twentytwentyfive/footer</code>; the home page shows the shop's footer</li>
+  <li>☐ Step 2: the complete functions.php; the post formats are aside and quote, the checkmark style is gone</li>
+  <li>☐ Step 3: the check, one command per inheritance rule</li>
+  <li>☐ Step 4: <code class="inline">wp theme activate pagesco</code>: pagesco active, the child installed (needed for Session 6)</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">A client uploads only your child theme (pagesco-tt5-child.zip) to a site where Twenty Twenty-Five has been deleted, and clicks Activate. What happens?</div><div class="opts"><div class="opt">A) WordPress uses its default theme as the parent instead</div><div class="opt">B) It refuses: the parent theme is missing, and the theme is listed under Broken Themes</div><div class="opt">C) The child activates, unstyled, until the parent is installed</div><div class="opt">D) WordPress downloads Twenty Twenty-Five automatically</div></div></div>
+<div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt">On the site at the end of Lesson 3.4: what do the two middle commands print?</div><pre class="code">wp theme activate pagesco-tt5-child
+wp option get stylesheet
+wp option get template
+wp theme activate pagesco</pre><div class="write"></div></div>
+<div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">A colleague's child theme.json lists only the two colors they wanted to change, base and contrast. What happens to Twenty Twenty-Five's accent colors?</div><div class="opts"><div class="opt">A) They disappear: the child's palette replaces the parent's whole palette, and styles that use accent variables silently lose their colors</div><div class="opt">B) They stay: theme.json is merged key by key</div><div class="opt">C) WordPress prints a notice that the palette is incomplete</div><div class="opt">D) The child's two colors are added to the end of the parent's list</div></div></div>
+<div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">Why can a child of Twenty Twenty-Five replace <code class="inline">twentytwentyfive_post_format_setup()</code> by defining a function with that name in its own functions.php?</div><div class="opts"><div class="opt">A) Child functions always override parent functions of the same name</div><div class="opt">B) WordPress renames the parent's function when a child theme is active</div><div class="opt">C) The parent's function is registered on a hook, and hooks prefer the child</div><div class="opt">D) The child's functions.php loads first, and the parent defines that function only <code class="inline">if ( ! function_exists( ... ) )</code></div></div></div>
+<div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">Twenty Twenty-Four enqueues no stylesheet of its own. In a child of it you write wp_enqueue_style( 'my-child-style', get_stylesheet_uri(), $deps, $version ). What should $deps be?</div><div class="opts"><div class="opt">A) <code class="inline">array( 'twentytwentyfour-style' )</code></div><div class="opt">B) <code class="inline">array( 'wp-block-library' )</code></div><div class="opt">C) <code class="inline">array()</code></div><div class="opt">D) <code class="inline">get_template_directory_uri() . '/style.css'</code></div></div></div>
+<div class="q" data-sc="12" data-kind="short"><div class="qn">Q12</div><div class="qt">The shop manager wants to try a darker link color for the holidays and switch it back in January, without calling you. Site Editor, child theme, or plugin? Why?</div><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>Imagine a client on Twenty Twenty-Five whose previous developer edited the theme's files directly. The next update is waiting. Write the steps you would take, in order, to move their changes into a child theme without losing anything. Which of today's commands (diff, _get_block_template_file(), wp theme list) would you use, and where?</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<p>Three questions, no notes. Write your answers, hand them in or keep them: they tell you and your instructor what to revisit.</p>
+<div class="q"><div class="qn">E1</div><div class="qt">Theme pattern or synced pattern: the shop's opening hours on four pages? And a hero section for new landing pages?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E2</div><div class="qt">Name two places where the Site Editor stores changes, and the command that lists them.</div><div class="write"></div></div>
+<div class="q"><div class="qn">E3</div><div class="qt">In a child theme, which runs first, the child's functions.php or the parent's, and what does that mean for removing a parent hook?</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Notes</h2><span class="rule"></span></div>
+<div class="notes-lines"></div>
+
+  <div class="sec"><h2>Homework Checklist</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ No Site Editor copies: <code class="inline">wp post list --post_type=wp_template,wp_template_part,wp_global_styles</code> lists nothing</li>
+  <li>☐ Lesson 3.3: the Evening variation, the web font, Export, Common Mistakes; the project Steps 2 to 4</li>
+  <li>☐ Lesson 3.4: the classic child theme section (needs the internet), Common Mistake 1; the project Steps 3 and 4</li>
+  <li>☐ pagesco is the active theme again; pagesco-tt5-child is installed but inactive</li>
+  <li>☐ Lesson 3.3 Hands-on Exercises 1 to 3 (Exercise 4 is a stretch)</li>
+  <li>☐ Lesson 3.4 Hands-on Exercises 1 to 3 (Exercise 4 is a stretch)</li>
+  <li>☐ Both Quick Quizzes on the lesson pages</li>
+  <li>☐ Both journal entries</li>
+  <li>☐ Labs not reached: <code class="inline">variation_contrast_starter.php</code>, <code class="inline">merge_layers_starter.php</code>, the two debug handouts</li>
+  <li>☐ Bring to Session 6: the site at the end of Lesson 3.4, the project folder with <code class="inline">labs/</code>, <code class="inline">pagesco-plan.txt</code>, my journal, this workbook</li>
+</ul>
+
+  <div class="sec"><h2>Glossary</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>theme pattern</td><td>A PHP file in the theme's <code class="inline">patterns/</code> folder; inserted as a copy of its blocks</td></tr>
+<tr><td>synced pattern</td><td>A <code class="inline">wp_block</code> post shown wherever <code class="inline">&lt;!-- wp:block {"ref":ID} /--&gt;</code> refers to it; one original</td></tr>
+<tr><td>Pattern block</td><td><code class="inline">&lt;!-- wp:pattern {"slug":"..."} /--&gt;</code>: a theme pattern used in a template by slug</td></tr>
+<tr><td><code class="inline">WP_DEVELOPMENT_MODE</code></td><td><code class="inline">theme</code> (also core, plugin, all): switches off the caches that get in a developer's way; never on production</td></tr>
+<tr><td>section style</td><td>A JSON file in <code class="inline">styles/</code> with <code class="inline">blockTypes</code>: a named look for one Group or Columns block (<code class="inline">is-style-&lt;slug&gt;</code>)</td></tr>
+<tr><td>style variation</td><td>A JSON file in <code class="inline">styles/</code> without <code class="inline">blockTypes</code>: an alternative look for the whole site</td></tr>
+<tr><td>user global styles</td><td>The <code class="inline">wp_global_styles</code> post the Site Editor saves; the top layer over core and theme</td></tr>
+<tr><td><code class="inline">fontFace</code></td><td>The theme.json key that describes bundled font files (<code class="inline">file:./assets/fonts/...</code>)</td></tr>
+<tr><td>child theme</td><td>A theme with <code class="inline">Template: &lt;parent folder&gt;</code> that holds only changes; the rest comes from the parent</td></tr>
+<tr><td><code class="inline">template</code> / <code class="inline">stylesheet</code></td><td>The two options that name the parent and the child (the same folder without a child theme)</td></tr>
+<tr><td>pluggable function</td><td>A parent function wrapped in <code class="inline">if ( ! function_exists( ... ) )</code>, which a child may define first</td></tr>
+<tr><td><code class="inline">after_setup_theme</code></td><td>The action that fires after both themes' functions.php files have loaded</td></tr>
+</tbody>
+</table>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 5 · Participant Workbook · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

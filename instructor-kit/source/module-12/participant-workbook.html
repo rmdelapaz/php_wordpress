@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Workbook: Session 12</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Student workbook —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">write in it · bring it to every session</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Participant Workbook</div>
+    <h1>Session 12: Static and Dynamic Blocks</h1>
+    <p class="sub">Your workbook for Session 12: a warm-up, the key ideas of Lessons 6.2 and 6.3, worked examples, the guided labs, predict-then-run practice, a self-check for each lesson, and your exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Lessons <b>6.2–6.3</b></span>
+      <span class="chip">Session <b>12</b> · 3 hours</span>
+      <span class="chip">Name: ____________________</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Session Goals</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Say where a static block keeps each attribute (the saved HTML or the comment), and read both with PHP.</li>
+  <li>Add editable text, sidebar controls and color, spacing and typography supports to a block, and know which changes to save() need a deprecation.</li>
+  <li>Render a dynamic block on the server with render.php: attributes as input, a query, the wrapper attributes, escaping.</li>
+  <li>Bind core blocks to a book's data with core/post-meta and with the shop's own source, pagesco/book.</li>
+  <li>Start the staff pick on the Staff picks post and the book pages with live details.</li>
+</ul>
+
+  <div class="sec"><h2>Warm-up: Lessons 5.5 and 6.1</h2><span class="rule"></span></div>
+<p>Answer from memory first; the class goes through them together.</p>
+<div class="q"><div class="qn">W1</div><div class="qt">A shortcode callback ends with <code class="inline">echo $html;</code> instead of <code class="inline">return $html;</code>. What goes wrong?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W2</div><div class="qt">Why does EventsTable::find() build its SQL with <code class="inline">$wpdb-&gt;prepare()</code> even though only the plugin calls it?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W3</div><div class="qt">Where does <code class="inline">npm run build</code> write, and which file does WordPress read to register the plugin's blocks?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W4</div><div class="qt">You add a second block folder in src/blocks/ and build. What PHP do you add to register it?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W5</div><div class="qt">You edited src/blocks/book-card/edit.js, reloaded the editor, and nothing changed. First question?</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Lessons</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">6.2</span><h3>Static Blocks: Attributes, Controls &amp; Supports</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Declare attributes in block.json and choose where each one is stored: in the saved HTML (source and selector) or in the block's comment</li>
+  <li>Make text editable on the canvas with RichText and save it with RichText.Content</li>
+  <li>Add settings to the block sidebar with InspectorControls and components from @wordpress/components</li>
+  <li>Opt into color, spacing and typography block supports and read the classes and styles they save</li>
+  <li>Explain block validation, and change save safely with a deprecated entry and migrate</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>Attributes with a <code class="inline">source</code> and <code class="inline">selector</code> live in the saved HTML</b> (title, author, a link's href); attributes without one live in the <b>block comment</b>, and only when they differ from their default. <code class="inline">parse_blocks()</code> sees only the comment.</li>
+  <li><b>RichText</b> edits text on the canvas (<code class="inline">allowedFormats</code>), <b>RichText.Content</b> saves it; <code class="inline">setAttributes()</code> is the only way to change attributes.</li>
+  <li><b>InspectorControls</b> puts <code class="inline">@wordpress/components</code> controls into the sidebar's Settings tab; <b>BlockControls</b> into the toolbar. Both live in edit.</li>
+  <li><b>Block supports</b> (color, spacing, typography) add attributes, controls, classes and styles through <code class="inline">useBlockProps()</code> / <code class="inline">useBlockProps.save()</code>, with the theme's presets saved as slugs.</li>
+  <li><b>Validation:</b> the editor re-runs save() and compares it with the stored HTML. save() must be pure: no translations, dates or random values.</li>
+  <li><b>Changing save() for existing content needs a deprecated entry:</b> the old attributes, supports and save, newest first, with an optional <code class="inline">migrate()</code>.</li>
+  <li>In PHP, a static block is <b>finished HTML</b>: read it with the HTML API, or store the value in the comment, or make the block dynamic.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: the supports, and the style engine</div>
+<p>Supports add attributes, controls, classes and styles without code of yours. Ask the registry which supports the finished card declares (the site after Lesson 6.2):</p>
+<pre class="code">wp eval 'echo wp_json_encode( WP_Block_Type_Registry::get_instance()-&gt;get_registered( "pagesco/book-card" )-&gt;supports ), "\n";'</pre>
+<pre class="out">{"html":false,"color":{"background":true,"text":true,"link":true},"spacing":{"margin":true,"padding":true},"typography":{"fontSize":true,"lineHeight":true}}</pre><p>A padding chosen in the Styles tab is saved in the comment as <code class="inline">var:preset|spacing|medium</code> and printed as an inline style. The style engine does that translation; ask it directly:</p>
+<pre class="code">wp eval 'echo wp_style_engine_get_styles( array( "spacing" =&gt; array( "padding" =&gt; array( "top" =&gt; "var:preset|spacing|medium", "bottom" =&gt; "var:preset|spacing|medium" ) ) ) )["css"], "\n";'</pre>
+<pre class="out">padding-top:var(--wp--preset--spacing--medium);padding-bottom:var(--wp--preset--spacing--medium);</pre><p>The value points at the theme's spacing preset (a CSS custom property), never at a number of pixels: change the preset in theme.json and every block that uses it follows, exactly like the color slugs.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>From the project folder: <code class="inline">cp labs/module-12/l6_2-static-blocks/attribute_sources_starter.php wordpress/</code>, then <code class="inline">wp eval-file --use-include attribute_sources_starter.php</code>.</li>
+  <li>TODO 1: the registered block type. TODOs 2 and 3: describe each attribute: in the HTML (with its source and selector) or in the comment (with its default). TODO 4: what parse_blocks() returns for the stored heading and image.</li>
+  <li>Before TODO 4, write your prediction: is the image's src in the attrs? The heading's text?</li>
+</ul>
+<div class="write"></div>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>Which source does core use that Lesson 6.2's table does not list?</td><td></td></tr>
+<tr><td>Why is the button's tagName in the comment?</td><td></td></tr>
+<tr><td>Who reads the image's src back, and how?</td><td></td></tr>
+</tbody>
+</table>
+<ul class="tick">
+  <li>Done when your output matches "Expected when done". Then <code class="inline">rm wordpress/attribute_sources_starter.php</code>.</li>
+  <li>Finished early? The folder lab <code class="inline">card_price_starter/</code> (README: install it as a must-use plugin, run <code class="inline">test_card_price.sh</code>), then <code class="inline">debug_card_report.php</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Predict, then run</div>
+<p>Write your prediction on the line first, then run it in the WP-CLI container shell (<code class="inline">docker compose run --rm wpcli sh</code>) or, for <code class="inline">wp</code> commands, from the project folder. P1 and P2 need the site after Lesson 6.2; P3 and P4 after Lesson 6.3.</p>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it. (A heading stored at its default level.)</div><pre class="code">wp eval 'echo wp_json_encode( parse_blocks( "&lt;!-- wp:heading --&gt;&lt;h2 class=\"wp-block-heading\"&gt;New this week&lt;/h2&gt;&lt;!-- /wp:heading --&gt;" )[0]["attrs"] ), "\n";'</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it. (How core's paragraph declares its text.)</div><pre class="code">wp eval 'echo wp_json_encode( WP_Block_Type_Registry::get_instance()-&gt;get_registered( "core/paragraph" )-&gt;attributes["content"] ), "\n";'</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>A Staff Pick on the Staff Picks Post</b> (lesson page, "Project: A Staff Pick on the Staff Picks Post"). In class: Step 1, if your card builds with the badge and the deprecation. At home: Steps 2 and 3.</p>
+<ul class="tick">
+  <li>☐ Step 1: the Hobbit card after the list: title, author, recommendation ("everyone" in italics), link, H3, badge on, Sage</li>
+  <li>☐ The Code editor shows the card's comment with only <code class="inline">{"backgroundColor":"sage"}</code>; I can say why</li>
+  <li>☐ Step 2: the front end shows the card between the list and the quote; the title links to the Hobbit's page</li>
+  <li>☐ Step 3: comparison with Lesson 1.3's helper; Card test deleted; parse_blocks lists four blocks; the plan line</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">A block attribute is declared <code class="inline">"url": { "type": "string", "source": "attribute", "selector": "a", "attribute": "href" }</code>. Where is the URL stored once the post is saved?</div><div class="opts"><div class="opt">A) In the block comment, as JSON</div><div class="opt">B) In post meta, under the key url</div><div class="opt">C) In the saved HTML: the <code class="inline">href</code> of the first <code class="inline">&lt;a&gt;</code> inside the block</div><div class="opt">D) Nowhere: the editor asks for it again</div></div></div>
+<div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">On the course site after Lesson 6.2: what does this print?</div><pre class="code">wp eval 'echo wp_json_encode( parse_blocks( "&lt;!-- wp:pagesco/book-card {\"showBadge\":false} --&gt;&lt;div class=\"wp-block-pagesco-book-card\"&gt;&lt;h3 class=\"wp-block-pagesco-book-card__title\"&gt;Emma&lt;/h3&gt;&lt;/div&gt;&lt;!-- /wp:pagesco/book-card --&gt;" )[0]["attrs"] ), "\n";'</pre><div class="write"></div></div>
+<div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">Cards are already on the site. Which change to the Book Card needs a new deprecated entry?</div><div class="opts"><div class="opt">A) A new rule in style.scss that rounds the corners more</div><div class="opt">B) A new sidebar control in edit.js only</div><div class="opt">C) Wrapping the author in a <code class="inline">&lt;cite&gt;</code> in save()</div><div class="opt">D) A new attribute whose default makes save() print nothing new</div></div></div>
+<div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">A designer wants the card's heading level in the toolbar that floats above the selected block, like core's Heading block. Where does the control go?</div><div class="opts"><div class="opt">A) Inside <code class="inline">&lt;BlockControls&gt;</code> in edit</div><div class="opt">B) Inside <code class="inline">&lt;InspectorControls&gt;</code> in save</div><div class="opt">C) Inside <code class="inline">&lt;InspectorControls&gt;</code> in edit</div><div class="opt">D) In block.json under supports</div></div></div>
+<div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">An editor picks the theme's Sage background for a card. What does the post store?</div><div class="opts"><div class="opt">A) The hex color in an inline style</div><div class="opt">B) The class <code class="inline">has-sage-background-color</code> in the HTML and <code class="inline">"backgroundColor":"sage"</code> in the comment</div><div class="opt">C) A row in wp_options</div><div class="opt">D) Nothing: the theme decides at view time</div></div></div>
+<div class="q" data-sc="6" data-kind="short"><div class="qn">Q6</div><div class="qt">Why does the course write the badge text <code class="inline">Staff pick</code> as a plain string in save() instead of <code class="inline">__( 'Staff pick', 'pagesco-books' )</code>?</div><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>List every piece of data in the Book Card and, for each, write where it is stored (HTML or comment), who can change it (the editor on the canvas, the sidebar, the theme) and what happens to it when the plugin is updated. Then pick one content element a client of yours would want as a block (a team member, a testimonial, an opening-hours box) and sketch its block.json attributes with a source for each, and the supports you would turn on.</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">6.3</span><h3>Dynamic Blocks &amp; Block Bindings</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Explain when a block should be dynamic, and what a dynamic block stores in post_content</li>
+  <li>Render a block on the server with render.php: attributes, a WP_Query through get_posts(), get_block_wrapper_attributes(), and escaping</li>
+  <li>Preview a dynamic block in the editor with ServerSideRender, and fill its controls from the REST API through @wordpress/core-data</li>
+  <li>Offer ready-made versions of a block as variations, generated in PHP</li>
+  <li>Bind core blocks to post meta with core/post-meta, and write a custom binding source with register_block_bindings_source()</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>A dynamic block stores only its comment.</b> <code class="inline">"render": "file:./render.php"</code> makes WordPress run the PHP on every view, with <code class="inline">$attributes</code>, <code class="inline">$content</code> and <code class="inline">$block</code>; the build copies render.php into build/.</li>
+  <li><b>In render.php treat attributes as input:</b> check optional ones with <code class="inline">isset()</code> (WordPress fills in defaults only for attributes that have one), cast, clamp, sanitize; query with <code class="inline">get_posts()</code>; start the wrapper with <code class="inline">get_block_wrapper_attributes()</code>; escape what you print.</li>
+  <li><b>An attribute without a default</b> can mean "use the site's setting": the Book List's count follows Books per list.</li>
+  <li><b>ServerSideRender</b> previews render.php through the block-renderer REST route; <code class="inline">@wordpress/core-data</code> fills controls with the site's data.</li>
+  <li><b>Variations</b> are presets of a block; <code class="inline">"variations": "file:./variations.php"</code> builds them in PHP, only when something asks.</li>
+  <li><b>Block bindings</b> connect core blocks' attributes to sources: <code class="inline">core/post-meta</code> returns raw values of registered, public meta; <code class="inline">register_block_bindings_source()</code> with <code class="inline">uses_context</code> gives formatted ones. They fail silently to the fallback.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: a dynamic block rendered from PHP</div>
+<p>A dynamic block can be rendered anywhere PHP runs, with any attributes: do_blocks() finds the comment and runs render.php, as a page view does (the site after Lesson 6.3):</p>
+<pre class="code">wp eval 'echo do_blocks( "&lt;!-- wp:pagesco/book-list {\"genre\":\"dystopian\",\"count\":2} /--&gt;" );'</pre>
+<pre class="out">&lt;ul class="wp-block-pagesco-book-list"&gt;
+			&lt;li class="wp-block-pagesco-book-list__item"&gt;&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/1984/"&gt;1984&lt;/a&gt; by George Orwell, &lt;span class="pagesco-book__price"&gt;$9.99&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
+			&lt;li class="wp-block-pagesco-book-list__item"&gt;&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/brave-new-world/"&gt;Brave New World&lt;/a&gt; by Aldous Huxley, &lt;span class="pagesco-book__price"&gt;$9.49&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
+	&lt;/ul&gt;</pre><p>Two of the three dystopian books, in title order, each printed by BookShortcode::render(). The variations come from variations.php, built from the genre terms:</p>
+<pre class="code">wp eval 'foreach ( WP_Block_Type_Registry::get_instance()-&gt;get_registered( "pagesco/book-list" )-&gt;get_variations() as $v ) { if ( "new-arrivals" !== $v["name"] ) { echo $v["title"], " "; } } echo "\n";'</pre>
+<pre class="out">Classic Books Dystopian Books Fantasy Books Fiction Books Science Fiction Books</pre><p>One variation per genre, generated in PHP when something asks for them. Add a genre on Books &gt; Genres and the list grows without a build.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>From the project folder: <code class="inline">cp -r labs/module-12/l6_3-dynamic-blocks/next_events_starter wordpress/wp-content/plugins/pagesco-next-events</code>, then <code class="inline">wp plugin activate pagesco-next-events</code>.</li>
+  <li><code class="inline">cp labs/module-12/l6_3-dynamic-blocks/test_next_events.php wordpress/</code>, then <code class="inline">wp eval-file --use-include test_next_events.php</code>: four blocks, four TODO paragraphs.</li>
+  <li>Edit wordpress/wp-content/plugins/pagesco-next-events/block/render.php: TODO 1 the count (no default!), TODO 2 the events, TODO 3 the empty case, TODO 4 the list. Run the test after each one.</li>
+</ul>
+<div class="write tall"></div>
+<ul class="tick">
+  <li>Done when the four blocks print five events, two Café events, the empty sentence and <code class="inline">count 99: 6 events</code>.</li>
+  <li>Then <code class="inline">wp plugin deactivate pagesco-next-events</code> and <code class="inline">rm -r wordpress/wp-content/plugins/pagesco-next-events wordpress/test_next_events.php</code>.</li>
+  <li>Finished early? <code class="inline">core_sources_starter.php</code>, then <code class="inline">debug_genre_counts.php</code> (same folder).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Predict, then run</div>
+<p>Write your prediction on the line first, then run it in the WP-CLI container shell (<code class="inline">docker compose run --rm wpcli sh</code>) or, for <code class="inline">wp</code> commands, from the project folder. P1 and P2 need the site after Lesson 6.2; P3 and P4 after Lesson 6.3.</p>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it. (A Book List that asks for 30 books.)</div><pre class="code">wp eval 'echo substr_count( do_blocks( "&lt;!-- wp:pagesco/book-list {\"count\":30} /--&gt;" ), "&lt;li class=" ), "\n";'</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it. (What get_post_meta() returns for a sold-out book's stock.)</div><pre class="code">wp eval 'echo get_post_meta( 37, "pagesco_in_stock", true ) === "" ? "empty string" : "something else", "\n";'</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>Book Pages with Live Details</b> (lesson page, "Project: Book Pages with Live Details"). In class: Steps 1 and 2. At home: Step 3, the editor section and the variations section.</p>
+<ul class="tick">
+  <li>☐ Step 1: templates/single-book.html with core/post-meta (author) and pagesco/book (price, stock, genres, pages, year) and New Arrivals</li>
+  <li>☐ Step 2: Dune shows $14.99, In stock, two genre links, 412 pages, 1965; Gatsby shows Sold out</li>
+  <li>☐ Step 3: Dune on sale shows $12.99 on its page and in the List test page, then $14.99 again; List test deleted; 14 features</li>
+  <li>☐ The List settings panel and the variations (New Arrivals, one per genre) in my editor</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">The Book List already sits on twenty pages. You change render.php so every item gets a second line. What else must you do?</div><div class="opts"><div class="opt">A) Add a deprecated entry to the block</div><div class="opt">B) Open and update each of the twenty pages</div><div class="opt">C) Run <code class="inline">npm run build</code> (render.php is copied into build/), then nothing: every page follows on its next view</div><div class="opt">D) Bump the block's version so caches notice</div></div></div>
+<div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt">On the course site after Lesson 6.3 (six Classic books): what does this print?</div><pre class="code">wp eval 'echo substr_count( do_blocks( "&lt;!-- wp:pagesco/book-list {\"genre\":\"classic\",\"count\":4} /--&gt;" ), "&lt;li class=" ), "\n";'</pre><div class="write"></div></div>
+<div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">In render.php the wrapper is <code class="inline">&lt;ul &lt;?php echo get_block_wrapper_attributes(); ?&gt;&gt;</code>, with no escaping function around it. Why is that safe?</div><div class="opts"><div class="opt">A) It is not: wrap it in esc_html()</div><div class="opt">B) Block attributes are always numbers</div><div class="opt">C) Only administrators can add blocks</div><div class="opt">D) get_block_wrapper_attributes() returns attributes that are already escaped (class and style from the supports)</div></div></div>
+<div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">A list item is bound to <code class="inline">core/post-meta</code> with the key <code class="inline">pagesco_in_stock</code>. What does it show on The Great Gatsby's page (sold out)?</div><div class="opts"><div class="opt">A) Sold out</div><div class="opt">B) The fallback text of the list item</div><div class="opt">C) false</div><div class="opt">D) Nothing: an empty list item</div></div></div>
+<div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">You register a binding source without <code class="inline">uses_context</code>. What does a bound paragraph in single-book.html show?</div><div class="opts"><div class="opt">A) Its fallback text, with no error</div><div class="opt">B) A PHP warning about the missing context</div><div class="opt">C) The value for the first book in the catalog</div><div class="opt">D) The value for the post being shown, as usual</div></div></div>
+<div class="q" data-sc="12" data-kind="short"><div class="qn">Q12</div><div class="qt">On the course site after Lesson 6.3: what does this print (book 40 is Animal Farm, published 1945-08-17)?</div><pre class="code"><span class="k">&lt;?php</span>
+<span class="v">$parsed</span> = parse_blocks( <span class="s">'&lt;!-- wp:paragraph {"metadata":{"bindings":{"content":{"source":"pagesco/book","args":{"field":"year"}}}}} --&gt;&lt;p&gt;First published&lt;/p&gt;&lt;!-- /wp:paragraph --&gt;'</span> )[<span class="s">0</span>];
+<span class="v">$block</span>  = <span class="k">new</span> WP_Block( <span class="v">$parsed</span>, <span class="k">array</span>( <span class="s">'postId'</span> =&gt; <span class="s">40</span>, <span class="s">'postType'</span> =&gt; <span class="s">'book'</span> ) );
+
+<span class="k">echo</span> wp_strip_all_tags( <span class="v">$block</span>-&gt;render() ), <span class="s">"\n"</span>;</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>Go through the Pages &amp; Co. site page by page and sort every piece of book data you see into three columns: typed into content (Book Card, the hard-coded staff picks pattern), rendered by PHP (shortcodes, Book List), or bound (book pages). For each item in the first column, decide whether it should move, and to which of the other two. Then write down one place on a client's site where a binding would replace a custom block.</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<p>Three questions, no notes. Write your answers, hand them in or keep them: they tell you and your instructor what to revisit before the checkpoint.</p>
+<div class="q"><div class="qn">E1</div><div class="qt">A static block's title and heading level: where is each stored?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E2</div><div class="qt">Name two things a dynamic block's render.php must do with its attributes.</div><div class="write"></div></div>
+<div class="q"><div class="qn">E3</div><div class="qt">A bound paragraph shows its fallback text on a book page. Name two causes.</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Notes</h2><span class="rule"></span></div>
+<div class="notes-lines"></div>
+
+  <div class="sec"><h2>Homework Checklist</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ Finish the staff pick (Steps 2 and 3) and the book pages (Step 3, the editor section, the variations section and build)</li>
+  <li>☐ Lesson 6.2 Hands-on Exercises 1 and 2 (Exercise 3 is a stretch)</li>
+  <li>☐ Lesson 6.3 Hands-on Exercises 1 and 2 (Exercise 3 is a stretch)</li>
+  <li>☐ Both Quick Quizzes on the lesson pages</li>
+  <li>☐ Both journal entries</li>
+  <li>☐ Before the Next Lesson: the card valid, Card test and List test gone, a final <code class="inline">npm run build</code>; JavaScript getters and preventDefault() refreshed</li>
+  <li>☐ Checkpoint 2 next session (Modules 5 and 6): reread Lessons 5.2 to 5.5, 6.2 and 6.3</li>
+  <li>☐ Optional: <code class="inline">card_price_starter/</code>, <code class="inline">core_sources_starter.php</code>, both debug handouts</li>
+  <li>☐ Bring to Session 13: a site at the end of Lesson 6.3, a working build, this workbook</li>
+</ul>
+
+  <div class="sec"><h2>Glossary</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>attribute</td><td>A piece of a block's data, declared in block.json with a type (and a source, a default)</td></tr>
+<tr><td>source / selector</td><td>Where an attribute is read back from the saved HTML (<code class="inline">html</code>, <code class="inline">rich-text</code>, <code class="inline">text</code>, <code class="inline">attribute</code>) and which element</td></tr>
+<tr><td>block comment</td><td><code class="inline">&lt;!-- wp:name {...} --&gt;</code>: the block's name and its source-less, non-default attributes as JSON</td></tr>
+<tr><td>RichText</td><td>The editable text component; <code class="inline">RichText.Content</code> prints its value in save</td></tr>
+<tr><td>InspectorControls / BlockControls</td><td>Render controls into the sidebar's Settings tab / the block toolbar</td></tr>
+<tr><td>block supports</td><td>Core features a block opts into in block.json (color, spacing, typography, align...)</td></tr>
+<tr><td>validation</td><td>The editor's check that save() still produces the stored HTML</td></tr>
+<tr><td>deprecation</td><td>An entry in <code class="inline">deprecated</code> describing an older attributes + supports + save, with optional <code class="inline">migrate</code></td></tr>
+<tr><td>dynamic block</td><td>A block whose HTML render.php (or a render_callback) makes on every view; it stores only its comment</td></tr>
+<tr><td><code class="inline">get_block_wrapper_attributes()</code></td><td>The wrapper's escaped class and style attributes in PHP (supports included)</td></tr>
+<tr><td>ServerSideRender</td><td>An editor component that previews a block with the server's render.php</td></tr>
+<tr><td>variation</td><td>A named preset of a block's attributes, listed in the inserter</td></tr>
+<tr><td>block binding / source</td><td>A block attribute replaced on every view by a source's value (<code class="inline">core/post-meta</code>, <code class="inline">pagesco/book</code>)</td></tr>
+</tbody>
+</table>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 12 · Participant Workbook · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<?php
+/**
+ * The header: the document head and the top of every page.
+ *
+ * @package brightwater
+ */
+
+?>
+<!DOCTYPE html>
+<html <?php language_attributes(); ?>>
+<head>
+	<meta charset="<?php bloginfo( 'charset' ); ?>">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title><?php bloginfo( 'name' ); ?></title>
+	<?php wp_head(); ?>
+</head>
+<body <?php body_class(); ?>>
+<?php // TODO T1: the hook plugins print into right after <body> (Lesson 3.1). ?>
+<a class="skip-link screen-reader-text" href="#main"><?php esc_html_e( 'Skip to content', 'brightwater' ); ?></a>
+<header class="site-header">
+	<p class="site-title"><a href="<?php echo esc_url( home_url( '/' ) ); ?>"><?php bloginfo( 'name' ); ?></a></p>
+	<?php if ( has_nav_menu( 'main' ) ) : ?>
+		<nav class="site-nav" aria-label="<?php esc_attr_e( 'Primary', 'brightwater' ); ?>">
+			<?php
+			wp_nav_menu(
+				array(
+					'theme_location' => 'main',
+					'container'      => false,
+					'depth'          => 1,
+				)
+			);
+			?>
+		</nav>
+	<?php endif; ?>
+</header>
+<main id="main" class="site-main">

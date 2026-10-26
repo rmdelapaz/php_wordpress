@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Workbook: Session 3</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Student workbook —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">write in it · bring it to every session</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Participant Workbook</div>
+    <h1>Session 3: Core Architecture, the Database and Hooks</h1>
+    <p class="sub">Your workbook for Session 3: a warm-up, the key ideas of Lessons 2.2 and 2.3, worked examples, the guided labs, predict-then-run practice, a self-check for each lesson, and your exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Lessons <b>2.2–2.3</b></span>
+      <span class="chip">Session <b>3</b> · 3 hours</span>
+      <span class="chip">Name: ____________________</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Session Goals</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Read wp-config.php and wp-settings.php as a developer: what each setting does, and what is available at each stage of loading.</li>
+  <li>Map WordPress's twelve tables and query them with SQL: joins, the key-value pattern, serialized values, autoloaded options.</li>
+  <li>Choose the API over raw SQL for anything that changes data, and say why.</li>
+  <li>Write actions and filters with the right priority and arguments, remove someone else's hook, and find the hook you need.</li>
+  <li>Start the Pages &amp; Co. store notice: a must-use plugin with hooks of its own, the first file of the course that stays.</li>
+</ul>
+
+  <div class="sec"><h2>Warm-up: Session 2 Revisited</h2><span class="rule"></span></div>
+<div class="blk lab"><div class="h">Five questions, no notes</div>
+<p>Answer from memory, then check with the class.</p>
+<div class="q"><div class="qn">W1</div><div class="qt">Which escaping function goes around a URL in an href attribute?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W2</div><div class="qt">Name the four shapes a WordPress callback can take. Which one is hard for anyone else to unhook?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W3</div><div class="qt">A page and a post: which table holds each, and which column tells them apart?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W4</div><div class="qt">Code must decide whether the current user may publish pages. What does it check, and why not the role?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W5</div><div class="qt">What does <code class="inline">wp_parse_args( $args, $defaults )</code> return?</div><div class="write"></div></div>
+<p>Site check, from the project folder: <code class="inline">wp post list --post_type=page,post --orderby=ID --order=asc --fields=ID,post_type,post_name,post_author</code> and <code class="inline">wp user list --orderby=ID --fields=ID,user_login,roles</code>. Same IDs as the projector (pages 12 to 14, posts 15 to 17, users 2 and 3)? ☐ yes ☐ no: I finish Lesson 2.1's project in the break.</p>
+</div>
+
+  <div class="sec"><h2>Lessons</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">2.2</span><h3>Core Architecture &amp; the Database</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Find your way around a WordPress install: what lives in wp-admin/, wp-includes/ and wp-content/, and what a drop-in is</li>
+  <li>Read wp-config.php and explain its settings, including the table prefix and the security keys</li>
+  <li>Trace how wp-settings.php loads WordPress, and say what is available at each stage</li>
+  <li>Map the twelve wp_* tables, their keys and indexes, and join them with SQL the way WordPress's own queries do</li>
+  <li>Explain the meta (key-value) pattern, serialized values and options autoloading, with their trade-offs</li>
+  <li>Query the Pages &amp; Co. site with wp db cli, wp db query and WP-CLI, and choose the API over raw SQL in your code</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>Core</b> is wp-admin/, wp-includes/ and the root files; <b>yours</b> is wp-content/ (where drop-ins such as object-cache.php can replace parts of core) and wp-config.php.</li>
+  <li><b>wp-config.php</b> holds the database connection, eight secret keys and <code class="inline">$table_prefix</code>, and its last line loads wp-settings.php: nothing defined after it takes effect.</li>
+  <li><b>wp-settings.php loads in a fixed order:</b> database, must-use plugins, plugins, pluggable functions, theme, current user, then <code class="inline">init</code> and <code class="inline">wp_loaded</code>.</li>
+  <li><b>Twelve tables</b> in five groups (content, taxonomies, users, comments, settings), linked by ID columns but with <b>no foreign keys</b>: integrity lives in PHP, so change data through WordPress.</li>
+  <li><b>Meta tables are key-value rows:</b> flexible, but every value is text, each condition is one more join, and values are not indexed.</li>
+  <li><b>Arrays are stored serialized</b>, lengths included: never edit them as text (<code class="inline">wp option patch</code>, <code class="inline">update_option()</code>, <code class="inline">wp search-replace</code>).</li>
+  <li><b>Autoload:</b> <code class="inline">on</code>, <code class="inline">auto</code>, <code class="inline">auto-on</code> are loaded with every request; <code class="inline">off</code>, <code class="inline">auto-off</code> are read on demand (one query, then cached). In code: <code class="inline">{$wpdb-&gt;posts}</code>, never <code class="inline">wp_posts</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: a slug lookup and its index</div>
+<p>How does WordPress turn <code class="inline">/about/</code> into page 12 so fast? Ask MySQL how it would find a page by its slug (EXPLAIN, from MySQL Foundations Lesson 6.1; <code class="inline">\G</code> prints the plan vertically):</p>
+<pre class="code">wp db query "EXPLAIN SELECT ID FROM wp_posts WHERE post_name = 'about' AND post_type = 'page'\G"</pre>
+<pre class="out">*************************** 1. row ***************************
+EXPLAIN: -&gt; Filter: ((wp_posts.post_name = 'about') and (wp_posts.post_type = 'page'))  (cost=0.295 rows=0.455)
+    -&gt; Index lookup on wp_posts using post_name (post_name = 'about')  (cost=0.295 rows=1)</pre><p>"Index lookup on wp_posts using post_name": the prefix index <code class="inline">post_name(191)</code> exists for exactly this question, so MySQL reads one row instead of the table. WordPress asks the same question through its API:</p>
+<pre class="code">wp post list --post_type=page --name=about --field=ID</pre>
+<pre class="out">12</pre><p>Every index on wp_posts matches a question WordPress asks all the time: by slug, by parent, by author, and "the latest published posts of this type" (<code class="inline">type_status_date</code>). There is no index on <code class="inline">wp_postmeta.meta_value</code>, which is why searching meta by value alone reads the whole table.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>From the project folder: <code class="inline">cp labs/module-03/l2_2-core-database/meta_pivot_starter.sh wordpress/</code>, then <code class="inline">docker compose run --rm wpcli sh meta_pivot_starter.sh</code>. Open <code class="inline">wordpress/meta_pivot_starter.sh</code> in VS Code and <code class="inline">wp db cli</code> in a second terminal.</li>
+  <li>For each TODO, build the query at the prompt first, then put it in the script inside <code class="inline">wp db query "..."</code> and run the script again.</li>
+  <li>Step 3 is the new idea: one join, GROUP BY the user, and one <code class="inline">MAX(CASE WHEN um.meta_key = '...' THEN um.meta_value END)</code> per column.</li>
+</ul>
+<div class="write tall"></div>
+<ul class="tick">
+  <li>Done when your output matches the "Expected when done" comment at the end of the file. Then <code class="inline">rm wordpress/meta_pivot_starter.sh</code>.</li>
+  <li>Finished early? <code class="inline">wpdb_report_starter.php</code>, then <code class="inline">debug_meta_report.php</code> in the same folder (run both with <code class="inline">wp eval-file --use-include</code>).</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>Why does Step 3 need GROUP BY?</td><td></td></tr>
+<tr><td>What would one more field in the report cost?</td><td></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Predict, then run</div>
+<p>Write your prediction on the line first, then run it on your site from the project folder. A wrong prediction you can explain afterward is worth more than a right guess.</p>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it. (An option that does not exist, twice.)</div><pre class="code">wp eval 'var_dump( get_option( "pagesco_no_such_option" ), get_option( "pagesco_no_such_option", "none" ) );'</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it. (The list of active plugins, as the database stores it.)</div><pre class="code">wp db query "SELECT option_value FROM wp_options WHERE option_name = 'active_plugins'"</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>A Database Inventory of Pages &amp; Co.</b> (lesson page, "Project: A Database Inventory of Pages &amp; Co."). In class: Steps 1 and 2. At home: Steps 3 and 4. Nothing on the site changes.</p>
+<ul class="tick">
+  <li>☐ Step 1: content by type and status; the numbers agree with <code class="inline">wp_count_posts()</code></li>
+  <li>☐ Step 2: all eight published posts and pages with author and categories (LEFT JOIN, the taxonomy condition in ON); both queries saved in <code class="inline">pagesco-inventory.sql</code></li>
+  <li>☐ Step 3: <code class="inline">pagesco-inventory.php</code> with <code class="inline">{$wpdb-&gt;posts}</code>, <code class="inline">{$wpdb-&gt;users}</code> and <code class="inline">$wpdb-&gt;prepare()</code>; the totals agree with the API</li>
+  <li>☐ Step 4: my five largest autoloaded options: ______________; the script deleted from the WordPress root</li>
+</ul>
+<div class="write"></div>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">A tutorial says to add <code class="inline">define( 'DISALLOW_FILE_EDIT', true );</code> to wp-config.php. You paste it as the very last line of the file, after <code class="inline">require_once ABSPATH . 'wp-settings.php';</code>. What happens?</div><div class="opts"><div class="opt">A) It works: wp-config.php is read on every request, so the position does not matter</div><div class="opt">B) PHP stops with a parse error</div><div class="opt">C) It is defined too late: wp-settings.php has already loaded WordPress, so the file editors stay</div><div class="opt">D) WordPress moves the line above the "stop editing" comment the next time it saves the file</div></div></div>
+<div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">What does this print on the course site, and what is that value?</div><pre class="code">wp config get DB_HOST</pre><div class="write"></div></div>
+<div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">In which order does wp-settings.php load these on every request?</div><div class="opts"><div class="opt">A) The theme's functions.php, active plugins, must-use plugins, pluggable.php</div><div class="opt">B) Must-use plugins, active plugins, pluggable.php, the theme's functions.php</div><div class="opt">C) pluggable.php, must-use plugins, the theme's functions.php, active plugins</div><div class="opt">D) Active plugins, must-use plugins, the theme's functions.php, pluggable.php</div></div></div>
+<div class="q" data-sc="4" data-kind="short"><div class="qn">Q4</div><div class="qt">Devon's first name is stored once in wp_usermeta. What does this print?</div><pre class="code">wp eval 'var_dump( get_user_meta( 3, "first_name" ) );'</pre><div class="write"></div></div>
+<div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">Someone runs <code class="inline">UPDATE wp_usermeta SET meta_value = REPLACE(meta_value, 'author', 'editor')</code> on Devon's <code class="inline">a:1:{s:6:"author";b:1;}</code>. What happens?</div><div class="opts"><div class="opt">A) The value breaks: unserialize() fails and Devon loses every role</div><div class="opt">B) It works, but only because both words have 6 characters: the s:6 length still matches. Change roles through WordPress anyway</div><div class="opt">C) MySQL refuses: the column holds serialized PHP</div><div class="opt">D) WordPress recomputes the lengths when it reads the value</div></div></div>
+<div class="q" data-sc="6"><div class="qn">Q6</div><div class="qt">An option's autoload column says <code class="inline">auto-off</code>. What does that mean?</div><div class="opts"><div class="opt">A) The code that saved it passed false</div><div class="opt">B) It is loaded on every request</div><div class="opt">C) The option is broken and will be deleted</div><div class="opt">D) Nobody chose, and WordPress decided not to autoload it, usually because the value is large (over 150,000 bytes)</div></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>Picture the bookstore database you built in MySQL Foundations next to WordPress's twelve tables. Where would a book, its author, its price and its genres live in WordPress? Write down one thing your own design did better (types, foreign keys, indexes) and one thing WordPress's design does better (flexibility, one API for everything). Which would you choose for an online shop, and why?</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">2.3</span><h3>The Hooks System</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Explain the difference between an action and a filter, and choose the right one for a task</li>
+  <li>Attach callbacks with add_action() and add_filter(), using priorities and the accepted-arguments count correctly</li>
+  <li>Remove a hook someone else added with remove_action() / remove_filter(), and say why a removal silently fails</li>
+  <li>Create your own action and filter hooks with do_action() and apply_filters() so other code can extend yours</li>
+  <li>Find the hook you need: in the core source, with has_filter() and $wp_filter, and from the command line with WP-CLI</li>
+  <li>Build the Pages &amp; Co. store notice as a must-use plugin that others can customize through its own hooks</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>A hook</b> is a named point where WordPress calls the functions registered for it: how you change WordPress without editing core.</li>
+  <li><b>Actions</b> (<code class="inline">add_action</code>, <code class="inline">do_action</code>) run code at a moment; <b>filters</b> (<code class="inline">add_filter</code>, <code class="inline">apply_filters</code>) receive a value and must return it.</li>
+  <li><b>Priority</b> (default 10, lower first, ties in the order added) orders callbacks; <b>accepted args</b> (default 1) must match what the callback asks for: <code class="inline">10, 2</code>.</li>
+  <li><b>Removing</b> needs the same hook, callback and priority, after the hook was added; <code class="inline">remove_action()</code> returns false silently when nothing matches. Closures cannot be removed by anyone else.</li>
+  <li><b>Your own hooks</b> make code extensible: prefix them, a filter for values and an action for moments, pass context, document them with a DocBlock.</li>
+  <li><b>Finding hooks:</b> the Code Reference, the function you want to change, <code class="inline">grep -rn</code> in wordpress/, and <code class="inline">has_filter()</code> / <code class="inline">$wp_filter</code> on the running site.</li>
+  <li><b>"Too early"</b> is the most common hook bug: code at the top of a plugin file runs while plugins load; move it into a callback on init or later.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: the two hooks of mailpit-smtp.php</div>
+<p>Since Lesson 1.2 a must-use plugin has been sending your site's email to Mailpit. It is two hooks. Find them:</p>
+<pre class="code">grep -n "add_filter\|add_action" wp-content/mu-plugins/mailpit-smtp.php</pre>
+<pre class="out">11:add_filter( 'wp_mail_from', function ( $from ) {
+15:add_action( 'phpmailer_init', function ( $phpmailer ) {</pre><p>A filter on <code class="inline">wp_mail_from</code> (the sender address: a value, so the closure returns it) and an action on <code class="inline">phpmailer_init</code> (a moment: WordPress hands over its mailer object and the closure configures it for Mailpit). Ask the running site whether the filter is attached, and run the value through it the way wp_mail() does:</p>
+<pre class="code">wp eval 'var_dump( has_filter( "wp_mail_from" ), apply_filters( "wp_mail_from", "wordpress@localhost" ) );'</pre>
+<pre class="out">bool(true)
+string(21) "wordpress@example.com"</pre><p><code class="inline">has_filter()</code> without a callback answers "is anything attached?" (with a callback it returns the priority). And <code class="inline">apply_filters()</code> is all it takes to ask a filter for its answer: <code class="inline">wordpress@localhost</code>, which the mailer would reject, comes back as <code class="inline">wordpress@example.com</code>. Both callbacks are closures, so nobody else can remove them: fine for a must-use plugin on your own site.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>From the project folder: <code class="inline">cp labs/module-03/l2_3-hooks/filter_chain_starter.php wordpress/</code>, then <code class="inline">wp eval-file --use-include filter_chain_starter.php</code>.</li>
+  <li>Do the TODOs in order and run the file after each one. TODO 2 needs both values of the hook: what must <code class="inline">add_filter()</code> be told?</li>
+  <li>Finished early? <code class="inline">hook_finder_starter.sh</code>, the title-parts folder lab (copy <code class="inline">title_parts_starter/pagesco-title.php</code> into <code class="inline">wordpress/wp-content/mu-plugins/</code>, then run <code class="inline">test_title_parts.sh</code>), then <code class="inline">debug_price_tag.php</code>.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>What did remove_filter() return without the priority?</td><td></td></tr>
+<tr><td>What changes if the capitalizing callback runs at 20?</td><td></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Predict, then run</div>
+<p>Write your prediction on the line first, then run it on your site from the project folder. A wrong prediction you can explain afterward is worth more than a right guess.</p>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it. (A filter on one hook, and a hook nobody filters.)</div><pre class="code">wp eval 'add_filter( "pagesco_p", "strrev" ); echo apply_filters( "pagesco_p", "Dune" ), " ", apply_filters( "pagesco_other", "Dune" ), "\n";'</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it. (What an action gives back.)</div><pre class="code">wp eval 'add_action( "pagesco_p", function () { echo "ran "; } ); var_dump( do_action( "pagesco_p" ) );'</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>The Pages &amp; Co. Store Notice</b> (lesson page, "Project: The Pages &amp; Co. Store Notice"). In class: Steps 1 to 3. At home: Step 4 and the checklist. This file stays: Session 4 starts from it.</p>
+<ul class="tick">
+  <li>☐ Step 1: <code class="inline">wordpress/wp-content/mu-plugins/pagesco-site.php</code> prints the notice right after <code class="inline">&lt;body&gt;</code></li>
+  <li>☐ Step 2: the filter <code class="inline">pagesco_store_notice</code> and the actions <code class="inline">pagesco_before_store_notice</code> and <code class="inline">pagesco_store_notice_end</code>, each with a DocBlock</li>
+  <li>☐ Step 3: the Thursday hours (priority 20), the See events link, the generator removal</li>
+  <li>☐ Step 4: pagesco-hello.php deleted; <code class="inline">has_action()</code> says 10, 20 and false; <code class="inline">grep -c</code> counts 0 generator tags</li>
+  <li>☐ Returning '' from my own test filter hid the bar; the test is removed again</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="7" data-kind="short"><div class="qn">Q7</div><div class="qt">What does this print when run with wp eval-file?</div><pre class="code"><span class="k">&lt;?php</span>
+add_filter( <span class="s">'pagesco_q7'</span>, <span class="k">fn</span>( <span class="v">$text</span> ) =&gt; <span class="v">$text</span> . <span class="s">'b'</span>, <span class="s">20</span> );
+add_filter( <span class="s">'pagesco_q7'</span>, <span class="k">fn</span>( <span class="v">$text</span> ) =&gt; strtoupper( <span class="v">$text</span> ) );
+add_filter( <span class="s">'pagesco_q7'</span>, <span class="k">fn</span>( <span class="v">$text</span> ) =&gt; <span class="v">$text</span> . <span class="s">'a'</span>, <span class="s">5</span> );
+
+<span class="k">echo</span> apply_filters( <span class="s">'pagesco_q7'</span>, <span class="s">'x'</span> ), <span class="s">"\n"</span>;</pre><div class="write"></div></div>
+<div class="q" data-sc="8"><div class="qn">Q8</div><div class="qt">A members page must send visitors who are not logged in to the login screen. On which action do you call wp_safe_redirect() and exit?</div><div class="opts"><div class="opt">A) <code class="inline">plugins_loaded</code></div><div class="opt">B) <code class="inline">wp_footer</code></div><div class="opt">C) <code class="inline">template_redirect</code></div><div class="opt">D) <code class="inline">shutdown</code></div></div></div>
+<div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">A theme adds <code class="inline">add_action( 'wp_head', 'pagesco_theme_banner' )</code> inside its after_setup_theme callback. Your plugin calls <code class="inline">remove_action( 'wp_head', 'pagesco_theme_banner' )</code> at the top of its main file, and the banner stays. Why?</div><div class="opts"><div class="opt">A) The plugin ran before the theme added the hook, so there was nothing to remove: remove it on init</div><div class="opt">B) remove_action() only works on core's hooks</div><div class="opt">C) The priority is wrong: it must be 1</div><div class="opt">D) Plugins cannot change what a theme does</div></div></div>
+<div class="q" data-sc="10" data-kind="short"><div class="qn">Q10</div><div class="qt">What does this print, and what does the value mean?</div><pre class="code">wp eval 'var_dump( has_filter( "the_content", "do_blocks" ) );'</pre><div class="write"></div></div>
+<div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">After a new the_title filter, posts have no titles and the only message is <code class="inline">Deprecated: str_replace(): Passing null to parameter #3 ... in .../wp-includes/formatting.php on line 5777</code>. What is the likely bug?</div><div class="opts"><div class="opt">A) Your callback does not return the title, so the next callback (core's, at priority 11) received null</div><div class="opt">B) A bug in WordPress 7.1's formatting.php: update core</div><div class="opt">C) PHP 8.5 deprecated str_replace()</div><div class="opt">D) The filter needs 2 accepted arguments</div></div></div>
+<div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">Your plugin prints a gift-card form. Other developers should be able to print a line of their own just BEFORE the form. What do you add right before you print it?</div><div class="opts"><div class="opt">A) <code class="inline">apply_filters( 'pagesco_before_gift_form', '' );</code></div><div class="opt">B) <code class="inline">add_action( 'pagesco_before_gift_form', 'pagesco_print_form' );</code></div><div class="opt">C) <code class="inline">do_action( 'before_gift_form' );</code></div><div class="opt">D) <code class="inline">do_action( 'pagesco_before_gift_form' );</code> with a DocBlock above it</div></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>Describe a website you use often as if it were built with hooks. Name three actions it would fire during a visit and one filter it might run on something you see. Which of them would you want to hook into if you were a developer working for that site, and what would your callback do?</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<p>Three questions, no notes. Write your answers, hand them in or keep them: they tell you and your instructor what to revisit before Checkpoint 1.</p>
+<div class="q"><div class="qn">E1</div><div class="qt">Why should code change WordPress data through WordPress (functions or WP-CLI) and not with UPDATE or DELETE?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E2</div><div class="qt">Action or filter, and which hook: a banner at the very top of every page; the length of every excerpt.</div><div class="write"></div></div>
+<div class="q"><div class="qn">E3</div><div class="qt"><code class="inline">remove_action()</code> returns false and the hook keeps running. Name two possible reasons.</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Notes</h2><span class="rule"></span></div>
+<div class="notes-lines"></div>
+
+  <div class="sec"><h2>Homework Checklist</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ Finish the inventory (Steps 3 and 4) and the store notice (Step 4, and Step 3 if needed); <code class="inline">mu-plugins/</code> = mailpit-smtp.php + pagesco-site.php</li>
+  <li>☐ Lesson 2.2 Hands-on Exercises 1 to 3 (Exercise 4 is a stretch)</li>
+  <li>☐ Lesson 2.3 Hands-on Exercises 1 to 3 (Exercise 4 is a stretch); each exercise file deleted afterwards</li>
+  <li>☐ Both Quick Quizzes on the lesson pages</li>
+  <li>☐ Both journal entries</li>
+  <li>☐ Both "Before the Next Lesson" lists (no leftover files, the orphan query, default-filters.php, mailpit-smtp.php)</li>
+  <li>☐ Checkpoint 1 in Session 4 (Modules 1 and 2): reread the Key Takeaways of Lessons 1.1 to 2.3, redo the self-checks of Sessions 1 to 3</li>
+  <li>☐ Optional: <code class="inline">wpdb_report_starter.php</code>, <code class="inline">debug_meta_report.php</code>, <code class="inline">hook_finder_starter.sh</code>, the title-parts lab, <code class="inline">debug_price_tag.php</code></li>
+  <li>☐ Bring to Session 4: the site with the full store notice on every page, the project folder with <code class="inline">labs/</code>, my journal and this workbook</li>
+</ul>
+
+  <div class="sec"><h2>Glossary</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>drop-in</td><td>A reserved file name in <code class="inline">wp-content/</code> (object-cache.php, db.php ...) that replaces part of core</td></tr>
+<tr><td><code class="inline">$table_prefix</code></td><td>The first letters of every table name (<code class="inline">wp_</code>), set in wp-config.php; in code <code class="inline">$wpdb-&gt;prefix</code></td></tr>
+<tr><td>pluggable function</td><td>A core function (wp_mail(), wp_get_current_user()) loaded after plugins, so a plugin may define it first</td></tr>
+<tr><td><code class="inline">$wpdb</code></td><td>WordPress's database object: <code class="inline">get_var()</code>, <code class="inline">get_col()</code>, <code class="inline">get_row()</code>, <code class="inline">get_results()</code>, <code class="inline">prepare()</code>, table names</td></tr>
+<tr><td>key-value (EAV) pattern</td><td>Extra fields stored as rows of (object, key, value) in the four meta tables</td></tr>
+<tr><td>serialized value</td><td>An array saved as PHP's <code class="inline">serialize()</code> text, lengths included (<code class="inline">a:1:{s:6:"editor";b:1;}</code>)</td></tr>
+<tr><td>autoload</td><td>Whether an option is loaded with every request (<code class="inline">on</code>, <code class="inline">auto</code>, <code class="inline">auto-on</code>) or on demand (<code class="inline">off</code>, <code class="inline">auto-off</code>)</td></tr>
+<tr><td>orphan</td><td>A meta or term row whose post no longer exists</td></tr>
+<tr><td>action / filter</td><td>A hook for a moment (your callback does something) / for a value (your callback returns it)</td></tr>
+<tr><td>callback</td><td>The function a hook calls: a name, a closure, an object or static method</td></tr>
+<tr><td>priority</td><td>The third argument of add_action/add_filter: lower runs first, default 10</td></tr>
+<tr><td>accepted args</td><td>The fourth argument: how many of the hook's values the callback receives, default 1</td></tr>
+<tr><td>must-use plugin</td><td>A PHP file in <code class="inline">wp-content/mu-plugins/</code>: loaded on every request, before plugins, no activation</td></tr>
+</tbody>
+</table>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 3 · Participant Workbook · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

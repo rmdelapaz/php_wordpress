@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Key: Session 15</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">answers &amp; solutions · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Answer Key</div>
+    <h1>Session 15: Debugging, Testing and Performance</h1>
+    <p class="sub">Answers and reasoning for every Session 15 item: the warm-up, both self-checks, the predict-then-run items, the lab reference outputs, the lessons' recorded cards, the lesson pages' own quizzes and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Session <b>15</b></span>
+      <span class="chip"><b>12</b> self-check items</span>
+      <span class="chip">Confidential</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Warm-up</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>W1 (Lesson 7.3).</b> No answer at all (a WP_Error: DNS, refused, timeout); an answer that is not a success (an array with a 401 or 503 status); a success whose body is not the JSON you expect. Only the first is a WP_Error.</li>
+  <li><b>W2 (Lesson 7.3).</b> Availability::get() reads through: it calls the supplier, stores the answer again (12 hours, 5 minutes after an error) and returns it. A transient may vanish at any time, so code never relies on it being there.</li>
+  <li><b>W3 (Lesson 7.3).</b> wp cron event run on a recurring event reschedules it to now plus the interval: the 03:00 job would move to whenever you ran it.</li>
+  <li><b>W4 (Lesson 7.2).</b> A 500. The route's callback should give its WP_Error array( 'status' =&gt; 404 ) (or the right code); permission callbacks use rest_authorization_required_code().</li>
+  <li><b>W5 (Lesson 7.3).</b> In wp-config.php (PAGESCO_BOOKS_SUPPLIER_URL and _KEY, set with wp config set): configuration per environment, never in the plugin's code. Lesson 8.4 moves them to the server's environment.</li>
+</ol>
+
+  <div class="sec"><h2>8.1 · Debugging &amp; Testing: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">The live Pages &amp; Co. shop should keep a record of PHP warnings for the developer, and show visitors none. Where should <code class="inline">WP_DEBUG_LOG</code> point?</div><div class="opts"><div class="opt">A) <code class="inline">true</code>, so the messages go to <code class="inline">wp-content/debug.log</code></div><div class="opt correct">B) A file outside the web root, such as <code class="inline">/home/pagesco/logs/wordpress.log</code></div><div class="opt">C) <code class="inline">false</code>: a live site must never record anything</div><div class="opt">D) The theme's folder, where only the theme developer looks</div></div><div class="why"><b>Why:</b> With display off and the log in a folder the web server does not serve, the messages are kept and nobody can download them. Lesson 8.1's Mistake 1: on the course site <code class="inline">curl</code> gets <code class="inline">wp-content/debug.log</code> with status 200.<br><b>A</b> is wrong: That is the default, inside the web root: bots try that address on every site.<br><b>C</b> is wrong: Then a live problem leaves no evidence at all; logging is fine, the location is the point.<br><b>D</b> is wrong: Also inside the web root, and a theme update would delete it.</div></div>
+  <div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">On the course site after Lesson 7.3, with WordPress loaded (<code class="inline">wp eval-file</code>): what does this print?</div><pre class="code"><span class="k">&lt;?php</span>
+add_filter(
+	<span class="s">'pre_http_request'</span>,
+	<span class="k">fn</span>() =&gt; <span class="k">array</span>(
+		<span class="s">'headers'</span>  =&gt; <span class="k">array</span>(),
+		<span class="s">'body'</span>     =&gt; <span class="s">'&lt;h1&gt;Service Unavailable&lt;/h1&gt;'</span>,
+		<span class="s">'response'</span> =&gt; <span class="k">array</span>( <span class="s">'code'</span> =&gt; <span class="s">503</span>, <span class="s">'message'</span> =&gt; <span class="s">'Service Unavailable'</span> ),
+		<span class="s">'cookies'</span>  =&gt; <span class="k">array</span>(),
+		<span class="s">'filename'</span> =&gt; <span class="k">null</span>,
+	)
+);
+<span class="v">$result</span> = ( <span class="k">new</span> PagesCo\Books\Supplier\Client() )-&gt;availability( <span class="k">array</span>( <span class="s">'9780441172719'</span> ) );
+<span class="k">echo</span> <span class="v">$result</span>-&gt;get_error_code(), <span class="s">' '</span>, <span class="v">$result</span>-&gt;get_error_data()[<span class="s">'status'</span>], <span class="s">"\n"</span>;</pre><div class="opts"><div class="opt correct"><code class="inline">pagesco_supplier_http_error 503</code></div></div><div class="why"><b>Why:</b> <code class="inline">pre_http_request</code> answers in place of the network, so the client never calls the sandbox. A 503 is an answer, not a transport failure: Client::decode() turns any status outside 200 to 299 into <code class="inline">pagesco_supplier_http_error</code> with the status in the error's data. That exact code and that exact number are what SupplierClientTest asserts, and why a test that only asked "is it an error?" would miss the bug of Lesson 8.1's red run.</div></div>
+  <div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">A plugin crashes on <code class="inline">init</code> and every WP-CLI command now dies with the same fatal error. Which command still deactivates it?</div><div class="opts"><div class="opt">A) <code class="inline">wp plugin deactivate pagesco-crash --force</code></div><div class="opt">B) <code class="inline">wp eval 'deactivate_plugins( "pagesco-crash/pagesco-crash.php" );'</code></div><div class="opt">C) <code class="inline">wp plugin delete pagesco-crash</code></div><div class="opt correct">D) <code class="inline">wp --skip-plugins=pagesco-crash plugin deactivate pagesco-crash</code></div></div><div class="why"><b>Why:</b> WP-CLI loads WordPress, and with it every active plugin, before it runs any command. --skip-plugins loads WordPress without the named plugin, so the deactivation can run. Recovery mode is the browser's way out; for a must-use plugin only renaming the file helps.<br><b>A</b> is wrong: There is no --force that skips loading the plugin: the fatal error happens first.<br><b>B</b> is wrong: wp eval loads WordPress too, so it dies before your code runs.<br><b>C</b> is wrong: Also loads WordPress first; and deleting is not the first move when deactivating will do.</div></div>
+  <div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">Why does the lesson name its temporary backtrace logger <code class="inline">0-pagesco-debug-backtrace.php</code>?</div><div class="opts"><div class="opt correct">A) Must-use plugins load in alphabetical order: it must be there before the plugin that asks too early</div><div class="opt">B) WordPress ignores must-use plugins whose names start with a letter</div><div class="opt">C) The 0- tells WordPress to load it only when WP_DEBUG is on</div><div class="opt">D) So that PHPCS skips the file</div></div><div class="why"><b>Why:</b> A hook added after the notice fired would miss it. <code class="inline">wp_get_mu_plugins()</code> sorts the files by name, so <code class="inline">0-</code> loads before <code class="inline">pagesco-too-early.php</code>, adds its <code class="inline">doing_it_wrong_run</code> callback, and catches the notice with the call stack.<br><b>B</b> is wrong: Every PHP file directly in mu-plugins/ loads.<br><b>C</b> is wrong: WordPress gives file names no meaning beyond their order.<br><b>D</b> is wrong: PHPCS only checks what its ruleset names; mu-plugins are not in the plugin's ruleset at all.</div></div>
+  <div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">PHPCS reports 30 times <code class="inline">PrefixAllGlobals.NonPrefixedVariableFound</code> in the blocks' <code class="inline">render.php</code> files. What did Lesson 8.1 do, and why?</div><div class="opts"><div class="opt">A) Renamed every variable to start with pagesco_books_</div><div class="opt">B) Turned the rule off for the whole plugin</div><div class="opt correct">C) Excluded that rule for those two file patterns in phpcs.xml.dist, with a comment: WordPress includes them inside a function, so the variables are local</div><div class="opt">D) Added // phpcs:ignore to each of the 30 lines</div></div><div class="why"><b>Why:</b> A ruleset exception that is narrow (one rule, the files it does not fit) and explained (the comment) is a decision a reviewer can read. Thirty ignore comments would hide the same decision thirty times; a plugin-wide switch would hide real globals elsewhere.<br><b>A</b> is wrong: Possible, but noisy, and it fixes nothing: the variables are not globals.<br><b>B</b> is wrong: Too wide: a real global anywhere else would go unreported.<br><b>D</b> is wrong: phpcs:ignore is for a single line that is right despite the rule; thirty of them is a ruleset decision.</div></div>
+  <div class="q" data-sc="6" data-kind="short"><div class="qn">Q6</div><div class="qt">In the plugin's folder, with the wp-env test environment started: which command runs the plugin's PHPUnit tests, and why not just <code class="inline">phpunit</code>?</div><div class="opts"><div class="opt correct"><code class="inline">npx @wordpress/env run cli --env-cwd=wp-content/plugins/pagesco-books vendor/bin/phpunit</code>: the plugin's own PHPUnit 9.6; the container's global phpunit is 10.5, which the WordPress 7.1 test library does not support</div></div><div class="why"><b>Why:</b> Two versions of PHPUnit in one process fail with "Call to undefined method PHPUnit\Framework\TestSuite::empty()" (Lesson 8.1, Common Mistake 2). --env-cwd is the folder to run in, relative to the WordPress root inside the container. composer test runs the same vendor/bin/phpunit.</div></div>
+
+  <div class="sec"><h2>8.1 · Debugging &amp; Testing: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'var_dump( WP_DEBUG_DISPLAY, ini_get( "display_errors" ) );'</pre><div class="opts"><div class="opt correct"><pre class="out">bool(true)
+string(6) "stderr"</pre></div></div><div class="why"><b>Why:</b> WP_DEBUG_DISPLAY is true, and WP-CLI sets PHP's display_errors to stderr: messages go to the terminal's error stream, which is why your terminal shows warnings that a pipe into a file would not catch. On a web request the same setting prints them into the page.</div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'add_filter( "pre_http_request", fn() =&gt; new WP_Error( "http_request_failed", "down" ) ); $r = wp_remote_get( "https://api.riverside.example/v1/availability" ); echo get_class( $r ), ": ", $r-&gt;get_error_message(), "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">WP_Error: down</pre></div></div><div class="why"><b>Why:</b> pre_http_request answered with a WP_Error before any connection was tried (the fictional address would not resolve anyway). wp_remote_get() returns it unchanged: a transport failure is a WP_Error, an HTTP error status is not (Lesson 7.3).</div></div>
+
+  <div class="sec"><h2>8.2 · Performance &amp; Caching: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="7" data-kind="short"><div class="qn">Q7</div><div class="qt">On the course site: what does this print?</div><pre class="code">wp eval 'global $wpdb; $b = $wpdb-&gt;num_queries; get_option( "pagesco_lab_nope" ); get_option( "pagesco_lab_nope" ); echo $wpdb-&gt;num_queries - $b, "\n";'</pre><div class="opts"><div class="opt correct"><code class="inline">1</code></div></div><div class="why"><b>Why:</b> The first <code class="inline">get_option()</code> of an option with no row asks the database and finds nothing; WordPress then remembers the name in the <code class="inline">notoptions</code> cache for the rest of the request, so the second costs nothing. One query per request is what <code class="inline">pagesco_books_settings</code> cost every page until Lesson 8.2 gave it an autoloaded row.</div></div>
+  <div class="q" data-sc="8"><div class="qn">Q8</div><div class="qt">On a site without a persistent object cache, these two commands run one after the other. What does the second print?</div><pre class="code">wp eval 'wp_cache_set( "stock", 24, "pagesco_demo" );'
+wp eval 'var_dump( wp_cache_get( "stock", "pagesco_demo" ) );'</pre><div class="opts"><div class="opt">A) <code class="inline">int(24)</code></div><div class="opt correct">B) <code class="inline">bool(false)</code></div><div class="opt">C) <code class="inline">NULL</code></div><div class="opt">D) A Warning: the group pagesco_demo does not exist</div></div><div class="why"><b>Why:</b> Each WP-CLI command is its own PHP process, a request of its own, and WordPress's own object cache lives in that process's memory: the second starts empty and wp_cache_get() returns false for a miss. With an object-cache.php drop-in (Redis, Memcached, the lesson's SQLite Object Cache) it would print int(24).<br><b>A</b> is wrong: That needs a persistent object cache; the course site has none (wp_using_ext_object_cache() is NULL).<br><b>C</b> is wrong: A cache miss is false, which is why the lesson's code checks is_array() or is_string() for a hit.<br><b>D</b> is wrong: Groups need no registration; an unknown key is simply a miss.</div></div>
+  <div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">A shop with 500 books runs <code class="inline">get_posts( array( 'post_type' =&gt; 'book', 'fields' =&gt; 'ids', 'posts_per_page' =&gt; -1 ) )</code>, then <code class="inline">get_post_meta()</code> for each ID, with an empty cache. About how many queries is that, and what is the fix?</div><div class="opts"><div class="opt">A) 2 queries: WordPress loads the meta with the IDs</div><div class="opt">B) 500 queries; the fix is a persistent object cache</div><div class="opt correct">C) 501 queries; the fix is update_postmeta_cache( $ids ) before the loop: 2 queries</div><div class="opt">D) 1 query; meta is autoloaded like options</div></div><div class="why"><b>Why:</b> With 'fields' => 'ids' get_posts() skips priming the meta cache, so each get_post_meta() asks for its own post: N+1. update_postmeta_cache() loads the meta of all IDs in one query (Lesson 8.2 measured 12 to 2 for eleven books; the lab <code class="inline">query_count</code> shows 11 and 1).<br><b>A</b> is wrong: That is what a normal WP_Query does; fields => ids is the shortcut that skips it.<br><b>B</b> is wrong: Off by one (the ID query), and a warm persistent cache only hides the problem until it is flushed.<br><b>D</b> is wrong: Post meta is never autoloaded; only options have autoload.</div></div>
+  <div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">EventsTable::find() treats a cached value as a hit with <code class="inline">if ( is_array( $events ) )</code>. A colleague suggests the shorter <code class="inline">if ( $events )</code>. What would break?</div><div class="opts"><div class="opt">A) Nothing: both conditions treat every cached value the same way</div><div class="opt correct">B) A cached empty result, array(), would count as a miss: a location without events would query the database on every call</div><div class="opt">C) A cached WP_Error would reach the shortcode</div><div class="opt">D) Two different limits would share one cache entry</div></div><div class="why"><b>Why:</b> An empty array is falsy in PHP, so a truthiness check turns a valid, cached answer (no events here) into a miss, every time. <code class="inline">is_array()</code> states what a hit is; <code class="inline">false !== $events</code> would work too, since a miss is false (run: <code class="inline">wp eval 'var_dump( false !== array(), (bool) array() );'</code>). Two limits sharing an entry is a different bug, prevented by the key: the debug handout <code class="inline">debug_events_cache.php</code> has exactly that one.<br><b>A</b> is wrong: array() is falsy: if ( array() ) does not run its block.<br><b>C</b> is wrong: find() never stores a WP_Error.<br><b>D</b> is wrong: That is prevented by the key, md5( $limit . '|' . $location ), not by the check.</div></div>
+  <div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">In Lesson 8.2's lab measurement the front page had a CLS of 0.101, just over the 0.1 limit. What caused it, and what fixed it?</div><div class="opts"><div class="opt">A) The web fonts; font-display: swap fixed it</div><div class="opt">B) The speculation rules prefetching the next page</div><div class="opt">C) The Navigation block's external stylesheet; inlining it fixed it</div><div class="opt correct">D) The hero image had no reserved space; the Image block's aspectRatio attribute fixed it</div></div><div class="why"><b>Why:</b> The browser laid the page out without knowing the image's height, and moved everything below it when it arrived. Block templates get no automatic width and height (wp_filter_content_tags skips the template context), so the theme adds the aspect ratio itself: CLS fell to 0.001.<br><b>A</b> is wrong: The font swap caused only the 0.001 that was left.<br><b>B</b> is wrong: Prefetching happens on a click and moves nothing on the current page.<br><b>C</b> is wrong: A render-blocking stylesheet delays the first paint; it does not shift content afterwards.</div></div>
+  <div class="q" data-sc="12" data-kind="short"><div class="qn">Q12</div><div class="qt">Which WordPress filter adds a <code class="inline">&lt;link rel="preload"&gt;</code> for the front page's hero image to the head, and which attribute tells the browser to fetch it first?</div><div class="opts"><div class="opt correct"><code class="inline">wp_preload_resources</code>, with <code class="inline">'fetchpriority' =&gt; 'high'</code> (and <code class="inline">'as' =&gt; 'image'</code>)</div></div><div class="why"><b>Why:</b> The browser finds the preload in the head before it reads the body. In the lesson's lab measurement LCP went from about 1.48 s to about 1.40 s: a modest gain, honestly reported, because the image was in the HTML anyway.</div></div>
+
+  <div class="sec"><h2>8.2 · Performance &amp; Caching: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'global $wpdb; $b = $wpdb-&gt;num_queries; get_post( 30 ); get_post( 30 ); echo $wpdb-&gt;num_queries - $b, "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">1</pre></div></div><div class="why"><b>Why:</b> The first get_post() loads the row and caches it in the posts group; the second comes from the object cache. Within one request WordPress never asks twice for the same post.</div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'var_dump( wp_using_ext_object_cache() );'</pre><div class="opts"><div class="opt correct"><pre class="out">NULL</pre></div></div><div class="why"><b>Why:</b> NULL: no object-cache.php drop-in, so WordPress uses its own in-memory cache (wp_using_ext_object_cache() is only set to true by a drop-in). In Lesson 8.2 it printed bool(true) while the SQLite Object Cache was installed.</div></div>
+
+  <div class="sec"><h2>Lab Reference Solutions</h2><span class="rule"></span></div>
+<p>Every output below is real: the lab files run exactly as <code class="inline">labs/check_labs.py</code> runs them, on a fresh course site at the state each file declares (WordPress 7.1.3, PHP 8.5, MySQL 9.7, WP-CLI 2.12), copied into the WordPress root and run with <code class="inline">wp eval-file --use-include</code> (PHP labs) or <code class="inline">sh</code> in the WP-CLI container (shell labs). Paths show <code class="inline">/var/www/html/...</code>, which is the learner's <code class="inline">wordpress/</code> folder.</p>
+<div class="blk lab"><div class="h">Lab 8.1-A (guided): labs/module-15/l8_1-debugging-testing/fake_supplier_starter.php → fake_supplier_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">PASS a good answer is keyed by ISBN
+TODO check 2: a 401 becomes pagesco_supplier_http_error with the status in its data
+TODO check 3: a 200 that is not JSON becomes pagesco_supplier_bad_response
+TODO check 4: a network failure comes back unchanged
+1 of 4 checks passed, 1 requests answered by the fake, none by the network</pre><p>The solution prints:</p>
+<pre class="out">PASS a good answer is keyed by ISBN
+PASS a 401 becomes pagesco_supplier_http_error with the status in its data
+PASS a 200 that is not JSON becomes pagesco_supplier_bad_response
+PASS a network failure comes back unchanged
+4 of 4 checks passed, 4 requests answered by the fake, none by the network</pre><p>What each check pins down: (2) a status outside 200 to 299 is <code class="inline">pagesco_supplier_http_error</code>, with the status in the data, even with a JSON body; (3) a 200 alone is not trusted: a body that is not JSON is <code class="inline">pagesco_supplier_bad_response</code>; (4) a transport failure comes back unchanged, so the Supplier column can tell "not reachable" from "answered 503". Common sticking points: <code class="inline">'401'</code> compared with <code class="inline">===</code> (the data holds the integer 401); a fake left in place from the previous check (<code class="inline">pagesco_lab_fake()</code> removes the old one first: ask why that matters); <code class="inline">global</code> in the script, which fails because <code class="inline">--use-include</code> runs the file inside a function.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 8.1-B: labs/module-15/l8_1-debugging-testing/next_event_starter/ → next_event_solution/ with test_next_event.sh</div>
+<p>The test with the starter's <code class="inline">pagesco-books-next-event.php</code> in mu-plugins/ (state after Lesson 8.1's Step 2):</p>
+<pre class="out">PHPCS with the plugin's ruleset:
+FILE: mu-plugins/pagesco-books-next-event.php
+--------------------------------------------------------------------------------------------------------------
+FOUND 6 ERRORS AFFECTING 3 LINES
+--------------------------------------------------------------------------------------------------------------
+  1 | ERROR | [ ] Missing file doc comment (Squiz.Commenting.FileComment.Missing)
+ 10 | ERROR | [x] There must be no blank lines between the function comment and the declaration
+    |       |     (Squiz.Commenting.FunctionComment.SpacingAfter)
+ 17 | ERROR | [ ] All output should be run through an escaping function (see the Security sections in the
+    |       |     WordPress Developer Handbooks), found '__'.
+    |       |     (WordPress.Security.EscapeOutput.OutputNotEscaped)
+ 17 | ERROR | [ ] A function call to __() with texts containing placeholders was found, but was not
+    |       |     accompanied by a "translators:" comment on the line above to clarify the meaning of the
+    |       |     placeholders. (WordPress.WP.I18n.MissingTranslatorsComment)
+ 17 | ERROR | [ ] Mismatched text domain. Expected 'pagesco-books' but got 'pagesco'.
+    |       |     (WordPress.WP.I18n.TextDomainMismatch)
+ 17 | ERROR | [ ] All output should be run through an escaping function (see the Security sections in the
+    |       |     WordPress Developer Handbooks), found '$event'.
+    |       |     (WordPress.Security.EscapeOutput.OutputNotEscaped)
+--------------------------------------------------------------------------------------------------------------
+PHPCBF CAN FIX THE 1 MARKED SNIFF VIOLATIONS AUTOMATICALLY
+--------------------------------------------------------------------------------------------------------------
+The footer line, as a visitor gets it:
+&lt;p class="pagesco-next-event"&gt;Next event: Book club: Dune&lt;/p&gt;</pre><p>With the solution's:</p>
+<pre class="out">PHPCS with the plugin's ruleset:
+PHPCS: no findings
+The footer line, as a visitor gets it:
+&lt;p class="pagesco-next-event"&gt;Next event: Book club: Dune&lt;/p&gt;</pre><p>Reading the report: the plugin header is a DocBlock, but PHPCS takes it for the function's comment (line 10) and finds no file comment (line 1): the fix is a file DocBlock with <code class="inline">@package</code> and a separate one for the function. Line 17 holds four findings: the output is not escaped (twice: <code class="inline">__()</code> and <code class="inline">$event</code>), the translators comment is missing, and the text domain is the theme's. The solution escapes the whole sentence once with <code class="inline">esc_html()</code> around the <code class="inline">sprintf()</code>, puts <code class="inline">/* translators: ... */</code> right before the string, and uses <code class="inline">pagesco-books</code>. The visitor sees exactly the same line: standards are about the code, not the page. Remove the file afterwards.</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-15/l8_1-debugging-testing/debug_supplier_log.php (deliberately broken)</div>
+<p>As shipped, PHP prints:</p>
+<pre class="out">Warning: Attempt to read property "ID" on null in /var/www/html/debug_supplier_log.php on line 34
+Warning: Undefined array key "X-API-Key" in /var/www/html/debug_supplier_log.php on line 24
+dune         24 copies at the supplier
+1984         31 copies at the supplier
+hobbit       0 copies at the supplier</pre><ol class="steps">
+  <li><b>Warning, line 34:</b> the slug <code class="inline">hobbit</code> does not exist (it is <code class="inline">the-hobbit</code>), so <code class="inline">get_page_by_path()</code> returns null and <code class="inline">-&gt;ID</code> reads a property of null. Its quiet consequence is the last line: an empty ISBN, so "0 copies" for a book the supplier has. Evidence beats the output: the Warning says which line, the output only looks odd.</li>
+  <li><b>Warning, line 24:</b> the header is called <code class="inline">X-Api-Key</code> (Client::headers()), not <code class="inline">X-API-Key</code>: PHP array keys are case-sensitive, even when HTTP headers are not.</li>
+  <li><b>Silent:</b> with the key's name fixed, the logger writes the whole API key into debug.log (below). No message, and the most serious bug of the three: logs are read by more people, and kept longer, than the code. Log the first eight characters, as Lesson 8.1's logger does.</li>
+</ol>
+<p>The two loud bugs fixed, the new line of debug.log (the silent bug, visible):</p>
+<pre class="out">[26-Oct-2026 13:23:25 UTC] supplier GET http://localhost:8080/supplier-sandbox/v1/availability, key sandbox-7f3a9c</pre><p>All three fixed: the log line and the output:</p>
+<pre class="out">[26-Oct-2026 13:23:25 UTC] supplier GET http://localhost:8080/supplier-sandbox/v1/availability, key sandbox-…</pre><pre class="out">dune         24 copies at the supplier
+1984         31 copies at the supplier
+the-hobbit   9 copies at the supplier</pre></div>
+<div class="blk lab"><div class="h">Lab 8.2-A (guided): labs/module-15/l8_2-performance-caching/query_count_starter.php → query_count_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">call                                                                     first     again
+get_option( 'blogname' )                                                     0         0
+TODO row 2: an option that has no row
+TODO row 3: two meta values of one book
+TODO row 4: the same WP_Query twice
+TODO row 5: one meta read per book
+TODO row 6: one meta query for all books</pre><p>The solution prints:</p>
+<pre class="out">call                                                                     first     again
+get_option( 'blogname' )                                                     0         0
+get_option( 'pagesco_lab_missing' )                                          1         0
+get_post_meta( 33, 'pagesco_price' ) and 'pagesco_author'                    1         0
+WP_Query: the three cheapest books                                           6         0
+get_post_meta() over 11 books, one by one                                   11         0
+get_post_meta() over 11 books, after update_postmeta_cache()                 1         0</pre><p>Reading the rows: (1) autoloaded options were loaded in one query before the script ran; (2) a missing option costs one query, then WordPress remembers it in <code class="inline">notoptions</code>; (3) the first meta read loads all of the book's meta, the second is free; (4) WP_Query's six queries (IDs, posts, meta, terms) and its own result cache (6.1); (5) N+1, one query per book; (6) <code class="inline">update_postmeta_cache()</code> turns them into one. Every "again" column is 0: within one request WordPress never asks twice. Accept a different row 4 count on a site with other book data; the 0 is the point.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 8.2-B: labs/module-15/l8_2-performance-caching/cheapest_cache_starter.php → cheapest_cache_solution.php</div>
+<p>As shipped (no cache, no invalidation):</p>
+<pre class="out">first call: 1 query, Pride and Prejudice at $7.99
+second call: 1 query, Pride and Prejudice at $7.99
+after Dune's price drop: 1 query, Dune at $1.99
+after the price is back: 1 query, Pride and Prejudice at $7.99
+Dune's price restored to 14.99
+TODO 1 and 2: the second call should cost 0 queries, the call after each price change 1</pre><p>The solution prints:</p>
+<pre class="out">first call: 1 query, Pride and Prejudice at $7.99
+second call: 0 queries, Pride and Prejudice at $7.99
+after Dune's price drop: 1 query, Dune at $1.99
+after the price is back: 1 query, Pride and Prejudice at $7.99
+Dune's price restored to 14.99</pre><p>With TODO 1 alone (the cache, but no <code class="inline">wp_cache_set_last_changed()</code> in the writer), the call after the price drop prints <code class="inline">0 queries, Pride and Prejudice at $7.99</code>: a stale answer, with no message, exactly Lesson 8.2's Mistake 1. TODO 2 makes every write renew the key. Why <code class="inline">is_string()</code> for the hit: a miss is false. The script restores Dune's price; a learner who stopped it halfway restores it with <code class="inline">wp post meta update 30 pagesco_price 14.99</code>.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 8.2-C: labs/module-15/l8_2-performance-caching/page_weight_starter.sh → page_weight_solution.sh</div>
+<p>As shipped:</p>
+<pre class="out">page            KB html  styles css files  modules  images
+/                    82    TODO      TODO     TODO    TODO
+/books/dune/         78    TODO      TODO     TODO    TODO
+/find-a-book/        81    TODO      TODO     TODO    TODO
+/events/             75    TODO      TODO     TODO    TODO
+hero image reserves its space: TODO
+hero image preloaded: TODO
+lazy images on the front page: TODO</pre><p>The solution prints, on the site as Lesson 8.1 leaves it:</p>
+<pre class="out">page            KB html  styles css files  modules  images
+/                    82      20         1        2       1
+/books/dune/         78      16         0        2       0
+/find-a-book/        81      15         0        3       0
+/events/             75      14         0        2       0
+hero image reserves its space: no (no width, height or aspect-ratio)
+hero image preloaded: no
+lazy images on the front page: 0</pre><p>And on the site as Lesson 8.2's project leaves it (the same script; the front page has one more element in the head, the preload link):</p>
+<pre class="out">page            KB html  styles css files  modules  images
+/                    82      20         1        2       1
+/books/dune/         78      16         0        2       0
+/find-a-book/        81      15         0        3       0
+/events/             75      14         0        2       0
+hero image reserves its space: yes
+hero image preloaded: yes
+lazy images on the front page: 0</pre><p><code class="inline">grep -c</code> counts lines, and WordPress prints several tags on one line: <code class="inline">grep -o ... | wc -l</code> counts matches. The one external stylesheet on the front page is the Navigation block's (too big for the 40,000-byte inline budget with SCRIPT_DEBUG on); the other pages inline everything.</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-15/l8_2-performance-caching/debug_events_cache.php (deliberately broken)</div>
+<p>As shipped, PHP prints:</p>
+<pre class="out">Next event: Warning: Undefined property: stdClass::$titel in /var/www/html/debug_events_cache.php on line 36
+
+Next three: Book club: Dune
+Next five:  Book club: Dune
+Warning: Undefined variable $pagesco_seats in /var/www/html/debug_events_cache.php on line 41
+Seats in those five: 20
+[new lines in wp-content/debug.log]
+[26-Oct-2026 13:26:42 UTC] PHP Warning:  Undefined property: stdClass::$titel in /var/www/html/debug_events_cache.php on line 36
+[26-Oct-2026 13:26:42 UTC] PHP Warning:  Undefined variable $pagesco_seats in /var/www/html/debug_events_cache.php on line 41</pre><ol class="steps">
+  <li><b>Warning, line 36:</b> <code class="inline">-&gt;titel</code> is not a property of the row (<code class="inline">title</code>). The line prints "Next event: " with nothing after it.</li>
+  <li><b>Warning, line 41:</b> <code class="inline">$pagesco_seats</code> is added to before it exists; PHP treats it as 0 and says so. Start it at 0 before the loop.</li>
+  <li><b>Silent, line 24:</b> the key has no <code class="inline">$limit</code>, so the first call's answer (one event) is returned for three and for five: "Next three" and "Next five" show one title, and the seats are one event's. The key must name everything the result depends on (Lesson 8.2, the events cache's <code class="inline">md5( $limit . '|' . $location )</code>).</li>
+</ol>
+<p>Fixed (the three changes), it prints:</p>
+<pre class="out">Next event: Book club: Dune
+Next three: Book club: Dune, Story time: The Hobbit, An evening with Ana Ruiz
+Next five:  Book club: Dune, Story time: The Hobbit, An evening with Ana Ruiz, Poetry open mic, Book club: Fahrenheit 451
+Seats in those five: 125</pre><p>The order of discovery matters: the two Warnings are found first, and only then does the output look plausible enough to hide the third. Counting the titles is the evidence.</p>
+</div>
+
+  <div class="sec"><h2>Recorded in the Lessons (quote, do not run in class)</h2><span class="rule"></span></div>
+<p>These cards are the lessons' own recordings (wp-env and PHPUnit need Node.js on the computer; the SQLite Object Cache needs the internet). The Facilitator Guide shows them; learners make them at home.</p>
+<div class="blk"><div class="h">Lesson 8.1: the first PHPCS report, by rule</div>
+<pre class="out">Composer could not detect the root package (pagesco/pagesco-books) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version
+
+PHP CODE SNIFFER VIOLATION SOURCE SUMMARY
+--------------------------------------------------------------------------------
+    SOURCE                                                                 COUNT
+--------------------------------------------------------------------------------
+[ ] WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound  30
+[x] WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound         5
+[ ] WordPress.Security.EscapeOutput.OutputNotEscaped                       5
+[ ] WordPress.DB.DirectDatabaseQuery.DirectQuery                           4
+[ ] WordPress.DB.DirectDatabaseQuery.NoCaching                             3
+[ ] WordPress.DB.SlowDBQuery.slow_db_query_meta_key                        2
+[ ] WordPress.DB.SlowDBQuery.slow_db_query_tax_query                       2
+[ ] WordPress.Security.NonceVerification.Recommended                       2
+[x] Generic.Formatting.MultipleStatementAlignment.NotSameWarning           1
+[ ] Universal.NamingConventions.NoReservedKeywordParameterNames.classFoun  1
+[ ] WordPress.DB.DirectDatabaseQuery.SchemaChange                          1
+[ ] WordPress.DB.PreparedSQL.NotPrepared                                   1
+[ ] WordPress.DB.SlowDBQuery.slow_db_query_meta_query                      1
+--------------------------------------------------------------------------------
+A TOTAL OF 58 SNIFF VIOLATIONS WERE FOUND IN 13 SOURCES
+--------------------------------------------------------------------------------
+PHPCBF CAN FIX THE 2 MARKED SOURCES AUTOMATICALLY (6 VIOLATIONS IN TOTAL)
+--------------------------------------------------------------------------------
+
+...
+
+Script phpcs handling the lint event returned with error code 2</pre></div>
+<div class="blk"><div class="h">Lesson 8.1: the test environment and the suite as test names</div>
+<pre class="out">WordPress development site started at http://localhost:8889
+MySQL is listening on port 45899
+
+ ✔ Done! (in 40s 62ms)</pre><pre class="out">PHPUnit 9.6.38 by Sebastian Bergmann and contributors.
+
+Book Shortcode (PagesCo\Books\Tests\BookShortcode)
+ ✔ Renders a published book
+ ✔ Prints nothing for drafts and pages
+ ✔ Escapes the author
+
+Books Endpoint (PagesCo\Books\Tests\BooksEndpoint)
+ ✔ Filters by genre and sorts by price
+ ✔ Rejects an unknown genre
+ ✔ Every book matches the schema
+
+Daily Sync (PagesCo\Books\Tests\DailySync)
+ ✔ Schedules one daily event at three
+ ✔ Run removes only past events
+
+Supplier Client (PagesCo\Books\Tests\SupplierClient)
+ ✔ Reads availability by isbn
+ ✔ Turns an error status into a wp error
+ ✔ Rejects an answer without items
+ ✔ Passes on a network failure
+
+Time: 00:00.101, Memory: 46.50 MB
+
+OK (12 tests, 30 assertions)</pre></div>
+<div class="blk"><div class="h">Lesson 8.2: the SQLite Object Cache installed (its version may differ)</div>
+<pre class="out">Installing SQLite Object Cache (1.6.6)
+Downloading installation package from https://downloads.wordpress.org/plugin/sqlite-object-cache.1.6.6.zip...
+Unpacking the package...
+Installing the plugin...
+Plugin installed successfully.
+Activating 'sqlite-object-cache'...
+Plugin 'sqlite-object-cache' activated.
+Success: Installed 1 of 1 plugins.
+bool(true)
++------------------+-------------------------------+
+| name             | title                         |
++------------------+-------------------------------+
+| object-cache.php | SQLite Object Cache (Drop-in) |
++------------------+-------------------------------+</pre></div>
+
+  <div class="sec"><h2>The Lesson Pages' Own Quick Quizzes</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Lesson 8.1 · Debugging &amp; Testing</div>
+<ol class="steps" data-lesson-quiz="8.1">
+  <li><b>B</b> WP_DEBUG true, WP_DEBUG_DISPLAY false, WP_DEBUG_LOG set to a path outside the web root: Errors are recorded but never shown, and the log lives where the web server does not serve it, unlike the default wp-content/debug.log.</li>
+  <li><b>A</b> An email with the plugin's name, the error and a recovery mode link: The fatal error handler finds the plugin from the file in the error and emails a recovery mode link that logs in with that plugin paused.</li>
+  <li><b>C</b> So that the test controls the answer, including failures, and does not depend on the network: The filter answers in place of the network, so each test decides exactly what the supplier says, including 503s and broken JSON, and the result depends only on your code.</li>
+  <li><b>C</b> A phpcs:ignore comment for that rule on that line, with the reason: The output is escaped by core, which PHPCS cannot know; an ignore comment for exactly that rule on exactly that line, with the reason, documents the decision.</li>
+  <li><b>A</b> The test library reinstalls that site's database on every run: The test library drops and reinstalls the tables of the database it is configured with on every run, so it must never be a database you care about.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Lesson 8.2 · Performance &amp; Caching</div>
+<ol class="steps" data-lesson-quiz="8.2">
+  <li><b>B</b> One query per request; an autoloaded row for the option removes it: Each request asks the database once and learns that the row does not exist; an autoloaded row is read with all other autoloaded options, for no extra query.</li>
+  <li><b>C</b> Until the end of the current request: The default object cache is an array in PHP's memory, emptied at the end of every request; only a drop-in such as Redis keeps it between requests.</li>
+  <li><b>A</b> So that every change to the table makes all older cached results unreachable: Every write renews the group's last-changed value, so all keys built before the write are never read again: no stale result without having to find and delete each entry.</li>
+  <li><b>B</b> Because WordPress skips loading optimizations for block templates, and the image is not in the Media Library: wp_get_loading_optimization_attributes() returns early for the template context, and width and height are only added for Media Library images; the theme must take care of its own images.</li>
+  <li><b>C</b> That a change you make can be compared against it on the same machine; field data from real visitors decides the rest: Lab measurements compare changes on one machine with the same settings; real visitors' phones and networks, measured as field data after launch, decide the Core Web Vitals.</li>
+</ol>
+</div>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>A critical error:</b> the server's error log (on development: wordpress/wp-content/debug.log) and the recovery mode email WordPress sent the admin address (it names the plugin, the file and the line); from the command line <code class="inline">wp --skip-plugins=&lt;plugin&gt; plugin deactivate &lt;plugin&gt;</code> works although every other command dies. A must-use plugin: rename the file.</li>
+  <li><b>The last-changed value in the key:</b> flush_cache() renews it after every insert or delete, so after a change every key is new and every old answer is simply never read again; nothing has to find and delete old entries. Without it, a persistent cache would show the old list until it expired.</li>
+  <li><b>Lab against field:</b> a lab measurement compares before and after a change on the same machine and setup (CLS 0.101 to 0.001 is real); it cannot say what visitors on mid-range phones over weak connections experience, how a full catalog or real traffic behaves, or what a page cache changes: field data after the launch (Lesson 8.4).</li>
+</ol>
+
+  <div class="sec"><h2>Common Wrong Answers and What They Reveal</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li><b>Q1 A ("true, wp-content/debug.log").</b> Remembers that logging is good, not where the log goes. Run Mistake 1's curl again: 200.</li>
+  <li><b>Q2 with <code class="inline">pagesco_supplier_bad_response</code>.</b> Thinks an HTML body makes it a bad response first. The status is checked before the body (Client::decode()): read the method's three numbered comments.</li>
+  <li><b>Q3 B ("wp eval deactivate_plugins").</b> Thinks wp eval runs before WordPress loads. Everything in WP-CLI except a few commands loads WordPress, plugins included.</li>
+  <li><b>Q8 A ("int(24)").</b> Does not separate one request from the next. Two WP-CLI commands are two PHP processes; show P4 (<code class="inline">wp_using_ext_object_cache()</code> is NULL).</li>
+  <li><b>Q9 B ("500, persistent cache").</b> A warm persistent cache hides N+1; flush it and the 501 queries are back. The fix is in the code.</li>
+  <li><b>Q10 A ("nothing breaks").</b> Forgets that an empty array is falsy. Run <code class="inline">wp eval 'var_dump( false !== array(), (bool) array() );'</code>: the second value is the truthiness of array(). A good moment to say: verify claims about code by running them.</li>
+  <li><b>Q11 A ("the fonts").</b> Remembers the 0.001 that was left. The 0.1 jump was the image without reserved space.</li>
+</ul>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 15 · Answer Key · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

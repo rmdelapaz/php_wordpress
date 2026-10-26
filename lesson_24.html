@@ -1,0 +1,1578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Custom REST endpoints on WordPress 7.1: register_rest_route on rest_api_init, arguments with types, validate and sanitize callbacks, JSON Schema, WP_Error responses with status codes, pagination headers, and a real permission_callback on every route, building the Pages &amp; Co. pagesco/v1 books and events API. PHP and WordPress Development Lesson 7.2.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Custom REST Endpoints - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 7: APIs &amp; Integration</a></li>
+            <li aria-current="page">Lesson 7.2: Custom REST Endpoints</li>
+        </ul>
+    </nav>
+
+    <main id="main-content" data-state="after:lesson_23">
+        <div class="container">
+            <header>
+                <h1>🔌 Lesson 7.2: Custom REST Endpoints</h1>
+                <p class="lead">In Lesson 7.1 the core books route said no to the shop's most natural question, "the fantasy books, cheapest first", and answered easy ones with 13 KB of fields nobody asked for. Today the plugin opens counters of its own under the namespace <code>pagesco/v1</code>: a compact, filterable books route whose page size follows the shop's settings, and an events route that reads and writes Lesson 5.5's custom table. Along the way you learn the parts every endpoint is made of, and the one you must never leave out: the check of who may use it.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Register routes with <code>register_rest_route()</code> on <code>rest_api_init</code>, as a feature class of the plugin</li>
+                        <li>Declare arguments with types, defaults, limits and enums, and add your own <code>validate_callback</code> and <code>sanitize_callback</code> without losing the built-in checks</li>
+                        <li>Describe responses with a JSON Schema, and return <code>WP_REST_Response</code> objects with headers and status codes</li>
+                        <li>Return errors as <code>WP_Error</code> with the right status, and know what WordPress does with one that has none</li>
+                        <li>Write a real <code>permission_callback</code> for every route, and explain why <code>__return_true</code> is only for public reads</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 145 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_23.html">Lesson 7.1: Using the REST API</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> the <code>pagesco/v1</code> API of the shop: <code>GET /books</code> (filter by genre and stock, sort by price, page size from the Books per list setting), <code>GET /books/&lt;id&gt;</code>, and <code>GET</code> and <code>POST /events</code> on the events table, with the first event added through it</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (everything here works the same since 5.5, when <code>permission_callback</code> became required; the plugin requires 6.8)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 7.1, the WP-CLI container, and Maria's "Inventory script" application password in <code>$PASS</code> and Devon's "Test" password in <code>$DEVON_PASS</code></li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#why" class="toc-link">A Counter of the Shop's Own</a></li>
+                        <li><a href="#first-route" class="toc-link">Your First Route</a></li>
+                        <li><a href="#args" class="toc-link">Arguments: Validate, Sanitize, Describe</a></li>
+                        <li><a href="#responses" class="toc-link">Responses, Headers and Errors</a></li>
+                        <li><a href="#permissions" class="toc-link">permission_callback: Who May</a></li>
+                        <li><a href="#frontend" class="toc-link">Calling It from the Front End</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: The Events API</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="why" class="lesson-section">
+                <h2>🪟 A Counter of the Shop's Own</h2>
+                <p>Core's <code>/wp/v2/books</code> is a general-purpose route: it knows posts, terms and registered meta, and serves the editor perfectly. For the shop's own clients (a Book Filter for a big catalog, a partner's site, the inventory system) it has three problems you met in Lesson 7.1: it cannot sort by price or filter by stock (meta means nothing to it), it filters genres by ID while the shop's addresses use slugs (<code>?genre=fantasy</code>, Lesson 6.4), and each book is a large object full of fields (<code>guid</code>, <code>template</code>, <code>class_list</code>, <code>_links</code>…) that have nothing to do with books. You could bend the core route with filters, but a route of your own is cleaner: its own shape, its own rules, documented by its own schema.</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: a window with a printed menu</h4>
+                    <p>Core's counter handles everything for everyone, so its menu is long and its packages are big. The shop opens a window of its own with a short printed menu: "books, by genre or stock, sorted three ways, ten details each" and "events: read them, or add one if you work here". The menu is the route and its arguments; the printed card describing each package is the schema; and the sign "staff only" on the second item is the permission callback. A window without such a sign serves anyone who walks up.</p>
+                </div>
+                <p>The plan, with the names from the course's spine (the namespace is <em>vendor/version</em>: when a future <code>pagesco/v2</code> changes the shape, <code>v1</code> clients keep working):</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Endpoint</th><th>Does</th><th>Who may</th><th>Arguments</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>GET /pagesco/v1/books</code></td><td>a page of books, compact</td><td>anyone (the catalog is public)</td><td><code>genre</code>, <code>in_stock</code>, <code>orderby</code>, <code>page</code>, <code>per_page</code> (default: Books per list)</td></tr>
+                            <tr><td><code>GET /pagesco/v1/books/&lt;id&gt;</code></td><td>one published book</td><td>anyone</td><td><code>id</code> from the address</td></tr>
+                            <tr><td><code>GET /pagesco/v1/events</code></td><td>events in date order</td><td>anyone</td><td><code>limit</code> (default: Events to show), <code>location</code></td></tr>
+                            <tr><td><code>POST /pagesco/v1/events</code></td><td>adds an event</td><td>staff who can edit everyone's posts</td><td><code>title</code>, <code>starts_at</code>, <code>location</code>, <code>capacity</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="first-route" class="lesson-section">
+                <h2>🚪 Your First Route</h2>
+                <p>A route is registered with <code>register_rest_route( $namespace, $route, $args )</code>, inside a callback on <strong><code>rest_api_init</code></strong>, the action WordPress fires when it builds the REST server (only on requests that need it). The <code>$args</code> array names the HTTP methods, the <strong>callback</strong> that answers, and the <strong>permission callback</strong> that decides who may ask. Like every part of the plugin, the endpoint is a feature class (Lesson 5.1). Create <code>wordpress/wp-content/plugins/pagesco-books/src/Rest/BooksEndpoint.php</code>, a first version:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/Rest/BooksEndpoint.php"><code class="language-php">&lt;?php
+/**
+ * The shop's own books routes, under the pagesco/v1 namespace.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books\Rest;
+
+use PagesCo\Books\BookPostType;
+use PagesCo\Books\Feature;
+use PagesCo\Books\GenreTaxonomy;
+use PagesCo\Books\Settings;
+use WP_Post;
+use WP_REST_Request;
+use WP_REST_Server;
+
+/**
+ * A compact catalog for the shop's JavaScript and partners: one book = ten plain fields.
+ */
+final class BooksEndpoint implements Feature {
+
+	/**
+	 * The namespace of every route the plugin adds: vendor/version.
+	 */
+	public const NAMESPACE = 'pagesco/v1';
+
+	/**
+	 * Registers the routes when the REST API starts, not on every request.
+	 */
+	public function register(): void {
+		add_action( 'rest_api_init', array( $this, 'register_routes' ) );
+	}
+
+	/**
+	 * Tells the REST server about the route: its method, callback and permission check.
+	 */
+	public function register_routes(): void {
+		register_rest_route(
+			self::NAMESPACE,
+			'/books',
+			array(
+				'methods'             =&gt; WP_REST_Server::READABLE,
+				'callback'            =&gt; array( $this, 'get_books' ),
+				'permission_callback' =&gt; '__return_true',
+			)
+		);
+	}
+
+	/**
+	 * GET /pagesco/v1/books: the first books of the catalog, in title order.
+	 *
+	 * @param WP_REST_Request $request The request.
+	 */
+	public function get_books( WP_REST_Request $request ) {
+		$books = get_posts(
+			array(
+				'post_type'      =&gt; BookPostType::NAME,
+				'post_status'    =&gt; 'publish',
+				'posts_per_page' =&gt; (int) Settings::get( 'books_per_page' ),
+				'orderby'        =&gt; 'title',
+				'order'          =&gt; 'ASC',
+			)
+		);
+
+		return rest_ensure_response( array_map( array( $this, 'prepare_book' ), $books ) );
+	}
+
+	/**
+	 * One book as the API shows it: plain values, in real types.
+	 *
+	 * @param WP_Post $book A published book.
+	 */
+	public function prepare_book( WP_Post $book ): array {
+		$genres = get_the_terms( $book, GenreTaxonomy::NAME );
+
+		return array(
+			'id'        =&gt; $book-&gt;ID,
+			'title'     =&gt; $book-&gt;post_title,
+			'slug'      =&gt; $book-&gt;post_name,
+			'link'      =&gt; get_permalink( $book ),
+			'author'    =&gt; (string) get_post_meta( $book-&gt;ID, 'pagesco_author', true ),
+			'price'     =&gt; (float) get_post_meta( $book-&gt;ID, 'pagesco_price', true ),
+			'in_stock'  =&gt; (bool) get_post_meta( $book-&gt;ID, 'pagesco_in_stock', true ),
+			'pages'     =&gt; (int) get_post_meta( $book-&gt;ID, 'pagesco_pages', true ),
+			'published' =&gt; (string) get_post_meta( $book-&gt;ID, 'pagesco_published', true ),
+			'genres'    =&gt; is_array( $genres ) ? wp_list_pluck( $genres, 'slug' ) : array(),
+		);
+	}
+}</code></pre>
+                <ul>
+                    <li><strong>The namespace</strong> is a constant, so the events endpoint later uses the same one. The class lives in <code>src/Rest/</code>, so its namespace is <code>PagesCo\Books\Rest</code> (PSR-4, Lesson 5.1), and the <code>use</code> lines import the plugin's classes and WordPress's REST classes, which live in the global namespace.</li>
+                    <li><strong><code>WP_REST_Server::READABLE</code></strong> is the string <code>'GET'</code>; <code>CREATABLE</code> is <code>'POST'</code>, <code>EDITABLE</code> is <code>'POST, PUT, PATCH'</code>, <code>DELETABLE</code> is <code>'DELETE'</code>. The constants say what you mean.</li>
+                    <li><strong><code>permission_callback</code></strong> is required on every route. <code>__return_true</code>, a core function that returns <code>true</code>, says "anyone": right for a public catalog, the same books every visitor sees on the site.</li>
+                    <li><strong>The callback</strong> gets a <code>WP_REST_Request</code> and returns data. <code>rest_ensure_response()</code> wraps an array in a <code>WP_REST_Response</code>, which WordPress turns into JSON. The page size is the Books per list setting from Lesson 5.4, as promised there: the shop changes every default-length list, on the site and in the API, from one screen.</li>
+                    <li><strong><code>prepare_book()</code></strong> decides the shape: ten fields, each cast to the type a client expects (<code>(float)</code>, <code>(bool)</code>, <code>(int)</code>), because meta comes out of the database as strings. The title is the plain title as typed: JSON is data, and whoever prints it escapes it (as the Lesson 7.1 widget did with <code>textContent</code>).</li>
+                </ul>
+                <p>Register the feature after Lesson 7.1's widget (in your editor; here with <code>sed</code>), then ask the new namespace what it offers and call the route:</p>
+                <pre data-cli><code class="language-bash">sed -i '/\t\t\tAdmin\\StockWidget::class,/a\			Rest\\BooksEndpoint::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+grep -c "::class," wp-content/plugins/pagesco-books/src/Plugin.php
+curl -s http://localhost:8080/wp-json/ | grep -o '"namespaces":\[[^]]*\]'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>16
+"namespaces":["oembed\/1.0","pagesco\/v1","wp\/v2","wp-site-health\/v1","wp-block-editor\/v1","wp-abilities\/v1"]</code></pre>
+                </div>
+                <pre data-web="/wp-json/pagesco/v1/books" data-json><code class="language-text">http://localhost:8080/wp-json/pagesco/v1/books</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>[
+  {
+    "id": 31,
+    "title": "1984",
+    "slug": "1984",
+    "link": "http://localhost:8080/books/1984/",
+    "author": "George Orwell",
+    "price": 9.99,
+    "in_stock": true,
+    "pages": 328,
+    "published": "1949-06-08",
+    "genres": [
+      "classic",
+      "dystopian",
+      "fiction"
+    ]
+  },
+  {
+    "id": 40,
+    "title": "Animal Farm",
+    "slug": "animal-farm",
+    "link": "http://localhost:8080/books/animal-farm/",
+    "author": "George Orwell",
+    "price": 8.49,
+    "in_stock": true,
+    "pages": 112,
+    "published": "1945-08-17",
+    "genres": [
+      "classic",
+      "fiction"
+    ]
+  },
+  {
+    "id": 36,
+    "title": "Brave New World",
+    "slug": "brave-new-world",
+    "link": "http://localhost:8080/books/brave-new-world/",
+    "author": "Aldous Huxley",
+    "price": 9.49,
+    "in_stock": true,
+    "pages": 311,
+    "published": "1932-01-01",
+    "genres": [
+      "dystopian",
+      "fiction",
+      "science-fiction"
+    ]
+  },
+  {
+    "id": 30,
+    "title": "Dune",
+    "slug": "dune",
+    "link": "http://localhost:8080/books/dune/",
+    "author": "Frank Herbert",
+    "price": 14.99,
+    "in_stock": true,
+    "pages": 412,
+    "published": "1965-08-01",
+    "genres": [
+      "fiction",
+      "science-fiction"
+    ]
+  },
+  {
+    "id": 39,
+    "title": "Fahrenheit 451",
+    "slug": "fahrenheit-451",
+    "link": "http://localhost:8080/books/fahrenheit-451/",
+    "author": "Ray Bradbury",
+    "price": 10.49,
+    "in_stock": true,
+    "pages": 158,
+    "published": "1953-10-19",
+    "genres": [
+      "dystopian",
+      "fiction",
+      "science-fiction"
+    ]
+  },
+  {
+    "id": 38,
+    "title": "Lord of the Rings",
+    "slug": "lord-of-the-rings",
+    "link": "http://localhost:8080/books/lord-of-the-rings/",
+    "author": "J.R.R. Tolkien",
+    "price": 15.99,
+    "in_stock": true,
+    "pages": 1178,
+    "published": "1954-07-29",
+    "genres": [
+      "fantasy",
+      "fiction"
+    ]
+  }
+]</code></pre>
+                </div>
+                <p>Six books (the setting's default), in title order, ten fields each, all of it in about the size core needed for one book. Clients never wonder whether <code>price</code> is <code>"14.99"</code> or <code>14.99</code>. It works, but it is a counter with no menu: it ignores every argument, it cannot show page 2, and nothing tells a client what a book looks like. The next two sections fix that.</p>
+            </section>
+
+            <section id="args" class="lesson-section">
+                <h2>📝 Arguments: Validate, Sanitize, Describe</h2>
+                <p>A route's <code>args</code> list the parameters it accepts, from the query string, a form or a JSON body (WordPress merges them into the request; read them as <code>$request['genre']</code>). Each argument is described with JSON Schema keywords, and WordPress uses that description three ways:</p>
+                <ol>
+                    <li><strong>Validation</strong> before your callback runs: a wrong type, a number out of range or a value not in the <code>enum</code> stops the request with <code>400 rest_invalid_param</code>, with a message per parameter. Your callback never sees bad input.</li>
+                    <li><strong>Sanitizing</strong>: <code>"5"</code> from a query string becomes the integer <code>5</code>, <code>"true"</code> becomes <code>true</code>; missing arguments get their <code>default</code>.</li>
+                    <li><strong>Documentation</strong>: an <code>OPTIONS</code> request, and the <code>/wp-json/pagesco/v1</code> index, list every argument with its description, type and limits.</li>
+                </ol>
+                <p>With a <code>type</code> and no callbacks, WordPress does validation and sanitizing from the schema by itself (<code>rest_validate_request_arg()</code> and <code>rest_sanitize_request_arg()</code>, together <code>rest_parse_request_arg()</code>). For rules a schema cannot express, such as "a genre that exists", you add a <code>validate_callback</code> (return <code>true</code>, or a <code>WP_Error</code> whose message tells the client what is wrong) and a <code>sanitize_callback</code> (return the cleaned value). The order is: validate, sanitize, then the permission check, then your callback. Replace <code>src/Rest/BooksEndpoint.php</code> with the full version:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/Rest/BooksEndpoint.php"><code class="language-php">&lt;?php
+/**
+ * The shop's own books routes: GET /pagesco/v1/books and /pagesco/v1/books/&lt;id&gt;.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books\Rest;
+
+use PagesCo\Books\BookPostType;
+use PagesCo\Books\Feature;
+use PagesCo\Books\GenreTaxonomy;
+use PagesCo\Books\Settings;
+use WP_Error;
+use WP_Post;
+use WP_Query;
+use WP_REST_Request;
+use WP_REST_Response;
+use WP_REST_Server;
+
+/**
+ * A compact, filterable catalog for the shop's JavaScript and partners: one book = ten plain fields.
+ */
+final class BooksEndpoint implements Feature {
+
+	/**
+	 * The namespace of every route the plugin adds: vendor/version.
+	 */
+	public const NAMESPACE = 'pagesco/v1';
+
+	/**
+	 * The schema, built once per request.
+	 *
+	 * @var array|null
+	 */
+	private ?array $schema = null;
+
+	/**
+	 * Registers the routes when the REST API starts, not on every request.
+	 */
+	public function register(): void {
+		add_action( 'rest_api_init', array( $this, 'register_routes' ) );
+	}
+
+	/**
+	 * Tells the REST server about the two routes: their methods, callbacks, permissions and arguments.
+	 */
+	public function register_routes(): void {
+		register_rest_route(
+			self::NAMESPACE,
+			'/books',
+			array(
+				array(
+					'methods'             =&gt; WP_REST_Server::READABLE,
+					'callback'            =&gt; array( $this, 'get_books' ),
+					'permission_callback' =&gt; '__return_true',
+					'args'                =&gt; $this-&gt;collection_args(),
+				),
+				'schema' =&gt; array( $this, 'get_schema' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/books/(?P&lt;id&gt;\d+)',
+			array(
+				array(
+					'methods'             =&gt; WP_REST_Server::READABLE,
+					'callback'            =&gt; array( $this, 'get_book' ),
+					'permission_callback' =&gt; '__return_true',
+					'args'                =&gt; array(
+						'id' =&gt; array(
+							'description' =&gt; __( 'The book ID.', 'pagesco-books' ),
+							'type'        =&gt; 'integer',
+							'minimum'     =&gt; 1,
+						),
+					),
+				),
+				'schema' =&gt; array( $this, 'get_schema' ),
+			)
+		);
+	}
+
+	/**
+	 * The query arguments GET /books accepts. With a type and no sanitize_callback, WordPress
+	 * validates and sanitizes each one against its schema (rest_parse_request_arg).
+	 */
+	private function collection_args(): array {
+		return array(
+			'page'     =&gt; array(
+				'description' =&gt; __( 'The page of results.', 'pagesco-books' ),
+				'type'        =&gt; 'integer',
+				'default'     =&gt; 1,
+				'minimum'     =&gt; 1,
+			),
+			'per_page' =&gt; array(
+				'description' =&gt; __( 'Books per page. Default: the Books per list setting.', 'pagesco-books' ),
+				'type'        =&gt; 'integer',
+				'default'     =&gt; (int) Settings::get( 'books_per_page' ),
+				'minimum'     =&gt; 1,
+				'maximum'     =&gt; 100,
+			),
+			'genre'    =&gt; array(
+				'description'       =&gt; __( 'Only books in this genre (a genre slug).', 'pagesco-books' ),
+				'type'              =&gt; 'string',
+				'default'           =&gt; '',
+				'sanitize_callback' =&gt; 'sanitize_key',
+				'validate_callback' =&gt; array( $this, 'validate_genre' ),
+			),
+			'in_stock' =&gt; array(
+				'description' =&gt; __( 'true: only books in stock; false: only sold-out books.', 'pagesco-books' ),
+				'type'        =&gt; 'boolean',
+			),
+			'orderby'  =&gt; array(
+				'description' =&gt; __( 'The order of the books.', 'pagesco-books' ),
+				'type'        =&gt; 'string',
+				'enum'        =&gt; array( 'title', 'newest', 'price' ),
+				'default'     =&gt; 'title',
+			),
+		);
+	}
+
+	/**
+	 * Accepts '' (all genres) or the slug of an existing genre.
+	 *
+	 * @param mixed $value The genre argument as sent.
+	 * @return true|WP_Error
+	 */
+	public function validate_genre( $value ) {
+		if ( ! is_string( $value ) ) {
+			return new WP_Error( 'rest_invalid_type', __( 'genre must be a genre slug.', 'pagesco-books' ) );
+		}
+		if ( '' === $value || term_exists( sanitize_key( $value ), GenreTaxonomy::NAME ) ) {
+			return true;
+		}
+
+		return new WP_Error( 'pagesco_unknown_genre', __( 'genre must be the slug of an existing genre.', 'pagesco-books' ) );
+	}
+
+	/**
+	 * GET /pagesco/v1/books: one page of books, with the totals in the X-WP-Total headers.
+	 *
+	 * @param WP_REST_Request $request The request, its arguments already validated and sanitized.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function get_books( WP_REST_Request $request ) {
+		$query_args = array(
+			'post_type'      =&gt; BookPostType::NAME,
+			'post_status'    =&gt; 'publish',
+			'posts_per_page' =&gt; $request['per_page'],
+			'paged'          =&gt; $request['page'],
+			'orderby'        =&gt; 'title',
+			'order'          =&gt; 'ASC',
+		);
+
+		if ( 'newest' === $request['orderby'] ) {
+			$query_args['orderby'] = 'date';
+			$query_args['order']   = 'DESC';
+		} elseif ( 'price' === $request['orderby'] ) {
+			$query_args['meta_key'] = 'pagesco_price';
+			$query_args['orderby']  = 'meta_value_num';
+		}
+
+		if ( '' !== $request['genre'] ) {
+			$query_args['tax_query'] = array(
+				array(
+					'taxonomy' =&gt; GenreTaxonomy::NAME,
+					'field'    =&gt; 'slug',
+					'terms'    =&gt; $request['genre'],
+				),
+			);
+		}
+
+		if ( isset( $request['in_stock'] ) ) {
+			$query_args['meta_query'] = array(
+				array(
+					'key'   =&gt; 'pagesco_in_stock',
+					'value' =&gt; $request['in_stock'] ? '1' : '',
+				),
+			);
+		}
+
+		$query = new WP_Query( $query_args );
+
+		if ( $request['page'] &gt; 1 &amp;&amp; $request['page'] &gt; $query-&gt;max_num_pages ) {
+			return new WP_Error(
+				'pagesco_invalid_page',
+				__( 'The page number is larger than the number of pages.', 'pagesco-books' ),
+				array( 'status' =&gt; 400 )
+			);
+		}
+
+		$response = rest_ensure_response( array_map( array( $this, 'prepare_book' ), $query-&gt;posts ) );
+		$response-&gt;header( 'X-WP-Total', (string) $query-&gt;found_posts );
+		$response-&gt;header( 'X-WP-TotalPages', (string) $query-&gt;max_num_pages );
+
+		return $response;
+	}
+
+	/**
+	 * GET /pagesco/v1/books/&lt;id&gt;: one published book, or a 404 error.
+	 *
+	 * @param WP_REST_Request $request The request; $request['id'] comes from the route's pattern.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function get_book( WP_REST_Request $request ) {
+		$book = get_post( $request['id'] );
+
+		if ( ! $book || BookPostType::NAME !== $book-&gt;post_type || 'publish' !== $book-&gt;post_status ) {
+			return new WP_Error(
+				'pagesco_book_not_found',
+				__( 'No book was found with that ID.', 'pagesco-books' ),
+				array( 'status' =&gt; 404 )
+			);
+		}
+
+		return rest_ensure_response( $this-&gt;prepare_book( $book ) );
+	}
+
+	/**
+	 * One book as the API shows it: plain values, in the types the schema promises.
+	 *
+	 * @param WP_Post $book A published book.
+	 */
+	public function prepare_book( WP_Post $book ): array {
+		$genres = get_the_terms( $book, GenreTaxonomy::NAME );
+
+		return array(
+			'id'        =&gt; $book-&gt;ID,
+			'title'     =&gt; $book-&gt;post_title,
+			'slug'      =&gt; $book-&gt;post_name,
+			'link'      =&gt; get_permalink( $book ),
+			'author'    =&gt; (string) get_post_meta( $book-&gt;ID, 'pagesco_author', true ),
+			'price'     =&gt; (float) get_post_meta( $book-&gt;ID, 'pagesco_price', true ),
+			'in_stock'  =&gt; (bool) get_post_meta( $book-&gt;ID, 'pagesco_in_stock', true ),
+			'pages'     =&gt; (int) get_post_meta( $book-&gt;ID, 'pagesco_pages', true ),
+			'published' =&gt; (string) get_post_meta( $book-&gt;ID, 'pagesco_published', true ),
+			'genres'    =&gt; is_array( $genres ) ? wp_list_pluck( $genres, 'slug' ) : array(),
+		);
+	}
+
+	/**
+	 * The JSON Schema of one book: what clients may rely on. OPTIONS requests return it.
+	 */
+	public function get_schema(): array {
+		if ( null === $this-&gt;schema ) {
+			$this-&gt;schema = array(
+				'$schema'    =&gt; 'http://json-schema.org/draft-04/schema#',
+				'title'      =&gt; 'pagesco-book',
+				'type'       =&gt; 'object',
+				'properties' =&gt; array(
+					'id'        =&gt; array( 'type' =&gt; 'integer', 'readonly' =&gt; true ),
+					'title'     =&gt; array( 'type' =&gt; 'string' ),
+					'slug'      =&gt; array( 'type' =&gt; 'string' ),
+					'link'      =&gt; array( 'type' =&gt; 'string', 'format' =&gt; 'uri' ),
+					'author'    =&gt; array( 'type' =&gt; 'string' ),
+					'price'     =&gt; array( 'type' =&gt; 'number' ),
+					'in_stock'  =&gt; array( 'type' =&gt; 'boolean' ),
+					'pages'     =&gt; array( 'type' =&gt; 'integer' ),
+					'published' =&gt; array( 'type' =&gt; 'string', 'format' =&gt; 'date' ),
+					'genres'    =&gt; array(
+						'type'  =&gt; 'array',
+						'items' =&gt; array( 'type' =&gt; 'string' ),
+					),
+				),
+			);
+		}
+
+		return $this-&gt;schema;
+	}
+}</code></pre>
+                <p>What changed, from the top:</p>
+                <ul>
+                    <li><strong>Two routes</strong>, each an array of endpoints (here one each) plus a route-level <code>'schema'</code>. The second route's pattern <code>(?P&lt;id&gt;\d+)</code> captures the ID into <code>$request['id']</code>, and its <code>id</code> argument types it, so <code>/books/abc</code> does not even match and <code>/books/0</code> fails validation.</li>
+                    <li><strong><code>collection_args()</code></strong>: <code>page</code> and <code>per_page</code> with minimums and a maximum of 100 (core's limit), <code>per_page</code> defaulting to the setting; <code>in_stock</code> a boolean without a default (missing means "do not filter"); <code>orderby</code> an <code>enum</code> of the same three orders as Lesson 6.3's Book List.</li>
+                    <li><strong><code>genre</code></strong> has both callbacks. <code>validate_genre()</code> accepts <code>''</code> or the slug of an existing term (<code>term_exists()</code>), the same "validate against what is allowed" rule as Lesson 6.4's <code>?genre=</code>, and does not repeat the input in its message. Because it brings its own callbacks, the schema checks do not run for it (Common Mistake 2): the callback also checks the type itself.</li>
+                    <li><strong><code>get_books()</code></strong> builds a <code>WP_Query</code> (Lesson 4.2) from arguments that are already valid, typed and defaulted: no <code>isset()</code>, no <code>absint()</code>, no clamping in the callback. It uses <code>WP_Query</code> rather than <code>get_posts()</code> because it needs <code>found_posts</code> and <code>max_num_pages</code> for the headers.</li>
+                    <li><strong><code>get_schema()</code></strong> describes one book. It is built once per request and cached in a property, as core's controllers do.</li>
+                </ul>
+                <p>The menu, as clients see it: an <code>OPTIONS</code> request returns the route's methods, arguments and schema. The arguments of <code>GET /books</code>, keys only:</p>
+                <pre data-cli><code class="language-bash">curl -s -X OPTIONS http://localhost:8080/wp-json/pagesco/v1/books | php -r '$route = json_decode( stream_get_contents( STDIN ), true ); foreach ( $route["endpoints"][0]["args"] as $name =&gt; $arg ) { printf( "%-9s %-8s %s\n", $name, $arg["type"], $arg["description"] ); } echo "schema: ", implode( ", ", array_keys( $route["schema"]["properties"] ) ), "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>page      integer  The page of results.
+per_page  integer  Books per page. Default: the Books per list setting.
+genre     string   Only books in this genre (a genre slug).
+in_stock  boolean  true: only books in stock; false: only sold-out books.
+orderby   string   The order of the books.
+schema: id, title, slug, link, author, price, in_stock, pages, published, genres</code></pre>
+                </div>
+                <p>Now the questions core could not answer. The fantasy books, cheapest first, and the sold-out books:</p>
+                <pre data-web="/wp-json/pagesco/v1/books?genre=fantasy&amp;orderby=price" data-json-pick="title,price"><code class="language-text">http://localhost:8080/wp-json/pagesco/v1/books?genre=fantasy&amp;orderby=price   (title and price of each)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>[
+  {
+    "title": "The Hobbit",
+    "price": 10.99
+  },
+  {
+    "title": "Lord of the Rings",
+    "price": 15.99
+  }
+]</code></pre>
+                </div>
+                <pre data-web="/wp-json/pagesco/v1/books?in_stock=false" data-json-pick="id,title,in_stock"><code class="language-text">http://localhost:8080/wp-json/pagesco/v1/books?in_stock=false   (id, title and in_stock of each)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>[
+  {
+    "id": 37,
+    "title": "The Catcher in the Rye",
+    "in_stock": false
+  },
+  {
+    "id": 33,
+    "title": "The Great Gatsby",
+    "in_stock": false
+  }
+]</code></pre>
+                </div>
+                <p>And what the schema turns away, before a line of your callback runs. Each request is wrong in a different way:</p>
+                <pre data-cli><code class="language-bash">curl -s 'http://localhost:8080/wp-json/pagesco/v1/books?genre=romance'; echo
+curl -s 'http://localhost:8080/wp-json/pagesco/v1/books?per_page=500'; echo
+curl -s 'http://localhost:8080/wp-json/pagesco/v1/books?orderby=pages'; echo
+curl -s 'http://localhost:8080/wp-json/pagesco/v1/books?in_stock=maybe'; echo</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>{"code":"rest_invalid_param","message":"Invalid parameter(s): genre","data":{"status":400,"params":{"genre":"genre must be the slug of an existing genre."},"details":{"genre":{"code":"pagesco_unknown_genre","message":"genre must be the slug of an existing genre.","data":null}}}}
+{"code":"rest_invalid_param","message":"Invalid parameter(s): per_page","data":{"status":400,"params":{"per_page":"per_page must be between 1 (inclusive) and 100 (inclusive)"},"details":{"per_page":{"code":"rest_out_of_bounds","message":"per_page must be between 1 (inclusive) and 100 (inclusive)","data":null}}}}
+{"code":"rest_invalid_param","message":"Invalid parameter(s): orderby","data":{"status":400,"params":{"orderby":"orderby is not one of title, newest, and price."},"details":{"orderby":{"code":"rest_not_in_enum","message":"orderby is not one of title, newest, and price.","data":null}}}}
+{"code":"rest_invalid_param","message":"Invalid parameter(s): in_stock","data":{"status":400,"params":{"in_stock":"in_stock is not of type boolean."},"details":{"in_stock":{"code":"rest_invalid_type","message":"in_stock is not of type boolean.","data":{"param":"in_stock"}}}}}</code></pre>
+                </div>
+                <p>Four <code>400</code> answers with messages a developer can act on, and only the first one needed code of yours. The genre message comes from <code>validate_genre()</code>, with your error code in <code>details</code>; the rest WordPress wrote from the schema.</p>
+            </section>
+
+            <section id="responses" class="lesson-section">
+                <h2>📦 Responses, Headers and Errors</h2>
+                <p>A callback can return three things: plain data (WordPress wraps it), a <code>WP_REST_Response</code> (data plus status and headers), or a <code>WP_Error</code> (an error response). <code>get_books()</code> returns a response with the same pagination headers core uses, so every client from Lesson 7.1 (and the <code>Access-Control-Expose-Headers</code> core already sends for them) works unchanged:</p>
+                <pre data-web="/wp-json/pagesco/v1/books?per_page=4&amp;page=3" data-headers="X-WP-Total,X-WP-TotalPages" data-json-pick="title"><code class="language-text">http://localhost:8080/wp-json/pagesco/v1/books?per_page=4&amp;page=3   (status, two headers, the titles)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>HTTP/1.1 200 OK
+X-WP-Total: 11
+X-WP-TotalPages: 3
+
+[
+  {
+    "title": "The Great Gatsby"
+  },
+  {
+    "title": "The Hobbit"
+  },
+  {
+    "title": "To Kill a Mockingbird"
+  }
+]</code></pre>
+                </div>
+                <p>A <code>WP_Error</code> becomes JSON with its code and message, and the HTTP status from its data: <code>new WP_Error( 'pagesco_book_not_found', $message, array( 'status' =&gt; 404 ) )</code>. Prefix your error codes like everything else; clients test the code, not the message, which may be translated. One book, a page that is not there, and an ID that is not a book (14 is the Events page):</p>
+                <pre data-web="/wp-json/pagesco/v1/books/30" data-json><code class="language-text">http://localhost:8080/wp-json/pagesco/v1/books/30</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>{
+  "id": 30,
+  "title": "Dune",
+  "slug": "dune",
+  "link": "http://localhost:8080/books/dune/",
+  "author": "Frank Herbert",
+  "price": 14.99,
+  "in_stock": true,
+  "pages": 412,
+  "published": "1965-08-01",
+  "genres": [
+    "fiction",
+    "science-fiction"
+  ]
+}</code></pre>
+                </div>
+                <pre data-cli><code class="language-bash">curl -s 'http://localhost:8080/wp-json/pagesco/v1/books?page=9'; echo
+curl -s -i http://localhost:8080/wp-json/pagesco/v1/books/14 | sed -n '1p;$p'; echo</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>{"code":"pagesco_invalid_page","message":"The page number is larger than the number of pages.","data":{"status":400}}
+HTTP/1.1 404 Not Found
+{"code":"pagesco_book_not_found","message":"No book was found with that ID.","data":{"status":404}}</code></pre>
+                </div>
+                <p><code>sed -n '1p;$p'</code> prints the first line (the status) and the last (the body). Page 9 is a client mistake, <code>400</code>, as core answers the same question; book 14 is "no such item", <code>404</code>. Notice that the 404 does not say "that is a page, not a book": an endpoint that tells visitors what exists behind an ID they may not see leaks information. Drafts and private books get the same answer, because <code>get_book()</code> requires <code>publish</code>.</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You return</th><th>The client gets</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>array( … )</code> or <code>rest_ensure_response( $data )</code></td><td><code>200</code> with the data as JSON</td></tr>
+                            <tr><td><code>$response-&gt;set_status( 201 )</code>, <code>$response-&gt;header( 'X-WP-Total', '11' )</code></td><td>that status, those headers</td></tr>
+                            <tr><td><code>new WP_Error( 'code', 'message', array( 'status' =&gt; 404 ) )</code></td><td><code>404</code> with <code>{"code","message","data":{"status":404}}</code></td></tr>
+                            <tr><td><code>new WP_Error( 'code', 'message' )</code></td><td><code>500</code> (Common Mistake 3)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="permissions" class="lesson-section">
+                <h2>🛂 permission_callback: Who May</h2>
+                <p>The permission callback runs for every request, after the arguments are validated and before your callback. It receives the request and returns <code>true</code> (go ahead), <code>false</code>, or a <code>WP_Error</code> (refuse, with that error). It is Lesson 5.3's capability check for the REST API: the current user is already known (cookie plus nonce, or application password, Lesson 7.1), so the question is only "may this user do this?":</p>
+                <pre data-norun><code class="language-php">// Who may add or change events: staff who may edit everyone's posts (editors and administrators).
+public function can_manage_events() {
+	if ( current_user_can( 'edit_others_posts' ) ) {
+		return true;
+	}
+
+	return new WP_Error(
+		'rest_forbidden',
+		__( 'Sorry, you are not allowed to manage events.', 'pagesco-books' ),
+		array( 'status' =&gt; rest_authorization_required_code() )
+	);
+}</code></pre>
+                <p>(A fragment of the project's class.) <code>rest_authorization_required_code()</code> returns <code>401</code> when nobody is logged in and <code>403</code> when someone is: the "who are you?" and "you may not" of Lesson 7.1, chosen for you. Returning <code>false</code> works too; WordPress then answers <code>rest_forbidden</code>, "Sorry, you are not allowed to do that.", with the same status rule, and your own error simply says more.</p>
+                <div class="card card-danger">
+                    <h4>🛑 Never __return_true on a route that changes anything</h4>
+                    <p><code>'permission_callback' =&gt; '__return_true'</code> on a <code>POST</code>, <code>PUT</code> or <code>DELETE</code> endpoint means anyone on the internet can call it, with no login, no nonce and no rate limit; within days of going live, bots that scan for open endpoints will. Checking inside the callback instead does not help either: by then the request has passed the server's permission step, and every future change to the callback must remember the check. For writes, check a capability, as specific as the job (<code>edit_others_posts</code> for shop-wide content, <code>edit_post</code> with the ID for one item, <code>manage_options</code> for settings). <code>__return_true</code> is for reads of public data, like the catalog.</p>
+                </div>
+                <p>Two more rules from Lesson 5.3 carry over. A permission check about a specific item uses the meta capability with its ID, <code>current_user_can( 'edit_post', $request['id'] )</code>, so roles and ownership both count. And a permission callback answers only "may this user?"; whether the input makes sense belongs to validation.</p>
+            </section>
+
+            <section id="frontend" class="lesson-section">
+                <h2>🛍️ Calling It from the Front End</h2>
+                <p>Lesson 6.4's Book Filter renders the whole catalog on the server, up to 100 books, and its FAQ promised the alternative for a big catalog: fetch books on demand from an endpoint like this one. The public route needs no nonce and no login, so in a script module (where <code>wp.apiFetch</code> is not available, Lesson 7.1) plain <code>fetch()</code> does it. On the Find a Book page, in the browser's Console (recorded with Playwright in Chromium on a WordPress 7.1 site built by this lesson):</p>
+                <pre><code class="language-text">&gt; const response = await fetch( '/wp-json/pagesco/v1/books?genre=fantasy&amp;per_page=2' );
+&gt; const books = await response.json();
+&gt; [ response.status, response.headers.get( 'X-WP-Total' ), response.headers.get( 'X-WP-TotalPages' ) ]
+[200, "2", "1"]
+&gt; books.map( ( book ) =&gt; [ book.title, book.price ] )
+[["Lord of the Rings", 15.99], ["The Hobbit", 10.99]]
+
+Console messages: none</code></pre>
+                <p>Two fantasy books, typed (<code>15.99</code> is a number), and the headers say there are two in all, on one page, so there is no more to load. A Book Filter for 5,000 books would be built on exactly these requests. In outline (a design for that catalog, not a change to the shop's filter, which stays server-rendered because eleven books need no network):</p>
+                <ul>
+                    <li><code>render.php</code> renders only the first page of the chosen genre on the server, and puts the endpoint's address in the state: <code>'restUrl' =&gt; rest_url( 'pagesco/v1/books' )</code>, so the module never hard-codes <code>/wp-json/</code>.</li>
+                    <li>The book list becomes a <code>&lt;template data-wp-each="state.books"&gt;</code>, so the store can add items (Lesson 6.4's directive table).</li>
+                    <li>A "Load more" button runs a generator action, the Interactivity API's way to wait for a request: <code>*loadMore() { const response = yield fetch( `${ state.restUrl }?genre=${ state.genre }&amp;page=${ state.page + 1 }` ); state.books.push( ...( yield response.json() ) ); state.page++; }</code>, and hides itself with <code>data-wp-bind--hidden</code> when <code>state.page</code> reaches the total from the header.</li>
+                    <li>The genre links keep their <code>href</code>, so without JavaScript the server still renders each genre's first page.</li>
+                </ul>
+                <p>The endpoint already does the hard parts: validated arguments, the shop's page size, the totals, and one formatter for every book.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <p>Make each one in a scratch must-use plugin or a copy of the file, look at what WordPress does, and remove it again.</p>
+
+                <h3>1. A route without permission_callback</h3>
+                <pre data-file="wp-content/mu-plugins/pagesco-rest-mistake.php"><code class="language-php">&lt;?php
+add_action(
+	'rest_api_init',
+	function () {
+		register_rest_route(
+			'pagesco/v1',
+			'/hours',
+			array(
+				'methods'  =&gt; 'GET',
+				'callback' =&gt; fn() =&gt; array( 'thursday' =&gt; '9 a.m. to 9 p.m.' ),
+			)
+		);
+	}
+);</code></pre>
+                <pre data-cli><code class="language-bash">curl -s -i http://localhost:8080/wp-json/pagesco/v1/hours | grep -E '^(HTTP|X-WP-DoingItWrong)'
+curl -s http://localhost:8080/wp-json/pagesco/v1/hours; echo</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>HTTP/1.1 200 OK
+X-WP-DoingItWrong: register_rest_route (since 5.5.0; The REST API route definition for &lt;code&gt;pagesco/v1/hours&lt;/code&gt; is missing the required &lt;code&gt;permission_callback&lt;/code&gt; argument. For REST API routes that are intended to be public, use &lt;code&gt;__return_true&lt;/code&gt; as the permission callback.)
+{"thursday":"9 a.m. to 9 p.m."}</code></pre>
+                </div>
+                <p>The route works, and the only sign of trouble is a header nobody looks at: during a REST request WordPress does not print "called incorrectly" notices (they would break the JSON); it sends them as <code>X-WP-DoingItWrong</code> headers, which the Network panel shows. Anywhere else the REST server is built, the notice is printed as usual, for example in WP-CLI:</p>
+                <pre data-cli data-raises="doing_it_wrong"><code class="language-bash">wp eval 'rest_get_server();'</code></pre>
+                <div class="card card-output">
+                    <h4>Error</h4>
+                    <pre><code>Notice: Function register_rest_route was called &lt;strong&gt;incorrectly&lt;/strong&gt;. The REST API route definition for &lt;code&gt;pagesco/v1/hours&lt;/code&gt; is missing the required &lt;code&gt;permission_callback&lt;/code&gt; argument. For REST API routes that are intended to be public, use &lt;code&gt;__return_true&lt;/code&gt; as the permission callback. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 5.5.0.) in /var/www/html/wp-includes/functions.php on line 6260</code></pre>
+                </div>
+                <p><strong>What it means:</strong> since WordPress 5.5 a route without <code>permission_callback</code> still answers, as if it were public, and WordPress reports the omission on every request that builds the REST server. The notice exists because routes without a check used to be public by accident; leaving it out of a write route is how that happens. Check the response headers of your own routes during development. <strong>Fix:</strong> always write the key; for a deliberately public read, <code>'__return_true'</code> says so. Remove the file:</p>
+                <pre data-cli><code class="language-bash">rm wp-content/mu-plugins/pagesco-rest-mistake.php</code></pre>
+
+                <h3>2. A sanitize_callback that switches off the schema</h3>
+                <p>Adding <code>absint</code> to <code>per_page</code> looks like extra safety. Try it on a copy of the class (here with <code>sed</code>) and ask for 500 books per page:</p>
+                <pre data-cli><code class="language-bash">cd wp-content/plugins/pagesco-books/src/Rest
+cp BooksEndpoint.php BooksEndpoint.php.bak
+sed -i "s|\t\t\t\t'maximum'     =&gt; 100,|&amp;\n\t\t\t\t'sanitize_callback' =&gt; 'absint',|" BooksEndpoint.php
+grep -n -B 1 "'absint'" BooksEndpoint.php
+curl -s -D - -o /dev/null 'http://localhost:8080/wp-json/pagesco/v1/books?per_page=500' | grep -E '^(HTTP|X-WP-TotalPages)'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>101-				'maximum'     =&gt; 100,
+102:				'sanitize_callback' =&gt; 'absint',
+HTTP/1.1 200 OK
+X-WP-TotalPages: 1</code></pre>
+                </div>
+                <p><strong>What it means:</strong> <code>200</code> and one page: the maximum of 100 was not enforced. WordPress applies the schema (<code>rest_parse_request_arg()</code>) only when an argument has a type and <em>no</em> <code>sanitize_callback</code>; yours replaced it, and nothing validates the range anymore. With 11 books it is harmless; with 50,000 it is one request that loads all of them. <strong>Fix:</strong> leave sanitizing to the schema when it can express the rule, or keep the schema check explicitly with <code>'validate_callback' =&gt; 'rest_validate_request_arg'</code> next to your sanitizer (the project's <code>title</code> argument does that). Restore the class:</p>
+                <pre data-cli><code class="language-bash">mv wp-content/plugins/pagesco-books/src/Rest/BooksEndpoint.php.bak wp-content/plugins/pagesco-books/src/Rest/BooksEndpoint.php</code></pre>
+
+                <h3>3. A WP_Error without a status</h3>
+                <pre data-file="wp-content/mu-plugins/pagesco-rest-mistake.php"><code class="language-php">&lt;?php
+add_action(
+	'rest_api_init',
+	function () {
+		register_rest_route(
+			'pagesco/v1',
+			'/missing-book',
+			array(
+				'methods'             =&gt; 'GET',
+				'permission_callback' =&gt; '__return_true',
+				'callback'            =&gt; fn() =&gt; new WP_Error( 'pagesco_book_not_found', 'No book was found with that ID.' ),
+			)
+		);
+	}
+);</code></pre>
+                <pre data-cli><code class="language-bash">curl -s -i http://localhost:8080/wp-json/pagesco/v1/missing-book | sed -n '1p;$p'; echo
+rm wp-content/mu-plugins/pagesco-rest-mistake.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>HTTP/1.1 500 Internal Server Error
+{"code":"pagesco_book_not_found","message":"No book was found with that ID.","data":null}</code></pre>
+                </div>
+                <p><strong>What it means:</strong> a <code>WP_Error</code> without <code>array( 'status' =&gt; … )</code> is sent as <code>500 Internal Server Error</code>, with <code>"data":null</code>. Clients, monitoring and caches now believe the server broke, and a client that retries server errors will ask again and again for a book that does not exist. <strong>Fix:</strong> every <code>WP_Error</code> a REST callback returns carries the status that describes it: 400 for bad input, 401/403 for permissions, 404 for missing items, 409 for conflicts, and 500 only when something really failed.</p>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: The Events API</h2>
+                <p>Lesson 5.5 promised that the events in the custom table would get a REST route, and that it would reuse <code>EventsTable::find()</code> and <code>add()</code> instead of writing SQL again. The shop wants the events readable by its newsletter tool and addable by staff from any program. Allow about 40 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: The events endpoint <span class="step-time">(18 min)</span></h3>
+                    <p>One route, <code>/events</code>, with two endpoints: <code>GET</code> for anyone, <code>POST</code> for staff. Create <code>wordpress/wp-content/plugins/pagesco-books/src/Rest/EventsEndpoint.php</code>:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/Rest/EventsEndpoint.php"><code class="language-php">&lt;?php
+/**
+ * The shop's events route: GET and POST /pagesco/v1/events.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books\Rest;
+
+use PagesCo\Books\EventsTable;
+use PagesCo\Books\Feature;
+use PagesCo\Books\Settings;
+use WP_Error;
+use WP_REST_Request;
+use WP_REST_Response;
+use WP_REST_Server;
+
+/**
+ * Lists the events from the custom table, and lets staff add one, through EventsTable (Lesson 5.5).
+ */
+final class EventsEndpoint implements Feature {
+
+	/**
+	 * Registers the route when the REST API starts.
+	 */
+	public function register(): void {
+		add_action( 'rest_api_init', array( $this, 'register_routes' ) );
+	}
+
+	/**
+	 * One route, two endpoints: anyone may read, staff may write.
+	 */
+	public function register_routes(): void {
+		register_rest_route(
+			BooksEndpoint::NAMESPACE,
+			'/events',
+			array(
+				array(
+					'methods'             =&gt; WP_REST_Server::READABLE,
+					'callback'            =&gt; array( $this, 'get_events' ),
+					'permission_callback' =&gt; '__return_true',
+					'args'                =&gt; array(
+						'limit'    =&gt; array(
+							'description' =&gt; __( 'How many events at most. Default: the Events to show setting.', 'pagesco-books' ),
+							'type'        =&gt; 'integer',
+							'default'     =&gt; (int) Settings::get( 'events_limit' ),
+							'minimum'     =&gt; 1,
+							'maximum'     =&gt; 50,
+						),
+						'location' =&gt; array(
+							'description' =&gt; __( 'Only events at this location (exact match).', 'pagesco-books' ),
+							'type'        =&gt; 'string',
+							'default'     =&gt; '',
+						),
+					),
+				),
+				array(
+					'methods'             =&gt; WP_REST_Server::CREATABLE,
+					'callback'            =&gt; array( $this, 'create_event' ),
+					'permission_callback' =&gt; array( $this, 'can_manage_events' ),
+					'args'                =&gt; array(
+						'title'     =&gt; array(
+							'description'       =&gt; __( 'The event\'s name.', 'pagesco-books' ),
+							'type'              =&gt; 'string',
+							'required'          =&gt; true,
+							'minLength'         =&gt; 1,
+							'maxLength'         =&gt; 200,
+							'sanitize_callback' =&gt; 'sanitize_text_field',
+							'validate_callback' =&gt; 'rest_validate_request_arg',
+						),
+						'starts_at' =&gt; array(
+							'description'       =&gt; __( 'Local date and time, such as 2027-12-16 19:00.', 'pagesco-books' ),
+							'type'              =&gt; 'string',
+							'required'          =&gt; true,
+							'validate_callback' =&gt; array( $this, 'validate_starts_at' ),
+							'sanitize_callback' =&gt; array( $this, 'sanitize_starts_at' ),
+						),
+						'location'  =&gt; array(
+							'description'       =&gt; __( 'Where in the shop.', 'pagesco-books' ),
+							'type'              =&gt; 'string',
+							'default'           =&gt; '',
+							'maxLength'         =&gt; 200,
+							'sanitize_callback' =&gt; 'sanitize_text_field',
+							'validate_callback' =&gt; 'rest_validate_request_arg',
+						),
+						'capacity'  =&gt; array(
+							'description' =&gt; __( 'Seats, or 0 for an event open to all.', 'pagesco-books' ),
+							'type'        =&gt; 'integer',
+							'default'     =&gt; 0,
+							'minimum'     =&gt; 0,
+							'maximum'     =&gt; 65535,
+						),
+					),
+				),
+				'schema' =&gt; array( $this, 'get_schema' ),
+			)
+		);
+	}
+
+	/**
+	 * Who may add or change events: staff who may edit everyone's posts (editors and administrators).
+	 *
+	 * @return true|WP_Error
+	 */
+	public function can_manage_events() {
+		if ( current_user_can( 'edit_others_posts' ) ) {
+			return true;
+		}
+
+		return new WP_Error(
+			'rest_forbidden',
+			__( 'Sorry, you are not allowed to manage events.', 'pagesco-books' ),
+			array( 'status' =&gt; rest_authorization_required_code() )
+		);
+	}
+
+	/**
+	 * Accepts a local date and time written Y-m-d H:i, such as 2027-12-16 19:00.
+	 *
+	 * @param mixed $value The starts_at argument as sent.
+	 * @return true|WP_Error
+	 */
+	public function validate_starts_at( $value ) {
+		$date = is_string( $value ) ? \DateTime::createFromFormat( '!Y-m-d H:i', $value ) : false;
+
+		if ( $date &amp;&amp; $date-&gt;format( 'Y-m-d H:i' ) === $value ) {
+			return true;
+		}
+
+		return new WP_Error( 'pagesco_invalid_date', __( 'starts_at must be a date and time such as 2027-12-16 19:00.', 'pagesco-books' ) );
+	}
+
+	/**
+	 * Turns a valid starts_at into the table's DATETIME format.
+	 *
+	 * @param string $value A value validate_starts_at() accepted.
+	 */
+	public function sanitize_starts_at( $value ): string {
+		return $value . ':00';
+	}
+
+	/**
+	 * GET /pagesco/v1/events: events in date order, from the custom table.
+	 *
+	 * @param WP_REST_Request $request The request.
+	 */
+	public function get_events( WP_REST_Request $request ): WP_REST_Response {
+		$events = EventsTable::find( $request['limit'], $request['location'] );
+
+		return rest_ensure_response( array_map( array( $this, 'prepare_event' ), $events ) );
+	}
+
+	/**
+	 * POST /pagesco/v1/events: adds an event and answers 201 Created with it.
+	 *
+	 * @param WP_REST_Request $request The request, its arguments validated and sanitized.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function create_event( WP_REST_Request $request ) {
+		$id = EventsTable::add( $request['title'], $request['starts_at'], $request['location'], $request['capacity'] );
+
+		if ( ! $id ) {
+			return new WP_Error( 'pagesco_event_not_saved', __( 'The event could not be saved.', 'pagesco-books' ), array( 'status' =&gt; 500 ) );
+		}
+
+		$response = rest_ensure_response(
+			$this-&gt;prepare_event(
+				(object) array(
+					'id'        =&gt; $id,
+					'title'     =&gt; $request['title'],
+					'starts_at' =&gt; $request['starts_at'],
+					'location'  =&gt; $request['location'],
+					'capacity'  =&gt; $request['capacity'],
+				)
+			)
+		);
+		$response-&gt;set_status( 201 );
+
+		return $response;
+	}
+
+	/**
+	 * One event as the API shows it. Table rows arrive as strings; the API promises real types.
+	 *
+	 * @param object $event A row from EventsTable::find(), or the same shape.
+	 */
+	public function prepare_event( object $event ): array {
+		return array(
+			'id'        =&gt; (int) $event-&gt;id,
+			'title'     =&gt; $event-&gt;title,
+			'starts_at' =&gt; mysql2date( 'Y-m-d\TH:i:s', $event-&gt;starts_at, false ),
+			'location'  =&gt; $event-&gt;location,
+			'capacity'  =&gt; (int) $event-&gt;capacity,
+		);
+	}
+
+	/**
+	 * The JSON Schema of one event.
+	 */
+	public function get_schema(): array {
+		return array(
+			'$schema'    =&gt; 'http://json-schema.org/draft-04/schema#',
+			'title'      =&gt; 'pagesco-event',
+			'type'       =&gt; 'object',
+			'properties' =&gt; array(
+				'id'        =&gt; array( 'type' =&gt; 'integer', 'readonly' =&gt; true ),
+				'title'     =&gt; array( 'type' =&gt; 'string' ),
+				'starts_at' =&gt; array( 'type' =&gt; 'string', 'format' =&gt; 'date-time' ),
+				'location'  =&gt; array( 'type' =&gt; 'string' ),
+				'capacity'  =&gt; array( 'type' =&gt; 'integer' ),
+			),
+		);
+	}
+}</code></pre>
+                    <ul>
+                        <li><strong>Defaults from the settings</strong>: <code>limit</code> defaults to Events to show (Lesson 5.4), like the <code>[pagesco_events]</code> shortcode, with a maximum of 50, the shortcode's clamp.</li>
+                        <li><strong><code>title</code> and <code>location</code></strong> need <code>sanitize_text_field()</code> (no tags, no line breaks) <em>and</em> the schema's length check, so they name both callbacks: your sanitizer and <code>rest_validate_request_arg</code> (Common Mistake 2). <code>required</code> makes a missing title a <code>400</code> before anything else.</li>
+                        <li><strong><code>starts_at</code></strong> has a format no schema keyword expresses: the shop's local time, written <code>2027-12-16 19:00</code>. <code>validate_starts_at()</code> parses it with <code>DateTime::createFromFormat()</code> and compares it back, which also rejects impossible dates such as February 30 (Lesson 5.3's <code>valid_date()</code> idea); <code>sanitize_starts_at()</code> adds the seconds the <code>DATETIME</code> column expects. (<code>\DateTime</code> has a backslash: it is PHP's class, outside the plugin's namespace.)</li>
+                        <li><strong><code>capacity</code></strong> is an integer from 0 to 65535, the range of the <code>SMALLINT UNSIGNED</code> column from Lesson 5.5: the schema protects the database from values it would refuse or cut.</li>
+                        <li><strong><code>create_event()</code></strong> calls <code>EventsTable::add()</code>, answers <code>201 Created</code> with the new event, and a real <code>500</code> if the insert failed. <code>prepare_event()</code> turns the table's strings into the types the schema promises, and the date into ISO 8601 (<code>2027-12-16T19:00:00</code>), the format JSON clients expect.</li>
+                    </ul>
+                    <p>Register it after the books endpoint:</p>
+                    <pre data-cli><code class="language-bash">sed -i '/\t\t\tRest\\BooksEndpoint::class,/a\			Rest\\EventsEndpoint::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+grep -n -A 1 'BooksEndpoint::class' wp-content/plugins/pagesco-books/src/Plugin.php</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>91:			Rest\BooksEndpoint::class,
+92-			Rest\EventsEndpoint::class,</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: Read the events <span class="step-time">(5 min)</span></h3>
+                    <pre data-web="/wp-json/pagesco/v1/events" data-json-pick="id,title,starts_at"><code class="language-text">http://localhost:8080/wp-json/pagesco/v1/events   (id, title and starts_at of each)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>[
+  {
+    "id": 1,
+    "title": "Book club: Dune",
+    "starts_at": "2027-11-04T19:00:00"
+  },
+  {
+    "id": 2,
+    "title": "Story time: The Hobbit",
+    "starts_at": "2027-11-06T10:30:00"
+  },
+  {
+    "id": 3,
+    "title": "An evening with Ana Ruiz",
+    "starts_at": "2027-11-11T18:30:00"
+  },
+  {
+    "id": 4,
+    "title": "Poetry open mic",
+    "starts_at": "2027-11-18T19:30:00"
+  },
+  {
+    "id": 5,
+    "title": "Book club: Fahrenheit 451",
+    "starts_at": "2027-12-02T19:00:00"
+  }
+]</code></pre>
+                    </div>
+                    <pre data-web="/wp-json/pagesco/v1/events?location=Caf%C3%A9" data-json><code class="language-text">http://localhost:8080/wp-json/pagesco/v1/events?location=Café</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>[
+  {
+    "id": 3,
+    "title": "An evening with Ana Ruiz",
+    "starts_at": "2027-11-11T18:30:00",
+    "location": "Café",
+    "capacity": 40
+  },
+  {
+    "id": 4,
+    "title": "Poetry open mic",
+    "starts_at": "2027-11-18T19:30:00",
+    "location": "Café",
+    "capacity": 30
+  }
+]</code></pre>
+                    </div>
+                    <p>Five events by default, the same five as the Events page, because the setting and <code>EventsTable::find()</code> are shared. In the URL, the é of Café is sent encoded (<code>Caf%C3%A9</code>); browsers do that for you, <code>curl</code> does not.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: Try to add an event without permission <span class="step-time">(7 min)</span></h3>
+                    <p>The newsletter tool reads; it must not write. An anonymous attempt, and one by Devon (author), whose password you created in Lesson 7.1 (<code>$DEVON_PASS</code>):</p>
+                    <pre data-web="/wp-json/pagesco/v1/events" data-method="POST" data-body='{"title":"Book club: Pride and Prejudice","starts_at":"2027-12-16 19:00"}'><code class="language-bash">curl -s -X POST -H 'Content-Type: application/json' -d '{"title":"Book club: Pride and Prejudice","starts_at":"2027-12-16 19:00"}' http://localhost:8080/wp-json/pagesco/v1/events</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>{"code":"rest_forbidden","message":"Sorry, you are not allowed to manage events.","data":{"status":401}}</code></pre>
+                    </div>
+                    <pre data-web="/wp-json/pagesco/v1/events" data-auth="devon" data-method="POST" data-body='{"title":"Book club: Pride and Prejudice","starts_at":"2027-12-16 19:00"}'><code class="language-bash">curl -s --user "devon:$DEVON_PASS" -X POST -H 'Content-Type: application/json' -d '{"title":"Book club: Pride and Prejudice","starts_at":"2027-12-16 19:00"}' http://localhost:8080/wp-json/pagesco/v1/events</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>{"code":"rest_forbidden","message":"Sorry, you are not allowed to manage events.","data":{"status":403}}</code></pre>
+                    </div>
+                    <p>Your message, with <code>401</code> for nobody and <code>403</code> for Devon. And Maria with a date the shop would never type the same way twice, and a negative capacity:</p>
+                    <pre data-web="/wp-json/pagesco/v1/events" data-auth="maria" data-method="POST" data-body='{"title":"Book club: Pride and Prejudice","starts_at":"16/12/2027 7pm","capacity":-3}' data-json-pick="code,data.params"><code class="language-bash">curl -s --user "maria:$PASS" -X POST -H 'Content-Type: application/json' -d '{"title":"Book club: Pride and Prejudice","starts_at":"16/12/2027 7pm","capacity":-3}' http://localhost:8080/wp-json/pagesco/v1/events</code></pre>
+                    <div class="card card-output">
+                        <h4>Output (code and params, pretty-printed here)</h4>
+                        <pre><code>{
+  "code": "rest_invalid_param",
+  "data": {
+    "params": {
+      "starts_at": "starts_at must be a date and time such as 2027-12-16 19:00."
+    }
+  }
+}</code></pre>
+                    </div>
+                    <p>Only <code>starts_at</code> is reported: WordPress runs the <code>validate_callback</code>s first and stops there; the schema checks of the other arguments run in the sanitizing step, which a failed validation never reaches. Fix the date, send again, and the capacity error would come next. Clients should expect errors one round at a time.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 4: Add the event, and check <span class="step-time">(10 min)</span></h3>
+                    <p>Maria adds the December book club through the API, with a stray HTML tag in the title from a copy-paste:</p>
+                    <pre data-web="/wp-json/pagesco/v1/events" data-auth="maria" data-method="POST" data-body='{"title":"Book club: &lt;b&gt;Pride and Prejudice&lt;/b&gt;","starts_at":"2027-12-16 19:00","location":"Reading corner","capacity":20}' data-headers=""><code class="language-bash">curl -s -i --user "maria:$PASS" -X POST -H 'Content-Type: application/json' -d '{"title":"Book club: &lt;b&gt;Pride and Prejudice&lt;/b&gt;","starts_at":"2027-12-16 19:00","location":"Reading corner","capacity":20}' http://localhost:8080/wp-json/pagesco/v1/events</code></pre>
+                    <div class="card card-output">
+                        <h4>Output (status line and body)</h4>
+                        <pre><code>HTTP/1.1 201 Created
+
+{"id":7,"title":"Book club: Pride and Prejudice","starts_at":"2027-12-16T19:00:00","location":"Reading corner","capacity":20}</code></pre>
+                    </div>
+                    <p><code>201 Created</code>, the new ID, and a title without the tag: <code>sanitize_text_field()</code> ran before the callback. Check the table, the plugin and the namespace:</p>
+                    <pre data-cli data-checkpoint><code class="language-bash">wp db query "SELECT id, title, starts_at, location, capacity FROM wp_pagesco_events WHERE id = 7"
+grep -c "::class," wp-content/plugins/pagesco-books/src/Plugin.php
+ls wp-content/plugins/pagesco-books/src/Rest
+wp eval 'echo implode( "\n", preg_grep( "#^/pagesco/v1#", array_keys( rest_get_server()-&gt;get_routes() ) ) ), "\n";'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>id	title	starts_at	location	capacity
+7	Book club: Pride and Prejudice	2027-12-16 19:00:00	Reading corner	20
+
+17
+BooksEndpoint.php   EventsEndpoint.php
+/pagesco/v1
+/pagesco/v1/books
+/pagesco/v1/books/(?P&lt;id&gt;\d+)
+/pagesco/v1/events</code></pre>
+                    </div>
+                    <p>The row is in the table that <code>[pagesco_events]</code> reads, so the Events page lists it as soon as it is among the next five. Seventeen features, two endpoint classes, four routes (the namespace index is the first). In <code>pagesco-plan.txt</code> under "APIs", note: "pagesco/v1: GET books (genre, in_stock, orderby, page, per_page = Books per list), GET books/&lt;id&gt;, GET events (limit = Events to show, location), POST events (edit_others_posts). Rest\BooksEndpoint, Rest\EventsEndpoint."</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>src/Rest/BooksEndpoint.php</code> and <code>src/Rest/EventsEndpoint.php</code> exist and are the plugin's sixteenth and seventeenth features</li>
+                        <li><code>/pagesco/v1/books</code> filters by genre slug and stock, sorts by price, pages with the totals in headers, and defaults to the Books per list setting</li>
+                        <li>Bad arguments get <code>400</code> answers that name the argument; a missing book gets <code>404</code></li>
+                        <li><code>GET /pagesco/v1/events</code> works for anyone; <code>POST</code> answers <code>401</code> anonymously, <code>403</code> to an author, and <code>201</code> to an editor</li>
+                        <li>Every route has a <code>permission_callback</code>, and the only <code>__return_true</code> ones are reads of public data</li>
+                        <li>Event 7, the December book club, is in the table</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Each exercise leaves the site as the project did. Try each one before you open the solution.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Call Your Route Without HTTP</h3>
+                    <p>PHP code on the same site (a WP-CLI command, a cron job in Lesson 7.3, a test in Lesson 8.1) can run a REST request internally, with no network at all. Print the status, the <code>X-WP-Total</code> header and the titles of <code>GET /pagesco/v1/books?genre=dystopian</code>, then the status and code of <code>GET /pagesco/v1/books/99</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>new WP_REST_Request( 'GET', '/pagesco/v1/books' )</code>, <code>-&gt;set_query_params( array( … ) )</code>, then <code>rest_do_request( $request )</code> returns a <code>WP_REST_Response</code> with <code>get_status()</code>, <code>get_headers()</code> and <code>get_data()</code>. An error response's data is the error as an array.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="rest-internal.php" data-wp><code class="language-php">&lt;?php
+$request = new WP_REST_Request( 'GET', '/pagesco/v1/books' );
+$request-&gt;set_query_params( array( 'genre' =&gt; 'dystopian' ) );
+$response = rest_do_request( $request );
+
+echo $response-&gt;get_status(), ' ', $response-&gt;get_headers()['X-WP-Total'], "\n";
+echo implode( ', ', wp_list_pluck( $response-&gt;get_data(), 'title' ) ), "\n";
+
+$missing = rest_do_request( new WP_REST_Request( 'GET', '/pagesco/v1/books/99' ) );
+echo $missing-&gt;get_status(), ' ', $missing-&gt;get_data()['code'], "\n";</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>200 3
+1984, Brave New World, Fahrenheit 451
+404 pagesco_book_not_found</code></pre>
+                        </div>
+                        <p>The same validation, permission check and callback as over HTTP, at the speed of a function call. Remove the script: <code>rm rest-internal.php</code>.</p>
+                        <pre data-cli><code class="language-bash">rm rest-internal.php</code></pre>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Does the Route Keep Its Promise?</h3>
+                    <p>The schema is a promise to clients. Check every book of the catalog against it with <code>rest_validate_value_from_schema()</code>, and print how many are valid. Then show what the function says about a book whose price is the string <code>"free"</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Get the schema and the books from the feature: <code>PagesCo\Books\Plugin::instance()-&gt;feature( PagesCo\Books\Rest\BooksEndpoint::class )</code>. <code>rest_validate_value_from_schema( $value, $schema, 'book' )</code> returns <code>true</code> or a <code>WP_Error</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="schema-check.php" data-wp><code class="language-php">&lt;?php
+$endpoint = PagesCo\Books\Plugin::instance()-&gt;feature( PagesCo\Books\Rest\BooksEndpoint::class );
+$schema   = $endpoint-&gt;get_schema();
+$books    = get_posts( array( 'post_type' =&gt; 'book', 'posts_per_page' =&gt; -1 ) );
+
+$valid = 0;
+foreach ( $books as $book ) {
+	if ( true === rest_validate_value_from_schema( $endpoint-&gt;prepare_book( $book ), $schema, 'book' ) ) {
+		++$valid;
+	}
+}
+echo "$valid of ", count( $books ), " books match the schema\n";
+
+$broken           = $endpoint-&gt;prepare_book( get_post( 30 ) );
+$broken['price']  = 'free';
+echo rest_validate_value_from_schema( $broken, $schema, 'book' )-&gt;get_error_message(), "\n";</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>11 of 11 books match the schema
+book[price] is not of type number.</code></pre>
+                        </div>
+                        <p>The validator is as lenient as for query strings (a numeric string such as <code>"14.99"</code> would pass as a number, and a comma-separated string as a list), but a price of <code>"free"</code> is caught. WordPress does not validate responses for you; a check like this belongs in the tests of Lesson 8.1, so a change to <code>prepare_book()</code> that forgets a cast is caught before a client trips over it. Remove the script: <code>rm schema-check.php</code>.</p>
+                        <pre data-cli><code class="language-bash">rm schema-check.php</code></pre>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: Cancel an Event (Stretch)</h3>
+                    <p>Add <code>DELETE /pagesco/v1/events/&lt;id&gt;</code> in a temporary must-use plugin: the same permission as adding, <code>404</code> for an unknown ID, and on success <code>{"deleted":true,"id":…}</code>. Test it on a throwaway event that you add first, check that a second delete gets the 404, then remove the plugin.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Reuse the feature's <code>can_manage_events()</code> as the permission callback (<code>array( $endpoints, 'can_manage_events' )</code>, with the object from <code>Plugin::instance()-&gt;feature()</code>). <code>$wpdb-&gt;delete( EventsTable::name(), array( 'id' =&gt; $id ), array( '%d' ) )</code> returns the number of rows deleted. In a real plugin this would be <code>EventsTable::delete()</code> and a third endpoint in <code>EventsEndpoint</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/mu-plugins/exercise-cancel-event.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Exercise: Cancel an Event
+ */
+
+use PagesCo\Books\EventsTable;
+use PagesCo\Books\Plugin;
+use PagesCo\Books\Rest\EventsEndpoint;
+
+add_action(
+	'rest_api_init',
+	function () {
+		$endpoints = Plugin::instance()-&gt;feature( EventsEndpoint::class );
+
+		register_rest_route(
+			'pagesco/v1',
+			'/events/(?P&lt;id&gt;\d+)',
+			array(
+				'methods'             =&gt; WP_REST_Server::DELETABLE,
+				'permission_callback' =&gt; array( $endpoints, 'can_manage_events' ),
+				'args'                =&gt; array(
+					'id' =&gt; array(
+						'type'    =&gt; 'integer',
+						'minimum' =&gt; 1,
+					),
+				),
+				'callback'            =&gt; function ( WP_REST_Request $request ) {
+					global $wpdb;
+
+					if ( ! $wpdb-&gt;delete( EventsTable::name(), array( 'id' =&gt; $request['id'] ), array( '%d' ) ) ) {
+						return new WP_Error( 'pagesco_event_not_found', __( 'No event was found with that ID.', 'pagesco-books' ), array( 'status' =&gt; 404 ) );
+					}
+
+					return array(
+						'deleted' =&gt; true,
+						'id'      =&gt; $request['id'],
+					);
+				},
+			)
+		);
+	}
+);</code></pre>
+                        <pre data-cli><code class="language-bash">EX_PASS=$(wp user application-password create maria "Exercise 3" --porcelain)
+API=http://localhost:8080/wp-json/pagesco/v1/events
+ID=$(curl -s --user "maria:$EX_PASS" -X POST -H 'Content-Type: application/json' -d '{"title":"Test event","starts_at":"2027-12-30 10:00"}' "$API" | grep -o '"id":[0-9]*' | grep -o '[0-9]*')
+curl -s -X DELETE "$API/$ID"; echo
+curl -s --user "maria:$EX_PASS" -X DELETE "$API/$ID" | sed "s/$ID/ID/"; echo
+curl -s --user "maria:$EX_PASS" -X DELETE "$API/$ID"; echo
+wp user application-password delete maria "$(wp user application-password list maria --name='Exercise 3' --field=uuid)"
+rm wp-content/mu-plugins/exercise-cancel-event.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>{"code":"rest_forbidden","message":"Sorry, you are not allowed to manage events.","data":{"status":401}}
+{"deleted":true,"id":ID}
+{"code":"pagesco_event_not_found","message":"No event was found with that ID.","data":{"status":404}}
+Success: Deleted 1 of 1 application password.</code></pre>
+                        </div>
+                        <p>Anonymous: refused by the shared permission callback. Maria: deleted (the <code>sed</code> only hides the ID, which differs on every site). Again: <code>404</code>, because the row is gone. A deletion endpoint deserves the strictest check in the API; some shops would require <code>manage_options</code> here, or keep a "canceled" status instead of deleting.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> On which hook do you call <code>register_rest_route()</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="rest_api_init fires when WordPress builds the REST server, only on requests that need it; registering anywhere else triggers a called incorrectly notice.">
+                                A) rest_api_init
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="init runs on every request, and WordPress checks where routes are registered. Which action fires when the REST server starts?">
+                                B) init
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Feature classes boot on plugins_loaded, but the REST server does not exist yet then. Which hook belongs to the REST API?">
+                                C) plugins_loaded
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> The shop sets Books per list to 8. What does <code>GET /wp-json/pagesco/v1/books</code> (no arguments) return?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="10 is core's default for /wp/v2/books. Where does this route's per_page default come from?">
+                                A) 10 books, and X-WP-TotalPages: 2
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The route never returns everything at once. What is per_page when the client does not send it?">
+                                B) All 11 books
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="per_page defaults to Settings::get( 'books_per_page' ), now 8, so page 1 has 8 books and the headers say 11 in total on 2 pages.">
+                                C) 8 books, and X-WP-Total: 11, X-WP-TotalPages: 2
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> An argument is declared <code>array( 'type' =&gt; 'integer', 'maximum' =&gt; 100, 'sanitize_callback' =&gt; 'absint' )</code>. A client sends <code>500</code>. What happens?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The schema check runs only when there is no sanitize_callback. What did Common Mistake 2 show?">
+                                A) 400 rest_invalid_param: must be at most 100
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="With a sanitize_callback of its own, the argument is no longer run through rest_parse_request_arg, so the maximum is never checked and the callback receives 500.">
+                                B) The callback receives 500: the maximum is not checked
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="absint only removes signs and fractions. Does anything cap the value at 100?">
+                                C) The callback receives 100
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> Which <code>permission_callback</code> fits <code>POST /pagesco/v1/events</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="A write needs a capability check; edit_others_posts lets editors and administrators add shop-wide events, and the function answers 401 or 403 otherwise.">
+                                A) A function that returns current_user_can( 'edit_others_posts' ), or a WP_Error with rest_authorization_required_code()
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That lets anyone on the internet add events. For which kind of route is __return_true right?">
+                                B) '__return_true', because the callback sanitizes everything
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Being logged in only says who someone is. Should every subscriber or author be able to add shop events?">
+                                C) 'is_user_logged_in'
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> A callback returns <code>new WP_Error( 'pagesco_book_not_found', 'No book was found with that ID.' )</code>. Which status does the client get?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="WordPress cannot read the meaning of your message. Where does it look for the status?">
+                                A) 404
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="An error is never sent as a success. What did Common Mistake 3 print as the first line?">
+                                B) 200
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Without a status of 404 in the error data, WordPress sends 500 Internal Server Error with data null.">
+                                C) 500
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Should my endpoints extend WP_REST_Controller?</summary>
+                    <p>Core's own routes are classes that extend <code>WP_REST_Controller</code>, which names the parts (<code>register_routes()</code>, <code>get_items()</code>, <code>get_item()</code>, <code>create_item()</code>, <code>*_permissions_check()</code>, <code>prepare_item_for_response()</code>, <code>get_item_schema()</code>, <code>get_collection_params()</code>) and gives helpers such as <code>add_additional_fields_to_object()</code>, so <code>register_rest_field()</code> works on your route too. For a plugin with many routes, or one that should feel exactly like core, extend it. The course's endpoints use the same parts with the plugin's own feature pattern, which is easier to read the first time; moving to the controller class later is mostly renaming.</p>
+                </details>
+                <details>
+                    <summary>Why version the namespace when there is only v1?</summary>
+                    <p>Because the shape will change one day (a price with a currency, genres as objects), and clients you do not control (a partner's site, an app on old phones) cannot all update the same day. With <code>pagesco/v2</code> next to <code>v1</code>, both work while clients move. Adding a field is not a breaking change and needs no new version; removing or retyping one is.</p>
+                </details>
+                <details>
+                    <summary>Can another site's JavaScript call my endpoints (CORS)?</summary>
+                    <p>For public <code>GET</code> routes, yes: WordPress answers with <code>Access-Control-Allow-Origin</code> set to the requesting origin and exposes the <code>X-WP-Total</code> headers. Cookie authentication from another origin is not accepted (no nonce can come from there), which is the point; other sites' servers use application passwords. To restrict origins, filter <code>rest_pre_serve_request</code> or the allowed headers.</p>
+                </details>
+                <details>
+                    <summary>Should public routes be cached?</summary>
+                    <p>The books route runs two small queries, so not yet. On a busy site, page caches usually skip <code>/wp-json/</code>, and a popular endpoint can keep its answer in a transient keyed by its arguments, cleared when a book is saved. Lesson 7.3 introduces transients and Lesson 8.2 measures when caching pays off.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Add <code>PATCH /pagesco/v1/books/&lt;id&gt;</code> for the inventory script: only <code>price</code> (a number, minimum 0) and <code>in_stock</code> (a boolean), both optional, and a <code>permission_callback</code> that checks <code>current_user_can( 'edit_post', $request['id'] )</code>. Update the meta with <code>update_post_meta()</code> and answer with <code>prepare_book()</code>. Then compare it with core's <code>POST /wp/v2/books/&lt;id&gt;</code> from Lesson 7.1: what does your route not do that core's does (revisions, the <code>save_post</code> hooks, the modified date)? When is that a feature, and when a bug?</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Design an endpoint the shop does not have yet, for example "reserve a seat at an event" or "a customer's wish list". Write its route and method, every argument with its type and rule, the permission callback in one sentence, the success status and response, and three error responses with code and status. Which of your checks can the schema do, and which need a callback?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Register routes with <code>register_rest_route( 'vendor/v1', '/route', … )</code> on <code>rest_api_init</code>; a route holds one or more endpoints (methods + callback + permission callback + args) and a schema</li>
+                        <li>Arguments with a <code>type</code> are validated and sanitized from their schema (ranges, enums, required, defaults); a <code>sanitize_callback</code> of your own replaces that, so keep <code>'validate_callback' =&gt; 'rest_validate_request_arg'</code> next to it</li>
+                        <li>Order of work: validate, sanitize, permission, callback; your callback receives clean, typed values</li>
+                        <li>Return data, a <code>WP_REST_Response</code> (status, headers such as <code>X-WP-Total</code>), or a <code>WP_Error</code> with a prefixed code and an explicit status; without one, it is a 500</li>
+                        <li>Every route has a <code>permission_callback</code>; <code>__return_true</code> only for public reads, a capability check for every write, <code>rest_authorization_required_code()</code> for 401/403</li>
+                        <li>A JSON Schema documents the response (<code>OPTIONS</code>), and <code>rest_do_request()</code> calls routes from PHP without HTTP</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>A route</td><td><code>register_rest_route( 'pagesco/v1', '/books', array( array( 'methods' =&gt; WP_REST_Server::READABLE, 'callback' =&gt; …, 'permission_callback' =&gt; …, 'args' =&gt; … ), 'schema' =&gt; … ) );</code></td></tr>
+                            <tr><td>An ID in the address</td><td><code>'/books/(?P&lt;id&gt;\d+)'</code>, read <code>$request['id']</code></td></tr>
+                            <tr><td>A checked number with a default</td><td><code>'per_page' =&gt; array( 'type' =&gt; 'integer', 'default' =&gt; 6, 'minimum' =&gt; 1, 'maximum' =&gt; 100 )</code></td></tr>
+                            <tr><td>A rule of your own</td><td><code>'validate_callback' =&gt; array( $this, 'validate_genre' )</code> returning <code>true</code> or a <code>WP_Error</code></td></tr>
+                            <tr><td>Clean text and the schema check</td><td><code>'sanitize_callback' =&gt; 'sanitize_text_field', 'validate_callback' =&gt; 'rest_validate_request_arg'</code></td></tr>
+                            <tr><td>Created, with headers</td><td><code>$response = rest_ensure_response( $data ); $response-&gt;set_status( 201 ); $response-&gt;header( 'X-WP-Total', '11' );</code></td></tr>
+                            <tr><td>An error</td><td><code>new WP_Error( 'pagesco_book_not_found', __( '…' ), array( 'status' =&gt; 404 ) )</code></td></tr>
+                            <tr><td>A permission check</td><td><code>current_user_can( 'edit_others_posts' )</code> or a <code>WP_Error</code> with <code>rest_authorization_required_code()</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You gave the shop its own API namespace, <code>pagesco/v1</code>, with three routes (four endpoints) as two feature classes</li>
+                        <li>You answered the questions core could not: books by genre slug, by stock, by price, in a compact, typed shape</li>
+                        <li>You kept Lesson 5.4's promise (the API's page size is a setting) and Lesson 5.5's (events through <code>EventsTable</code>, no new SQL)</li>
+                        <li>You let anyone read and only staff write, with errors that tell clients exactly what happened</li>
+                        <li>You added the December book club through your own API</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>So far the shop's site answers requests; it never makes any. In <a href="lesson_25.html"><strong>Lesson 7.3: External APIs, Transients &amp; WP-Cron</strong></a> it becomes a client itself: it calls another service over HTTP with <code>wp_remote_get()</code> and <code>wp_remote_post()</code>, keeps the answers in transients so it does not ask on every page view, and runs work on a schedule with WP-Cron, using the <code>pagesco_books_daily_sync</code> event.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Call all four <code>pagesco/v1</code> endpoints once more, and make sure event 7 is in the table and the scratch files and must-use plugins are gone</li>
+                    <li>Revoke the application passwords you no longer need (keep Maria's "Inventory script")</li>
+                    <li>Reread Lesson 7.1's error table: in Lesson 7.3 you are the client, and you will read other services' errors the same way</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>An API is a promise to people you will never meet: that a URL keeps working, that a field keeps its type, that a request either succeeds or says clearly why not. Today you made that kind of promise for the first time, and backed it with a schema, validation and permission checks. Many plugins in the wild skip half of that. If the order of validate, sanitize, permission and callback still feels like a lot, picture the request walking past four desks; you now know what each desk does.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_23.html" class="prev-lesson">← Previous: Using the REST API</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_25.html" class="next-lesson">Next: External APIs, Transients &amp; WP-Cron →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

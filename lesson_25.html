@@ -1,0 +1,1874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="The Pages &amp; Co. site as an API client on WordPress 7.1: wp_remote_get and wp_remote_post with real error handling, transients and their relation to the object cache, WP-Cron scheduled events, and a first ability with the Abilities API, against a local supplier sandbox. PHP and WordPress Development Lesson 7.3.">
+    <meta name="author" content="Ray de la Paz">
+    <title>External APIs, Transients &amp; WP-Cron - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 7: APIs &amp; Integration</a></li>
+            <li aria-current="page">Lesson 7.3: External APIs, Transients &amp; WP-Cron</li>
+        </ul>
+    </nav>
+
+    <main id="main-content" data-state="after:lesson_24">
+        <div class="container">
+            <header>
+                <h1>📞 Lesson 7.3: External APIs, Transients &amp; WP-Cron</h1>
+                <p class="lead">In Lessons 7.1 and 7.2 the Pages &amp; Co. site answered other programs. Today it calls one. The shop's book distributor has an API that says how many copies it has of each book and when its next delivery comes, and the booksellers want that next to their own stock. Calling another server is easy; doing it well means planning for the days it is slow, down or wrong, not asking it on every page view, and doing the regular work on a schedule. That is <code>wp_remote_get()</code>, transients and WP-Cron, and at the end you let other programs ask your site a question through the Abilities API.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Call an external API with <code>wp_remote_get()</code> and <code>wp_remote_post()</code>, and handle each way it can fail: no answer, an error status, or an answer that is not what you expected</li>
+                        <li>Keep API keys in <code>wp-config.php</code> and choose <code>wp_safe_remote_get()</code> when a URL comes from a user</li>
+                        <li>Cache answers in transients, explain where they are stored and how a persistent object cache changes that, and cache failures briefly too</li>
+                        <li>Schedule recurring work with WP-Cron, start and stop it on activation and deactivation, and inspect and run it with WP-CLI</li>
+                        <li>Register an ability with the Abilities API and run it over the REST API</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 150 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_24.html">Lesson 7.2: Custom REST Endpoints</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> a supplier client in the plugin, a cached Supplier column on the Books screen, the daily <code>pagesco_books_daily_sync</code> job (which also removes past events), and the <code>pagesco/check-stock</code> ability</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (the HTTP API, transients and WP-Cron work the same on every supported version; the Abilities API needs 6.9)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 7.2, the WP-CLI container, and Maria's "Inventory script" application password in <code>$PASS</code>; no internet connection needed (except for the last exercise)</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#client" class="toc-link">The Shop Picks Up the Phone</a></li>
+                        <li><a href="#sandbox" class="toc-link">A Supplier to Call: the Sandbox</a></li>
+                        <li><a href="#http" class="toc-link">wp_remote_get and Its Answers</a></li>
+                        <li><a href="#transients" class="toc-link">Transients: Answers with an Expiry Date</a></li>
+                        <li><a href="#cron" class="toc-link">WP-Cron: Work on a Schedule</a></li>
+                        <li><a href="#abilities" class="toc-link">The Abilities API: Questions Others May Ask</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: The Supplier Sync</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="client" class="lesson-section">
+                <h2>☎️ The Shop Picks Up the Phone</h2>
+                <p>When a bookseller wants to know whether the distributor has more copies of The Great Gatsby, they call. Sometimes the line is busy, sometimes nobody answers, sometimes the person reads the wrong list. A good bookseller writes the answer on a sticky note with the time ("Riverside: Gatsby back mid-month, asked at 10 a.m."), so the next colleague who wonders does not call again, and at closing time somebody works through a checklist: update the notes, clear out yesterday's event posters.</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: the phone, the sticky note and the closing checklist</h4>
+                    <p><strong>The phone</strong> is WordPress's HTTP API: <code>wp_remote_get()</code> and friends call another server and give you its answer, or tell you that there was none. <strong>The sticky note</strong> is a transient: a value with an expiry time, which may also fall off the wall early, so you always check whether it is still there. <strong>The closing checklist</strong> is WP-Cron: jobs that run on a schedule. WordPress has no clock of its own, though: the checklist is worked through when the next visitor walks in after closing time.</p>
+                </div>
+                <p>Put together, a page that shows supplier data never waits for the supplier when a fresh note exists, and the daily job keeps the note fresh:</p>
+
+                <div class="mermaid">
+graph TD
+    A["Books screen needs the numbers"] --> B{"transient there?"}
+    B -->|"no"| D["wp_remote_get"]
+    G["nightly WP-Cron job"] --> D
+    D --> E["set_transient: 12 h, or 5 min after an error"]
+    E --> C["show the numbers"]
+    B -->|"yes"| C
+                </div>
+
+                <p>The plan for the shop, with the names from the course's spine:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Piece</th><th>What it does</th><th>Where</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Supplier client</td><td>asks the supplier's API, turns every failure into a <code>WP_Error</code></td><td><code>src/Supplier/Client.php</code></td></tr>
+                            <tr><td>Availability (feature)</td><td>caches the answer in the transient <code>pagesco_books_supplier_availability</code>, shows a Supplier column</td><td><code>src/Supplier/Availability.php</code></td></tr>
+                            <tr><td>Daily sync (feature)</td><td>the cron hook <code>pagesco_books_daily_sync</code>: refreshes the cache, removes past events</td><td><code>src/DailySync.php</code></td></tr>
+                            <tr><td>Abilities (feature)</td><td><code>pagesco/check-stock</code>, for assistants and other programs</td><td><code>src/Abilities.php</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="sandbox" class="lesson-section">
+                <h2>🧪 A Supplier to Call: the Sandbox</h2>
+                <p>Pages &amp; Co. and its distributor, Riverside Books, are fictional, so their API does not exist on the internet. Real suppliers, payment providers and shipping companies give developers the same thing this course gives you: a <strong>sandbox</strong>, a test version of the API that answers like the real one, with test data and a test key. Ours is three small files inside your WordPress folder, plain PHP that does not load WordPress, so it works offline and every answer in this lesson is reproducible. Be clear about what that means: your site calls <code>http://localhost:8080/supplier-sandbox/v1/…</code>, which is your own Apache, and in production the same code would call <code>https://api.riverside.example/v1/…</code> instead. Nothing else changes.</p>
+                <p>The supplier's documentation (as far as the sandbox implements it) says:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Endpoint</th><th>Does</th><th>Answers</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>GET /v1/availability?isbns=…</code></td><td>copies available for up to 100 ISBN-13s, comma-separated</td><td><code>200</code> <code>{"supplier","items":[{"isbn","available","next_delivery"}],"unknown":[…]}</code></td></tr>
+                            <tr><td><code>POST /v1/orders</code></td><td>orders copies; JSON body <code>{"isbn","quantity"}</code></td><td><code>201</code> with the order, <code>422</code> with <code>{"error","message"}</code></td></tr>
+                            <tr><td>every request</td><td>header <code>X-Api-Key</code></td><td><code>401</code> without a valid key</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Create the folder <code>wordpress/supplier-sandbox/</code> (next to <code>wp-content</code>, not inside it) with these three files. First an <code>.htaccess</code> that gives the two PHP files the documented addresses:</p>
+                <pre data-file="supplier-sandbox/.htaccess"><code class="language-text"># The supplier sandbox answers at /supplier-sandbox/v1/availability and /supplier-sandbox/v1/orders.
+RewriteEngine On
+RewriteRule ^v1/(availability|orders)$ $1.php [L]</code></pre>
+                <p>The availability endpoint. It checks the key, can imitate a slow or a broken day (<code>?simulate=slow</code>, <code>?simulate=down</code>: the real API has no such switch, but you need bad days to test against), and answers from a fixed list of the shop's eleven editions:</p>
+                <pre data-file="supplier-sandbox/availability.php"><code class="language-php">&lt;?php
+/**
+ * Supplier sandbox: GET /supplier-sandbox/v1/availability?isbns=9780441172719,9780743273565
+ *
+ * A stand-in for the Riverside Books distribution API, for local development only.
+ * Plain PHP, not WordPress. ?simulate=slow or ?simulate=down imitates a bad day.
+ */
+
+header( 'Content-Type: application/json; charset=utf-8' );
+
+if ( 'sandbox-7f3a9c' !== ( $_SERVER['HTTP_X_API_KEY'] ?? '' ) ) {
+	http_response_code( 401 );
+	echo json_encode( array( 'error' =&gt; 'invalid_api_key', 'message' =&gt; 'Send a valid API key in the X-Api-Key header.' ) );
+	exit;
+}
+
+$simulate = $_GET['simulate'] ?? '';
+if ( 'slow' === $simulate ) {
+	sleep( 4 );
+}
+if ( 'down' === $simulate ) {
+	http_response_code( 503 );
+	header( 'Content-Type: text/html; charset=utf-8' );
+	header( 'Retry-After: 120' );
+	echo '&lt;h1&gt;Service Unavailable&lt;/h1&gt;&lt;p&gt;Scheduled maintenance. Please try again later.&lt;/p&gt;';
+	exit;
+}
+
+// Copies at the supplier, and the next delivery date when there are none.
+$stock = array(
+	'9780441172719' =&gt; array( 24, null ),         // Dune
+	'9780451524935' =&gt; array( 31, null ),         // 1984
+	'9780060935467' =&gt; array( 12, null ),         // To Kill a Mockingbird
+	'9780743273565' =&gt; array( 0, '2027-11-15' ),  // The Great Gatsby
+	'9780141439518' =&gt; array( 18, null ),         // Pride and Prejudice
+	'9780547928227' =&gt; array( 9, null ),          // The Hobbit
+	'9780060850524' =&gt; array( 7, null ),          // Brave New World
+	'9780316769488' =&gt; array( 5, null ),          // The Catcher in the Rye
+	'9780544003415' =&gt; array( 3, null ),          // The Lord of the Rings
+	'9781451673319' =&gt; array( 15, null ),         // Fahrenheit 451
+	'9780451526342' =&gt; array( 22, null ),         // Animal Farm
+);
+
+$items   = array();
+$unknown = array();
+foreach ( array_filter( explode( ',', $_GET['isbns'] ?? '' ) ) as $isbn ) {
+	if ( isset( $stock[ $isbn ] ) ) {
+		$items[] = array(
+			'isbn'          =&gt; $isbn,
+			'available'     =&gt; $stock[ $isbn ][0],
+			'next_delivery' =&gt; $stock[ $isbn ][1],
+		);
+	} else {
+		$unknown[] = $isbn;
+	}
+}
+
+echo json_encode( array( 'supplier' =&gt; 'Riverside Books (sandbox)', 'items' =&gt; $items, 'unknown' =&gt; $unknown ) );</code></pre>
+                <p>And the orders endpoint, which checks an order and confirms it without storing anything:</p>
+                <pre data-file="supplier-sandbox/orders.php"><code class="language-php">&lt;?php
+/**
+ * Supplier sandbox: POST /supplier-sandbox/v1/orders with a JSON body {"isbn":"…","quantity":10}
+ *
+ * A stand-in for the Riverside Books distribution API, for local development only.
+ * It checks the order and answers like the real API, but stores nothing.
+ */
+
+header( 'Content-Type: application/json; charset=utf-8' );
+
+if ( 'sandbox-7f3a9c' !== ( $_SERVER['HTTP_X_API_KEY'] ?? '' ) ) {
+	http_response_code( 401 );
+	echo json_encode( array( 'error' =&gt; 'invalid_api_key', 'message' =&gt; 'Send a valid API key in the X-Api-Key header.' ) );
+	exit;
+}
+if ( 'POST' !== $_SERVER['REQUEST_METHOD'] ) {
+	http_response_code( 405 );
+	header( 'Allow: POST' );
+	echo json_encode( array( 'error' =&gt; 'method_not_allowed', 'message' =&gt; 'Orders are created with POST.' ) );
+	exit;
+}
+
+$order    = json_decode( file_get_contents( 'php://input' ), true );
+$isbn     = is_array( $order ) ? (string) ( $order['isbn'] ?? '' ) : '';
+$quantity = is_array( $order ) ? (int) ( $order['quantity'] ?? 0 ) : 0;
+
+if ( ! preg_match( '/^97[89]\d{10}$/', $isbn ) ) {
+	http_response_code( 422 );
+	echo json_encode( array( 'error' =&gt; 'invalid_isbn', 'message' =&gt; 'isbn must be an ISBN-13 without dashes.' ) );
+	exit;
+}
+if ( $quantity &lt; 1 || $quantity &gt; 50 ) {
+	http_response_code( 422 );
+	echo json_encode( array( 'error' =&gt; 'invalid_quantity', 'message' =&gt; 'quantity must be between 1 and 50.' ) );
+	exit;
+}
+
+http_response_code( 201 );
+echo json_encode(
+	array(
+		'order'             =&gt; 'RB-' . substr( $isbn, -4 ) . '-' . $quantity,
+		'isbn'              =&gt; $isbn,
+		'quantity'          =&gt; $quantity,
+		'expected_delivery' =&gt; '2027-11-08',
+	)
+);</code></pre>
+                <p>The plugin needs two settings: where the supplier is, and the key. Neither belongs in the plugin's code: the URL differs between your laptop and the live site, and a key in code ends up in Git, in backups and in every copy of the plugin (Lesson 5.3's "no secrets in code"). <code>wp-config.php</code> is the place, and WP-CLI writes constants into it. From the WP-CLI container:</p>
+                <pre data-cli><code class="language-bash">wp config set PAGESCO_BOOKS_SUPPLIER_URL 'http://localhost:8080/supplier-sandbox/v1/'
+wp config set PAGESCO_BOOKS_SUPPLIER_KEY 'sandbox-7f3a9c'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Added the constant 'PAGESCO_BOOKS_SUPPLIER_URL' to the 'wp-config.php' file with the value 'http://localhost:8080/supplier-sandbox/v1/'.
+Success: Added the constant 'PAGESCO_BOOKS_SUPPLIER_KEY' to the 'wp-config.php' file with the value 'sandbox-7f3a9c'.</code></pre>
+                </div>
+                <p>Try the sandbox with <code>curl</code> before writing any PHP, as you would with a real supplier's documentation open. Without a key, and with one (two of the shop's ISBNs, and one the supplier does not know):</p>
+                <pre data-cli><code class="language-bash">curl -s -i 'http://localhost:8080/supplier-sandbox/v1/availability?isbns=9780743273565' | sed -n '1p;$p'; echo
+curl -s -H 'X-Api-Key: sandbox-7f3a9c' 'http://localhost:8080/supplier-sandbox/v1/availability?isbns=9780743273565,9780316769488,9780000000000'; echo</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>HTTP/1.1 401 Unauthorized
+{"error":"invalid_api_key","message":"Send a valid API key in the X-Api-Key header."}
+
+{"supplier":"Riverside Books (sandbox)","items":[{"isbn":"9780743273565","available":0,"next_delivery":"2027-11-15"},{"isbn":"9780316769488","available":5,"next_delivery":null}],"unknown":["9780000000000"]}</code></pre>
+                </div>
+                <p>The Great Gatsby: none at the supplier either, next delivery November 15. The Catcher in the Rye: five copies. The made-up ISBN comes back in <code>unknown</code>. A real sandbox would also tell you its rate limits; Riverside's are imaginary, but the habit of asking "how often may I call?" is not.</p>
+                <div class="card card-danger">
+                    <h4>🛑 The sandbox is for your laptop only</h4>
+                    <p>The sandbox is served by your site to anyone who can reach it and its key is printed in this lesson. Never copy <code>supplier-sandbox/</code> to a live site; Lesson 8.4 deploys only the shop's own code from <code>wp-content</code>. The real key goes into the live site's <code>wp-config.php</code> (or an environment variable it reads with <code>getenv()</code>), never into Git.</p>
+                </div>
+            </section>
+
+            <section id="http" class="lesson-section">
+                <h2>📡 wp_remote_get and Its Answers</h2>
+                <p>PHP can fetch URLs in many ways (<code>file_get_contents()</code>, the cURL extension, Guzzle). In WordPress code use the <strong>HTTP API</strong>: <code>wp_remote_get()</code>, <code>wp_remote_post()</code>, <code>wp_remote_head()</code> and <code>wp_remote_request()</code> for other methods. They work on every host whatever PHP was compiled with (WordPress bundles the Requests library), use the CA certificates WordPress ships, honor proxy settings from <code>wp-config.php</code>, and offer filters such as <code>pre_http_request</code>, which lets tests replace the network (Lesson 8.1). A first call, as a scratch script in the WordPress folder (<code>wordpress/supplier-ask.php</code>):</p>
+                <pre data-file="supplier-ask.php" data-wp><code class="language-php">&lt;?php
+$response = wp_remote_get(
+	'http://localhost:8080/supplier-sandbox/v1/availability?isbns=9780743273565',
+	array(
+		'timeout' =&gt; 5,
+		'headers' =&gt; array( 'X-Api-Key' =&gt; PAGESCO_BOOKS_SUPPLIER_KEY ),
+	)
+);
+
+if ( is_wp_error( $response ) ) {
+	echo 'No answer: ', $response-&gt;get_error_message(), "\n";
+	return;
+}
+
+echo implode( ', ', array_keys( $response ) ), "\n";
+echo wp_remote_retrieve_response_code( $response ), ' ', wp_remote_retrieve_response_message( $response ), "\n";
+echo wp_remote_retrieve_header( $response, 'content-type' ), "\n";
+
+$data = json_decode( wp_remote_retrieve_body( $response ), true );
+print_r( $data['items'][0] );</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>headers, body, response, cookies, filename, http_response
+200 OK
+application/json; charset=utf-8
+Array
+(
+    [isbn] =&gt; 9780743273565
+    [available] =&gt; 0
+    [next_delivery] =&gt; 2027-11-15
+)</code></pre>
+                </div>
+                <p>A response is an array (with the original object in <code>http_response</code>); read it with the <code>wp_remote_retrieve_*()</code> helpers rather than by its keys: they also accept a <code>WP_Error</code> and then return <code>''</code> instead of failing. Header names are case-insensitive. The body is a string: you decode it, and you decide what a valid answer is. The arguments you will use most:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Argument</th><th>Default</th><th>Use</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>timeout</code></td><td>5 (seconds)</td><td>how long a visitor or a job may wait; keep it short</td></tr>
+                            <tr><td><code>headers</code></td><td>none</td><td><code>array( 'Accept' =&gt; 'application/json', 'X-Api-Key' =&gt; … )</code></td></tr>
+                            <tr><td><code>body</code></td><td>none</td><td>an array (sent as a form) or a string such as <code>wp_json_encode( $data )</code> with a <code>Content-Type</code> header</td></tr>
+                            <tr><td><code>method</code></td><td>set by the function</td><td>for <code>wp_remote_request()</code>: <code>PUT</code>, <code>PATCH</code>, <code>DELETE</code></td></tr>
+                            <tr><td><code>redirection</code></td><td>5</td><td>redirects to follow</td></tr>
+                            <tr><td><code>user-agent</code></td><td><code>WordPress/7.1.3; http://localhost:8080</code></td><td>some APIs ask you to name your application and a contact address</td></tr>
+                            <tr><td><code>sslverify</code></td><td><code>true</code></td><td>leave it on; a certificate error means something is wrong</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Three ways to fail</h3>
+                <p>Every call to another server can end in one of three ways besides success, and each looks different in PHP. A script that provokes all three: two against the sandbox, one against a host that does not exist:</p>
+                <pre data-file="supplier-failures.php" data-wp><code class="language-php">&lt;?php
+$key = array( 'X-Api-Key' =&gt; PAGESCO_BOOKS_SUPPLIER_KEY );
+$url = 'http://localhost:8080/supplier-sandbox/v1/availability';
+
+// 1. An answer, but an error status: wrong key.
+$wrong = wp_remote_get( $url, array( 'headers' =&gt; array( 'X-Api-Key' =&gt; 'guess' ) ) );
+echo 'Wrong key:  ', is_wp_error( $wrong ) ? 'WP_Error' : 'response', ' ', wp_remote_retrieve_response_code( $wrong ), ' ', wp_remote_retrieve_body( $wrong ), "\n";
+
+// 2. An answer, an error status, and HTML instead of JSON: the supplier is down.
+$down = wp_remote_get( $url . '?simulate=down', array( 'headers' =&gt; $key ) );
+echo 'Down:       ', wp_remote_retrieve_response_code( $down ), ', Retry-After ', wp_remote_retrieve_header( $down, 'retry-after' ), ', JSON: ';
+var_dump( json_decode( wp_remote_retrieve_body( $down ), true ) );
+
+// 3. No answer at all: the host does not exist.
+$nowhere = wp_remote_get( 'http://supplier.invalid/v1/availability' );
+echo 'No host:    ', is_wp_error( $nowhere ) ? 'WP_Error' : 'response', ' ', $nowhere-&gt;get_error_code(), ': ', $nowhere-&gt;get_error_message(), "\n";</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Wrong key:  response 401 {"error":"invalid_api_key","message":"Send a valid API key in the X-Api-Key header."}
+Down:       503, Retry-After 120, JSON: NULL
+No host:    WP_Error http_request_failed: cURL error 6: Could not resolve host: supplier.invalid (Domain name not found)</code></pre>
+                </div>
+                <ul>
+                    <li><strong>An error status is not a <code>WP_Error</code>.</strong> For WordPress, a <code>401</code> or <code>503</code> is a perfectly good HTTP response: you get an array, and only <code>wp_remote_retrieve_response_code()</code> tells you it failed. Code that only checks <code>is_wp_error()</code> treats the supplier's error page as data (Common Mistake 1).</li>
+                    <li><strong>Error answers may not be JSON.</strong> The 503 came from a maintenance page: <code>json_decode()</code> returns <code>NULL</code>. <code>Retry-After: 120</code> says when to try again; polite clients respect it.</li>
+                    <li><strong>No answer is a <code>WP_Error</code></strong> with the code <code>http_request_failed</code> and the transport's message. (<code>.invalid</code> is a top-level domain reserved never to exist, handy for this test.)</li>
+                </ul>
+                <p>The third kind has a slow cousin: the supplier answers, but too late. With a timeout of 2 seconds against the slow sandbox (it waits 4):</p>
+                <pre data-file="supplier-slow.php" data-wp><code class="language-php">&lt;?php
+$started  = microtime( true );
+$response = wp_remote_get(
+	'http://localhost:8080/supplier-sandbox/v1/availability?simulate=slow',
+	array(
+		'timeout' =&gt; 2,
+		'headers' =&gt; array( 'X-Api-Key' =&gt; PAGESCO_BOOKS_SUPPLIER_KEY ),
+	)
+);
+echo $response-&gt;get_error_code(), ': ', $response-&gt;get_error_message(), "\n";
+printf( "Waited %.1f seconds\n", microtime( true ) - $started );</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your milliseconds will differ slightly)</h4>
+                    <pre><code>http_request_failed: cURL error 28: Operation timed out after 2056 milliseconds with 0 bytes received
+Waited 1.9 seconds</code></pre>
+                </div>
+                <p>Two seconds lost, and then nothing. On a page view, a visitor waits that long for nothing; with the default of 5 seconds and three such calls on one page, fifteen. That is why pages should read cached answers and leave the calling to background jobs, and why every call names a timeout it can afford.</p>
+
+                <h3>Sending data: wp_remote_post</h3>
+                <p><code>wp_remote_post()</code> takes the same arguments. To send JSON, encode the body yourself and say so in a header; without the header, an array <code>body</code> is sent as an HTML form. An order for ten copies of The Catcher in the Rye, and one for eighty:</p>
+                <pre data-file="supplier-order.php" data-wp><code class="language-php">&lt;?php
+foreach ( array( 10, 80 ) as $quantity ) {
+	$response = wp_remote_post(
+		'http://localhost:8080/supplier-sandbox/v1/orders',
+		array(
+			'timeout' =&gt; 5,
+			'headers' =&gt; array(
+				'X-Api-Key'    =&gt; PAGESCO_BOOKS_SUPPLIER_KEY,
+				'Content-Type' =&gt; 'application/json',
+			),
+			'body'    =&gt; wp_json_encode(
+				array(
+					'isbn'     =&gt; '9780316769488',
+					'quantity' =&gt; $quantity,
+				)
+			),
+		)
+	);
+	echo wp_remote_retrieve_response_code( $response ), ' ', wp_remote_retrieve_body( $response ), "\n";
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>201 {"order":"RB-9488-10","isbn":"9780316769488","quantity":10,"expected_delivery":"2027-11-08"}
+422 {"error":"invalid_quantity","message":"quantity must be between 1 and 50."}</code></pre>
+                </div>
+                <p><code>201 Created</code> with the order, then <code>422 Unprocessable Content</code> with a message you can show a bookseller. The same three-way check applies to every <code>POST</code>, with one more rule: a request that changes something and timed out may still have arrived, so before retrying an order, ask the supplier whether it exists (good APIs accept an idempotency key for this).</p>
+
+                <h3>URLs from users: wp_safe_remote_get</h3>
+                <p>The supplier's URL comes from <code>wp-config.php</code>, which only you control. When a URL comes from a user (a "fetch the cover from this address" field, a webhook target), use the <code>wp_safe_remote_*()</code> functions: they refuse addresses in private networks and odd ports, so nobody can make your server request <code>http://192.168.1.1/admin</code> or a cloud provider's metadata service on their behalf (server-side request forgery, SSRF). Your own site's address stays allowed:</p>
+                <pre data-file="supplier-safe.php" data-wp><code class="language-php">&lt;?php
+foreach ( array( 'http://192.168.1.10/', 'http://127.0.0.1:8080/', 'http://localhost:8080/supplier-sandbox/v1/availability' ) as $url ) {
+	$response = wp_safe_remote_get( $url );
+	echo str_pad( $url, 58 ), is_wp_error( $response ) ? $response-&gt;get_error_message() : wp_remote_retrieve_response_code( $response ), "\n";
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>http://192.168.1.10/                                      A valid URL was not provided.
+http://127.0.0.1:8080/                                    A valid URL was not provided.
+http://localhost:8080/supplier-sandbox/v1/availability    401</code></pre>
+                </div>
+                <p>The private addresses are refused before any connection; <code>localhost:8080</code> is allowed because it is the site's own host (and it answers <code>401</code>: no key). Remove the scratch scripts:</p>
+                <pre data-cli><code class="language-bash">rm supplier-ask.php supplier-failures.php supplier-slow.php supplier-order.php supplier-safe.php</code></pre>
+            </section>
+
+            <section id="transients" class="lesson-section">
+                <h2>🗒️ Transients: Answers with an Expiry Date</h2>
+                <p>A transient is an option with an expiry time. Three functions cover it:</p>
+                <pre data-norun><code class="language-php">set_transient( 'pagesco_books_supplier_availability', $value, 12 * HOUR_IN_SECONDS ); // true on success
+$value = get_transient( 'pagesco_books_supplier_availability' );                      // false when missing or expired
+delete_transient( 'pagesco_books_supplier_availability' );</code></pre>
+                <p>The value can be anything <code>update_option()</code> accepts (arrays are serialized). The name is prefixed like every option (<code>pagesco_books_</code>, the spine's transient prefix) and at most 172 characters. <code>MINUTE_IN_SECONDS</code>, <code>HOUR_IN_SECONDS</code>, <code>DAY_IN_SECONDS</code> and <code>WEEK_IN_SECONDS</code> make the lifetime readable. With WP-CLI, look at where a transient really lives:</p>
+                <pre data-cli data-raises="Warning"><code class="language-bash">wp transient set pagesco_books_demo 'Gatsby: back November 15' 600
+wp transient get pagesco_books_demo
+wp db query "SELECT option_name, autoload FROM wp_options WHERE option_name LIKE '%pagesco_books_demo'"
+wp transient delete pagesco_books_demo
+wp transient get pagesco_books_demo</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Transient added.
+Gatsby: back November 15
+option_name	autoload
+_transient_timeout_pagesco_books_demo	off
+_transient_pagesco_books_demo	off
+
+Success: Transient deleted.
+Warning: Transient with key "pagesco_books_demo" is not set.</code></pre>
+                </div>
+                <p>Two rows in <code>wp_options</code> (Lesson 2.2): <code>_transient_pagesco_books_demo</code> with the value and <code>_transient_timeout_pagesco_books_demo</code> with the expiry as a Unix timestamp, both not autoloaded, so a transient costs nothing on requests that do not read it. When <code>get_transient()</code> finds the timeout passed, it deletes both rows and returns <code>false</code>; expired transients nobody reads are removed by core's daily <code>delete_expired_transients</code> cron job. <code>wp transient get</code> on a missing transient prints a warning, as the last command shows. Site transients (<code>set_site_transient()</code>) are the same for a whole multisite network.</p>
+
+                <h3>Transients and the object cache</h3>
+                <p>WordPress keeps an <strong>object cache</strong> in memory during every request (<code>wp_cache_get()</code>, <code>wp_cache_set()</code>): that is why reading an option twice costs one query (Lesson 2.2). By default it is forgotten at the end of the request. A site can add a <strong>persistent object cache</strong> with the <code>object-cache.php</code> drop-in (Lesson 2.2) and Redis or Memcached, and then transients change home: <code>set_transient()</code> writes to the cache instead of <code>wp_options</code>, and the rows above never exist. Your site has none:</p>
+                <pre data-cli><code class="language-bash">wp eval 'var_dump( wp_using_ext_object_cache() );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>NULL</code></pre>
+                </div>
+                <p>Code that uses the transient functions works the same either way, with one rule that matters most with a cache: <strong>a transient may disappear before it expires</strong> (a cache that runs out of memory evicts it; a deploy may flush it). The expiry is a maximum, never a promise. So every read is "use it if it is there, otherwise get it again", and nothing that cannot be fetched again (an order, a setting) may live only in a transient. Lesson 8.2 sets up and measures a persistent object cache.</p>
+
+                <h3>The read-through pattern, and caching failures</h3>
+                <p>The usual shape: try the transient, and only when it is missing call the API and store the answer. A demonstration that counts real HTTP requests with the <code>http_api_debug</code> action, which fires after each one:</p>
+                <pre data-file="cache-demo.php" data-wp><code class="language-php">&lt;?php
+$requests = 0;
+add_action(
+	'http_api_debug',
+	function () use ( &amp;$requests ) {
+		++$requests;
+	}
+);
+
+function pagesco_demo_gatsby() {
+	$cached = get_transient( 'pagesco_books_demo_gatsby' );
+	if ( false !== $cached ) {
+		return $cached;
+	}
+
+	$response = wp_remote_get(
+		'http://localhost:8080/supplier-sandbox/v1/availability?isbns=9780743273565',
+		array( 'headers' =&gt; array( 'X-Api-Key' =&gt; PAGESCO_BOOKS_SUPPLIER_KEY ) )
+	);
+	$data     = json_decode( wp_remote_retrieve_body( $response ), true );
+	$value    = $data['items'][0] ?? array();
+
+	set_transient( 'pagesco_books_demo_gatsby', $value, 10 * MINUTE_IN_SECONDS );
+	return $value;
+}
+
+for ( $view = 1; $view &lt;= 3; $view++ ) {
+	$gatsby = pagesco_demo_gatsby();
+	echo "View $view: next delivery {$gatsby['next_delivery']}, HTTP requests so far: $requests\n";
+}
+delete_transient( 'pagesco_books_demo_gatsby' );</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>View 1: next delivery 2027-11-15, HTTP requests so far: 1
+View 2: next delivery 2027-11-15, HTTP requests so far: 1
+View 3: next delivery 2027-11-15, HTTP requests so far: 1</code></pre>
+                </div>
+                <pre data-cli><code class="language-bash">rm cache-demo.php</code></pre>
+                <p>One request for three views, and a thousand views would still be one request per ten minutes. (The demo skips the error checks to stay short; the project's code does not.) Now the subtle part: what if the call <em>fails</em>? If you cache nothing, every view calls the broken supplier again and waits for its timeout, which turns the supplier's bad day into yours. So cache the failure too, briefly: the project stores "the supplier is not reachable" for five minutes, a good answer for twelve hours. And never cache <code>false</code> itself: <code>get_transient()</code> returns <code>false</code> for "missing", so a stored <code>false</code> looks like no note at all. Store an array such as <code>array( 'items' =&gt; array(), 'error' =&gt; '…' )</code> instead.</p>
+            </section>
+
+            <section id="cron" class="lesson-section">
+                <h2>⏰ WP-Cron: Work on a Schedule</h2>
+                <p>Operating systems have a clock that starts jobs (<code>cron</code> on Linux). WordPress cannot count on one, so it keeps a list of scheduled events in the option <code>cron</code> and, on an ordinary page request, checks whether any is due. If one is, it calls its own <code>wp-cron.php</code> in the background (a "loopback" request to its own URL, which is why Lesson 1.2's Apache listens on 8080 inside the container too) and the events run there, as actions: an event is a hook name, a time, a recurrence and arguments, and running it means <code>do_action( $hook, ...$args )</code>. The events of a fresh 7.1 site are core's:</p>
+                <pre data-cli><code class="language-bash">wp cron event list --fields=recurrence,hook --format=csv | sed 1d | sort
+wp cron schedule list
+wp cron test</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>"1 day",delete_expired_transients
+"1 day",recovery_mode_clean_expired_keys
+"1 day",wp_privacy_personal_data_cleanup_requests
+"1 day",wp_scheduled_auto_draft_delete
+"1 day",wp_scheduled_delete
+"1 hour",wp_privacy_delete_old_export_files
+"1 week",wp_delete_temp_updater_backups
+"1 week",wp_site_health_scheduled_check
+"12 hours",wp_update_plugins
+"12 hours",wp_update_themes
+"12 hours",wp_update_user_counts
+"12 hours",wp_version_check
++------------+-------------+----------+
+| name       | display     | interval |
++------------+-------------+----------+
+| hourly     | Once Hourly | 3600     |
+| twicedaily | Twice Daily | 43200    |
+| daily      | Once Daily  | 86400    |
+| weekly     | Once Weekly | 604800   |
++------------+-------------+----------+
+Success: WP-Cron spawning is working as expected.</code></pre>
+                </div>
+                <p>(WP-CLI lists events by their next run time, which changes every time one runs, so the command sorts them by recurrence instead: CSV without its header line, through <code>sort</code>.) Update checks twice a day, the trash emptied and expired transients deleted daily, Site Health weekly. The four built-in recurrences are hourly, twice daily, daily and weekly; you add others with the <code>cron_schedules</code> filter (Exercise 3). <code>wp cron test</code> checks that the loopback works. The functions:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>A recurring event</td><td><code>wp_schedule_event( $first_timestamp, 'daily', 'pagesco_books_daily_sync' )</code></td></tr>
+                            <tr><td>To know whether it is scheduled</td><td><code>wp_next_scheduled( 'pagesco_books_daily_sync' )</code>: a timestamp or <code>false</code></td></tr>
+                            <tr><td>A one-time event</td><td><code>wp_schedule_single_event( time() + HOUR_IN_SECONDS, 'pagesco_books_send_reminder', array( 7 ) )</code></td></tr>
+                            <tr><td>To stop it</td><td><code>wp_clear_scheduled_hook( 'pagesco_books_daily_sync' )</code> (every event of the hook)</td></tr>
+                            <tr><td>The work itself</td><td><code>add_action( 'pagesco_books_daily_sync', $callback )</code>, on every request</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Three consequences of "the next visitor starts it":</p>
+                <ul>
+                    <li><strong>Times are earliest times.</strong> A job due at 3:00 runs with the first request after 3:00: at 3:00:01 on a busy shop, at 7:45 on a quiet one. Jobs must not depend on an exact time.</li>
+                    <li><strong>No visitors, no jobs.</strong> On production sites, the usual fix is <code>define( 'DISABLE_WP_CRON', true );</code> in <code>wp-config.php</code> (no more loopbacks on page views) plus a real system cron entry that runs <code>wp cron event run --due-now</code> every five minutes. Lesson 8.4 sets that up.</li>
+                    <li><strong>Jobs run without a user.</strong> In <code>wp-cron.php</code> nobody is logged in: <code>current_user_can()</code> is false for everything, and <code>is_admin()</code> is false. A job does its work directly and checks no capabilities; that is safe because nobody can trigger it with input of their own (Common Mistake 3 shows the opposite trap).</li>
+                </ul>
+                <div class="card card-warning">
+                    <h4>⚠️ wp cron event run moves a recurring event</h4>
+                    <p><code>wp cron event run pagesco_books_daily_sync</code> runs the job now, which is what you want while developing, but WP-CLI also reschedules a recurring event from <em>now</em>: a job planned for 3:00 tomorrow that you run at 10:15 moves to 10:15 tomorrow (measured on WordPress 7.1 with WP-CLI 2.12). To run the work without touching the schedule, fire the hook yourself: <code>wp eval 'do_action( "pagesco_books_daily_sync" );'</code>, as the project does.</p>
+                </div>
+            </section>
+
+            <section id="abilities" class="lesson-section">
+                <h2>🤖 The Abilities API: Questions Others May Ask</h2>
+                <p>So far the site has been a client today, and a server with its own REST routes in Lesson 7.2. The <strong>Abilities API</strong> (in core since WordPress 6.9, extended in 7.1) is a third way to open the shop to other programs, designed for AI assistants and automation tools: you register an <strong>ability</strong>, a named unit of work with a description in plain language, a JSON Schema for its input and output, a permission check and a callback. Tools can then <em>discover</em> what the site can do (list the abilities, read their descriptions and schemas) and run one, through PHP, the REST API under <code>/wp-json/wp-abilities/v1/</code>, or adapters such as an MCP server for AI clients. Core registers three itself; as admin:</p>
+                <pre data-cli><code class="language-bash">wp eval 'foreach ( wp_get_abilities() as $ability ) { echo $ability-&gt;get_name(), ": ", $ability-&gt;get_label(), "\n"; }'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>core/get-site-info: Get Site Information
+core/get-user-info: Get User Information
+core/get-environment-info: Get Environment Info</code></pre>
+                </div>
+                <p>Registration happens on two actions of their own: <code>wp_abilities_api_categories_init</code> for categories (every ability belongs to one) and <code>wp_abilities_api_init</code> for abilities. The pieces of <code>wp_register_ability( 'pagesco/check-stock', $args )</code>:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Key</th><th>Required</th><th>Holds</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>label</code>, <code>description</code></td><td>yes</td><td>what the ability does, in words an assistant (or a person) can choose by</td></tr>
+                            <tr><td><code>category</code></td><td>yes</td><td>a registered category slug, here <code>pagesco</code></td></tr>
+                            <tr><td><code>execute_callback</code></td><td>yes</td><td>does the work; receives the validated input; returns data or a <code>WP_Error</code></td></tr>
+                            <tr><td><code>permission_callback</code></td><td>yes</td><td>may the current user run it? Lesson 7.2's rule again: a real check</td></tr>
+                            <tr><td><code>input_schema</code>, <code>output_schema</code></td><td>no</td><td>JSON Schema, validated on the way in and out</td></tr>
+                            <tr><td><code>meta.annotations</code></td><td>no</td><td><code>readonly</code>, <code>destructive</code>, <code>idempotent</code>: hints for tools, and <code>readonly</code> makes the REST run endpoint a <code>GET</code></td></tr>
+                            <tr><td><code>meta.show_in_rest</code></td><td>no</td><td>list and run it over the REST API (default off)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>An ability is not a replacement for a REST route: the route is the shop's API with its own URL and shape; an ability is one action described for discovery, which the REST API (and others) can carry. The project registers one that combines the shop's stock with the supplier's: the question a bookseller's assistant would ask.</p>
+                <div class="card card-info">
+                    <h4>🧩 Version note: the Abilities API on 6.9 and 7.x</h4>
+                    <p>The Abilities API arrived in WordPress 6.9 (functions, the <code>wp-abilities/v1</code> routes, the three core abilities). 7.1 added the <code>meta.public</code> flag (a default for channels such as REST; <code>show_in_rest</code> still wins), many <code>wp_ability_*</code> filters, and filtering in <code>wp_get_abilities( $args )</code>. The project sets <code>show_in_rest</code>, which works on both. The plugin requires 6.8: there the two actions never fire, so the feature simply does nothing. WP-CLI 2.12 has no <code>wp ability</code> command yet (it is in the 3.0 development builds), so this lesson uses <code>wp eval</code> and the REST API.</p>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <p>Make each one in a scratch must-use plugin, look at what happens, and remove it again.</p>
+
+                <h3>1. Trusting the answer</h3>
+                <p>A first draft checks for a <code>WP_Error</code>, as the documentation says, and then uses the body. Load it with <code>?supplier-test</code> in the address on a day the supplier is down:</p>
+                <pre data-file="wp-content/mu-plugins/mistake-supplier.php"><code class="language-php">&lt;?php
+add_action(
+	'template_redirect',
+	function () {
+		if ( ! isset( $_GET['supplier-test'] ) ) {
+			return;
+		}
+		$response = wp_remote_get( 'http://localhost:8080/supplier-sandbox/v1/availability?simulate=down', array( 'headers' =&gt; array( 'X-Api-Key' =&gt; PAGESCO_BOOKS_SUPPLIER_KEY ) ) );
+		if ( is_wp_error( $response ) ) {
+			return;
+		}
+		$data  = json_decode( wp_remote_retrieve_body( $response ), true );
+		$total = 0;
+		foreach ( $data['items'] as $item ) {
+			$total += $item['available'];
+		}
+		echo "Copies at the supplier: $total\n";
+		exit;
+	}
+);</code></pre>
+                <pre data-web="/?supplier-test=1" data-raises="Warning"><code class="language-text">http://localhost:8080/?supplier-test=1</code></pre>
+                <div class="card card-output">
+                    <h4>Error</h4>
+                    <pre><code>Warning: Trying to access array offset on null in /var/www/html/wp-content/mu-plugins/mistake-supplier.php on line 14
+
+Warning: foreach() argument must be of type array|object, null given in /var/www/html/wp-content/mu-plugins/mistake-supplier.php on line 14
+Copies at the supplier: 0</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the 503 maintenance page is a valid response, so <code>is_wp_error()</code> was false; <code>json_decode()</code> of HTML gave <code>null</code>, reading <code>$data['items']</code> from <code>null</code> warns once, and <code>foreach</code> over the resulting <code>null</code> warns again. Worse than the warning is the last line: "0 copies" is a confident, wrong answer that a bookseller would believe. <strong>Fix:</strong> check all three ways to fail, in order: <code>is_wp_error()</code>, then the status code, then the shape of the decoded data, as the project's <code>Client::decode()</code> does. Remove the file:</p>
+                <pre data-cli><code class="language-bash">rm wp-content/mu-plugins/mistake-supplier.php</code></pre>
+
+                <h3>2. Scheduling on every request</h3>
+                <p>Scheduling on <code>init</code> looks like a way to make sure the event exists. Without asking <code>wp_next_scheduled()</code> first:</p>
+                <pre data-file="wp-content/mu-plugins/mistake-schedule.php"><code class="language-php">&lt;?php
+add_action(
+	'init',
+	function () {
+		if ( wp_doing_cron() ) {
+			return; // Only for this demo: count WP-CLI's requests, not WP-Cron's own.
+		}
+		wp_schedule_event( time(), 'daily', 'pagesco_books_mistake' );
+	}
+);</code></pre>
+                <p>Every WP-CLI command is a WordPress request too, with an <code>init</code>. Three commands a second apart, then count the events (the counting command is a fourth request; the demo skips WP-Cron's own background requests so that the count is exact, but on a live site they add events too):</p>
+                <pre data-cli><code class="language-bash">for i in 1 2 3; do wp eval ''; sleep 1; done
+wp cron event list --hook=pagesco_books_mistake --format=count; echo</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>4</code></pre>
+                </div>
+                <p><strong>What it means:</strong> four daily events of the same hook, one per request. WordPress refuses an exact duplicate (same hook, same time, same arguments) but every request has a new <code>time()</code>. On a live site that is one more event per page view, and the job runs as often as the site has visitors; the <code>cron</code> option grows until every request is slowed by loading it. <strong>Fix:</strong> schedule once, on activation, guarded with <code>if ( ! wp_next_scheduled( $hook ) )</code>, and unschedule on deactivation. Clean up (the function returns how many events it removed):</p>
+                <pre data-cli><code class="language-bash">rm wp-content/mu-plugins/mistake-schedule.php
+wp eval 'echo wp_clear_scheduled_hook( "pagesco_books_mistake" ), "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>4</code></pre>
+                </div>
+
+                <h3>3. A job that only listens in the admin</h3>
+                <p>Plugins often wrap their admin code in <code>if ( is_admin() )</code>. If the cron callback ends up inside:</p>
+                <pre data-file="wp-content/mu-plugins/mistake-cron-admin.php"><code class="language-php">&lt;?php
+if ( is_admin() ) {
+	add_action(
+		'pagesco_books_mistake_job',
+		function () {
+			update_option( 'pagesco_books_mistake_ran', 'yes' );
+		}
+	);
+}</code></pre>
+                <p>Schedule a one-time event that is already due, and let WP-Cron run it the way it does on a live site, through <code>wp-cron.php</code>:</p>
+                <pre data-cli data-raises="Error"><code class="language-bash">wp eval 'wp_schedule_single_event( time() - 60, "pagesco_books_mistake_job" );'
+curl -s http://localhost:8080/wp-cron.php
+wp cron event list --hook=pagesco_books_mistake_job --format=count; echo
+wp option get pagesco_books_mistake_ran</code></pre>
+                <div class="card card-output">
+                    <h4>Error</h4>
+                    <pre><code>0
+Error: Could not get 'pagesco_books_mistake_ran' option. Does it exist?</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the event ran (it is gone from the list: zero left) and nothing happened, without any message. In <code>wp-cron.php</code>, <code>is_admin()</code> is false, so the callback was never added; WP-Cron fired a hook nobody listened to. (Run in wp-admin, the same code would work, which makes it a bug that "works on my machine".) <strong>Fix:</strong> add cron callbacks unconditionally, as <code>DailySync::register()</code> does. Remove the file:</p>
+                <pre data-cli><code class="language-bash">rm wp-content/mu-plugins/mistake-cron-admin.php</code></pre>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: The Supplier Sync</h2>
+                <p>The booksellers want to see, on the Books screen, what Riverside has of each book; the supplier's numbers should be at most a day old; past events should leave the Events page by themselves (Lesson 5.5's FAQ promised that); and the shop's assistant should be able to ask "do we have Gatsby, and if not, when?". Allow about 50 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: Give the books their ISBNs <span class="step-time">(5 min)</span></h3>
+                    <p>Suppliers know books by ISBN, and Lesson 5.2 registered <code>pagesco_isbn</code> without filling it. These are the ISBN-13s of the editions the shop sells (real editions; you can look each one up on Open Library). Save the script as <code>wordpress/pagesco-isbns.php</code> and run it once:</p>
+                    <pre data-file="pagesco-isbns.php" data-wp><code class="language-php">&lt;?php
+/**
+ * Gives every book the ISBN-13 of the edition the shop sells (run once with wp eval-file).
+ */
+
+$pagesco_isbns = array(
+	'dune'                   =&gt; '9780441172719',
+	'1984'                   =&gt; '9780451524935',
+	'to-kill-a-mockingbird'  =&gt; '9780060935467',
+	'the-great-gatsby'       =&gt; '9780743273565',
+	'pride-and-prejudice'    =&gt; '9780141439518',
+	'the-hobbit'             =&gt; '9780547928227',
+	'brave-new-world'        =&gt; '9780060850524',
+	'the-catcher-in-the-rye' =&gt; '9780316769488',
+	'lord-of-the-rings'      =&gt; '9780544003415',
+	'fahrenheit-451'         =&gt; '9781451673319',
+	'animal-farm'            =&gt; '9780451526342',
+);
+
+foreach ( $pagesco_isbns as $slug =&gt; $isbn ) {
+	$book = get_page_by_path( $slug, OBJECT, 'book' );
+	if ( $book ) {
+		update_post_meta( $book-&gt;ID, 'pagesco_isbn', $isbn );
+		printf( "%-3d %-24s %s\n", $book-&gt;ID, $book-&gt;post_title, $isbn );
+	}
+}</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>30  Dune                     9780441172719
+31  1984                     9780451524935
+32  To Kill a Mockingbird    9780060935467
+33  The Great Gatsby         9780743273565
+34  Pride and Prejudice      9780141439518
+35  The Hobbit               9780547928227
+36  Brave New World          9780060850524
+37  The Catcher in the Rye   9780316769488
+38  Lord of the Rings        9780544003415
+39  Fahrenheit 451           9781451673319
+40  Animal Farm              9780451526342</code></pre>
+                    </div>
+                    <pre data-cli><code class="language-bash">rm pagesco-isbns.php</code></pre>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: The client and the cached column <span class="step-time">(20 min)</span></h3>
+                    <p>The client knows HTTP and the supplier's API; nothing else in the plugin does. It is not a feature (it adds no hooks), just a class the features use. Create <code>wordpress/wp-content/plugins/pagesco-books/src/Supplier/Client.php</code>:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/Supplier/Client.php"><code class="language-php">&lt;?php
+/**
+ * The supplier's API (Riverside Books), over HTTP.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books\Supplier;
+
+use WP_Error;
+
+/**
+ * Asks the supplier what it has, and places orders. Every method returns data or a WP_Error, never both.
+ *
+ * The address and the API key come from wp-config.php: PAGESCO_BOOKS_SUPPLIER_URL and PAGESCO_BOOKS_SUPPLIER_KEY.
+ */
+final class Client {
+
+	/**
+	 * Seconds to wait for the supplier before giving up.
+	 */
+	private const TIMEOUT = 5;
+
+	/**
+	 * GET /availability: copies at the supplier and the next delivery date, keyed by ISBN.
+	 *
+	 * @param string[] $isbns ISBN-13s without dashes.
+	 * @return array&lt;string, array{available: int, next_delivery: string}&gt;|WP_Error
+	 */
+	public function availability( array $isbns ) {
+		$url = $this-&gt;url( 'availability' );
+		if ( is_wp_error( $url ) ) {
+			return $url;
+		}
+
+		$response = wp_remote_get(
+			add_query_arg( 'isbns', rawurlencode( implode( ',', $isbns ) ), $url ),
+			array(
+				'timeout' =&gt; self::TIMEOUT,
+				'headers' =&gt; $this-&gt;headers(),
+			)
+		);
+
+		$data = $this-&gt;decode( $response );
+		if ( is_wp_error( $data ) ) {
+			return $data;
+		}
+		if ( ! isset( $data['items'] ) || ! is_array( $data['items'] ) ) {
+			return new WP_Error( 'pagesco_supplier_bad_response', __( 'The supplier answered without a list of items.', 'pagesco-books' ) );
+		}
+
+		$availability = array();
+		foreach ( $data['items'] as $item ) {
+			$availability[ (string) ( $item['isbn'] ?? '' ) ] = array(
+				'available'     =&gt; (int) ( $item['available'] ?? 0 ),
+				'next_delivery' =&gt; (string) ( $item['next_delivery'] ?? '' ),
+			);
+		}
+
+		return $availability;
+	}
+
+	/**
+	 * POST /orders: orders copies of a book. Returns the supplier's order confirmation.
+	 *
+	 * @param string $isbn     ISBN-13 without dashes.
+	 * @param int    $quantity How many copies.
+	 * @return array|WP_Error
+	 */
+	public function order( string $isbn, int $quantity ) {
+		$url = $this-&gt;url( 'orders' );
+		if ( is_wp_error( $url ) ) {
+			return $url;
+		}
+
+		$response = wp_remote_post(
+			$url,
+			array(
+				'timeout' =&gt; self::TIMEOUT,
+				'headers' =&gt; $this-&gt;headers() + array( 'Content-Type' =&gt; 'application/json' ),
+				'body'    =&gt; wp_json_encode(
+					array(
+						'isbn'     =&gt; $isbn,
+						'quantity' =&gt; $quantity,
+					)
+				),
+			)
+		);
+
+		return $this-&gt;decode( $response );
+	}
+
+	/**
+	 * The full address of one of the supplier's endpoints, from the URL in wp-config.php.
+	 *
+	 * @param string $endpoint The endpoint's path, such as availability.
+	 * @return string|WP_Error
+	 */
+	private function url( string $endpoint ) {
+		if ( ! defined( 'PAGESCO_BOOKS_SUPPLIER_URL' ) || ! defined( 'PAGESCO_BOOKS_SUPPLIER_KEY' ) ) {
+			return new WP_Error( 'pagesco_supplier_not_configured', __( 'The supplier is not configured in wp-config.php.', 'pagesco-books' ) );
+		}
+
+		return trailingslashit( PAGESCO_BOOKS_SUPPLIER_URL ) . $endpoint;
+	}
+
+	/**
+	 * The headers every request sends: what we accept, and who we are.
+	 */
+	private function headers(): array {
+		return array(
+			'Accept'    =&gt; 'application/json',
+			'X-Api-Key' =&gt; PAGESCO_BOOKS_SUPPLIER_KEY,
+		);
+	}
+
+	/**
+	 * Turns an HTTP response into data, or into a WP_Error for each way it can go wrong.
+	 *
+	 * @param array|WP_Error $response What wp_remote_get() or wp_remote_post() returned.
+	 * @return array|WP_Error
+	 */
+	private function decode( $response ) {
+		// 1. No answer at all: DNS, connection refused, timeout.
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+		$data = json_decode( wp_remote_retrieve_body( $response ), true );
+
+		// 2. An answer, but not a success: 401, 404, 422, 503...
+		if ( $code &lt; 200 || $code &gt; 299 ) {
+			return new WP_Error(
+				'pagesco_supplier_http_error',
+				sprintf(
+					/* translators: 1: HTTP status code, 2: the supplier's message. */
+					__( 'The supplier answered %1$d: %2$s', 'pagesco-books' ),
+					$code,
+					is_array( $data ) &amp;&amp; isset( $data['message'] ) ? $data['message'] : wp_remote_retrieve_response_message( $response )
+				),
+				array(
+					'status'      =&gt; $code,
+					'retry_after' =&gt; wp_remote_retrieve_header( $response, 'retry-after' ),
+				)
+			);
+		}
+
+		// 3. A success that is not the JSON we expect.
+		if ( ! is_array( $data ) ) {
+			return new WP_Error( 'pagesco_supplier_bad_response', __( 'The supplier\'s answer is not JSON.', 'pagesco-books' ) );
+		}
+
+		return $data;
+	}
+}</code></pre>
+                    <ul>
+                        <li><strong>Configuration</strong> comes from the two constants; without them the client returns a <code>WP_Error</code> instead of calling a guessed address. <code>trailingslashit()</code> accepts the URL with or without its final slash.</li>
+                        <li><strong><code>decode()</code></strong> is the three-way check from the section above, in one place. Each failure becomes a <code>WP_Error</code> with a prefixed code, an HTTP status code in its data when there was one, and the <code>Retry-After</code> value.</li>
+                        <li><strong>One request for the whole catalog</strong>: <code>availability()</code> sends all ISBNs at once, and returns an array keyed by ISBN, with real types.</li>
+                        <li><strong><code>order()</code></strong> uses <code>wp_remote_post()</code> with a JSON body (Exercise 1 uses it).</li>
+                    </ul>
+                    <p>The feature keeps the answer and shows it. Create <code>src/Supplier/Availability.php</code>:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/Supplier/Availability.php"><code class="language-php">&lt;?php
+/**
+ * What the supplier has of each book, cached in a transient.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books\Supplier;
+
+use PagesCo\Books\BookPostType;
+use PagesCo\Books\Feature;
+
+/**
+ * Keeps the supplier's availability for the whole catalog in one transient, and shows it on the Books screen.
+ */
+final class Availability implements Feature {
+
+	/**
+	 * The transient that holds the last answer (or the last error).
+	 */
+	public const TRANSIENT = 'pagesco_books_supplier_availability';
+
+	/**
+	 * Keep a good answer for 12 hours; the daily sync refreshes it anyway.
+	 */
+	private const LIFETIME = 12 * HOUR_IN_SECONDS;
+
+	/**
+	 * After a failure, wait 5 minutes before asking again.
+	 */
+	private const RETRY = 5 * MINUTE_IN_SECONDS;
+
+	/**
+	 * Adds a Supplier column to the Books screen.
+	 */
+	public function register(): void {
+		add_filter( 'manage_' . BookPostType::NAME . '_posts_columns', array( $this, 'add_column' ), 20 );
+		add_action( 'manage_' . BookPostType::NAME . '_posts_custom_column', array( $this, 'print_column' ), 10, 2 );
+	}
+
+	/**
+	 * The cached availability; asks the supplier only when there is no cached answer.
+	 *
+	 * @return array{items: array, error: string}
+	 */
+	public function get(): array {
+		$cached = get_transient( self::TRANSIENT );
+
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
+
+		return $this-&gt;refresh();
+	}
+
+	/**
+	 * Asks the supplier now and caches the answer: for 12 hours, or for 5 minutes if it failed.
+	 *
+	 * @return array{items: array, error: string}
+	 */
+	public function refresh(): array {
+		$result = ( new Client() )-&gt;availability( $this-&gt;catalog_isbns() );
+
+		if ( is_wp_error( $result ) ) {
+			$value = array(
+				'items' =&gt; array(),
+				'error' =&gt; $result-&gt;get_error_message(),
+			);
+			set_transient( self::TRANSIENT, $value, self::RETRY );
+
+			return $value;
+		}
+
+		$value = array(
+			'items' =&gt; $result,
+			'error' =&gt; '',
+		);
+		set_transient( self::TRANSIENT, $value, self::LIFETIME );
+
+		return $value;
+	}
+
+	/**
+	 * The ISBNs of the published books that have one.
+	 *
+	 * @return string[]
+	 */
+	private function catalog_isbns(): array {
+		$ids = get_posts(
+			array(
+				'post_type'      =&gt; BookPostType::NAME,
+				'post_status'    =&gt; 'publish',
+				'posts_per_page' =&gt; 100,
+				'fields'         =&gt; 'ids',
+			)
+		);
+
+		$isbns = array_map( fn( $id ) =&gt; (string) get_post_meta( $id, 'pagesco_isbn', true ), $ids );
+
+		return array_values( array_filter( $isbns ) );
+	}
+
+	/**
+	 * Adds the Supplier column after the shop's own Stock column.
+	 *
+	 * @param string[] $columns Column keys and headings.
+	 * @return string[]
+	 */
+	public function add_column( $columns ) {
+		$columns['pagesco_supplier'] = __( 'Supplier', 'pagesco-books' );
+
+		return $columns;
+	}
+
+	/**
+	 * Prints a book's Supplier cell: copies there, or the next delivery date.
+	 *
+	 * @param string $column  The column key.
+	 * @param int    $post_id The book in this row.
+	 */
+	public function print_column( $column, $post_id ): void {
+		if ( 'pagesco_supplier' !== $column ) {
+			return;
+		}
+
+		$isbn         = (string) get_post_meta( $post_id, 'pagesco_isbn', true );
+		$availability = $this-&gt;get();
+		$item         = $availability['items'][ $isbn ] ?? null;
+
+		if ( '' !== $availability['error'] ) {
+			esc_html_e( 'Supplier not reachable', 'pagesco-books' );
+		} elseif ( null === $item ) {
+			echo '&amp;mdash;';
+		} elseif ( $item['available'] &gt; 0 ) {
+			/* translators: %s: number of copies. */
+			echo esc_html( sprintf( _n( '%s copy', '%s copies', $item['available'], 'pagesco-books' ), number_format_i18n( $item['available'] ) ) );
+		} elseif ( '' !== $item['next_delivery'] ) {
+			/* translators: %s: a date. */
+			echo esc_html( sprintf( __( 'None; next delivery %s', 'pagesco-books' ), mysql2date( get_option( 'date_format' ), $item['next_delivery'] ) ) );
+		} else {
+			esc_html_e( 'None', 'pagesco-books' );
+		}
+	}
+}</code></pre>
+                    <ul>
+                        <li><strong><code>get()</code></strong> is the read-through pattern; <code>refresh()</code> always asks, and caches a success for 12 hours or a failure for 5 minutes, in the same shape (<code>items</code>, <code>error</code>), so a cached failure is an array and never <code>false</code>.</li>
+                        <li><strong>The column</strong> uses the same two hooks as Lesson 5.2's <code>BookColumns</code>; two features may add to one filter, and priority 20 puts the Supplier column after the others. Only the Books screen ever waits for the supplier, and only when the note is missing.</li>
+                    </ul>
+                    <p>Register the feature after the events endpoint (in your editor; here with <code>sed</code>), and ask the supplier once from WP-CLI:</p>
+                    <pre data-cli><code class="language-bash">sed -i '/\t\t\tRest\\EventsEndpoint::class,/a\			Supplier\\Availability::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+wp eval '$a = PagesCo\Books\Plugin::instance()-&gt;feature( PagesCo\Books\Supplier\Availability::class )-&gt;refresh(); echo count( $a["items"] ), " books, error: \"", $a["error"], "\"\n"; print_r( $a["items"]["9780743273565"] );'
+wp db query "SELECT option_name, autoload FROM wp_options WHERE option_name LIKE '%pagesco_books_supplier%'"</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>11 books, error: ""
+Array
+(
+    [available] =&gt; 0
+    [next_delivery] =&gt; 2027-11-15
+)
+option_name	autoload
+_transient_timeout_pagesco_books_supplier_availability	off
+_transient_pagesco_books_supplier_availability	off</code></pre>
+                    </div>
+                    <p>Now the Books screen, logged in as Maria (the Supplier cells only):</p>
+                    <pre data-web="/wp-admin/edit.php?post_type=book&amp;orderby=title&amp;order=asc" data-login="maria" data-select-all="td.column-pagesco_supplier" data-text><code class="language-text">http://localhost:8080/wp-admin/edit.php?post_type=book&amp;orderby=title&amp;order=asc   (the Supplier column)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>31 copies
+22 copies
+7 copies
+24 copies
+15 copies
+3 copies
+18 copies
+5 copies
+None; next delivery November 15, 2027
+9 copies
+12 copies</code></pre>
+                    </div>
+                    <p>In title order from 1984 to To Kill a Mockingbird. Gatsby, sold out at the shop, shows the next delivery; The Catcher in the Rye, also sold out at the shop, has five copies at the supplier: time to order. And on a bad day? You can simulate one without touching the sandbox: the <code>pre_http_request</code> filter may answer in place of the network, and returning a <code>WP_Error</code> from it means "no connection" (Lesson 8.1's tests use the same trick):</p>
+                    <pre data-cli><code class="language-bash">wp eval 'add_filter( "pre_http_request", fn() =&gt; new WP_Error( "http_request_failed", "cURL error 7: Failed to connect to api.riverside.example port 443" ) ); $a = PagesCo\Books\Plugin::instance()-&gt;feature( PagesCo\Books\Supplier\Availability::class )-&gt;refresh(); echo $a["error"], "\n";'
+wp eval 'var_dump( get_transient( "pagesco_books_supplier_availability" )["error"] );'
+wp eval 'PagesCo\Books\Plugin::instance()-&gt;feature( PagesCo\Books\Supplier\Availability::class )-&gt;refresh();'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>cURL error 7: Failed to connect to api.riverside.example port 443
+string(65) "cURL error 7: Failed to connect to api.riverside.example port 443"</code></pre>
+                    </div>
+                    <p>The failure is cached (for five minutes) with its message, so the column says "Supplier not reachable" instead of hanging or lying, and the last command, without the filter, restores a good answer.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: The daily sync <span class="step-time">(15 min)</span></h3>
+                    <p>First the events table learns to delete. In your editor, add this method at the end of the <code>EventsTable</code> class in <code>src/EventsTable.php</code>, before the class's closing brace (the commands remove that brace and append the method with a new one):</p>
+                    <pre data-cli><code class="language-bash">sed -i '$d' wp-content/plugins/pagesco-books/src/EventsTable.php</code></pre>
+                    <pre data-append="wp-content/plugins/pagesco-books/src/EventsTable.php"><code class="language-php">	/**
+	 * Deletes the events that start before a date and time, and returns how many it deleted.
+	 *
+	 * @param string $datetime Local date and time, Y-m-d H:i:s.
+	 */
+	public static function delete_before( string $datetime ): int {
+		global $wpdb;
+
+		return (int) $wpdb-&gt;query(
+			$wpdb-&gt;prepare( 'DELETE FROM %i WHERE starts_at &lt; %s', self::name(), $datetime )
+		);
+	}
+}</code></pre>
+                    <p>The job, as a feature. Create <code>src/DailySync.php</code>:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/DailySync.php"><code class="language-php">&lt;?php
+/**
+ * The shop's daily WP-Cron job.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books;
+
+use PagesCo\Books\Supplier\Availability;
+
+/**
+ * Once a day: refresh the supplier's availability and remove events that are over.
+ */
+final class DailySync implements Feature {
+
+	/**
+	 * The cron hook. WP-Cron fires it as an action, so the callback is added like any action.
+	 */
+	public const HOOK = 'pagesco_books_daily_sync';
+
+	/**
+	 * Connects the job to its hook, on every request: WP-Cron runs on whichever request finds it due.
+	 */
+	public function register(): void {
+		add_action( self::HOOK, array( $this, 'run' ) );
+	}
+
+	/**
+	 * Schedules the job once a day, from 3 a.m. tomorrow in the site's time zone. Called on activation.
+	 */
+	public static function schedule(): void {
+		if ( wp_next_scheduled( self::HOOK ) ) {
+			return;
+		}
+
+		$first = new \DateTimeImmutable( 'tomorrow 03:00', wp_timezone() );
+		wp_schedule_event( $first-&gt;getTimestamp(), 'daily', self::HOOK );
+	}
+
+	/**
+	 * Removes the job. Called on deactivation.
+	 */
+	public static function unschedule(): void {
+		wp_clear_scheduled_hook( self::HOOK );
+	}
+
+	/**
+	 * The job itself. It runs without a logged-in user, so it checks no capabilities and prints nothing.
+	 */
+	public function run(): void {
+		$availability = Plugin::instance()-&gt;feature( Availability::class );
+		if ( $availability instanceof Availability ) {
+			$availability-&gt;refresh();
+		}
+
+		// Events that started before today are over (Lesson 5.5's promise).
+		EventsTable::delete_before( wp_date( 'Y-m-d 00:00:00' ) );
+	}
+}</code></pre>
+                    <ul>
+                        <li><strong><code>register()</code></strong> adds the callback on every request, unconditionally (Common Mistake 3).</li>
+                        <li><strong><code>schedule()</code></strong> asks <code>wp_next_scheduled()</code> first (Common Mistake 2), and starts at 3 a.m. tomorrow in the site's time zone (<code>wp_timezone()</code>, Settings &gt; General), a quiet hour, rather than "now".</li>
+                        <li><strong><code>run()</code></strong> reaches the Availability feature through <code>Plugin::instance()-&gt;feature()</code> (Lesson 5.1) and deletes events that started before today, so tonight's event stays on the page until tomorrow.</li>
+                    </ul>
+                    <p>Scheduling belongs to the plugin's life cycle (Lesson 5.1's table promised it): <code>Activator</code> starts the job and stops it. Replace <code>src/Activator.php</code>:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/Activator.php"><code class="language-php">&lt;?php
+/**
+ * What happens when the plugin is activated or deactivated.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books;
+
+/**
+ * Activation and deactivation callbacks (uninstall.php cleans up for good).
+ */
+final class Activator {
+
+	/**
+	 * Runs once, when an administrator activates the plugin.
+	 */
+	public static function activate(): void {
+		$author = get_role( 'author' );
+
+		add_role(
+			'pagesco_bookseller',
+			'Bookseller',
+			$author ? $author-&gt;capabilities : array( 'read' =&gt; true )
+		);
+
+		// init has already run on this request: register the post type and taxonomy now, so their rules exist.
+		( new BookPostType() )-&gt;register_post_type();
+		( new GenreTaxonomy() )-&gt;register_taxonomy();
+		flush_rewrite_rules();
+
+		// Create the events table, or bring it up to date (Lesson 5.5).
+		EventsTable::install();
+
+		// Start the daily WP-Cron job (Lesson 7.3).
+		DailySync::schedule();
+	}
+
+	/**
+	 * Runs once, when the plugin is deactivated. Keeps all data.
+	 */
+	public static function deactivate(): void {
+		// Remove the post type's and taxonomy's rules, so /books/ stops answering while the plugin is off.
+		unregister_post_type( BookPostType::NAME );
+		unregister_taxonomy( GenreTaxonomy::NAME );
+		flush_rewrite_rules();
+
+		// A deactivated plugin's cron job would still be due every day, with no callback to run.
+		DailySync::unschedule();
+	}
+}</code></pre>
+                    <p>Add one line to the end of <code>uninstall.php</code>, so a deleted plugin leaves no note behind:</p>
+                    <pre data-append="wp-content/plugins/pagesco-books/uninstall.php"><code class="language-php">delete_transient( 'pagesco_books_supplier_availability' );</code></pre>
+                    <p>Register the feature, and deactivate and activate the plugin so the new activation code runs on your site (activation code never runs by itself on a site where the plugin is already active):</p>
+                    <pre data-cli><code class="language-bash">sed -i '/\t\t\tSupplier\\Availability::class,/a\			DailySync::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+wp plugin deactivate pagesco-books
+wp plugin activate pagesco-books
+wp cron event list --hook=pagesco_books_daily_sync --fields=hook,recurrence
+wp eval 'echo wp_date( "H:i", wp_next_scheduled( "pagesco_books_daily_sync" ) ), " ", wp_timezone_string(), "\n";'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Plugin 'pagesco-books' deactivated.
+Success: Deactivated 1 of 1 plugins.
+Plugin 'pagesco-books' activated.
+Success: Activated 1 of 1 plugins.
++--------------------------+------------+
+| hook                     | recurrence |
++--------------------------+------------+
+| pagesco_books_daily_sync | 1 day      |
++--------------------------+------------+
+03:00 +00:00</code></pre>
+                    </div>
+                    <p>Scheduled daily from 3:00 in the site's time zone (<code>+00:00</code>, UTC, unless you changed it under Settings &gt; General). To test the job without waiting for tonight, add an event that is over, fire the hook, and look at the table:</p>
+                    <pre data-cli><code class="language-bash">wp eval 'echo PagesCo\Books\EventsTable::add( "Summer reading kickoff", "2025-06-12 18:00:00", "Reading corner", 0 ) &gt; 0 ? "added\n" : "failed\n";'
+wp db query "SELECT COUNT(*) AS events FROM wp_pagesco_events"
+wp eval 'do_action( "pagesco_books_daily_sync" );'
+wp db query "SELECT id, title FROM wp_pagesco_events ORDER BY starts_at"</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>added
+events
+8
+
+id	title
+1	Book club: Dune
+2	Story time: The Hobbit
+3	An evening with Ana Ruiz
+4	Poetry open mic
+5	Book club: Fahrenheit 451
+6	Gift-wrapping night
+7	Book club: Pride and Prejudice</code></pre>
+                    </div>
+                    <p>Eight events before, seven after: the past one is gone, and every event still to come is untouched.</p>
+                    <div class="card card-info">
+                        <h4>💡 If the sample events are already over on your calendar</h4>
+                        <p>Lesson 5.5's seven events have fixed dates so that every reader sees the same lists. The job compares them with <em>your</em> today, so if you take this lesson after those dates, it rightly deletes them as well, and the event lists in later lessons come out shorter than printed. That is the job working, not a bug: add a few events dated a few weeks ahead (for example <code>wp eval 'PagesCo\Books\EventsTable::add( "Book club: Dune", "YYYY-MM-DD 19:00:00", "Reading corner", 20 );'</code> with a real future date) and carry on.</p>
+                    </div>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 4: The check-stock ability <span class="step-time">(10 min)</span></h3>
+                    <p>Create <code>src/Abilities.php</code>:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/Abilities.php"><code class="language-php">&lt;?php
+/**
+ * The shop's abilities: what other programs (and AI assistants) may ask the site to do.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books;
+
+use PagesCo\Books\Supplier\Availability;
+use WP_Error;
+
+/**
+ * Registers the pagesco ability category and the pagesco/check-stock ability (Abilities API, WordPress 6.9+).
+ */
+final class Abilities implements Feature {
+
+	/**
+	 * Hooks into the Abilities API's two registration actions. On WordPress 6.8 they never fire.
+	 */
+	public function register(): void {
+		add_action( 'wp_abilities_api_categories_init', array( $this, 'register_category' ) );
+		add_action( 'wp_abilities_api_init', array( $this, 'register_abilities' ) );
+	}
+
+	/**
+	 * The category that groups the shop's abilities.
+	 */
+	public function register_category(): void {
+		wp_register_ability_category(
+			'pagesco',
+			array(
+				'label'       =&gt; __( 'Pages &amp; Co.', 'pagesco-books' ),
+				'description' =&gt; __( 'What the Pages &amp; Co. bookstore can do.', 'pagesco-books' ),
+			)
+		);
+	}
+
+	/**
+	 * One ability: check a book's stock, at the shop and at the supplier.
+	 */
+	public function register_abilities(): void {
+		wp_register_ability(
+			'pagesco/check-stock',
+			array(
+				'label'               =&gt; __( 'Check a book\'s stock', 'pagesco-books' ),
+				'description'         =&gt; __( 'Says whether the shop has a book in stock, how many copies the supplier has, and when the supplier\'s next delivery is.', 'pagesco-books' ),
+				'category'            =&gt; 'pagesco',
+				'input_schema'        =&gt; array(
+					'type'                 =&gt; 'object',
+					'properties'           =&gt; array(
+						'slug' =&gt; array(
+							'type'        =&gt; 'string',
+							'description' =&gt; __( 'The book\'s slug, such as the-great-gatsby.', 'pagesco-books' ),
+							'minLength'   =&gt; 1,
+						),
+					),
+					'required'             =&gt; array( 'slug' ),
+					'additionalProperties' =&gt; false,
+				),
+				'output_schema'       =&gt; array(
+					'type'       =&gt; 'object',
+					'properties' =&gt; array(
+						'title'              =&gt; array( 'type' =&gt; 'string' ),
+						'in_stock'           =&gt; array( 'type' =&gt; 'boolean' ),
+						'supplier_available' =&gt; array( 'type' =&gt; array( 'integer', 'null' ) ),
+						'next_delivery'      =&gt; array( 'type' =&gt; 'string' ),
+					),
+				),
+				'execute_callback'    =&gt; array( $this, 'check_stock' ),
+				'permission_callback' =&gt; array( $this, 'can_check_stock' ),
+				'meta'                =&gt; array(
+					'annotations'  =&gt; array(
+						'readonly'    =&gt; true,
+						'destructive' =&gt; false,
+						'idempotent'  =&gt; true,
+					),
+					'show_in_rest' =&gt; true,
+				),
+			)
+		);
+	}
+
+	/**
+	 * Staff only: the supplier's numbers are not for the public.
+	 */
+	public function can_check_stock(): bool {
+		return current_user_can( 'edit_others_posts' );
+	}
+
+	/**
+	 * The ability's work: the shop's stock from the book's meta, the supplier's from the cached availability.
+	 *
+	 * @param array $input Validated against input_schema: array( 'slug' =&gt; '…' ).
+	 * @return array|WP_Error
+	 */
+	public function check_stock( $input ) {
+		$book = get_page_by_path( sanitize_title( $input['slug'] ), OBJECT, BookPostType::NAME );
+
+		if ( ! $book || 'publish' !== $book-&gt;post_status ) {
+			return new WP_Error( 'pagesco_book_not_found', __( 'No book was found with that slug.', 'pagesco-books' ), array( 'status' =&gt; 404 ) );
+		}
+
+		$isbn         = (string) get_post_meta( $book-&gt;ID, 'pagesco_isbn', true );
+		$availability = Plugin::instance()-&gt;feature( Availability::class );
+		$item         = $availability instanceof Availability ? ( $availability-&gt;get()['items'][ $isbn ] ?? null ) : null;
+
+		return array(
+			'title'              =&gt; $book-&gt;post_title,
+			'in_stock'           =&gt; (bool) get_post_meta( $book-&gt;ID, 'pagesco_in_stock', true ),
+			'supplier_available' =&gt; $item ? $item['available'] : null,
+			'next_delivery'      =&gt; $item ? $item['next_delivery'] : '',
+		);
+	}
+}</code></pre>
+                    <ul>
+                        <li><strong>The description</strong> is written for a reader who has never seen the shop: an assistant picks abilities by reading it.</li>
+                        <li><strong><code>input_schema</code></strong> requires a <code>slug</code> and allows nothing else (<code>additionalProperties</code> false); WordPress validates the input before your callback runs, and the output against <code>output_schema</code> after it (<code>supplier_available</code> may be an integer or <code>null</code>).</li>
+                        <li><strong>The permission</strong> is staff only (<code>edit_others_posts</code>, as for adding events in Lesson 7.2): the supplier's numbers are business information.</li>
+                        <li><strong><code>readonly</code></strong> tells tools that running it changes nothing, and makes its REST endpoint a <code>GET</code>.</li>
+                    </ul>
+                    <p>Register it, then ask as Maria with her application password (<code>input[slug]</code> in the query string is the input object, written <code>input%5Bslug%5D</code> because <code>curl</code> treats square brackets as a pattern):</p>
+                    <pre data-cli><code class="language-bash">sed -i '/\t\t\tDailySync::class,/a\			Abilities::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+grep -c "::class," wp-content/plugins/pagesco-books/src/Plugin.php</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>20</code></pre>
+                    </div>
+                    <pre data-web="/wp-json/wp-abilities/v1/abilities/pagesco/check-stock" data-auth="maria" data-json-pick="name,label,category,input_schema.required,meta.annotations.readonly"><code class="language-bash">curl -s --user "maria:$PASS" http://localhost:8080/wp-json/wp-abilities/v1/abilities/pagesco/check-stock   (a few fields)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>{
+  "name": "pagesco/check-stock",
+  "label": "Check a book's stock",
+  "category": "pagesco",
+  "input_schema": {
+    "required": [
+      "slug"
+    ]
+  },
+  "meta": {
+    "annotations": {
+      "readonly": true
+    }
+  }
+}</code></pre>
+                    </div>
+                    <pre data-web="/wp-json/wp-abilities/v1/abilities/pagesco/check-stock/run?input%5Bslug%5D=the-great-gatsby" data-auth="maria" data-json><code class="language-bash">curl -s --user "maria:$PASS" 'http://localhost:8080/wp-json/wp-abilities/v1/abilities/pagesco/check-stock/run?input%5Bslug%5D=the-great-gatsby'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>{
+  "title": "The Great Gatsby",
+  "in_stock": false,
+  "supplier_available": 0,
+  "next_delivery": "2027-11-15"
+}</code></pre>
+                    </div>
+                    <p>Sold out at the shop, none at the supplier, next delivery November 15: the whole answer to the bookseller's question in one call, read from the cache without asking the supplier. Devon, and a book the shop does not have:</p>
+                    <pre data-web="/wp-json/wp-abilities/v1/abilities/pagesco/check-stock/run?input%5Bslug%5D=the-great-gatsby" data-auth="devon"><code class="language-bash">curl -s --user "devon:$DEVON_PASS" 'http://localhost:8080/wp-json/wp-abilities/v1/abilities/pagesco/check-stock/run?input%5Bslug%5D=the-great-gatsby'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>{"code":"rest_ability_cannot_execute","message":"Sorry, you are not allowed to execute this ability.","data":{"status":403}}</code></pre>
+                    </div>
+                    <pre data-web="/wp-json/wp-abilities/v1/abilities/pagesco/check-stock/run?input%5Bslug%5D=emma" data-auth="maria" data-headers=""><code class="language-bash">curl -s --user "maria:$PASS" 'http://localhost:8080/wp-json/wp-abilities/v1/abilities/pagesco/check-stock/run?input%5Bslug%5D=emma'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>HTTP/1.1 404 Not Found
+
+{"code":"pagesco_book_not_found","message":"No book was found with that slug.","data":{"status":404}}</code></pre>
+                    </div>
+                    <p>Devon is stopped by the permission callback, with core's message and <code>403</code>. The unknown slug gets the callback's own <code>WP_Error</code>, with the <code>404</code> its data names; without that status the client would get a <code>500</code>, Lesson 7.2's Common Mistake 3 again. The same ability runs from PHP, which is how other plugins (and WordPress 7's AI client, Lesson 9.2) use it, and the final check of the project:</p>
+                    <pre data-cli data-checkpoint><code class="language-bash">wp eval 'print_r( wp_get_ability( "pagesco/check-stock" )-&gt;execute( array( "slug" =&gt; "the-catcher-in-the-rye" ) ) );' --user=maria
+ls wp-content/plugins/pagesco-books/src/Supplier
+wp cron event list --hook=pagesco_books_daily_sync --fields=hook,recurrence
+wp config get PAGESCO_BOOKS_SUPPLIER_URL</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Array
+(
+    [title] =&gt; The Catcher in the Rye
+    [in_stock] =&gt;
+    [supplier_available] =&gt; 5
+    [next_delivery] =&gt;
+)
+Availability.php  Client.php
++--------------------------+------------+
+| hook                     | recurrence |
++--------------------------+------------+
+| pagesco_books_daily_sync | 1 day      |
++--------------------------+------------+
+http://localhost:8080/supplier-sandbox/v1/</code></pre>
+                    </div>
+                    <p>The Catcher in the Rye: sold out here, five at the supplier. In <code>pagesco-plan.txt</code> under "APIs", note: "Supplier (Riverside, sandbox locally): PAGESCO_BOOKS_SUPPLIER_URL/KEY in wp-config. Supplier\Client (wp_remote_get/post), Supplier\Availability (transient pagesco_books_supplier_availability, 12 h / 5 min on error, Supplier column). DailySync: cron pagesco_books_daily_sync daily 03:00 (refresh + delete past events). Ability pagesco/check-stock (staff)."</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li>The supplier sandbox answers at <code>/supplier-sandbox/v1/</code>, and <code>wp-config.php</code> holds <code>PAGESCO_BOOKS_SUPPLIER_URL</code> and <code>PAGESCO_BOOKS_SUPPLIER_KEY</code></li>
+                        <li>All eleven books have their ISBN</li>
+                        <li><code>Supplier\Client</code> turns timeouts, error statuses and bad JSON into <code>WP_Error</code>s; <code>Supplier\Availability</code> caches its answer and the Books screen shows a Supplier column</li>
+                        <li><code>pagesco_books_daily_sync</code> is scheduled once, daily from 3:00, by activation, and is cleared on deactivation</li>
+                        <li>The job refreshes the supplier's numbers and removed the past "Summer reading kickoff" event</li>
+                        <li><code>pagesco/check-stock</code> answers Maria over the REST API and refuses Devon; the plugin has twenty features</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Each exercise leaves the site as the project did. Try each one before you open the solution.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Order Through the Client</h3>
+                    <p>Use <code>Supplier\Client::order()</code> to order 10 copies of The Catcher in the Rye (ISBN from the book's meta), then 80. Print the order number for the first, and the error code, message and HTTP status for the second.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>( new PagesCo\Books\Supplier\Client() )-&gt;order( $isbn, 10 )</code> returns the decoded JSON or a <code>WP_Error</code>. The status is in the error's data: <code>$error-&gt;get_error_data()['status']</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="order-catcher.php" data-wp><code class="language-php">&lt;?php
+$client = new PagesCo\Books\Supplier\Client();
+$isbn   = get_post_meta( 37, 'pagesco_isbn', true );
+
+foreach ( array( 10, 80 ) as $quantity ) {
+	$result = $client-&gt;order( $isbn, $quantity );
+	if ( is_wp_error( $result ) ) {
+		echo $result-&gt;get_error_code(), ' (', $result-&gt;get_error_data()['status'], '): ', $result-&gt;get_error_message(), "\n";
+	} else {
+		echo "Order {$result['order']}: {$result['quantity']} copies, expected {$result['expected_delivery']}\n";
+	}
+}</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Order RB-9488-10: 10 copies, expected 2027-11-08
+pagesco_supplier_http_error (422): The supplier answered 422: quantity must be between 1 and 50.</code></pre>
+                        </div>
+                        <p>The caller never sees HTTP: it gets an order or an error with a message a bookseller can read. A "Reorder" button on the Books screen would be this call behind an admin-post handler with a nonce and a capability check (Lesson 5.3). Remove the script: <code>rm order-catcher.php</code>.</p>
+                        <pre data-cli><code class="language-bash">rm order-catcher.php</code></pre>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Throw Away a Stale Note</h3>
+                    <p>If a bookseller corrects a book's ISBN, the cached availability still has the old one until it expires. In a temporary must-use plugin, delete the transient whenever a book's <code>pagesco_isbn</code> changes. Show that the transient exists, change Dune's ISBN to a test value and back, and show that it is gone; then refresh it.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The action <code>updated_post_meta</code> fires after a meta value changes, with <code>$meta_id, $object_id, $meta_key, $meta_value</code>. <code>update_post_meta()</code> with the value already stored changes nothing and fires nothing.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/mu-plugins/exercise-isbn-cache.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Exercise: Forget the Supplier Note When an ISBN Changes
+ */
+
+add_action(
+	'updated_post_meta',
+	function ( $meta_id, $object_id, $meta_key ) {
+		if ( 'pagesco_isbn' === $meta_key ) {
+			delete_transient( 'pagesco_books_supplier_availability' );
+		}
+	},
+	10,
+	3
+);</code></pre>
+                        <pre data-cli><code class="language-bash">wp eval 'echo false === get_transient( "pagesco_books_supplier_availability" ) ? "missing\n" : "cached\n";'
+wp post meta update 30 pagesco_isbn 9780000000000
+wp post meta update 30 pagesco_isbn 9780441172719
+wp eval 'echo false === get_transient( "pagesco_books_supplier_availability" ) ? "missing\n" : "cached\n";'
+rm wp-content/mu-plugins/exercise-isbn-cache.php
+wp eval 'PagesCo\Books\Plugin::instance()-&gt;feature( PagesCo\Books\Supplier\Availability::class )-&gt;refresh();'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>cached
+Success: Updated custom field 'pagesco_isbn'.
+Success: Updated custom field 'pagesco_isbn'.
+missing</code></pre>
+                        </div>
+                        <p>Deleting a cache entry when its source changes is called <em>invalidation</em>, and it is why a cache's key should say what it depends on. Here one note covers the whole catalog, so any ISBN change throws it away; the next Books screen view or the nightly job fetches a new one.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: Every Six Hours</h3>
+                    <p>The supplier offers fresher numbers. Add a recurrence <code>pagesco_books_six_hours</code> with the <code>cron_schedules</code> filter in a temporary must-use plugin, show it in <code>wp cron schedule list</code>, and show what <code>wp_schedule_event()</code> returns for a recurrence that does not exist, with <code>$wp_error</code> true. Remove the plugin.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The filter receives the schedules array: add <code>'pagesco_books_six_hours' =&gt; array( 'interval' =&gt; 6 * HOUR_IN_SECONDS, 'display' =&gt; __( 'Every six hours', 'pagesco-books' ) )</code>. <code>wp_schedule_event( $timestamp, $recurrence, $hook, $args, $wp_error )</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/mu-plugins/exercise-six-hours.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Exercise: A Six-Hour Recurrence
+ */
+
+add_filter(
+	'cron_schedules',
+	function ( $schedules ) {
+		$schedules['pagesco_books_six_hours'] = array(
+			'interval' =&gt; 6 * HOUR_IN_SECONDS,
+			'display'  =&gt; __( 'Every six hours', 'pagesco-books' ),
+		);
+		return $schedules;
+	}
+);</code></pre>
+                        <pre data-cli><code class="language-bash">wp cron schedule list --fields=name,interval
+wp eval '$e = wp_schedule_event( time(), "pagesco_books_sixhours", "pagesco_books_daily_sync", array(), true ); echo $e-&gt;get_error_code(), ": ", $e-&gt;get_error_message(), "\n";'
+rm wp-content/mu-plugins/exercise-six-hours.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>+-------------------------+----------+
+| name                    | interval |
++-------------------------+----------+
+| hourly                  | 3600     |
+| pagesco_books_six_hours | 21600    |
+| twicedaily              | 43200    |
+| daily                   | 86400    |
+| weekly                  | 604800   |
++-------------------------+----------+
+invalid_schedule: Event schedule does not exist.</code></pre>
+                        </div>
+                        <p>The new recurrence is listed with its interval in seconds; the misspelled one is refused with <code>invalid_schedule</code> (without <code>$wp_error</code> the function would just return <code>false</code>). The filter must stay active as long as an event uses the recurrence, so in the plugin it would be part of <code>DailySync</code>, not a temporary file.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 4: A Real Public API (Stretch)</h3>
+                    <p>This one needs an internet connection. <a href="https://openlibrary.org/developers/api" target="_blank" rel="noopener">Open Library</a> (run by the Internet Archive) has a free search API without a key. Its documentation asks clients to cache responses and to identify themselves with a <code>User-Agent</code> that names the application and a contact email (identified clients get three requests per second instead of one). Fetch the first publication year and the number of editions of The Hobbit from <code>https://openlibrary.org/search.json</code>, with a 10-second timeout and such a User-Agent, and handle the failure cases as the client does.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Parameters <code>title</code>, <code>author</code>, <code>fields=title,first_publish_year,edition_count</code> and <code>limit=1</code>; values with spaces must be encoded: <code>rawurlencode( 'The Hobbit' )</code> inside <code>add_query_arg()</code>, which does not encode for you. The answer has a <code>docs</code> list.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-norun><code class="language-php">&lt;?php
+$url = add_query_arg(
+	array(
+		'title'  =&gt; rawurlencode( 'The Hobbit' ),
+		'author' =&gt; rawurlencode( 'Tolkien' ),
+		'fields' =&gt; 'title,first_publish_year,edition_count',
+		'limit'  =&gt; 1,
+	),
+	'https://openlibrary.org/search.json'
+);
+
+$response = wp_remote_get(
+	$url,
+	array(
+		'timeout'    =&gt; 10,
+		'user-agent' =&gt; 'PagesCoBooks/1.0 (hello@example.com)',
+	)
+);
+
+if ( is_wp_error( $response ) ) {
+	echo 'No answer: ', $response-&gt;get_error_message(), "\n";
+} elseif ( 200 !== wp_remote_retrieve_response_code( $response ) ) {
+	echo 'Open Library answered ', wp_remote_retrieve_response_code( $response ), "\n";
+} else {
+	$data = json_decode( wp_remote_retrieve_body( $response ), true );
+	$book = $data['docs'][0] ?? null;
+	echo $book ? "{$book['title']}: first published {$book['first_publish_year']}, {$book['edition_count']} editions\n" : "Not found\n";
+}</code></pre>
+                        <div class="card card-output">
+                            <h4>Output (recorded on a WordPress 7.1 site with internet access; the edition count changes as Open Library grows)</h4>
+                            <pre><code>The Hobbit: first published 1937, 482 editions</code></pre>
+                        </div>
+                        <p>Save it as a scratch script and run it with <code>wp eval-file</code>; it is not part of the course's verified runs because it depends on a live service, exactly the reason to cache its answers. Replace <code>hello@example.com</code> with your own address when you use the API for real. Remove the script afterwards.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> The supplier answers <code>503 Service Unavailable</code> with an HTML page. What does <code>wp_remote_get()</code> return?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="WP_Error means there was no answer at all. Did the supplier answer?">
+                                A) A WP_Error with the code http_request_failed
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The HTTP API does not throw for error statuses. What did the Three ways to fail script print for the down supplier?">
+                                B) It throws an exception
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="An error status is still a response: an array whose code wp_remote_retrieve_response_code() reports as 503, with the HTML as the body. Only a missing answer is a WP_Error.">
+                                C) A normal response array; wp_remote_retrieve_response_code() returns 503
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> A site runs Redis as a persistent object cache. Where does <code>set_transient( 'pagesco_books_x', $value, HOUR_IN_SECONDS )</code> store the value?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="With an external object cache, transients are stored in the cache only, and may be evicted before they expire; without one they are two rows in wp_options.">
+                                A) In the object cache only, where it may be evicted before the hour is over
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That is where they go without a persistent object cache. What does wp_using_ext_object_cache() change?">
+                                B) In two rows of wp_options, as always
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Transients never need a table of their own. Which store replaces wp_options when a cache is installed?">
+                                C) In a wp_transients table
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> Where should a plugin call <code>wp_schedule_event()</code> for its daily job?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Common Mistake 2 did that. How many events were there after four requests?">
+                                A) On init, on every request, to be sure it exists
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Schedule once on activation, guarded by wp_next_scheduled(), and clear it with wp_clear_scheduled_hook() on deactivation; the callback itself is added on every request.">
+                                B) In the activation callback, after checking wp_next_scheduled(), with wp_clear_scheduled_hook() on deactivation
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Is the job only needed when someone opens wp-admin? And would the event be removed when the plugin is turned off?">
+                                C) On admin_init, so visitors are not slowed down
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> A shop with no visitors between 1 a.m. and 8 a.m. schedules a job for 3:00 with WP-Cron (no system cron). When does it run?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="WordPress has no clock of its own. What starts WP-Cron?">
+                                A) At 3:00 exactly
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="WP-Cron checks for due events on requests; the first request after 3:00, here the first visitor around 8 a.m., starts it. A system cron calling wp cron event run --due-now removes that dependency.">
+                                B) With the first request after 3:00, around 8 a.m.
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Missed events are not dropped; they are due until something runs them. Which request finds them due?">
+                                C) Not that day: missed events are skipped
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> Why does <code>Supplier\Availability</code> cache a failed request for five minutes instead of caching nothing?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The project stores the error as an array, precisely because false means missing. What would happen on every view without a cached failure?">
+                                A) Because get_transient() needs a value of false to work
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The 12-hour answer is a success; a failure stays only five minutes. What is the five minutes protecting?">
+                                B) So that the Supplier column keeps showing old numbers
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Without a cached failure, every Books screen view would call the broken supplier again and wait for its timeout; five minutes protects both sites and still retries soon.">
+                                C) So that a broken supplier is not asked, and waited for, on every screen view
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Should the supplier push changes to us instead (webhooks)?</summary>
+                    <p>Often, yes. If the supplier can call a URL when stock changes, the shop gets news within seconds and makes no requests at all; the URL would be a <code>POST</code> route of your own (Lesson 7.2) whose <code>permission_callback</code> checks a signature or a shared secret the supplier sends, since the supplier has no WordPress user. Many integrations use both: webhooks for speed, a daily pull to catch anything a webhook missed.</p>
+                </details>
+                <details>
+                    <summary>What about heavy or many jobs, such as 5,000 books one by one?</summary>
+                    <p>WP-Cron runs every due event in one request, with PHP's time limit (30 seconds in the course container). For queues of many small jobs, plugins use <strong>Action Scheduler</strong>, the library WooCommerce ships (also available on its own): it stores jobs in its own tables, runs them in batches, retries failures and shows them under Tools &gt; Scheduled Actions. For the shop's one daily call, WP-Cron is enough.</p>
+                </details>
+                <details>
+                    <summary>Should the API key go into the plugin's settings page instead?</summary>
+                    <p>For a plugin other people install, often yes: a site owner cannot edit <code>wp-config.php</code> on every host. Then store it in an option that is not autoloaded, never print it back into the form (show "a key is saved" and a field to replace it), and remember that anyone with a database export has it. The <code>wp-config.php</code> constant or an environment variable is better for your own sites, because it keeps the key out of the database and out of backups of it. Some plugins accept both: a constant, if defined, wins over the setting.</p>
+                </details>
+                <details>
+                    <summary>Can I see what my site sends and receives?</summary>
+                    <p>The <code>http_api_debug</code> action (used in the transients demo) fires after every request with the response, the arguments and the URL; logging it is a quick way to see your integration's traffic. Query Monitor (Lesson 8.1) shows every HTTP request a page made, with its time and status.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Add a "Reorder 10" row action on the Books screen for books the shop has sold out and the supplier has in stock: a link to <code>admin-post.php</code> with a nonce (Lesson 5.3's <code>StockAction</code> is the model), a handler that checks <code>edit_others_posts</code>, calls <code>Client::order()</code>, and redirects back with the order number or the supplier's error in an admin notice. Then think about the timeout rule from this lesson: what should the handler say when the order request timed out, and why must it not simply send the order again?</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Pick a real service a client of yours might want on their site (shipping rates, a newsletter list, weather for an outdoor event, exchange rates). Write down: its endpoint, how it authenticates and where the key will live, what you would cache and for how long, what the page shows when the service is down, and whether a cron job, a webhook or a page view should trigger the call.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Call other servers with <code>wp_remote_get()</code> / <code>wp_remote_post()</code> and read answers with <code>wp_remote_retrieve_response_code()</code>, <code>_body()</code> and <code>_header()</code>; always set a timeout you can afford</li>
+                        <li>Check three failures in order: a <code>WP_Error</code> (no answer, timeout), a status outside 2xx (still a normal response), and a body that is not the data you expect</li>
+                        <li>Keys and environment-specific URLs live in <code>wp-config.php</code>, not in code; use <code>wp_safe_remote_*()</code> for URLs that users supply</li>
+                        <li>Transients are options with an expiry (two non-autoloaded rows, or the persistent object cache when there is one); they can vanish early, so read through and never store <code>false</code>; cache failures briefly</li>
+                        <li>WP-Cron runs due events on the next request, as actions, without a user: schedule once on activation with <code>wp_next_scheduled()</code>, clear on deactivation, add the callback on every request</li>
+                        <li>The Abilities API describes units of work (input and output schemas, a permission check) that tools can discover and run, through PHP or <code>/wp-json/wp-abilities/v1/</code></li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>A GET with a key and a timeout</td><td><code>wp_remote_get( $url, array( 'timeout' =&gt; 5, 'headers' =&gt; array( 'X-Api-Key' =&gt; KEY ) ) )</code></td></tr>
+                            <tr><td>A JSON POST</td><td><code>wp_remote_post( $url, array( 'headers' =&gt; array( 'Content-Type' =&gt; 'application/json' ), 'body' =&gt; wp_json_encode( $data ) ) )</code></td></tr>
+                            <tr><td>The status and the data</td><td><code>wp_remote_retrieve_response_code( $r )</code>, <code>json_decode( wp_remote_retrieve_body( $r ), true )</code></td></tr>
+                            <tr><td>A cached value</td><td><code>get_transient( $key )</code> (false = missing), <code>set_transient( $key, $value, 12 * HOUR_IN_SECONDS )</code></td></tr>
+                            <tr><td>A daily job</td><td><code>if ( ! wp_next_scheduled( $hook ) ) { wp_schedule_event( $start, 'daily', $hook ); }</code> + <code>add_action( $hook, $callback )</code></td></tr>
+                            <tr><td>Stop it</td><td><code>wp_clear_scheduled_hook( $hook )</code></td></tr>
+                            <tr><td>Inspect it</td><td><code>wp cron event list</code>, <code>wp cron schedule list</code>, <code>wp cron test</code>, <code>wp transient get</code></td></tr>
+                            <tr><td>An ability</td><td><code>wp_register_ability( 'pagesco/check-stock', array( 'label', 'description', 'category', 'input_schema', 'execute_callback', 'permission_callback', 'meta' ) )</code> on <code>wp_abilities_api_init</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You turned the shop's site into a careful API client that survives a slow, broken or confused supplier</li>
+                        <li>You kept the supplier's key and address out of the code</li>
+                        <li>You cached the supplier's answers, failures included, so pages never wait on another company's server</li>
+                        <li>You scheduled the shop's first nightly job, and kept Lesson 5.5's promise: past events now clean themselves up</li>
+                        <li>You gave the shop its first ability, ready for assistants and automation tools</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>Module 7 is done: the site serves an API, has its own routes, and calls others. Module 8 is about working like a professional, and it starts with the question every one of these lessons has quietly raised: how do you know your code works, and how do you find out why it does not? In <a href="lesson_26.html"><strong>Lesson 8.1: Debugging &amp; Testing</strong></a> you go deeper into <code>WP_DEBUG</code> and the debug log, try Query Monitor, write automated PHPUnit tests for the plugin (including the supplier client, with <code>pre_http_request</code> instead of the network) in a wp-env test environment, and check the code against the WordPress Coding Standards with PHPCS.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Open the Books screen and check the Supplier column, and confirm that <code>wp cron event list</code> shows <code>pagesco_books_daily_sync</code> once</li>
+                    <li>Make sure the scratch scripts and must-use plugins from today are gone (<code>ls wordpress wordpress/wp-content/mu-plugins</code>)</li>
+                    <li>Lesson 8.1 uses wp-env, which needs Node.js 22.13 or newer (Node 24 from Lesson 6.1 is fine): check with <code>node --version</code></li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Most code that talks to other servers is written for the sunny day, and works until the first rainy one. Today you wrote for the rain on purpose: a supplier that is down, slow, or answering nonsense, a job that might run late, a note that might fall off the wall. That habit of asking "and what if it fails?" is what separates an integration you can leave running for years from one that pages you at night. If the three failure kinds still blur together, run the Three ways to fail script again and read its three answers slowly.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_24.html" class="prev-lesson">← Previous: Custom REST Endpoints</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_26.html" class="next-lesson">Next: Debugging &amp; Testing →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

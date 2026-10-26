@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facilitator Guide: Session 11</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">contains answers &amp; timing · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Facilitator Guide</div>
+    <h1>Session 11: Custom Tables, Shortcodes and Block Setup</h1>
+    <p class="sub">How to teach Session 11. Finish Module 5 with shortcodes that return escaped HTML and a custom events table built with dbDelta(), read and written with $wpdb and migrated by a schema version, then open Module 6: Node 24, create-block in the existing plugin, the @wordpress/scripts build and its manifest, and the Blocks feature that registers the Book Card.</p>
+    <div class="meta-row">
+      <span class="chip"><b>2</b> lessons</span>
+      <span class="chip"><b>3 hrs</b> session</span>
+      <span class="chip">Lessons <b>5.5–6.1</b></span>
+      <span class="chip">Session <b>11</b> of 18 · Part 2</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>How to Use This Guide</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Same rhythm for both lessons: frame → live demo (you type, they type along) → guided lab (a kit lab, new practice) → start the lesson's own project. Exercises, quiz and journal are homework.</li>
+  <li>Every command below was run to produce the output printed under it, on WordPress 7.1.3 / PHP 8.5: the 5.5 demo on the site as Lesson 5.4 leaves it (<code class="inline">after:lesson_17</code>), the 6.1 demo on the site as Lesson 5.5 leaves it, with Node 24 in the node:24 container (create-block, npm install and the build really ran).</li>
+  <li><b>Type the short things, copy the long ones</b>: the WP-CLI, sed and npm lines are typed; BookShortcode.php, EventsTable.php, the Activator, the test scripts, package.json and Blocks.php are copied from the lesson pages and read aloud.</li>
+  <li>Keep <code class="inline">lesson_18.html</code> and <code class="inline">lesson_19.html</code> open. Labs live in <code class="inline">labs/module-11/</code>: <code class="inline">_starter</code> files and folders are handouts, <code class="inline">_solution</code> ones are yours.</li>
+  <li>Session 11 is the hinge between PHP and JavaScript: the first half finishes Module 5 (data), the second starts Module 6 (blocks). Lesson 6.1 needs Node 24 and a 540 MB npm install: the warm-up starts that download.</li>
+</ul>
+<div class="note warn"><div class="t">The #1 risk of Session 11: the npm install eats Lesson 6.1</div>
+<p>Twenty laptops downloading 540 MB of build tools at once over venue Wi-Fi can take longer than the whole lesson. <b>Before:</b> Session 10's bring list asked for Node 24; email again two days ahead. <b>In the warm-up:</b> every learner creates pagesco-books/package.json from Lesson 6.1 (it does not depend on Lesson 5.5) and starts <code class="inline">npm install</code> in a second terminal, so the download runs through Lesson 5.5. <b>In the demo:</b> if a laptop is still installing, the learner follows on the projector and builds at the project start. The shelf_label lab needs no Node at all (its build/ is prebuilt).</p>
+</div>
+
+  <div class="sec"><h2>Before the Session</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ <b>Homework check by email:</b> the site at the end of Lesson 5.4 (nine features, <code class="inline">wp option get pagesco_books_settings</code> prints the defaults), and <code class="inline">node --version</code> printing v24 (or <code class="inline">docker pull node:24</code> done).</li>
+  <li>☐ <b>Run the kit check once:</b> <code class="inline">python3 labs/check_labs.py module-11</code> (19 results in about two minutes; every line PASS).</li>
+  <li>☐ <b>Projector machine at the end of Lesson 5.4</b> (<code class="inline">after:lesson_17</code>), Node 24 installed, <code class="inline">npm install</code> for pagesco-books already done once at home (so the npm cache is warm), VS Code, two terminals, the post editor in a browser tab.</li>
+  <li>☐ <b>Board:</b> the storage table (content = post type, groups = taxonomy, site-wide values = option, many uniform rows = custom table); the kit-workshop-shelf drawing: <b>src/blocks → npm run build → build/blocks + manifest → Blocks feature on init → the editor and the front end</b>.</li>
+  <li>☐ <b>Print or share:</b> the workbook, sticky notes.</li>
+</ul>
+<div class="blk warn"><div class="h">Known traps of Session 11</div>
+<table class="timing">
+<thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td>The shortcode's output appears above the page</td><td>The callback echoes</td><td>Build a string and return it (ob_start() / ob_get_clean() for template-style HTML).</td></tr>
+<tr><td>A new column never appears</td><td>schema() changed, DB_VERSION not raised</td><td>Raise DB_VERSION; the next request migrates.</td></tr>
+<tr><td><code class="inline">Unknown column</code> after renaming a column in schema()</td><td>dbDelta() only adds; the old column stays and the new one is empty</td><td>An explicit ALTER TABLE step for that version.</td></tr>
+<tr><td><code class="inline">npx</code> asks "Ok to proceed?" and seems to hang</td><td>The first create-block download</td><td>Answer y.</td></tr>
+<tr><td>A second plugin <code class="inline">book-card</code> appears in the Plugins list</td><td>create-block without --no-plugin, in wp-content/plugins</td><td><code class="inline">rm -r wp-content/plugins/book-card</code>; scaffold with --no-plugin --target-dir.</td></tr>
+<tr><td>"The specified manifest file does not exist." above every page</td><td>No build/ (fresh checkout, npm never ran)</td><td><code class="inline">npm install &amp;&amp; npm run build</code> in the plugin folder.</td></tr>
+<tr><td>The editor shows the old block after a change</td><td>build/ is stale</td><td><code class="inline">npm run build</code>, or keep <code class="inline">npm start</code> running.</td></tr>
+<tr><td><code class="inline">npm</code> or <code class="inline">node</code> not found in Ubuntu on Windows</td><td>Node installed in Windows, not in WSL</td><td>Install Node inside WSL (nvm), or use the node:24 image.</td></tr>
+<tr><td>EACCES errors from npm in the docker run line</td><td>The container ran as root, or HOME is not writable</td><td>The lesson's <code class="inline">--user "$(id -u):$(id -g)" -e HOME=/tmp</code>.</td></tr>
+</tbody>
+</table>
+</div>
+
+  <div class="sec"><h2>Session 11 Agenda (3 hours)</h2><span class="rule"></span></div>
+  <table class="timing">
+    <thead><tr><th>Clock</th><th>Minutes</th><th>Segment</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="t">0:00</td><td class="t">15</td><td>Warm-up</td><td>Five retrieval questions on Session 10; homework check; <code class="inline">node --version</code> on every laptop and the npm install started early.</td></tr>
+      <tr><td class="t">0:15</td><td class="t">10</td><td><b>5.5</b> Frame and mental model</td><td>A placeholder card in the shop window; when a custom table is right.</td></tr>
+      <tr><td class="t">0:25</td><td class="t">25</td><td><b>5.5</b> Live demo</td><td>The book card shortcode and its attributes, the events table with dbDelta(), a row's life with $wpdb, a schema change without a version.</td></tr>
+      <tr><td class="t">0:50</td><td class="t">15</td><td><b>5.5</b> Guided lab</td><td><code class="inline">labs/module-11/l5_5-custom-tables/wishlist_table_starter.php</code>: a throwaway table from CREATE to DROP.</td></tr>
+      <tr><td class="t">1:05</td><td class="t">15</td><td><b>5.5</b> Start the lesson project</td><td>The events calendar: Steps 1 and 2 (the migration to version 2, the table dropped on uninstall).</td></tr>
+      <tr><td class="t">1:20</td><td class="t">10</td><td>Break</td><td>Laptops whose npm install has not finished keep it running; nobody starts it now on venue Wi-Fi without asking.</td></tr>
+      <tr><td class="t">1:30</td><td class="t">10</td><td><b>6.1</b> Frame and mental model</td><td>A kit, a workshop and a shelf; what a block is for a developer.</td></tr>
+      <tr><td class="t">1:40</td><td class="t">35</td><td><b>6.1</b> Live demo</td><td>Node 24, create-block --no-plugin, package.json and the build, the manifest, the Blocks feature, a missing build, a stale build.</td></tr>
+      <tr><td class="t">2:15</td><td class="t">15</td><td><b>6.1</b> Guided lab</td><td><code class="inline">labs/module-11/l6_1-block-setup/shelf_label_starter/</code>: register a prebuilt block from its manifest.</td></tr>
+      <tr><td class="t">2:30</td><td class="t">20</td><td><b>6.1</b> Start the lesson project</td><td>The Book Card's first draft: Step 1 (make it the shop's, rebuild) and a look in the editor (Step 2).</td></tr>
+      <tr><td class="t">2:50</td><td class="t">10</td><td>Wrap-up</td><td>Exit ticket (3 questions), homework, bring list for Session 12.</td></tr>
+      <tr><td class="t"><b>Total</b></td><td class="t"><b>180</b></td><td></td><td>Ends at 3:00.</td></tr>
+    </tbody>
+  </table>
+<p><b>In the room.</b> The lesson pages estimate 140 + 135 = 275 minutes for a learner working alone; the room has 145. Both lessons keep their shape; Lesson 6.1's demo gets 35 minutes because the toolchain is new for everyone.</p>
+<p><b>Goes home (about 2 to 3 hours).</b> 5.5: project Steps 3 and 4 (the [pagesco_events] shortcode, the seeded events, the Events page) and Common Mistakes 1 and 3 if skipped. 6.1: the project Steps 3 and 4 (the block on the front end, the final check) and the FAQ. Each lesson's Hands-on Exercises, both Quick Quizzes and both journal entries.</p>
+<p><b>Protect, in this order:</b> a working build and a registered Book Card on every laptop (Sessions 12 and 13 build on it); the 5.5 table with a versioned migration; one shortcode that returns. <b>Cut first:</b> the 5.5 attribute cases (the self-check covers them), then the 6.1 stale-build mistake (say the sentence), then the 5.5 project Step 2 (uninstall.php goes home).</p>
+
+  <div class="sec"><h2>Opening Segment</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">0:00</span><h3>Warm-up, Homework Check and Node</h3><span class="dur">15 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Timing</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">7m</td><td>Five retrieval questions on Session 10 (W1 to W5)</td></tr>
+<tr><td class="t">8m</td><td>Homework check, then <code class="inline">node --version</code> and the early <code class="inline">npm install</code></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Sequence and talking points</div>
+<ul class="tick">
+  <li><b>Retrieval (7m).</b> W1 to W5 in the workbook, then answers. W4 (%i) and W5 (uninstall) lead straight into Lesson 5.5.</li>
+  <li><b>Homework check (3m).</b> From the WP-CLI container shell:</li>
+</ul>
+<pre class="code">grep -c '::class,' wp-content/plugins/pagesco-books/src/Plugin.php</pre><pre class="out">9</pre><pre class="code">wp option get pagesco_books_settings --format=json</pre><pre class="out">{"notice_extra":"Open until 9 p.m. on Thursdays.","show_events_link":true,"books_per_page":6,"events_limit":5}</pre><ul class="tick">
+  <li><b>Node and the early install (5m).</b> Everyone: <code class="inline">node --version</code> (the course runs v24.21.0; any v24 is right). Then create wordpress/wp-content/plugins/pagesco-books/package.json from Lesson 6.1 (copy it) and start <code class="inline">npm install</code> in that folder in a second terminal (or the lesson's docker run line with <code class="inline">npm install</code>). It runs while we do Lesson 5.5.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Warm-up answers (W1 to W5)</div>
+<ol class="steps">
+  <li><b>W1</b> Genuine (nonce), allowed (<code class="inline">current_user_can()</code> for this object), sanitize and validate, escape on output; SQL by hand through <code class="inline">$wpdb-&gt;prepare()</code>.</li>
+  <li><b>W2</b> The group (<code class="inline">pagesco_books</code>), the first argument of <code class="inline">register_setting()</code>; <code class="inline">do_settings_sections()</code> takes the slug.</li>
+  <li><b>W3</b> Nothing: missing means off (<code class="inline">! empty( ... )</code>).</li>
+  <li><b>W4</b> <code class="inline">%i</code> (WordPress 6.2+), today's lesson builds a whole table with it.</li>
+  <li><b>W5</b> The plugin's own data (the settings option, the role); the shop's books stay. Today the events table joins the "remove" list.</li>
+</ol>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Lesson Plans</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">5.5</span><h3>Shortcodes, $wpdb &amp; Custom Tables</h3><span class="dur">65 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Register shortcodes with add_shortcode() whose callbacks return escaped HTML, with attributes handled by shortcode_atts()</li>
+  <li>Decide when a custom table is the right storage, and when post types, meta, taxonomies or options are</li>
+  <li>Create and upgrade a table with dbDelta() and a schema version stored in an option</li>
+  <li>Read and write rows with $wpdb: insert(), update(), delete(), get_row(), get_var(), get_results(), always through prepare() or format arrays</li>
+  <li>Remove the table and its version option in uninstall.php</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing in the room</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame: the placeholder card; when a custom table is right</td></tr>
+<tr><td class="t">25m</td><td>Live demo: BookShortcode, attributes, the table, a row's life, a schema change without a version</td></tr>
+<tr><td class="t">15m</td><td>Guided lab: <code class="inline">wishlist_table_starter.php</code></td></tr>
+<tr><td class="t">15m</td><td>Start the lesson project: Steps 1 and 2</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Mental model to say</div>
+<p>"Picture the shop window with a small card that reads 'Book of the Month goes here'. Whoever dresses the window does not need to know the price or the stock; every morning someone swaps the card for the real book. A shortcode is that card: the editor writes <code class="inline">[pagesco_book id="30"]</code>, and on every page view your callback swaps it for the book's current title, price and stock."</p>
+<p>Then the second picture: "Post types, meta, taxonomies and options give you admin screens, REST, revisions and export for free. A table of your own gives all that up, so it is the last choice, for many rows with the same few fields, queried by those fields: events, later bookings and holds." And the one rule for both: <b>values reach SQL only through placeholders</b>.</p>
+</div>
+<div class="blk"><div class="h">Live demo (you type, they follow)</div>
+<p>On the site as Lesson 5.4 leaves it.</p>
+<ol class="steps">
+  <li><b>A shortcode returns, never echoes (4m).</b> "A shortcode is a placeholder card in the shop window." Learners copy src/Shortcodes/BookShortcode.php; read render() aloud: shortcode_atts(), absint(), a check that it is a published book, every value escaped, a returned string. List it and run it by hand:
+<pre class="code">sed -i '/Admin\\SettingsPage::class,/a\			Shortcodes\\BookShortcode::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+wp eval 'echo do_shortcode( "[pagesco_book id=\"30\"]" ), "\n";'</pre>
+<pre class="out">&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/dune/"&gt;Dune&lt;/a&gt; by Frank Herbert, &lt;span class="pagesco-book__price"&gt;$14.99&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;</pre></li>
+  <li><b>Four ways to write the tag (3m).</b> "Attributes arrive as strings, or as an empty string." Save the lesson's test file in the WordPress root and run it:
+<pre class="code"><span class="k">&lt;?php</span>
+<span class="v">$cases</span> = <span class="k">array</span>(
+	<span class="s">'[pagesco_book id="33"]'</span>,               <span class="c">// another book</span>
+	<span class="s">'[pagesco_book id="12"]'</span>,               <span class="c">// ID 12 is the About page, not a book</span>
+	<span class="s">'[pagesco_book]'</span>,                       <span class="c">// no attributes at all</span>
+	<span class="s">'[pagesco_book ID="35" color="red"]'</span>,   <span class="c">// upper-case name, unknown attribute</span>
+);
+<span class="k">foreach</span> ( <span class="v">$cases</span> <span class="k">as</span> <span class="v">$case</span> ) {
+	<span class="k">echo</span> <span class="v">$case</span>, <span class="s">"\n  =&gt; '"</span>, do_shortcode( <span class="v">$case</span> ), <span class="s">"'\n"</span>;
+}</pre>
+<pre class="out">[pagesco_book id="33"]
+  =&gt; '&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/the-great-gatsby/"&gt;The Great Gatsby&lt;/a&gt; by F. Scott Fitzgerald, &lt;span class="pagesco-book__price"&gt;$8.99&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;Sold out&lt;/span&gt;&lt;/span&gt;'
+[pagesco_book id="12"]
+  =&gt; ''
+[pagesco_book]
+  =&gt; ''
+[pagesco_book ID="35" color="red"]
+  =&gt; '&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/the-hobbit/"&gt;The Hobbit&lt;/a&gt; by J.R.R. Tolkien, &lt;span class="pagesco-book__price"&gt;$10.99&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;'</pre>
+A page that is not a book, no attribute at all: an empty string, never an error message in a public page. Upper-case names are lowercased; undeclared attributes dropped.</li>
+  <li><b>When a table is right (2m).</b> Put the lesson's storage table on the board (post type, taxonomy, option, custom table) and ask where events go before showing it. Many uniform rows, listed by date, never written in the editor: a table, with everything a post type gives for free now written by hand.</li>
+  <li><b>The table, with dbDelta() (6m).</b> Learners copy src/EventsTable.php (version 1) and the new Activator.php; point at the four formatting rules of dbDelta() and at name() built from $wpdb-&gt;prefix. List the feature and reactivate:
+<pre class="code">sed -i '/Admin\\SettingsPage::class,/a\			EventsTable::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+wp plugin deactivate pagesco-books
+wp plugin activate pagesco-books
+wp option get pagesco_books_db_version</pre>
+<pre class="out">Plugin 'pagesco-books' deactivated.
+Success: Deactivated 1 of 1 plugins.
+Plugin 'pagesco-books' activated.
+Success: Activated 1 of 1 plugins.
+1</pre>
+<pre class="code">DESCRIBE wp_pagesco_events;</pre>
+<pre class="out">+------------+-----------------+------+-----+---------+----------------+
+| Field      | Type            | Null | Key | Default | Extra          |
++------------+-----------------+------+-----+---------+----------------+
+| id         | bigint unsigned | NO   | PRI | NULL    | auto_increment |
+| title      | varchar(200)    | NO   |     | NULL    |                |
+| starts_at  | datetime        | NO   | MUL | NULL    |                |
+| location   | varchar(200)    | NO   |     |         |                |
+| created_at | datetime        | NO   |     | NULL    |                |
++------------+-----------------+------+-----+---------+----------------+</pre>
+Version 1 recorded, starts_at indexed (MUL).</li>
+  <li><b>A row's whole life (4m).</b> "Six methods, every value through a placeholder." The lesson's script in the WordPress root:
+<pre class="code"><span class="k">&lt;?php</span>
+<span class="k">use</span> PagesCo\Books\EventsTable;
+
+<span class="k">global</span> <span class="v">$wpdb</span>;
+<span class="v">$table</span> = EventsTable::name();
+
+<span class="v">$id</span> = EventsTable::add( <span class="s">'Test event'</span>, <span class="s">'2027-10-31 12:00:00'</span>, <span class="s">'Back office'</span> );
+<span class="k">echo</span> <span class="s">"insert: new ID $id\n"</span>;
+
+<span class="v">$row</span> = <span class="v">$wpdb</span>-&gt;get_row( <span class="v">$wpdb</span>-&gt;prepare( <span class="s">'SELECT title, location FROM %i WHERE id = %d'</span>, <span class="v">$table</span>, <span class="v">$id</span> ) );
+<span class="k">echo</span> <span class="s">"get_row: {$row-&gt;title} in the {$row-&gt;location}\n"</span>;
+
+<span class="v">$changed</span> = <span class="v">$wpdb</span>-&gt;update( <span class="v">$table</span>, <span class="k">array</span>( <span class="s">'location'</span> =&gt; <span class="s">'Café'</span> ), <span class="k">array</span>( <span class="s">'id'</span> =&gt; <span class="v">$id</span> ), <span class="k">array</span>( <span class="s">'%s'</span> ), <span class="k">array</span>( <span class="s">'%d'</span> ) );
+<span class="k">echo</span> <span class="s">"update: $changed row(s) changed\n"</span>;
+
+<span class="k">echo</span> <span class="s">'prepare: '</span>, <span class="v">$wpdb</span>-&gt;prepare( <span class="s">'SELECT COUNT(*) FROM %i WHERE location = %s'</span>, <span class="v">$table</span>, <span class="s">"Children's corner"</span> ), <span class="s">"\n"</span>;
+
+<span class="v">$deleted</span> = <span class="v">$wpdb</span>-&gt;delete( <span class="v">$table</span>, <span class="k">array</span>( <span class="s">'id'</span> =&gt; <span class="v">$id</span> ), <span class="k">array</span>( <span class="s">'%d'</span> ) );
+<span class="k">echo</span> <span class="s">"delete: $deleted row(s) deleted\n"</span>;
+<span class="k">echo</span> <span class="s">'rows left: '</span>, <span class="v">$wpdb</span>-&gt;get_var( <span class="v">$wpdb</span>-&gt;prepare( <span class="s">'SELECT COUNT(*) FROM %i'</span>, <span class="v">$table</span> ) ), <span class="s">"\n"</span>;</pre>
+<pre class="out">insert: new ID 1
+get_row: Test event in the Back office
+update: 1 row(s) changed
+prepare: SELECT COUNT(*) FROM `wp_pagesco_events` WHERE location = 'Children\'s corner'
+delete: 1 row(s) deleted
+rows left: 0</pre>
+Point at the prepare: line: the table in backticks from %i, the apostrophe escaped. Then <code class="inline">rm events-crud.php</code>.</li>
+  <li><b>Mistake: a schema change without a version (4m).</b> "The shop wants a host per event. Add the column, reload, and..."
+<pre class="code">sed -i 's/^\t\t\tcreated_at datetime NOT NULL,$/&amp;\n\t\t\thost varchar(100) NOT NULL,/' wp-content/plugins/pagesco-books/src/EventsTable.php
+grep -n "host varchar" wp-content/plugins/pagesco-books/src/EventsTable.php
+curl -s -o /dev/null http://localhost:8080/
+wp option get pagesco_books_db_version
+wp db query "SELECT COUNT(*) AS host_columns FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'wp_pagesco_events' AND COLUMN_NAME = 'host'"</pre>
+<pre class="out">75:			host varchar(100) NOT NULL,
+1
+host_columns
+0</pre>
+0 host columns: maybe_upgrade() only runs when DB_VERSION is higher. Take the line out again (<code class="inline">sed -i '/host varchar(100)/d' ...</code>). The project does it right.</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b>A shortcode that echoes.</b> Coach: "Where does echo print, and when does the callback run?" (the open_hours lab shows it).</li>
+  <li><b>Hard-coding wp_ or interpolating values into SQL.</b> Coach: "Who controls this string? $wpdb-&gt;prefix is WordPress's; anything from a visitor goes through a placeholder." (Self-check Q3.)</li>
+  <li><b>A schema change without DB_VERSION</b>, or a rename expected from dbDelta(). Coach with the two mistakes of the lesson: dbDelta only ADDS, and only when asked. (Self-check Q5.)</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<p><b>File:</b> <code class="inline">labs/module-11/l5_5-custom-tables/wishlist_table_starter.php</code>; your reference is <code class="inline">labs/module-11/l5_5-custom-tables/wishlist_table_solution.php</code>. A throwaway wishlist table (which reader wants which book) from CREATE to DROP in one script: dbDelta() in the right shape, inserts with format arrays, a JOIN with wp_posts through prepare() and %i, an update with a where format, then DROP TABLE and a proof it is gone. Not the events table (the project's).</p>
+<ul class="tick">
+  <li><b>Run it as shipped (2m):</b> five TODO lines.</li>
+  <li><b>TODOs 1 to 5 in pairs (10m),</b> running after each. Circulate for <code class="inline">PRIMARY KEY (id)</code> with one space, a comma after the last column, and values written into the SQL instead of the format array. If a run stops half-way: <code class="inline">wp db query "DROP TABLE IF EXISTS wp_pagesco_lab_wishlist"</code>.</li>
+  <li><b>Expected when done:</b></li>
+</ul>
+<pre class="out">Created table wp_pagesco_lab_wishlist
+rows: 4, last ID 4
+Dune: 2 reader(s)
+Fahrenheit 451: 1 reader(s)
+The Hobbit: 1 reader(s)
+updated: 1 row(s)
+tables left: 0</pre><ul class="tick">
+  <li><b>Debrief (3m):</b> "What did dbDelta() return, and what would it return on a second run?" (an empty array: nothing to change). "Which line would break if a reader were named O'Brien?" (none: placeholders).</li>
+  <li><b>Fast finishers:</b> the must-use plugin <code class="inline">labs/module-11/l5_5-custom-tables/open_hours_starter/</code> with <code class="inline">labs/module-11/l5_5-custom-tables/test_open_hours.sh</code>, then <code class="inline">labs/module-11/l5_5-custom-tables/debug_events_report.php</code> (after the project's seeding).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Start the lesson project</div>
+<p>The lesson project is <b>The Events Calendar</b>. In the room: Steps 1 and 2 (15 minutes).</p>
+<ul class="tick">
+  <li>Step 1: replace EventsTable.php with version 2 (copy it: DB_VERSION 2, a capacity column, add() and find() learn it). Do NOT reactivate; load a page and check:</li>
+</ul>
+<pre class="code">curl -s -o /dev/null http://localhost:8080/
+wp option get pagesco_books_db_version</pre><pre class="out">2</pre><pre class="code">SELECT COLUMN_NAME, COLUMN_TYPE, COLUMN_DEFAULT
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'wp_pagesco_events'
+ORDER BY ORDINAL_POSITION;</pre><pre class="out">+-------------+-------------------+----------------+
+| COLUMN_NAME | COLUMN_TYPE       | COLUMN_DEFAULT |
++-------------+-------------------+----------------+
+| id          | bigint unsigned   | NULL           |
+| title       | varchar(200)      | NULL           |
+| starts_at   | datetime          | NULL           |
+| location    | varchar(200)      |                |
+| created_at  | datetime          | NULL           |
+| capacity    | smallint unsigned | 0              |
++-------------+-------------------+----------------+</pre><ul class="tick">
+  <li>capacity was appended at the end: a fresh install from version 2 has the statement's order instead, which is why nobody SELECTs *.</li>
+  <li>Step 2: replace uninstall.php (the table and both options go, the books stay) and test it while the table is still empty:</li>
+</ul>
+<pre class="code">wp plugin uninstall pagesco-books --deactivate --skip-delete
+wp db query "SELECT COUNT(*) AS events_tables FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'wp_pagesco_events'"
+wp option list --search='pagesco_books*'
+wp plugin activate pagesco-books
+wp option get pagesco_books_db_version</pre><pre class="out">Deactivating 'pagesco-books'...
+Plugin 'pagesco-books' deactivated.
+Ran uninstall procedure for 'pagesco-books' plugin without deleting.
+Success: Uninstalled 1 of 1 plugins.
+events_tables
+0
+
++-------------+--------------+
+| option_name | option_value |
++-------------+--------------+
++-------------+--------------+
+Plugin 'pagesco-books' activated.
+Success: Activated 1 of 1 plugins.
+2</pre><ul class="tick">
+  <li><b>Goes home:</b> Step 3 (EventsShortcode, the seeding script, six events) and Step 4 (the Events page shows five, sized by the setting).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<ul class="tick">
+  <li>What must a shortcode callback do with its HTML? <b>Answer:</b> return it, escaped; never echo.</li>
+  <li>When is a custom table the right storage? <b>Answer:</b> many rows with the same few fields, queried by those fields, not edited as content.</li>
+  <li>How does an update add a column on a live site? <b>Answer:</b> a higher DB_VERSION; maybe_upgrade() on init runs install() and dbDelta() adds it.</li>
+</ul>
+<p>Workbook self-check, items Q1 to Q6.</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q1</b> <span data-sc="1"><code class="inline">{"limit":"3","location":""}</code></span>; <b>Q2</b> <span data-sc="2">A) A REST route, admin screens, revisions and export</span>; <b>Q3</b> <span data-sc="3"><code class="inline">SELECT title FROM `wp_pagesco_events` WHERE location = 'Café'</code></span>; <b>Q4</b> <span data-sc="4">B) <code class="inline">$wpdb-&gt;insert_id</code></span>; <b>Q5</b> <span data-sc="5">C) Because a plugin update replaces the files but does not run the activation hook again</span>; <b>Q6</b> <span data-sc="6"><code class="inline">&lt;ul class="pagesco-events"&gt;&lt;li class="pagesco-event"&gt;&lt;strong&gt;Book club: Dune&lt;/strong&gt; &lt;time datetime="2027-11-04T19:00"&gt;Thursday, November 4, 7:00 pm&lt;/time&gt; &lt;span class="pagesco-event__where"&gt;Reading corner, 20 seats&lt;/span&gt;&lt;/li&gt;&lt;/ul&gt;</code></span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> learners new to SQL write the CREATE TABLE on paper first, column by column, against DESCRIBE's output. <b>Stretch:</b> the open_hours lab and debug_events_report.php; Exercise 3 (an enclosing shortcode) and Exercise 4 (lookup by slug through the shortcode_atts filter).</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">6.1</span><h3>Block Development Setup</h3><span class="dur">80 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Describe a block type as WordPress sees it: block.json metadata, an editor script with edit and save, styles, and (later) PHP rendering</li>
+  <li>Scaffold a block into an existing plugin with npx @wordpress/create-block and --no-plugin, and read every generated file</li>
+  <li>Build blocks with @wordpress/scripts, and say what each file in build/ is for, including index.asset.php and the blocks manifest</li>
+  <li>Register all built blocks from a plugin feature with wp_register_block_types_from_metadata_collection()</li>
+  <li>Recognize the setup mistakes that cost beginners an afternoon: a second plugin by accident, a missing build, and stale build files</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing in the room</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame: a kit, a workshop and a shelf; the four parts of a block type</td></tr>
+<tr><td class="t">35m</td><td>Live demo: Node, create-block, package.json and the build, the manifest, the Blocks feature, two mistakes</td></tr>
+<tr><td class="t">15m</td><td>Guided lab: <code class="inline">shelf_label_starter/</code></td></tr>
+<tr><td class="t">20m</td><td>Start the lesson project: Step 1 and a look in the editor</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Mental model to say</div>
+<p>"The source files in src/blocks/book-card/ are a flat-pack kit: modern JavaScript with JSX and SCSS that no browser reads as is. The build is the workshop: @wordpress/scripts assembles the kit into plain JavaScript and CSS in build/blocks/book-card/. WordPress only ever looks at the shelf, the build/ folder, through the registration call in your plugin. Change the kit and nothing happens on the shelf until the workshop runs again."</p>
+<p>Then the four parts on the board: <b>block.json</b> (metadata, read by PHP and the editor) · <b>edit</b> (the editing view, a React component) · <b>save</b> (the HTML stored in post_content) · <b>styles</b> (and later a PHP render). "A static block's front end needs no JavaScript: visitors get the stored HTML."</p>
+</div>
+<div class="blk"><div class="h">Live demo (you type, they follow)</div>
+<p>On the site as Lesson 5.5 leaves it, with Node 24.</p>
+<ol class="steps">
+  <li><b>Core's own blocks (2m).</b> "A block type is block.json, an editor script with edit and save, styles." How many does core register?
+<pre class="code">wp eval 'echo count( WP_Block_Type_Registry::get_instance()-&gt;get_all_registered() ), "\n";'</pre>
+<pre class="out">116</pre>
+Every one a block.json in wp-includes/blocks plus prebuilt JavaScript. A static block's front end needs no JavaScript at all.</li>
+  <li><b>Node 24 (2m).</b> In the plugin's folder (or with the node:24 image, the lesson's docker run line):
+<pre class="code">node --version
+npm --version</pre>
+<pre class="out">v24.21.0
+11.19.0</pre></li>
+  <li><b>create-block --no-plugin (5m).</b> "Every tutorial creates a new plugin. We add a block to the one we have." Run the lesson's command in the plugin folder, then look at what it wrote:
+<pre class="code">npx @wordpress/create-block@latest book-card --no-plugin --target-dir=src/blocks/book-card --namespace=pagesco --textdomain=pagesco-books --short-description="A book recommended by the Pages &amp; Co. staff."</pre>
+<pre class="out">Creating a new WordPress block in the /var/www/html/wp-content/plugins/pagesco-books/src/blocks/book-card directory.
+
+Creating a "block.json" file.
+
+Done: WordPress block Book Card bootstrapped in the /var/www/html/wp-content/plugins/pagesco-books/src/blocks/book-card directory.
+
+Code is Poetry</pre>
+<pre class="code">ls wp-content/plugins/pagesco-books/src/blocks/book-card
+cat wp-content/plugins/pagesco-books/src/blocks/book-card/block.json</pre>
+<pre class="out">block.json   edit.js      editor.scss  index.js     save.js      style.scss   view.js
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "pagesco/book-card",
+	"version": "0.1.0",
+	"title": "Book Card",
+	"category": "widgets",
+	"icon": "smiley",
+	"description": "A book recommended by the Pages &amp; Co. staff.",
+	"example": {},
+	"supports": {
+		"html": false
+	},
+	"textdomain": "pagesco-books",
+	"editorScript": "file:./index.js",
+	"editorStyle": "file:./index.css",
+	"style": "file:./style-index.css",
+	"viewScript": "file:./view.js"
+}</pre>
+Read block.json with the lesson's field table; then index.js, edit.js (useBlockProps()), save.js (a pure function of the attributes).</li>
+  <li><b>package.json, install, build (10m).</b> Learners whose <code class="inline">npm install</code> ran during the warm-up already have node_modules/. Show package.json (the three flags on the build script), then build:
+<pre class="code">{
+	"name": "pagesco-books",
+	"version": "1.0.0",
+	"private": true,
+	"description": "The blocks of the Pages &amp; Co. Books plugin.",
+	"license": "GPL-2.0-or-later",
+	"scripts": {
+		"build": "wp-scripts build --webpack-src-dir=src/blocks --output-path=build/blocks --blocks-manifest",
+		"start": "wp-scripts start --webpack-src-dir=src/blocks --output-path=build/blocks --blocks-manifest"
+	},
+	"devDependencies": {
+		"@wordpress/scripts": "^37.0.0"
+	}
+}</pre>
+<pre class="code">npm run build</pre>
+<pre class="out">&gt; pagesco-books@1.0.0 build
+&gt; wp-scripts build --webpack-src-dir=src/blocks --output-path=build/blocks --blocks-manifest
+
+assets by chunk 1.48 KiB (name: book-card/index)
+  assets by path book-card/*.css 102 bytes
+    asset book-card/index-rtl.css 51 bytes [emitted] (name: book-card/index)
+    asset book-card/index.css 51 bytes [emitted] (name: book-card/index)
+  asset book-card/index.js 1.23 KiB [emitted] [minimized] (name: book-card/index)
+...
+webpack 5.112.2 compiled successfully in 990 ms</pre>
+(The install added 1261 packages here; read its warnings once: deprecated packages deep in the toolchain, the audit count of build tools, npm 11's install-scripts rule.) What the build wrote:
+<pre class="code">cd wp-content/plugins/pagesco-books
+find build -type f | sort
+cat build/blocks/blocks-manifest.php</pre>
+<pre class="out">build/blocks/blocks-manifest.php
+build/blocks/book-card/block.json
+build/blocks/book-card/index-rtl.css
+build/blocks/book-card/index.asset.php
+build/blocks/book-card/index.css
+build/blocks/book-card/index.js
+build/blocks/book-card/style-index-rtl.css
+build/blocks/book-card/style-index.css
+build/blocks/book-card/view.asset.php
+build/blocks/book-card/view.js
+&lt;?php
+// This file is generated. Do not modify it manually.
+return array(
+	'book-card' =&gt; array(
+		'$schema' =&gt; 'https://schemas.wp.org/trunk/block.json',
+		'apiVersion' =&gt; 3,
+...</pre>
+<pre class="code">cat wp-content/plugins/pagesco-books/build/blocks/book-card/index.asset.php</pre>
+<pre class="out">&lt;?php return array(
+	'dependencies' =&gt; array(
+		'react-jsx-runtime',
+		'wp-block-editor',
+		'wp-blocks',
+		'wp-i18n'
+	),
+	'version' =&gt; 'e4dd14a0fd30d395bc2c'
+);</pre></li>
+  <li><b>The Blocks feature (5m).</b> "Registering the built blocks is one more feature class." Copy src/Blocks.php: one call, wp_register_block_types_from_metadata_collection(), on init. List it and ask the registry:
+<pre class="code">sed -i '/Shortcodes\\EventsShortcode::class,/a\			Blocks::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+wp eval '$type = WP_Block_Type_Registry::get_instance()-&gt;get_registered( "pagesco/book-card" );
+echo $type-&gt;title, " (", $type-&gt;category, ")\n";
+echo "editor script: ", implode( ", ", $type-&gt;editor_script_handles ), "\n";
+echo "styles: ", implode( ", ", $type-&gt;style_handles ), " / editor: ", implode( ", ", $type-&gt;editor_style_handles ), "\n";
+echo "view script: ", implode( ", ", $type-&gt;view_script_handles ), "\n";
+echo wp_scripts()-&gt;registered["pagesco-book-card-editor-script"]-&gt;src, "\n";'</pre>
+<pre class="out">Book Card (widgets)
+editor script: pagesco-book-card-editor-script
+styles: pagesco-book-card-style / editor: pagesco-book-card-editor-style
+view script: pagesco-book-card-view-script
+http://localhost:8080/wp-content/plugins/pagesco-books/build/blocks/book-card/index.js</pre>
+Each file of block.json became a registered script or style with a handle from the block name. Open the post editor and insert the Book Card.</li>
+  <li><b>Mistake: a missing build (3m).</b> "You check the plugin out from Git, where build/ is not committed, and forget to build."
+<pre class="code">mv wp-content/plugins/pagesco-books/build wp-content/plugins/pagesco-books/build-off
+curl -s http://localhost:8080/ | head -n 2</pre>
+<pre class="out">Notice: Function WP_Block_Metadata_Registry::register_collection was called &lt;strong&gt;incorrectly&lt;/strong&gt;. The specified manifest file does not exist. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 6.7.0.) in /var/www/html/wp-includes/functions.php on line 6260</pre>
+A "called incorrectly" notice above the page (and above every admin screen with display on). Put the folder back.</li>
+  <li><b>Mistake: editing src/ and expecting WordPress to notice (3m).</b> "The smiley has to go." Change the icon in src/ and ask WordPress:
+<pre class="code">sed -i 's/"icon": "smiley"/"icon": "book"/' wp-content/plugins/pagesco-books/src/blocks/book-card/block.json
+grep '"icon"' wp-content/plugins/pagesco-books/src/blocks/book-card/block.json
+wp eval 'echo WP_Block_Type_Registry::get_instance()-&gt;get_registered( "pagesco/book-card" )-&gt;icon, "\n";'</pre>
+<pre class="out">	"icon": "book",
+smiley</pre>
+The kit changed, the shelf did not. <code class="inline">npm run build &gt; /dev/null</code>, ask again:
+<pre class="code">wp eval 'echo WP_Block_Type_Registry::get_instance()-&gt;get_registered( "pagesco/book-card" )-&gt;icon, "\n";'</pre>
+<pre class="out">book</pre></li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b>A second plugin by accident.</b> create-block without --no-plugin. Coach: "<code class="inline">wp plugin list</code>: how many plugins do you have now?" (Self-check Q12.)</li>
+  <li><b>Editing src/ and reloading.</b> Coach with the shelf: "Did the workshop run?" (The core_blocks_tour lab and Mistake 3.)</li>
+  <li><b>npm in the wrong folder.</b> <code class="inline">npm run build</code> in wordpress/ or the project folder: "Missing script: build". Coach: "Where is package.json?"</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<p><b>Folder:</b> <code class="inline">labs/module-11/l6_1-block-setup/shelf_label_starter/</code> (a small plugin, <code class="inline">pagesco-shelf-label</code>, with one static block and its build/ prebuilt) with <code class="inline">labs/module-11/l6_1-block-setup/test_shelf_label.sh</code>; your reference is <code class="inline">labs/module-11/l6_1-block-setup/shelf_label_solution/</code>. TODO 1 registers the build from its manifest, exactly the Blocks feature's call; it needs no Node, so learners still installing can do it. TODO 2 (keywords, then a rebuild) needs Node.</p>
+<ul class="tick">
+  <li><b>Install and run (3m):</b> <code class="inline">cp -r labs/module-11/l6_1-block-setup/shelf_label_starter wordpress/wp-content/plugins/pagesco-shelf-label</code>, <code class="inline">wp plugin activate pagesco-shelf-label</code>, copy the test, run it: not registered, no stylesheet, yet the saved HTML is on the page.</li>
+  <li><b>TODO 1 (5m),</b> then the test; <b>TODO 2 (5m)</b> for laptops with Node.</li>
+  <li><b>Expected when done</b> (the solution's test):</li>
+</ul>
+<pre class="out">Plugin 'pagesco-shelf-label' activated.
+Success: Activated 1 of 1 plugins.
+Shelf Label (text, icon tag)
+keywords: shelf, sign
+handles: pagesco-shelf-label-editor-script, pagesco-shelf-label-style
+front end: 1 stylesheet(s)
+&lt;p class="wp-block-pagesco-shelf-label"&gt;Staff picks&lt;/p&gt;</pre><ul class="tick">
+  <li><b>Debrief (2m):</b> "Why did the page show the label even unregistered?" (the HTML is in the post). "And why no stylesheet?" (no registered style handle).</li>
+  <li><b>Fast finishers:</b> <code class="inline">labs/module-11/l6_1-block-setup/core_blocks_tour_starter.sh</code>, then <code class="inline">labs/module-11/l6_1-block-setup/debug_block_registration.php</code>. Remove the lab plugin afterwards (<code class="inline">wp plugin deactivate pagesco-shelf-label</code>, <code class="inline">rm -r ...</code>).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Start the lesson project</div>
+<p>The lesson project is <b>The Book Card's First Draft</b>. In the room: Step 1 and Step 2 (20 minutes).</p>
+<ul class="tick">
+  <li>Step 1: replace block.json, edit.js, save.js, style.scss and editor.scss from the lesson (copy them), delete view.js, build and list:</li>
+</ul>
+<pre class="code">rm src/blocks/book-card/view.js
+npm run build &gt; /dev/null
+ls src/blocks/book-card build/blocks/book-card</pre><pre class="out">build/blocks/book-card:
+block.json
+index-rtl.css
+index.asset.php
+index.css
+index.js
+style-index-rtl.css
+style-index.css
+
+src/blocks/book-card:
+block.json
+edit.js
+editor.scss
+index.js
+save.js
+style.scss</pre><ul class="tick">
+  <li>Step 2: reload the post editor, insert the Book Card, open the Code editor view.</li>
+  <li><b>Goes home:</b> Step 3 (the block on the front end: its CSS inlined, and only where the block is used) and Step 4 (the final check and the line in pagesco-plan.txt).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<ul class="tick">
+  <li>Which folder does WordPress read? <b>Answer:</b> build/blocks and its blocks-manifest.php, never src/.</li>
+  <li>What is index.asset.php for? <b>Answer:</b> the script handles index.js depends on, and a version hash.</li>
+  <li>Does a visitor's browser run save()? <b>Answer:</b> no; the stored HTML is in the post.</li>
+</ul>
+<p>Workbook self-check, items Q7 to Q12.</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q7</b> <span data-sc="7">D) <code class="inline">index.asset.php</code>, the dependency list and version hash</span>; <b>Q8</b> <span data-sc="8"><code class="inline">pagesco-book-card-style</code></span>; <b>Q9</b> <span data-sc="9">A) <code class="inline">npm run build</code>: the minified production files, without .map files</span>; <b>Q10</b> <span data-sc="10">C) Their stored comments still say wp:pagesco/book-card, a block that no longer exists: the editor cannot handle them</span>; <b>Q11</b> <span data-sc="11"><code class="inline">3</code>: wp-block-editor, wp-blocks and wp-i18n; the fourth dependency, react-jsx-runtime, does not start with wp-</span>; <b>Q12</b> <span data-sc="12">B) A plugin PHP file, a package.json and node_modules/</span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> a learner without Node follows the demo on the projector and does the shelf_label lab's TODO 1; they build at home with the node:24 image. <b>Stretch:</b> core_blocks_tour and the debug handout; Exercise 4 (a second block, no new PHP) and the Bonus Challenge (lint and format scripts).</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Closing</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Exit ticket (3 questions, no notes, 4 minutes)</div>
+<ol class="steps">
+  <li>Why must a shortcode callback return its HTML instead of echoing it? <b>Answer:</b> it runs while the content is filtered, before the page is printed (in a block theme before the &lt;head&gt;); echoed output lands outside the content.</li>
+  <li>You add a column to schema(). What else must change, and why? <b>Answer:</b> DB_VERSION must go up, so maybe_upgrade() runs install() on the next request; updates do not rerun activation.</li>
+  <li>Name the path of the Book Card from your files to the editor. <b>Answer:</b> src/blocks/book-card → npm run build → build/blocks + blocks-manifest.php → the Blocks feature registers them on init → the editor (and the front end gets the saved HTML and style-index.css).</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Homework (about 2 to 3 hours)</div>
+<ul class="tick">
+  <li><b>Finish both lesson projects.</b> 5.5: Steps 3 and 4 (EventsShortcode, the seeding script, the Events page with five events). 6.1: Steps 3 and 4 (the front end, the final check). Session 12 starts from exactly this site: thirteen features and a built Book Card.</li>
+  <li><b>Lesson exercises.</b> 5.5: Exercises 1 to 3; Exercise 4 is a stretch. 6.1: Exercises 1 to 3; Exercise 4 is a stretch.</li>
+  <li><b>Both Quick Quizzes</b> and <b>both journal entries.</b></li>
+  <li><b>Labs not reached:</b> <code class="inline">labs/module-11/l5_5-custom-tables/open_hours_starter/</code>, <code class="inline">labs/module-11/l5_5-custom-tables/debug_events_report.php</code>, <code class="inline">labs/module-11/l6_1-block-setup/core_blocks_tour_starter.sh</code>, <code class="inline">labs/module-11/l6_1-block-setup/debug_block_registration.php</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Bring list for Session 12</div>
+<ul class="tick">
+  <li>The site at the end of Lesson 6.1: <code class="inline">npm run build</code> works in pagesco-books, the Book Card (book icon) is in the inserter, /events/ lists five events.</li>
+  <li>Node 24 (or the node:24 image); the project folder with <code class="inline">labs/</code>; the journal and the workbook.</li>
+</ul>
+</div>
+
+  <div class="sec"><h2>If You Run Long or Short</h2><span class="rule"></span></div>
+<div class="blk warn"><div class="h">Running long: what to protect and what to cut first</div>
+<ul class="tick">
+  <li><b>Protect:</b> a working build and a registered Book Card; the versioned migration; a shortcode that returns.</li>
+  <li><b>Cut first (saves 3m):</b> the attribute cases of 5.5 (self-check Q1 covers them).</li>
+  <li><b>Cut second (saves 3m):</b> 6.1's stale-build mistake: one sentence.</li>
+  <li><b>Cut third (saves 7m):</b> 5.5 project Step 2: uninstall.php goes home.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Running short: what to add</div>
+<ul class="tick">
+  <li>Lesson 5.5's Common Mistakes 3 live: dbDelta() "renaming" a column adds a second one.</li>
+  <li>Lesson 6.1's Exercise 2 (your block among core's widgets) and Exercise 3 (the text domain survives the build).</li>
+  <li><code class="inline">npm start</code> on the projector: change the editor text, reload the editor, watch it change.</li>
+</ul>
+</div>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 11 · Facilitator Guide · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

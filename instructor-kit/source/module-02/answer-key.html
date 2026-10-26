@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Key: Session 2</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">answers &amp; solutions · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Answer Key</div>
+    <h1>Session 2: PHP the WordPress Way and the Content Model</h1>
+    <p class="sub">Answers and reasoning for every Session 2 item: the warm-up, both self-checks, the predict-then-run items, the lab reference outputs, the lesson pages' own quizzes and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Session <b>2</b></span>
+      <span class="chip"><b>12</b> self-check items</span>
+      <span class="chip">Confidential</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Warm-up · Session 1 Revisited</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>W1</b> Which folder of the WordPress root is yours, and why is nothing else? <b>Answer:</b> <code class="inline">wp-content/</code> (themes, plugins, mu-plugins, uploads), plus your settings in <code class="inline">wp-config.php</code>. Everything else is core and every update replaces it.</li>
+  <li><b>W2</b> Put them in order: the main query, <code class="inline">init</code>, the template. <b>Answer:</b> <code class="inline">init</code> (the end of loading: core, mu-plugins, plugins, the theme), then <code class="inline">wp()</code> runs the main query, then the template loader draws the page: load, query, template.</li>
+  <li><b>W3</b> <code class="inline">docker compose down</code> and <code class="inline">docker compose down -v</code>: what survives each? <b>Answer:</b> <code class="inline">down</code> keeps the files and the database (the volume); <code class="inline">-v</code> deletes the database volume too.</li>
+  <li><b>W4</b> A page says "There has been a critical error on this website." Where do you look first? <b>Answer:</b> The end of <code class="inline">wordpress/wp-content/debug.log</code> (<code class="inline">tail -n 20 wordpress/wp-content/debug.log</code>, or <code class="inline">tail -f</code> while reloading).</li>
+  <li><b>W5</b> What does <code class="inline">wp option get blogname</code> print on the course site, and why? <b>Answer:</b> <code class="inline">Pages &amp;amp; Co.</code>: WordPress stored the title HTML-escaped when it was saved. Today's first lesson explains when to escape yourself.</li>
+</ol>
+<p>The site check prints, on a site exactly as Session 1 left it:</p>
+<pre class="out">7.1.3
++--------------+----------+
+| name         | status   |
++--------------+----------+
+| mailpit-smtp | must-use |
++--------------+----------+</pre>
+  <div class="sec"><h2>1.3 · PHP the WordPress Way: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">A template prints a book cover: <code class="inline">&lt;img src="..." alt="..."&gt;</code>. The alt text is the book's title as staff typed it. Which function goes around the title?</div><div class="opts"><div class="opt">A) <code class="inline">esc_html()</code></div><div class="opt correct">B) <code class="inline">esc_attr()</code></div><div class="opt">C) <code class="inline">esc_url()</code></div><div class="opt">D) <code class="inline">wp_kses_post()</code></div></div><div class="why"><b>Why:</b> The value goes inside an attribute, so <code class="inline">esc_attr()</code> (and the attribute is quoted). Lesson 1.3's rule: escape late, for the exact place the value is printed into.<br><b>A</b> is wrong: <code class="inline">esc_html()</code> is for text between tags. Here it would happen to encode the same characters, but a reviewer or PHPCS reads the context from the function: use the one that names it.<br><b>C</b> is wrong: <code class="inline">esc_url()</code> is for the <code class="inline">src</code> and every <code class="inline">href</code>: it checks the protocol, which an alt text does not have.<br><b>D</b> is wrong: <code class="inline">wp_kses_post()</code> keeps HTML tags a post may contain; tags inside an attribute value break the page.</div></div>
+  <div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">From the project folder, on the course site: what does this print?</div><pre class="code">wp eval 'echo esc_html( esc_html( "Tom &amp; Jerry" ) ), "\n";'</pre><div class="opts"><div class="opt correct"><code class="inline">Tom &amp;amp; Jerry</code></div></div><div class="why"><b>Why:</b> The first <code class="inline">esc_html()</code> turns the ampersand into <code class="inline">&amp;amp;</code>, and the second leaves an entity that is already there alone: WordPress's escapers do not double-encode (Lesson 1.3, the escape.php demo), so escaping at output is safe even when something upstream already escaped.</div></div>
+  <div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">What reaches the page from <code class="inline">$h = '&lt;h2&gt;' . _e( 'Staff picks', 'pagesco' ) . '&lt;/h2&gt;'; echo $h;</code>?</div><div class="opts"><div class="opt">A) <code class="inline">&lt;h2&gt;Staff picks&lt;/h2&gt;</code></div><div class="opt">B) Nothing: PHP stops with a fatal error</div><div class="opt correct">C) "Staff picks" first, then an empty <code class="inline">&lt;h2&gt;&lt;/h2&gt;</code></div><div class="opt">D) <code class="inline">&lt;h2&gt;_e(Staff picks)&lt;/h2&gt;</code></div></div><div class="why"><b>Why:</b> <code class="inline">_e()</code> ECHOES the translation at once and returns null, so the text is printed while the string is still being built, and the heading ends up empty. Inside an expression you want <code class="inline">__()</code>, or better <code class="inline">esc_html__()</code> (Lesson 1.3, Common Mistakes 3). No message warns you.<br><b>A</b> is wrong: That is what __() would give.<br><b>B</b> is wrong: Concatenating null is allowed; nothing complains.<br><b>D</b> is wrong: _e is a function call, not text.</div></div>
+  <div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">Which of these needs NO <code class="inline">pagesco_</code> prefix?</div><div class="opts"><div class="opt correct">A) A class inside the namespace <code class="inline">PagesCo\Books</code>, such as <code class="inline">PagesCo\Books\Plugin</code></div><div class="opt">B) A global function that formats prices</div><div class="opt">C) A variable defined at the top level of a plugin file</div><div class="opt">D) An option your plugin saves in wp_options</div></div><div class="why"><b>Why:</b> The namespace is the prefix (Module 5's plugin uses one). Everything global shares one PHP process with core and every plugin, and a database table with them: functions, global variables, constants, hook names, options and meta keys all get the prefix.<br><b>B</b> is wrong: Two plugins with format_price() stop the site with a fatal error.<br><b>C</b> is wrong: A plugin file runs in the global scope, so its variables are globals.<br><b>D</b> is wrong: Options share wp_options with core and every plugin: pagesco_books_settings, not settings.</div></div>
+  <div class="q" data-sc="5" data-kind="short"><div class="qn">Q5</div><div class="qt">What does this print?</div><pre class="code">wp eval 'var_dump( absint( "-7 copies" ), sanitize_key( "Staff Picks!" ) );'</pre><div class="opts"><div class="opt correct"><pre class="out">int(7)
+string(10) "staffpicks"</pre></div></div><div class="why"><b>Why:</b> <code class="inline">absint()</code> makes a non-negative integer: the text is cut at the first non-digit and the minus sign is dropped (validate when a negative must be REJECTED). <code class="inline">sanitize_key()</code> keeps lowercase letters, digits, dashes and underscores: option names and array keys.</div></div>
+  <div class="q" data-sc="6"><div class="qn">Q6</div><div class="qt"><code class="inline">$id = wp_insert_post( array( 'post_title' =&gt; '' ) );</code> What is <code class="inline">$id</code>, and how do you learn why it failed?</div><div class="opts"><div class="opt">A) A WP_Error: call <code class="inline">$id-&gt;get_error_message()</code></div><div class="opt">B) false: read debug.log</div><div class="opt">C) An exception: wrap the call in try/catch</div><div class="opt correct">D) <code class="inline">0</code>: pass <code class="inline">true</code> as the second argument to get a WP_Error with the message</div></div><div class="why"><b>Why:</b> By default <code class="inline">wp_insert_post()</code> returns 0 on failure; with <code class="inline">true</code> as its last argument it returns the WP_Error ("Content, title, and excerpt are empty."). Read the Return line in the Code Reference before you rely on a result (Lesson 1.3, errors.php).<br><b>A</b> is wrong: Only when asked for with true; wp_insert_user() always returns one.<br><b>B</b> is wrong: Nothing is logged: the failure is silent.<br><b>C</b> is wrong: Core returns errors as values; it does not throw.</div></div>
+
+  <div class="sec"><h2>1.3 · PHP the WordPress Way: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'echo esc_url( "example.com/books?a=1&amp;b=2" ), "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">http://example.com/books?a=1&amp;#038;b=2</pre></div></div><div class="why"><b>Why:</b> <code class="inline">esc_url()</code> adds <code class="inline">http://</code> to an address without a protocol (it looks like a domain) and encodes the ampersand for HTML as <code class="inline">&amp;#038;</code>. In an href the browser turns it back into <code class="inline">&amp;</code>. A URL you store or redirect to uses <code class="inline">esc_url_raw()</code>, which leaves the <code class="inline">&amp;</code> alone.</div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'echo _n( "%s book", "%s books", 0 ), "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">%s books</pre></div></div><div class="why"><b>Why:</b> English uses the plural for zero, so <code class="inline">_n()</code> picks the second string. It does NOT fill in the number: <code class="inline">_n()</code> only chooses the string, and <code class="inline">sprintf()</code> puts the count into <code class="inline">%s</code> (Lesson 1.3's book card does both: <code class="inline">sprintf( _n( ... ), number_format_i18n( $n ) )</code>).</div></div>
+
+  <div class="sec"><h2>2.1 · The Content Model: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">Twenty Twenty-Five's header menu lists the site's pages. Which post type stores that menu?</div><div class="opts"><div class="opt">A) <code class="inline">nav_menu_item</code></div><div class="opt">B) <code class="inline">page</code></div><div class="opt">C) <code class="inline">wp_template_part</code></div><div class="opt correct">D) <code class="inline">wp_navigation</code></div></div><div class="why"><b>Why:</b> Block themes keep their menus as <code class="inline">wp_navigation</code> posts (post 4 on the course site, holding a Page List block). Everything is a post with a type: one filing cabinet, many labels (Lesson 2.1).<br><b>A</b> is wrong: nav_menu_item rows are the menus of classic themes (Module 4).<br><b>B</b> is wrong: The pages are what the menu LISTS, not the menu.<br><b>C</b> is wrong: The header template part contains the Navigation block; the menu itself is a separate post.</div></div>
+  <div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt">On a fresh course site (before the lesson project): what does this print, and why are the two numbers counting different things?</div><pre class="code">wp eval 'echo count( get_posts( array( "post_type" =&gt; "page" ) ) ), " ", wp_count_posts( "page" )-&gt;draft, "\n";'</pre><div class="opts"><div class="opt correct"><code class="inline">1 1</code>: one published page for <code class="inline">get_posts()</code> (it defaults to publish), and one draft page counted by <code class="inline">wp_count_posts()</code> (the Privacy Policy)</div></div><div class="why"><b>Why:</b> <code class="inline">get_posts()</code> and WP_Query default to <code class="inline">'post_status' =&gt; 'publish'</code>, so PHP sees only the Sample Page; <code class="inline">wp_count_posts()</code> counts every status, and the draft Privacy Policy is one of them. WP-CLI's <code class="inline">wp post list</code> also lists every status unless you pass <code class="inline">--post_status</code>.</div></div>
+  <div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">Devon (Author) opens Maria's published post "Book club: Dune" (ID 17). What does <code class="inline">user_can( $devon, 'edit_post', 17 )</code> answer?</div><div class="opts"><div class="opt correct">A) false: <code class="inline">edit_post</code> is a meta capability that maps to <code class="inline">edit_others_posts</code> here, which authors lack</div><div class="opt">B) true: authors have <code class="inline">edit_posts</code></div><div class="opt">C) true: the post is published</div><div class="opt">D) An error: <code class="inline">edit_post</code> needs a role, not a user</div></div><div class="why"><b>Why:</b> WordPress maps the meta capability <code class="inline">edit_post</code> to real capabilities from the post's author and status: someone else's published post needs <code class="inline">edit_others_posts</code> (and <code class="inline">edit_published_posts</code>). Lesson 2.1's Exercise 1 prints exactly this "no".<br><b>B</b> is wrong: edit_posts covers his own posts only.<br><b>C</b> is wrong: Published makes it harder, not easier: edit_published_posts joins the list.<br><b>D</b> is wrong: user_can() takes a user (or ID); roles are never checked directly.</div></div>
+  <div class="q" data-sc="10" data-kind="short"><div class="qn">Q10</div><div class="qt">What does this print?</div><pre class="code">wp eval 'echo parse_blocks( "&lt;!-- wp:separator /--&gt;" )[0]["blockName"], "\n";'</pre><div class="opts"><div class="opt correct"><code class="inline">core/separator</code></div></div><div class="why"><b>Why:</b> Block markup drops the <code class="inline">core/</code> namespace of core blocks (<code class="inline">wp:separator</code>), and <code class="inline">parse_blocks()</code> puts it back. A self-closing comment is a block with no saved HTML; dynamic blocks such as Latest Posts look the same and are rendered by PHP on every view.</div></div>
+  <div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">A script creates a post with WP-CLI and then updates it twice. How many revisions does the post have, and what is in the newest one?</div><div class="opts"><div class="opt">A) Three: the newest holds the version before the last update</div><div class="opt correct">B) Two: the newest is identical to the current post</div><div class="opt">C) One: WordPress keeps only the latest</div><div class="opt">D) None: only the block editor makes revisions</div></div><div class="why"><b>Why:</b> "Every update is a revision, and the most recent revision always matches the current post" (core's own comment, shown in Lesson 2.1). Creating a post is not an update, so the first version has no revision.<br><b>A</b> is wrong: That is the intuitive model, and it is wrong in both the count and the content.<br><b>C</b> is wrong: WP_POST_REVISIONS is true on the course site: every revision is kept (-1).<br><b>D</b> is wrong: WP-CLI and the editor both call wp_insert_post() / wp_update_post(); the revision comes from core.</div></div>
+  <div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">A deployment script must set the "Site Address (URL)" field of Settings &gt; General. Which option is that?</div><div class="opts"><div class="opt">A) <code class="inline">siteurl</code></div><div class="opt">B) <code class="inline">blogname</code></div><div class="opt correct">C) <code class="inline">home</code></div><div class="opt">D) <code class="inline">permalink_structure</code></div></div><div class="why"><b>Why:</b> Site Address is <code class="inline">home</code> (where visitors find the site); WordPress Address is <code class="inline">siteurl</code> (where WordPress's files live). They are usually equal, which is why they are easy to swap. Every Settings field is a row in wp_options (Lesson 2.1's table).<br><b>A</b> is wrong: siteurl is the WordPress Address field.<br><b>B</b> is wrong: blogname is the Site Title.<br><b>D</b> is wrong: permalink_structure is Settings > Permalinks.</div></div>
+
+  <div class="sec"><h2>2.1 · The Content Model: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp post list --post_type=attachment --format=count</pre><div class="opts"><div class="opt correct"><pre class="out">0</pre></div></div><div class="why"><b>Why:</b> Zero. Twenty Twenty-Five's pictures are files in its theme folder, not uploads: only what goes through the Media Library (or <code class="inline">wp media import</code>) becomes an attachment post. The lesson's demo imports one of those theme files and deletes it again.</div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'var_dump( get_option( "page_on_front" ), get_option( "pagesco_no_such_option" ) );'</pre><div class="opts"><div class="opt correct"><pre class="out">string(1) "0"
+bool(false)</pre></div></div><div class="why"><b>Why:</b> <code class="inline">page_on_front</code> exists and is the STRING "0" (no static front page; options are strings). An option that does not exist returns <code class="inline">false</code>, which is how <code class="inline">get_option()</code> tells you it is missing (pass a second argument for another default).</div></div>
+
+  <div class="sec"><h2>Lab Reference Solutions</h2><span class="rule"></span></div>
+<p>Every output below is real: the lab files run exactly as <code class="inline">labs/check_labs.py</code> runs them, on a fresh course site (WordPress 7.1.3, PHP 8.5, MySQL 9.7, WP-CLI 2.12), copied into the WordPress root and run with <code class="inline">wp eval-file --use-include</code> (PHP labs) or <code class="inline">sh</code> in the WP-CLI container (shell labs). Paths show <code class="inline">/var/www/html/...</code>, which is the learner's <code class="inline">wordpress/</code> folder. All six files only read: they leave the site exactly as they found it.</p>
+<div class="blk lab"><div class="h">Lab 1.3-A (guided): labs/module-02/l1_3-php-the-wordpress-way/signup_form_starter.php → signup_form_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">name:  string(4) "TODO"
+email: TODO
+seats: TODO
+shelf: TODO
+field: &lt;input name="name" value="TODO"&gt;
+link:  &lt;a href="TODO"&gt;TODO&lt;/a&gt;</pre><p>The solution prints:</p>
+<pre class="out">name:  string(18) "Siobhan O'Neil VIP"
+email: Siobhan.ONeil@Example.COM (valid: yes)
+seats: 3
+shelf: fiction
+field: &lt;input name="name" value="Siobhan O&amp;#039;Neil VIP"&gt;
+link:  &lt;a href=""&gt;Siobhan O&amp;#039;Neil VIP&lt;/a&gt;</pre><p>What each line shows: the name lost its tags but not the text between them, its line break and extra spaces, and kept its apostrophe because <code class="inline">wp_unslash()</code> came first; the email was trimmed (sanitize_email() keeps the case) and <code class="inline">is_email()</code> validated it; <code class="inline">absint()</code> turned -3 into 3, which a real form should REJECT instead (validate, Lesson 1.3); the shelf was not on the list, so validation fell back to fiction; <code class="inline">esc_attr()</code> encoded the apostrophe for the attribute; <code class="inline">esc_url()</code> emptied the <code class="inline">javascript:</code> link. Accept <code class="inline">sanitize_text_field()</code> without <code class="inline">wp_unslash()</code> only after the learner has seen <code class="inline">O\'Neil</code> in the output and explained it.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 1.3-B: labs/module-02/l1_3-php-the-wordpress-way/event_line_starter.php → event_line_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">TODO: Author reading: Ada Quill
+TODO: Book club: Dune
+TODO: Story time &amp; cocoa
+TODO: Poetry night
+TODO: Book club: Dune
+TODO: Poetry night</pre><p>The solution prints:</p>
+<pre class="out">skipped: The event has no date. (pagesco_no_date)
+Book club: Dune on Thursday, October 1 · 1 seat left
+Story time &amp;amp; cocoa on Saturday, October 17 · 0 seats left
+Author reading: Ada Quill on Thursday, November 12 · 24 seats left
+Book club: Dune on Thursday, October 1
+New: Author reading: Ada Quill on Nov 12 · 24 seats left</pre><p>Reading it: the sort callback runs first, so the undated Poetry night (an empty string sorts first) is skipped with its WP_Error's message and code; <code class="inline">_n()</code> chose "1 seat left" and "0 seats left" (English uses the plural for zero); <code class="inline">esc_html()</code> encoded the ampersand of "Story time &amp; cocoa"; the last two calls pass options as an array and as a query string, which <code class="inline">wp_parse_args()</code> accepts too. Common sticking points: the arguments of <code class="inline">wp_parse_args()</code> swapped (the defaults then override the caller: the debug handout's silent bug), concatenating the date into the translated string instead of using <code class="inline">%2$s</code>, and printing the WP_Error object ("Object of class WP_Error could not be converted to string").</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-02/l1_3-php-the-wordpress-way/debug_book_badge.php (deliberately broken)</div>
+<p>As shipped, PHP prints:</p>
+<pre class="out">Warning: Undefined array key "autor" in /var/www/html/debug_book_badge.php on line 33
+Warning: Undefined array key "price" in /var/www/html/debug_book_badge.php on line 35
+Deprecated: number_format(): Passing null to parameter #1 ($num) of type float is deprecated in /var/www/html/wp-includes/functions.php on line 428
+&lt;span class="pagesco-badge"&gt;Staff pick&lt;/span&gt; &lt;b&gt;The Left Hand of Darkness&lt;/b&gt; by  $0.00
+Warning: Undefined array key "autor" in /var/www/html/debug_book_badge.php on line 33
+&lt;span class="pagesco-badge"&gt;Staff pick&lt;/span&gt; &lt;b&gt;Emma&lt;/b&gt; by  $7.99</pre><ol class="steps">
+  <li><b>Warning, line 33:</b> <code class="inline">$book['autor']</code>: the key is <code class="inline">author</code>. Both books lose their author.</li>
+  <li><b>Warning and Deprecated, line 35:</b> the first book has no price, so <code class="inline">$book['price']</code> is undefined (the Warning names the lab file) and the null reaches <code class="inline">number_format()</code> inside core (the Deprecated names wp-includes/functions.php). Read the Warning just above a core Deprecated: that is your line. Fix: print the price only when it is set (<code class="inline">isset( $book['price'] )</code>).</li>
+  <li><b>Silent, line 24:</b> the arguments of <code class="inline">wp_parse_args()</code> are swapped: the defaults are merged OVER the caller's options, so the second badge says "Staff pick" although the call asks for "New in paperback". <code class="inline">wp_parse_args( $args, $defaults )</code>: what the caller passed wins.</li>
+</ol>
+<p>Fixed (the key, the isset() and the order), it prints both badges as the calls ask for, without a message:</p>
+<pre class="out">&lt;span class="pagesco-badge"&gt;Staff pick&lt;/span&gt; &lt;b&gt;The Left Hand of Darkness&lt;/b&gt; by Ursula K. Le Guin
+&lt;span class="pagesco-badge"&gt;New in paperback&lt;/span&gt; &lt;b&gt;Emma&lt;/b&gt; by Jane Austen $7.99</pre><p>The lesson in it: messages find the typos; only reading the output against the calls finds the swapped arguments. A helper with an array of arguments needs one test call that passes every option.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 2.1-A (guided): labs/module-02/l2_1-content-model/content_census_starter.sh → content_census_solution.sh</div>
+<p>As shipped:</p>
+<pre class="out">== Pages &amp; Co. content census ==
+Post types: 16
+Published posts: TODO
+Pages, any status: TODO
+Draft pages: TODO
+Categories: TODO
+Home page shows: TODO
+Editor capabilities: TODO
+Blocks in post 1: TODO</pre><p>The solution prints (the site before the lesson project):</p>
+<pre class="out">== Pages &amp; Co. content census ==
+Post types: 16
+Published posts: 1
+Pages, any status: 2
+Draft pages: 1
+Categories: Uncategorized
+Home page shows: posts
+Editor capabilities: 34
+Blocks in post 1:
+      1 &lt;!-- wp:paragraph</pre><p><code class="inline">--format=count</code> makes WP-CLI count for you; leaving <code class="inline">--post_status</code> out lists every status (two pages, one of them the draft Privacy Policy). After the project the same script says 4 published posts, 5 pages, two categories (News and Uncategorized): the commands, not the numbers, are the answer. <code class="inline">uniq -c</code> prints the count first, padded with spaces. 34 capabilities include the old <code class="inline">level_*</code> entries kept for old plugins.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 2.1-B: labs/module-02/l2_1-content-model/post_report_starter.php → post_report_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">#1 TODO (publish) "Hello world!"
+   slug: hello-world · hierarchical type: TODO
+   author: admin, may edit others' posts: TODO
+   terms: TODO
+   revisions: TODO
+   top-level blocks: TODO
+   address: TODO
+#2 TODO (publish) "Sample Page"
+   slug: sample-page · hierarchical type: TODO
+   author: admin, may edit others' posts: TODO
+   terms: TODO
+   revisions: TODO
+   top-level blocks: TODO
+   address: TODO
+#3 TODO (draft) "Privacy Policy"
+   slug: privacy-policy · hierarchical type: TODO
+   author: admin, may edit others' posts: TODO
+   terms: TODO
+   revisions: TODO
+   top-level blocks: TODO
+   address: TODO
+#4 TODO (publish) "Navigation"
+   slug: navigation · hierarchical type: TODO
+   author: none (post_author is 0)
+   terms: TODO
+   revisions: TODO
+   top-level blocks: TODO
+   address: TODO
+#999 not found</pre><p>The solution prints:</p>
+<pre class="out">#1 Post (publish) "Hello world!"
+   slug: hello-world · hierarchical type: no
+   author: admin, may edit others' posts: yes
+   terms: category:Uncategorized
+   revisions: 0
+   top-level blocks: 1 (core/paragraph)
+   address: http://localhost:8080/hello-world/
+#2 Page (publish) "Sample Page"
+   slug: sample-page · hierarchical type: yes
+   author: admin, may edit others' posts: yes
+   terms: none
+   revisions: 0
+   top-level blocks: 5 (core/paragraph, core/quote)
+   address: http://localhost:8080/sample-page/
+#3 Page (draft) "Privacy Policy"
+   slug: privacy-policy · hierarchical type: yes
+   author: admin, may edit others' posts: yes
+   terms: none
+   revisions: 0
+   top-level blocks: 24 (core/heading, core/paragraph)
+   address: http://localhost:8080/?page_id=3
+#4 Navigation Menu (publish) "Navigation"
+   slug: navigation · hierarchical type: no
+   author: none (post_author is 0)
+   terms: none
+   revisions: 0
+   top-level blocks: 1 (core/page-list)
+   address: none (not a public type)
+#999 not found</pre><p>Points to draw out: post 4 (Twenty Twenty-Five's navigation menu) has no author, because WordPress made it, and no public address (<code class="inline">is_post_type_viewable()</code> is false: <code class="inline">get_permalink()</code> would still build one); the draft Privacy Policy has only an ugly <code class="inline">?page_id=3</code> address (no slug until it is published) and 24 top-level blocks; pages have no taxonomies at all. Accept <code class="inline">get_post_type_object( ... )-&gt;public</code> for TODO 6 on this site. After the project the IDs 12 to 17 work too: try <code class="inline">pagesco_lab_describe( 16 )</code> for the Staff picks post.</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-02/l2_1-content-model/debug_page_report.php (deliberately broken)</div>
+<p>As shipped, PHP prints:</p>
+<pre class="out">Post: Hello world!
+Filed under: 
+Page 2 categories:Warning: foreach() argument must be of type array|object, false given in /var/www/html/debug_page_report.php on line 24
+
+Page 3 categories:
+Pages are looked after by: Warning: Attempt to read property "display_name" on false in /var/www/html/debug_page_report.php on line 32
+[new lines in wp-content/debug.log]
+[26-Oct-2026 13:16:27 UTC] PHP Warning:  foreach() argument must be of type array|object, false given in /var/www/html/debug_page_report.php on line 24
+[26-Oct-2026 13:16:27 UTC] PHP Warning:  Attempt to read property "display_name" on false in /var/www/html/debug_page_report.php on line 32</pre><ol class="steps">
+  <li><b>Silent, line 19:</b> <code class="inline">$pagesco_post-&gt;category</code> prints nothing and no message: WP_Post has no such field, and for an unknown property it quietly looks up post meta with that key (empty). The categories come from <code class="inline">get_the_terms( $post, 'category' )</code>.</li>
+  <li><b>Warning, line 24:</b> pages have no categories, so <code class="inline">get_the_terms()</code> returns false and <code class="inline">foreach</code> cannot loop over it. Check the result (<code class="inline">is_array()</code>) or ask first (<code class="inline">is_object_in_taxonomy( 'page', 'category' )</code>). The message shows once although the loop runs twice: PHP does not repeat the same message from the same line here.</li>
+  <li><b>Warning, line 32:</b> there is no user maria yet (she arrives in the lesson project), so <code class="inline">get_user_by()</code> returns false. Check it before you use it. After the project this bug hides: the code is still wrong.</li>
+</ol>
+<p>Fixed, it prints:</p>
+<pre class="out">Post: Hello world!
+Filed under: Uncategorized
+Page 2 categories: none (pages have no categories)
+Page 3 categories: none (pages have no categories)
+Pages are looked after by: nobody yet (no user maria)</pre><p>The lesson in it: core functions say "nothing" with false or an empty value, not with an exception, and what posts and pages have is decided by their registration (Lesson 2.1's <code class="inline">get_object_taxonomies()</code>).</p>
+</div>
+
+  <div class="sec"><h2>The Lesson Pages' Own Quick Quizzes</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Lesson 1.3 · PHP the WordPress Way</div>
+<ol class="steps" data-lesson-quiz="1.3">
+  <li><b>C</b> echo '&lt;a href="' . esc_url( $url ) . '"&gt;Website&lt;/a&gt;';: href and src take esc_url, which encodes the URL for HTML and drops dangerous protocols such as javascript:.</li>
+  <li><b>A</b> small red: wp_parse_args keeps the default size, uses the passed color, and simply carries the misspelled colour key along without using it.</li>
+  <li><b>B</b> if ( 0 === $count ) { pagesco_reset_count(); }: Spaces inside the parentheses, a Yoda condition with ===, and a prefixed snake_case function name.</li>
+  <li><b>A</b> if ( is_wp_error( $id ) ) { /* show $id-&gt;get_error_message() */ }: wp_insert_user returns the new user ID or a WP_Error object; is_wp_error tells the two apart, and the error object has the code and message.</li>
+  <li><b>C</b> $nick = sanitize_text_field( wp_unslash( $_POST['nickname'] ) );: Unslash first (WordPress adds slashes to request data), then sanitize on input. Escape later, when you print it.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Lesson 2.1 · The Content Model</div>
+<ol class="steps" data-lesson-quiz="2.1">
+  <li><b>B</b> A page: Timeless content that is linked from a menu rather than listed by date is what pages are for.</li>
+  <li><b>C</b> core/heading 4: Core blocks are core/name in PHP even though the comment omits the namespace, and attributes come from the JSON in the opening comment.</li>
+  <li><b>A</b> current_user_can( 'edit_others_posts' ): Check the capability the feature needs. Administrators, editors and any custom role that has it pass; nobody else does.</li>
+  <li><b>B</b> At least three; the newest is identical to the current page: Every update stores a revision of the new version, so the most recent revision always matches the current page.</li>
+  <li><b>C</b> In the posts_per_page option: wp option update posts_per_page 12: Every Settings field is an option; this one is posts_per_page, so wp option update posts_per_page 12 sets it.</li>
+</ol>
+</div>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>Escapers:</b> <code class="inline">esc_html()</code> for text between tags, <code class="inline">esc_attr()</code> for an attribute value (quoted), <code class="inline">esc_url()</code> for every href and src; <code class="inline">wp_kses_post()</code> when the value is HTML a post may contain.</li>
+  <li><b>Prefixes:</b> core, the theme and every active plugin run in ONE PHP process with one global namespace (and share one options table): a second function with the same name is a fatal error that takes the site down, and you cannot know which plugins a client installs later. A namespace counts as a prefix for classes.</li>
+  <li><b>The content model:</b> all are rows of <code class="inline">wp_posts</code>; the <code class="inline">post_type</code> column tells them apart (post, page, attachment, revision, wp_navigation). That is why they share revisions, permissions and the REST API.</li>
+</ol>
+
+  <div class="sec"><h2>Common Wrong Answers and What They Reveal</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li><b>Q1 A (<code class="inline">esc_html()</code>).</b> Thinks of escaping as one operation. It works here by accident; ask where an href goes, then show the javascript: link from Mistake 1.</li>
+  <li><b>Q2 <code class="inline">Tom &amp;amp;amp; Jerry</code>.</b> Expects double encoding. Run it: WordPress's escapers leave existing entities alone.</li>
+  <li><b>Q3 A.</b> Has not met "<code class="inline">_e</code> echoes". Have them run the demo's <code class="inline">mistake-e.php</code> and read the third line of its output.</li>
+  <li><b>Q4 C.</b> Thinks a variable in a plugin file is private. Plugin files run in the global scope; show <code class="inline">$GLOBALS</code> holding it.</li>
+  <li><b>Q6 A.</b> Generalizes from <code class="inline">wp_insert_user()</code>. Read the Return line of <code class="inline">wp_insert_post()</code> in the Code Reference together.</li>
+  <li><b>Q7 A.</b> Classic-theme knowledge. Run <code class="inline">wp post get 4 --field=post_type</code> and <code class="inline">--field=post_content</code>.</li>
+  <li><b>Q8 <code class="inline">2 1</code> or <code class="inline">1 0</code>.</b> Expects one default for all tools. WP-CLI vs <code class="inline">get_posts()</code> is the lesson's statuses section.</li>
+  <li><b>Q11 A.</b> The intuitive model of revisions. Run the lesson's revision demo again and compare the newest revision with the post.</li>
+  <li><b>Q12 A.</b> Swaps the two addresses. WordPress Address = siteurl (files), Site Address = home (visitors).</li>
+</ul>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 2 · Answer Key · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Key: Session 11</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">answers &amp; solutions · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Answer Key</div>
+    <h1>Session 11: Custom Tables, Shortcodes and Block Setup</h1>
+    <p class="sub">Answers and reasoning for every Session 11 item: the warm-up, both self-checks, the predict-then-run items, the lab reference outputs, the lesson pages' own quizzes and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Session <b>11</b></span>
+      <span class="chip"><b>12</b> self-check items</span>
+      <span class="chip">Confidential</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Start Here · Warm-up</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">W1</div><div class="qt">A handler that changes data: the four checks, in order?</div><div class="opts"><div class="opt correct">Genuine (nonce), allowed (<code class="inline">current_user_can()</code> for this object), sanitize and validate, escape on output; SQL by hand through <code class="inline">$wpdb-&gt;prepare()</code>.</div></div></div>
+<div class="q"><div class="qn">W2</div><div class="qt"><code class="inline">settings_fields()</code> takes the group or the page slug?</div><div class="opts"><div class="opt correct">The group (<code class="inline">pagesco_books</code>), the first argument of <code class="inline">register_setting()</code>; <code class="inline">do_settings_sections()</code> takes the slug.</div></div></div>
+<div class="q"><div class="qn">W3</div><div class="qt">What does an unticked checkbox send?</div><div class="opts"><div class="opt correct">Nothing: missing means off (<code class="inline">! empty( ... )</code>).</div></div></div>
+<div class="q"><div class="qn">W4</div><div class="qt"><code class="inline">$wpdb-&gt;prepare()</code>: which placeholder for a table name?</div><div class="opts"><div class="opt correct"><code class="inline">%i</code> (WordPress 6.2+), today's lesson builds a whole table with it.</div></div></div>
+<div class="q"><div class="qn">W5</div><div class="qt">What does uninstall.php remove, and what does it keep?</div><div class="opts"><div class="opt correct">The plugin's own data (the settings option, the role); the shop's books stay. Today the events table joins the "remove" list.</div></div></div>
+
+  <div class="sec"><h2>5.5 · Shortcodes, $wpdb &amp; Custom Tables: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="1" data-kind="short"><div class="qn">Q1</div><div class="qt">What does this print?</div><pre class="code">wp eval 'echo wp_json_encode( shortcode_atts( array( "limit" =&gt; 5, "location" =&gt; "" ),
+    array( "limit" =&gt; "3", "color" =&gt; "red" ), "pagesco_events" ) ), "\n";'</pre><div class="opts"><div class="opt correct"><code class="inline">{"limit":"3","location":""}</code></div></div><div class="why"><b>Why:</b> shortcode_atts() keeps exactly the keys of the defaults: limit takes the given value, as the STRING "3" (attributes are always strings: absint() it before use), location keeps its default, and color, never declared, is dropped. The third argument creates the shortcode_atts_pagesco_events filter.</div></div>
+  <div class="q" data-sc="2"><div class="qn">Q2</div><div class="qt">Which of these do you get for free with a post type, but must build yourself for a custom table?</div><div class="opts"><div class="opt correct">A) A REST route, admin screens, revisions and export</div><div class="opt">B) Fast queries on an indexed column</div><div class="opt">C) A schema you control column by column</div><div class="opt">D) JOINs with wp_posts</div></div><div class="why"><b>Why:</b> That is the price of a table (Lesson 5.5, "When a Custom Table Is Right"): the events got a shortcode now, a REST route in Lesson 7.2, and their cleanup in uninstall.php, all written by hand. In return the table has typed columns and an index on starts_at.<br><b>B</b> is wrong: That is what the table GIVES you (KEY starts_at); meta queries sort a string column.<br><b>C</b> is wrong: Also a benefit of the table, and a duty: you write the migrations.<br><b>D</b> is wrong: Any table can be joined; the wishlist lab joins wp_posts.</div></div>
+  <div class="q" data-sc="3" data-kind="short"><div class="qn">Q3</div><div class="qt">On the finished Lesson 5.5 site, what does this print?</div><pre class="code">wp eval 'global $wpdb; echo $wpdb-&gt;prepare( "SELECT title FROM %i WHERE location = %s",
+    PagesCo\Books\EventsTable::name(), "Café" ), "\n";'</pre><div class="opts"><div class="opt correct"><code class="inline">SELECT title FROM `wp_pagesco_events` WHERE location = 'Café'</code></div></div><div class="why"><b>Why:</b> %i quotes an identifier with backticks (WordPress 6.2+), %s quotes and escapes a value. The table name comes from EventsTable::name(), built from $wpdb->prefix, never a hard-coded wp_.</div></div>
+  <div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">EventsTable::add() calls $wpdb->insert(). Where does it find the new row's ID?</div><div class="opts"><div class="opt">A) In the return value of insert()</div><div class="opt correct">B) <code class="inline">$wpdb-&gt;insert_id</code></div><div class="opt">C) <code class="inline">$wpdb-&gt;last_query</code></div><div class="opt">D) Only with a second query, SELECT LAST_INSERT_ID()</div></div><div class="why"><b>Why:</b> insert() returns the number of rows inserted (1) or false; the auto-increment ID of the new row is in $wpdb->insert_id right after it (the lesson's add() returns it, or 0 when the insert failed).<br><b>A</b> is wrong: The return value is a count (or false), not an ID.<br><b>C</b> is wrong: last_query is the SQL that ran, useful for debugging.<br><b>D</b> is wrong: Not needed: wpdb reads it for you.</div></div>
+  <div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">Why does EventsTable check the schema version on every request (maybe_upgrade() on init), and not only on activation?</div><div class="opts"><div class="opt">A) Because dbDelta() must run on every request</div><div class="opt">B) Because the activation hook cannot create tables</div><div class="opt correct">C) Because a plugin update replaces the files but does not run the activation hook again</div><div class="opt">D) Because the version option is not autoloaded</div></div><div class="why"><b>Why:</b> An update ships a higher DB_VERSION and a new schema(); the next request sees the stored version is lower and runs install() once. The check costs one autoloaded get_option() (Lesson 5.5, Project Step 1: no reactivation).<br><b>A</b> is wrong: dbDelta() runs only when the stored version is older than the code.<br><b>B</b> is wrong: Activation does create it: Activator::activate() calls install().<br><b>D</b> is wrong: update_option() autoloads it, which is why the check is cheap.</div></div>
+  <div class="q" data-sc="6" data-kind="short"><div class="qn">Q6</div><div class="qt">On the finished Lesson 5.5 site, what does this print?</div><pre class="code">wp eval 'echo do_shortcode( "[pagesco_events location=\"Reading corner\" limit=\"1\"]" ), "\n";'</pre><div class="opts"><div class="opt correct"><code class="inline">&lt;ul class="pagesco-events"&gt;&lt;li class="pagesco-event"&gt;&lt;strong&gt;Book club: Dune&lt;/strong&gt; &lt;time datetime="2027-11-04T19:00"&gt;Thursday, November 4, 7:00 pm&lt;/time&gt; &lt;span class="pagesco-event__where"&gt;Reading corner, 20 seats&lt;/span&gt;&lt;/li&gt;&lt;/ul&gt;</code></div></div><div class="why"><b>Why:</b> location narrows the list (an exact match, through a %s placeholder in EventsTable::find()), limit caps it; the dates come from mysql2date() in the shop's local time. Two events are in the Reading corner; the first by date is the Dune book club.</div></div>
+
+  <div class="sec"><h2>5.5 · Shortcodes, $wpdb &amp; Custom Tables: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'echo do_shortcode( "[pagesco_book id=\"14\"]" ) === "" ? "(empty)" : "a card", "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">(empty)</pre></div></div><div class="why"><b>Why:</b> Page 14 is a page, not a published book, so render() returns an empty string and the tag disappears: a visitor never sees an error because an editor mistyped an ID.</div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'global $wpdb; echo $wpdb-&gt;get_var( "SELECT COUNT(*) FROM " . PagesCo\Books\EventsTable::name() ), "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">6</pre></div></div><div class="why"><b>Why:</b> Six: the seeding script added six events after the uninstall test had recreated the table (IDs 1 to 6).</div></div>
+
+  <div class="sec"><h2>6.1 · Block Development Setup: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">Which file in build/blocks/book-card/ has no source file of its own in src/?</div><div class="opts"><div class="opt">A) <code class="inline">block.json</code></div><div class="opt">B) <code class="inline">index.js</code></div><div class="opt">C) <code class="inline">style-index.css</code></div><div class="opt correct">D) <code class="inline">index.asset.php</code>, the dependency list and version hash</div></div><div class="why"><b>Why:</b> The build writes index.asset.php itself: the WordPress script handles index.js needs (react-jsx-runtime, wp-block-editor, wp-blocks, wp-i18n) and a hash of its content for cache busting. block.json is copied; index.js and style-index.css are compiled from the sources.<br><b>A</b> is wrong: block.json is copied from src/blocks/book-card/block.json.<br><b>B</b> is wrong: index.js is compiled from index.js, edit.js and save.js.<br><b>C</b> is wrong: style-index.css is compiled from style.scss.</div></div>
+  <div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt">On the finished Lesson 6.1 site, what does this print?</div><pre class="code">wp eval 'echo implode( ", ", WP_Block_Type_Registry::get_instance()
+    -&gt;get_registered( "pagesco/book-card" )-&gt;style_handles ), "\n";'</pre><div class="opts"><div class="opt correct"><code class="inline">pagesco-book-card-style</code></div></div><div class="why"><b>Why:</b> Registration turned block.json's "style": "file:./style-index.css" into a registered style with a handle derived from the block name. That handle is what a block theme prints (inlined) on pages that contain the block, and only there.</div></div>
+  <div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">You worked all afternoon with npm start running. What do you run before you commit or deploy?</div><div class="opts"><div class="opt correct">A) <code class="inline">npm run build</code>: the minified production files, without .map files</div><div class="opt">B) <code class="inline">npm install</code> again</div><div class="opt">C) <code class="inline">npx @wordpress/create-block</code> again</div><div class="opt">D) Nothing: npm start already wrote build/</div></div><div class="why"><b>Why:</b> npm start writes a development build (not minified, with source maps) and watches for changes; npm run build rewrites build/ with the small production files (Lesson 6.1, "While you work").<br><b>B</b> is wrong: npm install only installs the tools; it builds nothing.<br><b>C</b> is wrong: create-block scaffolds a NEW block.<br><b>D</b> is wrong: It did, but the development version, with .map files that should not ship.</div></div>
+  <div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">Posts already contain the Book Card. A developer renames the block from pagesco/book-card to pagesco/staff-pick. What happens to those posts?</div><div class="opts"><div class="opt">A) WordPress renames the block in every post automatically</div><div class="opt">B) Nothing visible: names are cosmetic</div><div class="opt correct">C) Their stored comments still say wp:pagesco/book-card, a block that no longer exists: the editor cannot handle them</div><div class="opt">D) The posts are deleted</div></div><div class="why"><b>Why:</b> The name is stored in every post that uses the block (<!-- wp:pagesco/book-card -->), so it is a permanent identifier: never rename it once content exists (Lesson 6.1, Reading block.json). Change the title instead; it is only a label.<br><b>A</b> is wrong: Nothing rewrites stored content for you.<br><b>B</b> is wrong: The name is the block's identity; the title is the cosmetic part.<br><b>D</b> is wrong: The content stays; only the editor no longer knows the block.</div></div>
+  <div class="q" data-sc="11" data-kind="short"><div class="qn">Q11</div><div class="qt">On the finished Lesson 6.1 site, what does this print, and why not 4?</div><pre class="code">grep -c "'wp-" wp-content/plugins/pagesco-books/build/blocks/book-card/index.asset.php</pre><div class="opts"><div class="opt correct"><code class="inline">3</code>: wp-block-editor, wp-blocks and wp-i18n; the fourth dependency, react-jsx-runtime, does not start with wp-</div></div><div class="why"><b>Why:</b> The build replaced every @wordpress/* import with the matching global script handle and listed them; WordPress loads them before index.js. That is why the block's own file is about a kilobyte.</div></div>
+  <div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">What does <code class="inline">npx @wordpress/create-block@latest book-card --no-plugin --target-dir=src/blocks/book-card</code> NOT create?</div><div class="opts"><div class="opt">A) A block.json</div><div class="opt correct">B) A plugin PHP file, a package.json and node_modules/</div><div class="opt">C) An edit.js and a save.js</div><div class="opt">D) A view.js</div></div><div class="why"><b>Why:</b> --no-plugin writes only the block's own files into the target folder: block.json, index.js, edit.js, save.js, view.js and the two SCSS files. The plugin, its package.json and the npm install are yours (Lesson 6.1, Building with @wordpress/scripts).<br><b>A</b> is wrong: block.json is the first file it writes.<br><b>C</b> is wrong: Both are scaffolded (edit for the editor, save for the stored HTML).<br><b>D</b> is wrong: It writes view.js too; the project deletes it.</div></div>
+
+  <div class="sec"><h2>6.1 · Block Development Setup: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'echo implode( ", ", array_keys( require WP_PLUGIN_DIR . "/pagesco-books/build/blocks/blocks-manifest.php" ) ), "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">book-card</pre></div></div><div class="why"><b>Why:</b> The manifest is plain PHP that returns an array keyed by the block's folder in build/blocks: one block, book-card.</div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it.</div><pre class="code">curl -s http://localhost:8080/ | grep -c 'pagesco-book-card-style'</pre><div class="opts"><div class="opt correct"><pre class="out">0</pre></div></div><div class="why"><b>Why:</b> 0 (and grep exits 1): block themes print a block's styles only on pages that contain the block. The home page has no Book Card.</div></div>
+
+  <div class="sec"><h2>Lab Reference Solutions</h2><span class="rule"></span></div>
+<p>Every output below is real: the lab files run exactly as <code class="inline">labs/check_labs.py</code> runs them, on the site each declares (<code class="inline">after:lesson_17</code> = after Lesson 5.4, <code class="inline">after:lesson_18</code> = after Lesson 5.5).</p>
+<div class="blk lab"><div class="h">Lab 5.5-A (guided): labs/module-11/l5_5-custom-tables/wishlist_table_starter.php → wishlist_table_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">1. TODO
+2. TODO
+3. TODO
+4. TODO
+5. TODO</pre><p>The solution prints:</p>
+<pre class="out">Created table wp_pagesco_lab_wishlist
+rows: 4, last ID 4
+Dune: 2 reader(s)
+Fahrenheit 451: 1 reader(s)
+The Hobbit: 1 reader(s)
+updated: 1 row(s)
+tables left: 0</pre><p>dbDelta() returned one message (it created the table); a second CREATE would return an empty array. The JOIN puts both table names through %i; the update has a data format and a where format; DROP TABLE goes through prepare() too, and information_schema proves the site is as it was.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 5.5-B: labs/module-11/l5_5-custom-tables/open_hours_starter/ → open_hours_solution/ with test_open_hours.sh</div>
+<p>The test with the starter (the list is ECHOED: it appears before the quotes, and the callback returned ''):</p>
+<pre class="out">[pagesco_open_hours day="saturday"] =&gt; &lt;ul class="pagesco-hours"&gt;&lt;li&gt;Monday: 9:00-18:00&lt;/li&gt;&lt;li&gt;Tuesday: 9:00-18:00&lt;/li&gt;&lt;li&gt;Wednesday: 9:00-18:00&lt;/li&gt;&lt;li&gt;Thursday: 9:00-21:00&lt;/li&gt;&lt;li&gt;Friday: 9:00-18:00&lt;/li&gt;&lt;li&gt;Saturday: 10:00-16:00&lt;/li&gt;&lt;li&gt;Sunday: closed&lt;/li&gt;&lt;/ul&gt;''
+[pagesco_open_hours day="SATURDAY"] =&gt; &lt;ul class="pagesco-hours"&gt;&lt;li&gt;Monday: 9:00-18:00&lt;/li&gt;&lt;li&gt;Tuesday: 9:00-18:00&lt;/li&gt;&lt;li&gt;Wednesday: 9:00-18:00&lt;/li&gt;&lt;li&gt;Thursday: 9:00-21:00&lt;/li&gt;&lt;li&gt;Friday: 9:00-18:00&lt;/li&gt;&lt;li&gt;Saturday: 10:00-16:00&lt;/li&gt;&lt;li&gt;Sunday: closed&lt;/li&gt;&lt;/ul&gt;''
+[pagesco_open_hours day="holiday"] =&gt; &lt;ul class="pagesco-hours"&gt;&lt;li&gt;Monday: 9:00-18:00&lt;/li&gt;&lt;li&gt;Tuesday: 9:00-18:00&lt;/li&gt;&lt;li&gt;Wednesday: 9:00-18:00&lt;/li&gt;&lt;li&gt;Thursday: 9:00-21:00&lt;/li&gt;&lt;li&gt;Friday: 9:00-18:00&lt;/li&gt;&lt;li&gt;Saturday: 10:00-16:00&lt;/li&gt;&lt;li&gt;Sunday: closed&lt;/li&gt;&lt;/ul&gt;''
+[pagesco_open_hours] =&gt; &lt;ul class="pagesco-hours"&gt;&lt;li&gt;Monday: 9:00-18:00&lt;/li&gt;&lt;li&gt;Tuesday: 9:00-18:00&lt;/li&gt;&lt;li&gt;Wednesday: 9:00-18:00&lt;/li&gt;&lt;li&gt;Thursday: 9:00-21:00&lt;/li&gt;&lt;li&gt;Friday: 9:00-18:00&lt;/li&gt;&lt;li&gt;Saturday: 10:00-16:00&lt;/li&gt;&lt;li&gt;Sunday: closed&lt;/li&gt;&lt;/ul&gt;''</pre><p>With the solution:</p>
+<pre class="out">[pagesco_open_hours day="saturday"] =&gt; '&lt;span class="pagesco-hours"&gt;Saturday: 10:00-16:00&lt;/span&gt;'
+[pagesco_open_hours day="SATURDAY"] =&gt; '&lt;span class="pagesco-hours"&gt;Saturday: 10:00-16:00&lt;/span&gt;'
+[pagesco_open_hours day="holiday"] =&gt; ''
+[pagesco_open_hours] =&gt; '&lt;ul class="pagesco-hours"&gt;&lt;li&gt;Monday: 9:00-18:00&lt;/li&gt;&lt;li&gt;Tuesday: 9:00-18:00&lt;/li&gt;&lt;li&gt;Wednesday: 9:00-18:00&lt;/li&gt;&lt;li&gt;Thursday: 9:00-21:00&lt;/li&gt;&lt;li&gt;Friday: 9:00-18:00&lt;/li&gt;&lt;li&gt;Saturday: 10:00-16:00&lt;/li&gt;&lt;li&gt;Sunday: closed&lt;/li&gt;&lt;/ul&gt;'</pre><p>shortcode_atts() gives day its default; sanitize_key() lowercases SATURDAY; an unknown day returns '' instead of an error; the whole list is built as a string and returned.</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-11/l5_5-custom-tables/debug_events_report.php (deliberately broken)</div>
+<p>As shipped:</p>
+<pre class="out">Notice: Function wpdb::prepare was called &lt;strong&gt;incorrectly&lt;/strong&gt;. The query argument of wpdb::prepare() must have a placeholder. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 3.9.0.) in /var/www/html/wp-includes/functions.php on line 6260
+Warning: Undefined property: stdClass::$capacity in /var/www/html/debug_events_report.php on line 22
+2027-11-04 19:00:00  Book club: Dune            0 seats
+2027-11-06 10:30:00  Story time: The Hobbit     0 seats
+2027-11-11 18:30:00  An evening with Ana Ruiz   0 seats
+Café: 2 seats
+Reading corner: 2 seats
+Children's corner: 1 seats
+Front of the shop: 1 seats</pre><ol class="steps">
+  <li><b>"called incorrectly", line 19:</b> prepare() with no placeholder at all. The table name is interpolated and LIMIT 3 is literal: pass both through %i and %d (or drop prepare()).</li>
+  <li><b>Warning, line 22:</b> the SELECT never asked for capacity, so the row object has no such property and every event shows 0 seats. Name every column you use.</li>
+  <li><b>Silent, line 26:</b> COUNT(capacity) counts rows (2, 2, 1, 1), SUM(capacity) adds seats. No message, a wrong report.</li>
+</ol>
+<p>Fixed, it prints:</p>
+<pre class="out">2027-11-04 19:00:00  Book club: Dune            20 seats
+2027-11-06 10:30:00  Story time: The Hobbit     15 seats
+2027-11-11 18:30:00  An evening with Ana Ruiz   40 seats
+Café: 70 seats
+Reading corner: 40 seats
+Children's corner: 15 seats
+Front of the shop: 0 seats</pre></div>
+<div class="blk lab"><div class="h">Lab 6.1-A (guided): labs/module-11/l6_1-block-setup/shelf_label_starter/ → shelf_label_solution/ with test_shelf_label.sh</div>
+<p>The test with the starter:</p>
+<pre class="out">Plugin 'pagesco-shelf-label' activated.
+Success: Activated 1 of 1 plugins.
+pagesco/shelf-label: not registered
+front end: 0 stylesheet(s)
+&lt;p class="wp-block-pagesco-shelf-label"&gt;Staff picks&lt;/p&gt;</pre><p>With the solution:</p>
+<pre class="out">Plugin 'pagesco-shelf-label' activated.
+Success: Activated 1 of 1 plugins.
+Shelf Label (text, icon tag)
+keywords: shelf, sign
+handles: pagesco-shelf-label-editor-script, pagesco-shelf-label-style
+front end: 1 stylesheet(s)
+&lt;p class="wp-block-pagesco-shelf-label"&gt;Staff picks&lt;/p&gt;</pre><p>Unregistered, the saved HTML still renders (it is in the post) but no style is printed. TODO 1 is the Blocks feature's call with __DIR__; the handles come from the block name. The keywords line needs TODO 2's rebuild: WordPress reads the manifest in build/, never src/.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 6.1-B: labs/module-11/l6_1-block-setup/core_blocks_tour_starter.sh → core_blocks_tour_solution.sh</div>
+<p>As shipped:</p>
+<pre class="out">1. block.json files in wp-includes/blocks:
+115
+2. blocks in core's manifest (blocks-json.php, the same idea as your blocks-manifest.php):
+TODO
+3. apiVersion of every core block:
+TODO
+4. core/quote's folder (where is its JavaScript?):
+TODO
+5. registered block types without a block.json:
+TODO</pre><p>The solution prints:</p>
+<pre class="out">1. block.json files in wp-includes/blocks:
+115
+2. blocks in core's manifest (blocks-json.php, the same idea as your blocks-manifest.php):
+115
+3. apiVersion of every core block:
+    115 "apiVersion": 3
+4. core/quote's folder (where is its JavaScript?):
+block.json         style-rtl.css      style-rtl.min.css  style.css          style.min.css      theme-rtl.css      theme-rtl.min.css  theme.css          theme.min.css
+5. registered block types without a block.json:
+core/post-comments</pre><p>Core has 115 block.json files and the same number of entries in its own manifest (blocks-json.php), all apiVersion 3; core/quote's folder has styles and no JavaScript, because the editor code of every core block is one bundle (wp-includes/js/dist/block-library.js). The registry has 116 types: core/post-comments is registered from PHP alone, a legacy block.</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-11/l6_1-block-setup/debug_block_registration.php (deliberately broken)</div>
+<p>As shipped:</p>
+<pre class="out">Notice: Function WP_Block_Type_Registry::register was called &lt;strong&gt;incorrectly&lt;/strong&gt;. Block type names must not contain uppercase characters. "pagesco/Sale-Badge" was given. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 5.0.0.) in /var/www/html/wp-includes/functions.php on line 6260
+Notice: Function WP_Block_Type_Registry::register was called &lt;strong&gt;incorrectly&lt;/strong&gt;. Block type names must contain a namespace prefix. Example: my-plugin/my-custom-block-type. "pagesco-gift-card" was given. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 5.0.0.) in /var/www/html/wp-includes/functions.php on line 6260
+pagesco/sale-badge: NOT registered
+pagesco/gift-card: NOT registered
+pagesco/reading-list: registered, apiVersion 2</pre><ol class="steps">
+  <li><b>"called incorrectly", line 18:</b> block names are lowercase: pagesco/sale-badge.</li>
+  <li><b>"called incorrectly", line 26:</b> a block name needs a namespace: pagesco/gift-card.</li>
+  <li><b>Silent, line 38:</b> api_version 2 registers without a word from PHP; the editor logs a deprecation for apiVersion 2 or lower and does not put the block in the iframed canvas the same way. Use 3, as every core block does.</li>
+</ol>
+<p>Fixed, it prints:</p>
+<pre class="out">pagesco/sale-badge: registered, apiVersion 3
+pagesco/gift-card: registered, apiVersion 3
+pagesco/reading-list: registered, apiVersion 3</pre></div>
+
+  <div class="sec"><h2>The Lesson Pages' Own Quick Quizzes</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Lesson 5.5 · Shortcodes, $wpdb &amp; Custom Tables</div>
+<ol class="steps" data-lesson-quiz="5.5">
+  <li><b>B</b> At the very top of the page, above the doctype: echo prints immediately, and a block theme renders the content before it prints the head, so the HTML ends up above the doctype; the shortcode's place in the content stays empty.</li>
+  <li><b>C</b> Thousands of bookings, each with the same few fields, listed by date: Many rows with the same fields, queried by those fields and not edited as content, are where a custom table beats post meta: real column types, indexes and simple SQL.</li>
+  <li><b>A</b> A higher DB_VERSION, so maybe_upgrade() runs install() again: maybe_upgrade only calls dbDelta when the stored version is lower than DB_VERSION. Without raising the constant, the new statement never runs.</li>
+  <li><b>C</b> {"limit":5,"location":""}: shortcode_atts compares keys exactly and keeps only declared ones, so LIMIT and color are both ignored and the defaults stay. In a real tag, the parser lowercases names before this step, which is why [pagesco_book ID=35] worked.</li>
+  <li><b>B</b> $wpdb-&gt;get_results( $wpdb-&gt;prepare( 'SELECT title FROM %i WHERE location = %s', $table, $loc ) ): prepare puts the table name in through %i and the visitor's value through %s, quoted and escaped, so it can never change the query.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Lesson 6.1 · Block Development Setup</div>
+<ol class="steps" data-lesson-quiz="6.1">
+  <li><b>B</b> build/blocks/ and its blocks-manifest.php: The Blocks feature passes build/blocks and its manifest to the registration function; src/ is only read by the build, which is why an unbuilt change never shows up.</li>
+  <li><b>A</b> To add the block to the existing pagesco-books plugin instead of creating a second plugin: Without it create-block scaffolds a separate plugin with its own PHP file and build setup; --no-plugin writes only the block files, so the block lives in pagesco-books with everything else.</li>
+  <li><b>C</b> It lists the WordPress scripts index.js depends on, and a version hash for caching: The build writes the script handles the file needs (wp-blocks, wp-block-editor...) and a content hash; WordPress loads those dependencies first and uses the hash as the version.</li>
+  <li><b>B</b> The build has not run since the change: Registration reads build/blocks-manifest.php and build/, which still hold the old title until npm run build (or npm start) runs again.</li>
+  <li><b>C</b> Only the styles from style-index.css; the HTML is already in the post: The HTML was stored when the editor saved the post; the front end only needs the shared styles, which a block theme adds (here inlined) only on pages that contain the block.</li>
+</ol>
+</div>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>Return, not echo:</b> the callback runs while the content is filtered, before the page is printed; in a block theme the template is rendered before the &lt;head&gt;, so echoed text lands above the doctype (in a classic theme at the top of the content).</li>
+  <li><b>DB_VERSION:</b> raise it; maybe_upgrade() compares it with pagesco_books_db_version on init and runs install(), whose dbDelta() adds the column. Plugin updates replace files without running activation.</li>
+  <li><b>The path:</b> src/blocks/book-card → npm run build → build/blocks/book-card + blocks-manifest.php → Blocks::register_blocks() on init → registered type and handles → the editor loads index.js; visitors get the saved HTML and style-index.css.</li>
+</ol>
+
+  <div class="sec"><h2>Common Wrong Answers and What They Reveal</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li><b>Q1 with limit as the number 3.</b> Attributes are strings: absint() them.</li>
+  <li><b>Q2 B.</b> Lists a benefit of tables as a cost: read the question again.</li>
+  <li><b>Q5 B.</b> Thinks activation cannot create tables; it does, the problem is updates.</li>
+  <li><b>Q7 A.</b> block.json is copied (and reformatted), not generated.</li>
+  <li><b>Q10 B.</b> Thinks the name is a label; the title is.</li>
+</ul>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 11 · Answer Key · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

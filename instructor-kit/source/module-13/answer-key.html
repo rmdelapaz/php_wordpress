@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Key: Session 13</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">answers &amp; solutions · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Answer Key</div>
+    <h1>Session 13: The Interactivity API and Using the REST API</h1>
+    <p class="sub">Answers and reasoning for every Session 13 item: the warm-up, both self-checks, the predict-then-run items, Checkpoint 2's rubric and model answer, the lab reference outputs, the lesson pages' own quizzes and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Session <b>13</b></span>
+      <span class="chip"><b>12</b> self-check items</span>
+      <span class="chip">Checkpoint <b>2</b></span>
+      <span class="chip">Confidential</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Warm-up: Lessons 6.2 and 6.3</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>W1.</b> Only the comment's: <code class="inline">{"backgroundColor":"sage"}</code>. Title, author, recommendation and link are in the HTML; headingLevel and showBadge are at their defaults.</li>
+  <li><b>W2.</b> When content with the old HTML exists that must stay editable (a client's posts): always. While the block exists only on a test site: delete the test posts instead.</li>
+  <li><b>W3.</b> render.php, on every view: no count means the Books per list setting (6), clamped to 1 to 24.</li>
+  <li><b>W4.</b> <code class="inline">'uses_context' =&gt; array( 'postId', 'postType' )</code> in register_block_bindings_source(); without it the fallback stays, silently.</li>
+  <li><b>W5.</b> <code class="inline">$10.99</code>: the large paragraph is bound to pagesco/book's price field, which formats pagesco_price on every view.</li>
+</ol>
+<p>On the projector site (after Lesson 6.3):</p>
+<pre class="code">wp eval '$b = wp_list_filter( parse_blocks( get_page_by_path( "staff-picks", OBJECT, "post" )-&gt;post_content ), array( "blockName" =&gt; "pagesco/book-card" ) ); echo wp_json_encode( reset( $b )["attrs"] ), "\n";'</pre><pre class="out">{"backgroundColor":"sage"}</pre><pre class="code">curl -s http://localhost:8080/books/the-hobbit/ | grep -o 'has-large-font-size wp-block-paragraph"&gt;[^&lt;]*'</pre><pre class="out">has-large-font-size wp-block-paragraph"&gt;$10.99</pre>
+  <div class="sec"><h2>6.4 · The Interactivity API: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">A visitor opens /find-a-book/?genre=fantasy. Where does the browser's store get state.genre's starting value from?</div><div class="opts"><div class="opt">A) From the address bar, read by view.js</div><div class="opt correct">B) From the state JSON that render.php's wp_interactivity_state() put into the page</div><div class="opt">C) From localStorage</div><div class="opt">D) From a REST request the store sends on load</div></div><div class="why"><b>Why:</b> render.php validates ?genre= and passes it to wp_interactivity_state(); WordPress prints the plain values as JSON (the script tag with the id wp-script-module-data-@wordpress/interactivity), and the runtime merges it into the store's state before anything runs.<br><b>A</b> is wrong: view.js only WRITES the address (history.replaceState()).<br><b>C</b> is wrong: Nothing in the block uses browser storage.<br><b>D</b> is wrong: The Book Filter makes no requests: all books are in the HTML (Lesson 7.2 designs the REST version).</div></div>
+  <div class="q" data-sc="2"><div class="qn">Q2</div><div class="qt">Which of these directives does the SERVER not evaluate when it renders the block?</div><div class="opts"><div class="opt">A) <code class="inline">data-wp-bind--hidden="!state.isVisible"</code></div><div class="opt">B) <code class="inline">data-wp-text="state.visibleCount"</code></div><div class="opt">C) <code class="inline">data-wp-class--is-selected="state.isSelected"</code></div><div class="opt correct">D) <code class="inline">data-wp-on--click="actions.selectGenre"</code></div></div><div class="why"><b>Why:</b> Events only exist in the browser, so data-wp-on (and watch, init, run) are browser-only. bind, class, style, text, context, each and interactive are processed on the server too, which is why the page is correct before any JavaScript runs.<br><b>A</b> is wrong: The server writes hidden on the nine non-fantasy books.<br><b>B</b> is wrong: The server fills the span with 2.<br><b>C</b> is wrong: The server adds class="is-selected" to the Fantasy link.</div></div>
+  <div class="q" data-sc="3" data-kind="short"><div class="qn">Q3</div><div class="qt">On the course site after Lesson 6.4 (three Dystopian books of eleven): what does this print?</div><pre class="code">curl -s 'http://localhost:8080/find-a-book/?genre=dystopian' | grep -c '&lt;li hidden'</pre><div class="opts"><div class="opt correct"><code class="inline">8</code></div></div><div class="why"><b>Why:</b> All eleven books are in the HTML; the server ran data-wp-bind--hidden for each and wrote hidden on the eight that are not dystopian. curl runs no JavaScript: this is what every visitor gets first.</div></div>
+  <div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">Each genre link must know its own slug. Where does that slug belong?</div><div class="opts"><div class="opt correct">A) In the element's context, <code class="inline">wp_interactivity_data_wp_context( array( 'slug' =&gt; $slug ) )</code></div><div class="opt">B) In the state, as one key per genre</div><div class="opt">C) In a global JavaScript variable</div><div class="opt">D) In the link's class name</div></div><div class="why"><b>Why:</b> State is shared by the whole store (one genre is selected for everyone); context is data attached to one element and visible to the directives inside it. getContext() reads it in getters and actions, wp_interactivity_get_context() in the PHP closures.<br><b>B</b> is wrong: Works, but every link's directives would need to name their own key: context is what per-element data is for.<br><b>C</b> is wrong: The runtime would not track it, so nothing would update.<br><b>D</b> is wrong: Classes are for styling; the store cannot read them as data.</div></div>
+  <div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">An action calls event.preventDefault() to stop a link. What does WordPress 6.8 and later require for it?</div><div class="opts"><div class="opt">A) Nothing: actions always run synchronously</div><div class="opt">B) data-wp-on-async--click instead of data-wp-on--click</div><div class="opt correct">C) Wrapping the action in withSyncEvent()</div><div class="opt">D) Returning false from the action</div></div><div class="why"><b>Why:</b> Since 6.8 the runtime may run actions after the browser has handled the event, too late to prevent anything. withSyncEvent() says the action needs the event right away; without it 7.1 still works but logs a deprecation warning (Common Mistake 2).<br><b>A</b> is wrong: That was true before 6.8.<br><b>B</b> is wrong: on-async is for actions that need NOTHING from the event.<br><b>D</b> is wrong: Return values of actions are ignored.</div></div>
+  <div class="q" data-sc="6" data-kind="short"><div class="qn">Q6</div><div class="qt">A visitor's browser blocks the Book Filter's script module, and she clicks Fantasy. What happens, and why?</div><div class="opts"><div class="opt correct">The link is followed (a page load) and the server renders the filtered page: the links are real ?genre= links and render.php reads the address</div></div><div class="why"><b>Why:</b> Progressive enhancement: the HTML works on its own; JavaScript only makes it faster. It came almost for free because the state starts in PHP and the derived values have PHP closures.</div></div>
+
+  <div class="sec"><h2>6.4 · The Interactivity API: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the output, then run it.</div><pre class="code">curl -s 'http://localhost:8080/find-a-book/?genre=romance' | grep -o 'visibleCount"&gt;[0-9]*'</pre><div class="opts"><div class="opt correct"><pre class="out">visibleCount"&gt;11</pre></div></div><div class="why"><b>Why:</b> render.php accepts only slugs of genres that have books, so romance falls back to All books: 11. Nothing from the address reaches the page unchecked (the lesson's Exercise 1).</div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the output, then run it.</div><pre class="code">wp eval 'echo wp_interactivity_process_directives( "&lt;div data-wp-interactive=\"pagesco/x\"&gt;&lt;b data-wp-text=\"state.missing\"&gt;old text&lt;/b&gt;&lt;/div&gt;" ), "\n";'</pre><div class="opts"><div class="opt correct"><pre class="out">&lt;div data-wp-interactive="pagesco/x"&gt;&lt;b data-wp-text="state.missing"&gt;&lt;/b&gt;&lt;/div&gt;</pre></div></div><div class="why"><b>Why:</b> The server evaluates <code class="inline">data-wp-text</code> against the store's state; <code class="inline">state.missing</code> has no value, so the element's text is REPLACED by nothing: the old text is gone. No message: check the namespace and the state key when a text is empty.</div></div>
+
+  <div class="sec"><h2>7.1 · Using the REST API: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">Anonymously, <code class="inline">GET /wp-json/wp/v2/books/30?context=edit</code>. What comes back?</div><div class="opts"><div class="opt">A) 200 with the raw title and the content as block markup</div><div class="opt">B) 404 rest_no_route</div><div class="opt correct">C) 401 rest_forbidden_context</div><div class="opt">D) 403 rest_cannot_edit</div></div><div class="why"><b>Why:</b> context=edit returns raw values only to users who could edit the item. Nobody is logged in, so it is "who are you?": 401. Maria with an application password gets the raw fields; Devon, an author, 403.<br><b>A</b> is wrong: Only for users who may edit the book.<br><b>B</b> is wrong: The route exists; only the context is refused.<br><b>D</b> is wrong: 403 means "I know you, and no": the request is anonymous.</div></div>
+  <div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt">On the course site (six Classic books, genre ID 7): what does this print?</div><pre class="code">curl -s 'http://localhost:8080/wp-json/wp/v2/books?genres=7&amp;per_page=4&amp;_fields=id' -D - -o /dev/null | grep -i '^X-WP-TotalPages'</pre><div class="opts"><div class="opt correct"><code class="inline">X-WP-TotalPages: 2</code></div></div><div class="why"><b>Why:</b> X-WP-TotalPages is the number of pages at this per_page: six books in pages of four are two pages. The body (sent to /dev/null here) would hold the first four; a client loops up to the header's number.</div></div>
+  <div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">A Dashboard page sends Maria's cookie and an X-WP-Nonce header with an old, made-up value. What does the REST API answer?</div><div class="opts"><div class="opt correct">A) 403 rest_cookie_invalid_nonce: the page must fetch a fresh nonce</div><div class="opt">B) 200: the cookie is enough</div><div class="opt">C) 401 rest_not_logged_in, as if no cookie had been sent</div><div class="opt">D) 500: the nonce check crashed</div></div><div class="why"><b>Why:</b> With no nonce, the cookie is ignored and the request is anonymous. With a WRONG nonce, WordPress refuses outright, so a stale page knows it must refresh (apiFetch does that by itself through the rest-nonce endpoint).<br><b>B</b> is wrong: The nonce is what protects the cookie from CSRF.<br><b>C</b> is wrong: That is the answer WITHOUT a nonce.<br><b>D</b> is wrong: A failed check is a normal error answer.</div></div>
+  <div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt"><code class="inline">/wp/v2/books/30?_embed=wp:term&amp;_fields=id,title</code> answers without any genres. Why?</div><div class="opts"><div class="opt">A) The book has no genres</div><div class="opt">B) _embed works only for authenticated requests</div><div class="opt">C) wp:term is not an embeddable relation</div><div class="opt correct">D) _fields removed _links, so there was nothing to follow, and _embedded is cut off too</div></div><div class="why"><b>Why:</b> Since 5.4 WordPress embeds only links that survive _fields. Add _links and _embedded to the list: _fields=id,title,_links,_embedded (Common Mistake 1).<br><b>A</b> is wrong: Dune is Fiction and Science Fiction.<br><b>B</b> is wrong: Public data embeds anonymously.<br><b>C</b> is wrong: The genre link says embeddable: true.</div></div>
+  <div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">Why can you create application passwords on the course site although it runs on plain http://localhost:8080?</div><div class="opts"><div class="opt">A) Application passwords never need HTTPS</div><div class="opt correct">B) WP_ENVIRONMENT_TYPE is local; elsewhere WordPress offers them only on HTTPS</div><div class="opt">C) Docker encrypts the traffic</div><div class="opt">D) Because the administrator created them</div></div><div class="why"><b>Why:</b> Basic authentication only encodes the password; on plain HTTP anyone on the way can read it. WordPress therefore offers application passwords on HTTPS sites or where the environment type is local, as compose.yaml sets it (Lesson 1.2).<br><b>A</b> is wrong: They do, outside local environments.<br><b>C</b> is wrong: The containers talk plain HTTP.<br><b>D</b> is wrong: Maria created hers with WP-CLI; the rule is about the connection.</div></div>
+  <div class="q" data-sc="12" data-kind="short"><div class="qn">Q12</div><div class="qt">Name two things wp.apiFetch() adds to a request that a plain fetch() on the Dashboard does not.</div><div class="opts"><div class="opt correct">The REST nonce (X-WP-Nonce) for the logged-in user, and the API's root URL (also _locale=user, a JSON body and the server's error object on failure)</div></div><div class="why"><b>Why:</b> The page prints apiFetch's setup when a script depends on wp-api-fetch: createRootURLMiddleware, the nonce middleware, the nonce endpoint for refreshing. Without the nonce the request is anonymous (Common Mistake 2).</div></div>
+
+  <div class="sec"><h2>7.1 · Using the REST API: predict, then run</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the output, then run it.</div><pre class="code">curl -s 'http://localhost:8080/wp-json/wp/v2/books?search=the&amp;per_page=1&amp;_fields=id' -D - -o /dev/null | grep -i '^X-WP-TotalPages'</pre><div class="opts"><div class="opt correct"><pre class="out">X-WP-TotalPages: 4</pre></div></div><div class="why"><b>Why:</b> search matches the title, content and excerpt; four books contain "the" in their title (or text), so at one per page X-WP-TotalPages is 4. The header answers "how many" without downloading the books.</div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict the output, then run it.</div><pre class="code">curl -s 'http://localhost:8080/wp-json/wp/v2/genres/8?_fields=name,count'; echo</pre><div class="opts"><div class="opt correct"><pre class="out">{"count":2,"name":"Fantasy"}</pre></div></div><div class="why"><b>Why:</b> One term by its ID, two fields: <code class="inline">_fields</code> works on every route, single items included. Fantasy is genre 8 with two books.</div></div>
+
+  <div class="sec"><h2>Checkpoint 2: Rubric and Model Answer</h2><span class="rule"></span></div>
+<p>Five rows, 0 to 2 points each (10 in all). Score from the learner's file (run it once on your projector site at the end of Lesson 6.3; it changes nothing) and the Part D page. <b>8 to 10:</b> on track. <b>5 to 7:</b> review the weakest row before Session 14. <b>Under 5:</b> a one-to-one before Session 15.</p>
+<table class="rubric">
+<thead><tr><th>Criterion</th><th>Strong (2)</th><th>Partial (1)</th><th>Missing (0)</th></tr></thead>
+<tbody>
+<tr><td class="crit">Part A · the query (5.2, 5.3)</td><td>One get_posts()/WP_Query: meta_query with price &lt;= max as DECIMAL (or NUMERIC) and stock '1'; meta_key + orderby meta_value_num; output matches line A</td><td>Right books but sorted by title, or the price compared as a string, or two queries merged in PHP</td><td>No meta_query (filters in PHP after loading all books), or wrong books</td></tr>
+<tr><td class="crit">Part B · safe SQL (5.5)</td><td>$wpdb-&gt;prepare() with %i for the table (or the table name from EventsTable::name()) and %s for the location; get_var(); (int); the hostile location counts 0 events and breaks nothing</td><td>Prepared, but the table name hard-coded as wp_pagesco_events, or get_results() + count()</td><td>The location concatenated into SQL, or Part B not working</td></tr>
+<tr><td class="crit">Part C · blocks (6.2, 6.3)</td><td>C1: the comment built with wp_json_encode() and rendered with do_blocks(), titles read from the output; C2: parse_blocks() of the post, filtered by blockName, count and the first card's attrs</td><td>One of C1 and C2 right, or C1 calls get_posts() itself instead of rendering the block</td><td>Neither, or the card's title read from attrs (Lesson 6.2's Mistake 1)</td></tr>
+<tr><td class="crit">Output and escaping</td><td>The four lines match the model answer; prices formatted with two decimals; nothing printed unescaped that came from a user (the location is only counted)</td><td>One line differs (a missing $, an extra space), or one value printed without esc_html() in a function that builds HTML</td><td>Several lines differ or the script prints a PHP message</td></tr>
+<tr><td class="crit">Part D · written (Modules 5 and 6)</td><td>D1 to D3 match the model answers, each with its reason</td><td>Two right, or right answers without reasons</td><td>One or none</td></tr>
+</tbody>
+</table>
+<div class="blk lab"><div class="h">Model answer: labs/module-13/checkpoint-2/checkpoint_solution.php</div>
+<pre class="code"><span class="k">&lt;?php</span>
+<span class="c">/**
+ * checkpoint_solution.php: Checkpoint 2 (Modules 5 and 6), the Weekly Picks report: MODEL ANSWER (Session 13)
+ * state: after:lesson_21
+ * expect: A  Under $10, in stock: Pride and Prejudice ($7.99), Animal Farm ($8.49), Brave New World ($9.49), 1984 ($9.99)
+ * expect: B  Café: 2 events · Rooftop: 0 events · Reading corner'; DROP TABLE x; --: 0 events
+ * expect: C1 Fantasy, cheapest first: The Hobbit, Lord of the Rings
+ * expect: C2 Staff picks post: 1 Book Card, comment attributes {"backgroundColor":"sage"}
+ *
+ * Instructor copy. The shop wants a weekly report for its newsletter, built from the plugin's data: Parts A to C
+ * are the scored code (three functions); Part D (three written answers) is on the workbook's Checkpoint page.
+ * The main section at the end is the same in the starter, and the script changes nothing on the site.
+ * Run: wp eval-file --use-include checkpoint_solution.php
+ */</span>
+
+<span class="c">/**
+ * Part A (Lessons 5.2, 5.3): books in stock that cost at most $max, cheapest first, as "Title ($8.49)".
+ *
+ * @param float $max The highest price.
+ * @return string[]
+ */</span>
+<span class="k">function</span> pagesco_cp_cheap_books( <span class="k">float</span> <span class="v">$max</span> ): <span class="k">array</span> {
+	<span class="v">$books</span> = get_posts(
+		<span class="k">array</span>(
+			<span class="s">'post_type'</span>      =&gt; <span class="s">'book'</span>,
+			<span class="s">'post_status'</span>    =&gt; <span class="s">'publish'</span>,
+			<span class="s">'posts_per_page'</span> =&gt; -<span class="s">1</span>,
+			<span class="s">'meta_key'</span>       =&gt; <span class="s">'pagesco_price'</span>,
+			<span class="s">'orderby'</span>        =&gt; <span class="s">'meta_value_num'</span>,
+			<span class="s">'order'</span>          =&gt; <span class="s">'ASC'</span>,
+			<span class="s">'meta_query'</span>     =&gt; <span class="k">array</span>(
+				<span class="k">array</span>(
+					<span class="s">'key'</span>     =&gt; <span class="s">'pagesco_price'</span>,
+					<span class="s">'value'</span>   =&gt; <span class="v">$max</span>,
+					<span class="s">'compare'</span> =&gt; <span class="s">'&lt;='</span>,
+					<span class="s">'type'</span>    =&gt; <span class="s">'DECIMAL(10,2)'</span>,
+				),
+				<span class="k">array</span>(
+					<span class="s">'key'</span>   =&gt; <span class="s">'pagesco_in_stock'</span>,
+					<span class="s">'value'</span> =&gt; <span class="s">'1'</span>,
+				),
+			),
+		)
+	);
+
+	<span class="v">$lines</span> = <span class="k">array</span>();
+	<span class="k">foreach</span> ( <span class="v">$books</span> <span class="k">as</span> <span class="v">$book</span> ) {
+		<span class="v">$lines</span>[] = sprintf( <span class="s">'%s ($%s)'</span>, <span class="v">$book</span>-&gt;post_title, number_format_i18n( (<span class="k">float</span>) get_post_meta( <span class="v">$book</span>-&gt;ID, <span class="s">'pagesco_price'</span>, <span class="k">true</span> ), <span class="s">2</span> ) );
+	}
+
+	<span class="k">return</span> <span class="v">$lines</span>;
+}
+
+<span class="c">/**
+ * Part B (Lesson 5.5): how many events take place at a location: one prepared COUNT query on the events table.
+ *
+ * @param string $location The exact location, as typed by anyone.
+ */</span>
+<span class="k">function</span> pagesco_cp_events_at( <span class="k">string</span> <span class="v">$location</span> ): <span class="k">int</span> {
+	<span class="k">global</span> <span class="v">$wpdb</span>;
+
+	<span class="k">return</span> (<span class="k">int</span>) <span class="v">$wpdb</span>-&gt;get_var(
+		<span class="v">$wpdb</span>-&gt;prepare( <span class="s">'SELECT COUNT(*) FROM %i WHERE location = %s'</span>, PagesCo\Books\EventsTable::name(), <span class="v">$location</span> )
+	);
+}
+
+<span class="c">/**
+ * Part C (Lessons 6.2, 6.3): C1 renders a Book List block for a genre, cheapest first, and returns its titles;
+ * C2 describes the Book Cards stored in a post.
+ *
+ * @param string $genre A genre slug.
+ * @return string[]
+ */</span>
+<span class="k">function</span> pagesco_cp_list_titles( <span class="k">string</span> <span class="v">$genre</span> ): <span class="k">array</span> {
+	<span class="v">$attributes</span> = <span class="k">array</span>(
+		<span class="s">'genre'</span>   =&gt; <span class="v">$genre</span>,
+		<span class="s">'orderBy'</span> =&gt; <span class="s">'price'</span>,
+	);
+	<span class="v">$html</span>       = do_blocks( <span class="s">'&lt;!-- wp:pagesco/book-list '</span> . wp_json_encode( <span class="v">$attributes</span> ) . <span class="s">' /--&gt;'</span> );
+
+	preg_match_all( <span class="s">'#&lt;a href="[^"]*"&gt;([^&lt;]*)&lt;/a&gt;#'</span>, <span class="v">$html</span>, <span class="v">$found</span> );
+
+	<span class="k">return</span> <span class="v">$found</span>[<span class="s">1</span>];
+}
+
+<span class="c">/**
+ * @param string $slug A post slug.
+ * @return array{count: int, attrs: array}
+ */</span>
+<span class="k">function</span> pagesco_cp_cards_in( <span class="k">string</span> <span class="v">$slug</span> ): <span class="k">array</span> {
+	<span class="v">$post</span>  = get_page_by_path( <span class="v">$slug</span>, OBJECT, <span class="s">'post'</span> );
+	<span class="v">$cards</span> = array_values( wp_list_filter( parse_blocks( <span class="v">$post</span> ? <span class="v">$post</span>-&gt;post_content : <span class="s">''</span> ), <span class="k">array</span>( <span class="s">'blockName'</span> =&gt; <span class="s">'pagesco/book-card'</span> ) ) );
+
+	<span class="k">return</span> <span class="k">array</span>(
+		<span class="s">'count'</span> =&gt; count( <span class="v">$cards</span> ),
+		<span class="s">'attrs'</span> =&gt; <span class="v">$cards</span> ? <span class="v">$cards</span>[<span class="s">0</span>][<span class="s">'attrs'</span>] : <span class="k">array</span>(),
+	);
+}
+
+<span class="c">// ---------------------------------------------------------------- main: the same in the starter</span>
+<span class="k">echo</span> <span class="s">'A  Under $10, in stock: '</span>, esc_html( implode( <span class="s">', '</span>, pagesco_cp_cheap_books( <span class="s">10.0</span> ) ) ), <span class="s">"\n"</span>;
+
+<span class="v">$pagesco_places</span> = <span class="k">array</span>( <span class="s">'Café'</span>, <span class="s">'Rooftop'</span>, <span class="s">"Reading corner'; DROP TABLE x; --"</span> );
+<span class="k">echo</span> <span class="s">'B  '</span>, implode( <span class="s">' · '</span>, array_map( <span class="k">fn</span>( <span class="v">$place</span> ) =&gt; <span class="v">$place</span> . <span class="s">': '</span> . pagesco_cp_events_at( <span class="v">$place</span> ) . <span class="s">' events'</span>, <span class="v">$pagesco_places</span> ) ), <span class="s">"\n"</span>;
+
+<span class="k">echo</span> <span class="s">'C1 Fantasy, cheapest first: '</span>, esc_html( implode( <span class="s">', '</span>, pagesco_cp_list_titles( <span class="s">'fantasy'</span> ) ) ), <span class="s">"\n"</span>;
+
+<span class="v">$pagesco_cards</span> = pagesco_cp_cards_in( <span class="s">'staff-picks'</span> );
+printf( <span class="s">"C2 Staff picks post: %d Book Card, comment attributes %s\n"</span>, <span class="v">$pagesco_cards</span>[<span class="s">'count'</span>], wp_json_encode( <span class="v">$pagesco_cards</span>[<span class="s">'attrs'</span>] ) );</pre><p>It prints (the site after Lesson 6.3):</p>
+<pre class="out">A  Under $10, in stock: Pride and Prejudice ($7.99), Animal Farm ($8.49), Brave New World ($9.49), 1984 ($9.99)
+B  Café: 2 events · Rooftop: 0 events · Reading corner'; DROP TABLE x; --: 0 events
+C1 Fantasy, cheapest first: The Hobbit, Lord of the Rings
+C2 Staff picks post: 1 Book Card, comment attributes {"backgroundColor":"sage"}</pre><p>As shipped, the starter prints the four lines with TODO and -1 values and no message. Accept: WP_Query instead of get_posts(); <code class="inline">%i</code> or the table name from EventsTable::name() concatenated (it is not user input); any way of reading the titles from C1's HTML that does not query the books again. <b>Do not accept <code class="inline">'type' =&gt; 'NUMERIC'</code> for the price:</b> NUMERIC makes MySQL cast to a whole number (<code class="inline">CAST('10.49' AS SIGNED)</code> is 10), so with a maximum of 10 Fahrenheit 451 ($10.49) and The Hobbit ($10.99) slip into line A, measured on the course site; that is Partial in row 1. Without any type the comparison is between strings and finds nothing.</p>
+</div>
+<div class="blk"><div class="h">Part D: model answers</div>
+<ol class="steps">
+  <li><b>D1.</b> The review: static, it is content an editor writes and it should stay as written (and survive the plugin). The three cheapest: dynamic, the data (prices, stock, new books) changes elsewhere, so render.php must ask on every view; a static block would go stale like Lesson 3.3's pattern.</li>
+  <li><b>D2.</b> A nonce (wp_nonce_field() in the form, check_admin_referer() or wp_verify_nonce() before saving; the Settings API does both). It stops cross-site request forgery: another site making a logged-in administrator's browser submit the form.</li>
+  <li><b>D3.</b> The genre choices are real links to ?genre= addresses, and render.php reads and validates ?genre= to set the starting state, with PHP closures for the derived state, so the server renders each filtered page itself (hidden on the other books, aria-current on the link).</li>
+</ol>
+</div>
+
+  <div class="sec"><h2>Lab Reference Solutions</h2><span class="rule"></span></div>
+<p>Every output below is real: the lab files run exactly as <code class="inline">labs/check_labs.py</code> runs them, on a fresh course site at the state each file declares (Lesson 6.4's labs at <code class="inline">after:lesson_21</code>, Lesson 7.1's at <code class="inline">after:lesson_22</code>), copied into the WordPress root and run with <code class="inline">wp eval-file --use-include</code> (PHP labs) or <code class="inline">sh</code> in the WP-CLI container (shell labs).</p>
+<div class="blk lab"><div class="h">Lab 6.4-A (guided): labs/module-13/l6_4-interactivity-api/open_today_starter.php → open_today_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">&lt;div data-wp-interactive="pagesco/hours"&gt;&lt;p&gt;TODO: today's hours&lt;/p&gt;
+&lt;button aria-expanded="false" data-wp-on--click="actions.toggleWeek" data-wp-bind--aria-expanded="state.showWeek"&gt;The whole week&lt;/button&gt;&lt;ul&gt;
+&lt;li data-wp-context='{"day":"Friday"}'&gt;Friday: 9:00-18:00&lt;/li&gt;
+&lt;li data-wp-context='{"day":"Saturday"}'&gt;Saturday: 10:00-16:00&lt;/li&gt;
+&lt;li data-wp-context='{"day":"Sunday"}'&gt;Sunday: closed&lt;/li&gt;
+&lt;/ul&gt;&lt;/div&gt;</pre><p>The solution prints:</p>
+<pre class="out">&lt;div data-wp-interactive="pagesco/hours"&gt;&lt;p data-wp-text="state.todayText"&gt;Today (Saturday): 10:00-16:00&lt;/p&gt;
+&lt;button aria-expanded="false" data-wp-on--click="actions.toggleWeek" data-wp-bind--aria-expanded="state.showWeek"&gt;The whole week&lt;/button&gt;&lt;ul&gt;
+&lt;li aria-current="false" hidden data-wp-context='{"day":"Friday"}' data-wp-bind--hidden="state.isHidden" data-wp-bind--aria-current="state.isToday" data-wp-class--is-today="state.isToday"&gt;Friday: 9:00-18:00&lt;/li&gt;
+&lt;li aria-current="true" class="is-today" data-wp-context='{"day":"Saturday"}' data-wp-bind--hidden="state.isHidden" data-wp-bind--aria-current="state.isToday" data-wp-class--is-today="state.isToday"&gt;Saturday: 10:00-16:00&lt;/li&gt;
+&lt;li aria-current="false" hidden data-wp-context='{"day":"Sunday"}' data-wp-bind--hidden="state.isHidden" data-wp-bind--aria-current="state.isToday" data-wp-class--is-today="state.isToday"&gt;Sunday: closed&lt;/li&gt;
+&lt;/ul&gt;&lt;/div&gt;</pre><p>Reading it: the server filled the paragraph (data-wp-text), wrote hidden on the two days that are not today (isHidden: the week is folded), aria-current true/false and the class on Saturday. data-wp-on--click is left for the browser: the store's <code class="inline">toggleWeek</code> action (<code class="inline">state.showWeek = ! state.showWeek</code>) and two getters mirroring the closures would make the button work, the lesson's view.js pattern. Accept closures that call <code class="inline">wp_interactivity_state( 'pagesco/hours' )</code> with the namespace.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 6.4-B: labs/module-13/l6_4-interactivity-api/event_list_starter.php → event_list_solution.php</div>
+<p>As shipped:</p>
+<pre class="out">Showing  of 5 events
+(no &lt;li&gt; yet: TODO 1)</pre><p>The solution prints:</p>
+<pre class="out">Showing 2 of 5 events
+&lt;li data-wp-each-child="pagesco/events::state.events" hidden data-wp-bind--hidden="state.isElsewhere"&gt;&lt;time data-wp-text="context.event.when"&gt;Nov 4&lt;/time&gt; &lt;span data-wp-text="context.event.title"&gt;Book club: Dune&lt;/span&gt;&lt;/li&gt;
+&lt;li data-wp-each-child="pagesco/events::state.events" hidden data-wp-bind--hidden="state.isElsewhere"&gt;&lt;time data-wp-text="context.event.when"&gt;Nov 6&lt;/time&gt; &lt;span data-wp-text="context.event.title"&gt;Story time: The Hobbit&lt;/span&gt;&lt;/li&gt;
+&lt;li data-wp-each-child="pagesco/events::state.events" data-wp-bind--hidden="state.isElsewhere"&gt;&lt;time data-wp-text="context.event.when"&gt;Nov 11&lt;/time&gt; &lt;span data-wp-text="context.event.title"&gt;An evening with Ana Ruiz&lt;/span&gt;&lt;/li&gt;
+&lt;li data-wp-each-child="pagesco/events::state.events" data-wp-bind--hidden="state.isElsewhere"&gt;&lt;time data-wp-text="context.event.when"&gt;Nov 18&lt;/time&gt; &lt;span data-wp-text="context.event.title"&gt;Poetry open mic&lt;/span&gt;&lt;/li&gt;
+&lt;li data-wp-each-child="pagesco/events::state.events" hidden data-wp-bind--hidden="state.isElsewhere"&gt;&lt;time data-wp-text="context.event.when"&gt;Dec 2&lt;/time&gt; &lt;span data-wp-text="context.event.title"&gt;Book club: Fahrenheit 451&lt;/span&gt;&lt;/li&gt;</pre><p>Reading it: data-wp-each repeated the template once per event and marked each copy <code class="inline">data-wp-each-child</code>, so the browser's store can take over the list (and add to it: Lesson 7.2's Load more design); inside each copy the context is <code class="inline">{ event: ... }</code>; the server evaluated the derived state per item. shown counts the Café's events from the same state. The <code class="inline">&lt;template&gt;</code> stays in the page for the browser.</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-13/l6_4-interactivity-api/debug_stock_badges.php (deliberately broken)</div>
+<p>As shipped, WordPress prints:</p>
+<pre class="out">Notice: Function WP_Interactivity_API::evaluate was called &lt;strong&gt;incorrectly&lt;/strong&gt;. Namespace or reference path cannot be empty. Directive value referenced: {"namespace":null,"value":"state.shop","suffix":null,"unique_id":null} Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 6.6.0.) in /var/www/html/wp-includes/functions.php on line 6260
+Warning: Undefined array key "instock" in /var/www/html/debug_stock_badges.php on line 30
+&lt;h2 data-wp-text="state.shop"&gt;&lt;/h2&gt;
+&lt;div data-wp-interactive="pagesco/badges"&gt;&lt;p&gt;In stock: &lt;span data-wp-text="state.inStock"&gt;0&lt;/span&gt;&lt;/p&gt;&lt;ul&gt;
+&lt;li data-wp-context='{"title":"Dune","inStock":true}'&gt;Dune &lt;span class="badge" data-wp-bind--hidden="!state.isSold"&gt;Sold out&lt;/span&gt;&lt;/li&gt;
+&lt;li data-wp-context='{"title":"The Great Gatsby","inStock":false}'&gt;The Great Gatsby &lt;span class="badge" data-wp-bind--hidden="!state.isSold"&gt;Sold out&lt;/span&gt;&lt;/li&gt;
+&lt;li data-wp-context='{"title":"The Catcher in the Rye","inStock":false}'&gt;The Catcher in the Rye &lt;span class="badge" data-wp-bind--hidden="!state.isSold"&gt;Sold out&lt;/span&gt;&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;</pre><ol class="steps">
+  <li><b>doing_it_wrong, line 38:</b> the <code class="inline">&lt;h2&gt;</code> with <code class="inline">data-wp-text</code> sits OUTSIDE the element with <code class="inline">data-wp-interactive</code>, so the directive has no namespace ("Namespace or reference path cannot be empty"). Move the heading inside the wrapper.</li>
+  <li><b>Warning, line 30:</b> the context key is <code class="inline">inStock</code>; <code class="inline">instock</code> is undefined, so isSold is <code class="inline">! null</code> = true and every badge shows (Dune's too).</li>
+  <li><b>Silent, line 33:</b> <code class="inline">wp_interactivity_state( 'pagesco/badge' )</code> names a store that does not exist, so the count is 0 instead of 1. Use the namespace <code class="inline">pagesco/badges</code> (or no argument inside a closure).</li>
+</ol>
+<p>Fixed (all three), it prints:</p>
+<pre class="out">&lt;div data-wp-interactive="pagesco/badges"&gt;&lt;h2 data-wp-text="state.shop"&gt;Pages &amp;amp; Co.&lt;/h2&gt;&lt;p&gt;In stock: &lt;span data-wp-text="state.inStock"&gt;1&lt;/span&gt;&lt;/p&gt;&lt;ul&gt;
+&lt;li data-wp-context='{"title":"Dune","inStock":true}'&gt;Dune &lt;span hidden class="badge" data-wp-bind--hidden="!state.isSold"&gt;Sold out&lt;/span&gt;&lt;/li&gt;
+&lt;li data-wp-context='{"title":"The Great Gatsby","inStock":false}'&gt;The Great Gatsby &lt;span class="badge" data-wp-bind--hidden="!state.isSold"&gt;Sold out&lt;/span&gt;&lt;/li&gt;
+&lt;li data-wp-context='{"title":"The Catcher in the Rye","inStock":false}'&gt;The Catcher in the Rye &lt;span class="badge" data-wp-bind--hidden="!state.isSold"&gt;Sold out&lt;/span&gt;&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;</pre><p>The fixed script is BADGES_FIXED in blocks_S13.py, run on the same site.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 7.1-A (guided): labs/module-13/l7_1-rest-api/catalog_queries_starter.sh → catalog_queries_solution.sh</div>
+<p>As shipped:</p>
+<pre class="out">Books in the catalog: 11
+The Dystopian genre: TODO
+Its books, by title: TODO
+Search for farm: TODO
+The site's pages, oldest first: TODO
+Book 99: TODO
+The two biggest genres: TODO</pre><p>The solution prints:</p>
+<pre class="out">Books in the catalog: 11
+The Dystopian genre:
+[{"id":9,"name":"Dystopian"}]
+Its books, by title:
+[{"slug":"1984"},{"slug":"brave-new-world"},{"slug":"fahrenheit-451"}]
+Search for farm:
+[{"id":40,"title":{"rendered":"Animal Farm"}}]
+The site's pages, oldest first:
+[{"slug":"sample-page"},{"slug":"about"},{"slug":"contact"},{"slug":"events"},{"slug":"find-a-book"}]
+Book 99: 404
+The two biggest genres:
+[{"count":11,"name":"Fiction"},{"count":6,"name":"Classic"}]</pre><p>Reading it: the total is a header (HEAD request, -I); the genres filter needs the ID (9), found by the slug; search matches title, content and excerpt; pages include Find a Book (Lesson 6.4) and the install's Sample Page; a missing book is a 404 with a JSON body; genres sort by count. Learners whose site lacks Find a Book are one lesson behind.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 7.1-B: labs/module-13/l7_1-rest-api/who_may_starter.sh → who_may_solution.sh</div>
+<p>As shipped:</p>
+<pre class="out">request                 anon devon  maria  admin
+users/me                401  TODO   TODO   TODO
+books/30?context=edit   401  TODO   TODO   TODO
+books?status=draft      400  TODO   TODO   TODO
+users?context=edit      401  TODO   TODO   TODO
+settings                401  TODO   TODO   TODO
+Lab passwords revoked.</pre><p>The solution prints:</p>
+<pre class="out">request                 anon devon  maria  admin
+users/me                401  200    200    200
+books/30?context=edit   401  403    200    200
+books?status=draft      400  200    200    200
+users?context=edit      401  403    403    200
+settings                401  403    403    200
+Lab passwords revoked.</pre><p>Reading it: users/me needs any login (401 anonymously); context=edit on Maria's book: Devon is known but may not (403); anonymous <code class="inline">status=draft</code> is a 400, "Status is forbidden", because the argument itself is refused before any permission check; listing users with context=edit and reading settings need administrator capabilities (list_users, manage_options), so Maria gets 403 too. The script revokes its three passwords: a lab leaves no credentials behind.</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-13/l7_1-rest-api/debug_stock_list.php (deliberately broken)</div>
+<p>As shipped, PHP prints:</p>
+<pre class="out">Warning: Undefined array key "meta" in /var/www/html/debug_stock_list.php on line 21
+Warning: Trying to access array offset on null in /var/www/html/debug_stock_list.php on line 21
+Warning: Array to string conversion in /var/www/html/debug_stock_list.php on line 22
+Array: sold out
+Warning: Undefined array key "meta" in /var/www/html/debug_stock_list.php on line 21
+Warning: Trying to access array offset on null in /var/www/html/debug_stock_list.php on line 21
+Warning: Array to string conversion in /var/www/html/debug_stock_list.php on line 22
+Array: sold out
+Warning: Undefined array key "meta" in /var/www/html/debug_stock_list.php on line 21
+Warning: Trying to access array offset on null in /var/www/html/debug_stock_list.php on line 21
+Warning: Array to string conversion in /var/www/html/debug_stock_list.php on line 22
+Array: sold out
+Warning: Undefined array key "meta" in /var/www/html/debug_stock_list.php on line 21
+Warning: Trying to access array offset on null in /var/www/html/debug_stock_list.php on line 21
+Warning: Array to string conversion in /var/www/html/debug_stock_list.php on line 22
+Array: sold out
+Total in the catalog: 11</pre><ol class="steps">
+  <li><b>Warnings, line 21:</b> <code class="inline">_fields=id,title</code> (line 17) left <code class="inline">meta</code> out of the answer, so <code class="inline">$book['meta']</code> is undefined (two warnings: the missing key, then an offset on null). Add <code class="inline">meta</code> to <code class="inline">_fields</code>.</li>
+  <li><b>Warning, line 22:</b> <code class="inline">title</code> is an object <code class="inline">{ rendered }</code>: printing the array gives "Array". Use <code class="inline">$book['title']['rendered']</code>.</li>
+  <li><b>Silent:</b> per_page=4 and no loop: four books listed, "Total in the catalog: 11" printed underneath. Loop over <code class="inline">page</code> up to X-WP-TotalPages (the lesson's Exercise 1).</li>
+</ol>
+<p>Fixed (all three), it prints:</p>
+<pre class="out">1984: in stock
+Animal Farm: in stock
+Brave New World: in stock
+Dune: in stock
+Fahrenheit 451: in stock
+Lord of the Rings: in stock
+Pride and Prejudice: in stock
+The Catcher in the Rye: sold out
+The Great Gatsby: sold out
+The Hobbit: in stock
+To Kill a Mockingbird: in stock
+Listed 11 of 11</pre><p>The fixed script is STOCK_LIST_FIXED in blocks_S13.py, run on the same site.</p>
+</div>
+
+  <div class="sec"><h2>The Lesson Pages' Own Quick Quizzes</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Lesson 6.4 · The Interactivity API</div>
+<ol class="steps" data-lesson-quiz="6.4">
+  <li><b>A</b> It also builds viewScriptModule files as script modules: It adds a module build, so viewScriptModule files such as view.js are built with a view.asset.php of type module; without it they are skipped silently.</li>
+  <li><b>C</b> All eleven books, nine of them with the hidden attribute: render.php prints every book, and the server evaluates data-wp-bind--hidden through the isVisible closure, so the nine others arrive with the hidden attribute.</li>
+  <li><b>B</b> data-wp-text="state.visibleCount" on the span: data-wp-text sets the element's text content from a value, on the server and in the browser; here the span holds state.visibleCount.</li>
+  <li><b>A</b> So the server can evaluate the directives and send correct HTML before any JavaScript runs: The server evaluates directives while rendering; with the closure it can compute isVisible per book, so the HTML is already filtered and nothing changes when the page hydrates.</li>
+  <li><b>C</b> The link is followed and the server renders the fantasy books, with a page load: No store is wired to the directives, so the click follows the link and the server renders the filtered page: correct, but a full page load each time, with no message.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Lesson 7.1 · Using the REST API</div>
+<ol class="steps" data-lesson-quiz="7.1">
+  <li><b>B</b> GET /wp-json/wp/v2/books?per_page=5&amp;_fields=id,title.rendered: per_page=5 gives five books, newest first by default, and _fields keeps only id and the rendered title.</li>
+  <li><b>C</b> 401: the request is treated as anonymous, and the edit is refused: Without an X-WP-Nonce header WordPress ignores the cookie, treats the request as anonymous and refuses the edit with 401. wp.apiFetch adds the nonce.</li>
+  <li><b>A</b> With an application password of a user whose role can edit books, over HTTPS: A program gets its own application password, for a user with no more rights than it needs, sent with Basic authentication over HTTPS, and revocable on its own.</li>
+  <li><b>C</b> 403: Devon is authenticated, so it is not 401; his role cannot edit another author's book, so the answer is 403 Forbidden.</li>
+  <li><b>B</b> 3: Eleven books in pages of four make three pages (4, 4 and 3); the header is the same on every page.</li>
+</ol>
+</div>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>State and derived state:</b> the state is the selected genre (with each book's genres); derived are isVisible, isSelected and visibleCount.</li>
+  <li><b>401</b> means "who are you?" (not authenticated); 403 is "I know you, and no" (authenticated, not allowed).</li>
+  <li><b>The partner's script:</b> an application password of a WordPress user whose role can edit books (an editor), sent with Basic authentication over HTTPS; never the account password.</li>
+</ol>
+
+  <div class="sec"><h2>Common Wrong Answers and What They Reveal</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li><b>Q1 A ("from the address bar").</b> Has not seen the state JSON: show the <code class="inline">&lt;script id="wp-script-module-data-..."&gt;</code> from the demo.</li>
+  <li><b>Q2 B or C.</b> Thinks the server only prints HTML: run the curl for ?genre=fantasy again.</li>
+  <li><b>Q4 B ("in the state").</b> Works for small cases; context is per element. Redraw the three columns.</li>
+  <li><b>Q7 D (403).</b> Confuses 401 and 403: the request has no user at all.</li>
+  <li><b>Q9 C (401 as anonymous).</b> Remembers the no-nonce case; a WRONG nonce is refused outright.</li>
+  <li><b>Q10 A or B.</b> Blames the data or the login: it is _fields cutting the links.</li>
+  <li><b>Q11 A.</b> Missed the HTTPS rule: application passwords are offered only on HTTPS or a local environment.</li>
+</ul>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 13 · Answer Key · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

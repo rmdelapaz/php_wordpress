@@ -1,0 +1,1547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Performance and caching on WordPress 7.1: measuring query cost with SAVEQUERIES, the object cache and transients, a persistent object cache, asset loading, responsive and prioritized images, and Core Web Vitals measured honestly, with before-and-after numbers for the Pages &amp; Co. site. PHP and WordPress Development Lesson 8.2.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Performance &amp; Caching - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 8: Professional Workflow</a></li>
+            <li aria-current="page">Lesson 8.2: Performance &amp; Caching</li>
+        </ul>
+    </nav>
+
+    <main id="main-content" data-state="after:lesson_26">
+        <div class="container">
+            <header>
+                <h1>⚡ Lesson 8.2: Performance &amp; Caching</h1>
+                <p class="lead">Lesson 8.1 proved that the Pages &amp; Co. plugin works. Today's question is whether it is fast, and the professional answer starts with a number, not a hunch. You will count what each page really costs the database, see what WordPress already caches for you and what a persistent object cache adds, read what the browser has to download, and measure the Core Web Vitals that search engines and visitors feel. Then you will make four real improvements to the plugin and the theme, each with a before and an after you measured yourself.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Measure what a request costs with <code>SAVEQUERIES</code> and <code>$wpdb-&gt;queries</code>, read an <code>EXPLAIN</code> of a meta query, and recognize missing options and N+1 queries</li>
+                        <li>Explain the object cache, its persistent version and transients, choose between them, and cache your own query with a key that is invalidated when the data changes</li>
+                        <li>Describe how WordPress 7.1 loads block CSS, script modules and classic scripts, and use <code>wp_preload_resources</code> and <code>fetchpriority</code> where they help</li>
+                        <li>Explain <code>srcset</code>, <code>sizes</code>, lazy loading and why block templates get no automatic image optimization</li>
+                        <li>Measure LCP, CLS and interaction timing in a browser, and say honestly what a local lab measurement can and cannot tell you</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 150 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_26.html">Lesson 8.1: Debugging &amp; Testing</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> a cached events query, an autoloaded settings row, a one-query catalog lookup for the supplier, and a hero image that no longer shifts the front page and arrives sooner, with the numbers before and after</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (<code>wp_cache_set_last_changed()</code> needs 6.3, <code>fetchpriority</code> in <code>wp_preload_resources</code> 6.6, the 40,000-byte inline CSS budget 6.9)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 8.1, the WP-CLI container, Docker for <code>composer:2</code>, Chrome or another Chromium browser with its developer tools, and an internet connection for one plugin</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#measure" class="toc-link">Measure Before You Optimize</a></li>
+                        <li><a href="#queries" class="toc-link">What a Page Costs the Database</a></li>
+                        <li><a href="#object-cache" class="toc-link">The Object Cache and Transients</a></li>
+                        <li><a href="#persistent" class="toc-link">A Persistent Object Cache</a></li>
+                        <li><a href="#assets" class="toc-link">What the Browser Downloads</a></li>
+                        <li><a href="#images" class="toc-link">Images</a></li>
+                        <li><a href="#web-vitals" class="toc-link">Core Web Vitals, Honestly</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: A Faster Shop, with Numbers</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="measure" class="lesson-section">
+                <h2>📏 Measure Before You Optimize</h2>
+                <p>Picture the shop on a busy Saturday with a long line at the register. You could hire a second cashier, buy a faster card reader or move the gift wrapping elsewhere, and each idea sounds sensible. A good manager first stands next to the register for ten minutes with a notepad: if most of the time goes into wrapping, the card reader money is wasted. Web performance works the same way. Every page view is a line of small jobs, and the slow one is rarely the one you would have guessed.</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: three places where time goes</h4>
+                    <p><strong>The server</strong> builds the HTML: PHP runs WordPress, your plugin and the theme, and asks the database questions. <strong>The network</strong> carries the HTML and then every file it names (CSS, JavaScript, images, fonts) to the visitor. <strong>The browser</strong> turns all of it into pixels and reacts to clicks. Caching makes the server's work cheaper or unnecessary; asset and image choices shrink the network's work; Core Web Vitals measure what the visitor finally experiences. Measure each place with its own tool.</p>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Question</th><th>Tool</th><th>In this lesson</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>How long until the server answers?</td><td><code>curl -w</code>, the browser's Network panel (Waiting for server response)</td><td>below</td></tr>
+                            <tr><td>Which database queries ran, and who asked?</td><td><code>SAVEQUERIES</code> + <code>$wpdb-&gt;queries</code>, Query Monitor (Lesson 8.1)</td><td>next section and the project</td></tr>
+                            <tr><td>What does the page download?</td><td>View Source, the Network panel, <code>curl</code> with <code>grep</code></td><td>What the Browser Downloads</td></tr>
+                            <tr><td>What do visitors experience?</td><td>Core Web Vitals: in the lab (DevTools, Lighthouse) and in the field (real visitors' data)</td><td>Core Web Vitals, Honestly</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>A first look from the WP-CLI container: how long each of three pages takes until the first byte of the answer arrives (the server's share), and how big the HTML is.</p>
+                <pre data-cli><code class="language-bash">for page in / /books/dune/ /find-a-book/; do
+  curl -s -o /dev/null -w "$page  %{http_code}  %{size_download} bytes  first byte after %{time_starttransfer} s\n" "http://localhost:8080$page"
+done</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your times will differ)</h4>
+                    <pre><code>/  200  84295 bytes  first byte after 0.355564 s
+/books/dune/  200  80250 bytes  first byte after 0.047349 s
+/find-a-book/  200  83202 bytes  first byte after 0.048615 s</code></pre>
+                </div>
+                <p>A few hundredths of a second each, on a site that runs on your own machine and has no other visitors. If the first page took much longer, that was PHP compiling WordPress's files after a restart; OPcache keeps the compiled code for the requests after it. These numbers swing from run to run (run the loop twice and compare), so never trust a single measurement, and never compare numbers from different machines. Two habits keep measurements honest: measure the same thing several times, and change one thing at a time.</p>
+            </section>
+
+            <section id="queries" class="lesson-section">
+                <h2>🔢 What a Page Costs the Database</h2>
+                <p>Every <code>get_option()</code>, <code>WP_Query</code> or <code>$wpdb</code> call that cannot be answered from memory becomes a query. Lesson 2.2's last exercise counted the home page's queries with <code>SAVEQUERIES</code> defined in a must-use plugin, and noticed that it missed the queries WordPress makes before must-use plugins load. Defined in <code>wp-config.php</code>, it records every query of the request. From the WP-CLI container:</p>
+                <pre data-cli><code class="language-bash">wp config set SAVEQUERIES true --raw</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Added the constant 'SAVEQUERIES' to the 'wp-config.php' file with the raw value 'true'.</code></pre>
+                </div>
+                <p>With the constant on, <code>$wpdb</code> keeps every query in <code>$wpdb-&gt;queries</code>: an array per query with the SQL, the time it took in seconds, and the <em>caller</em>, the call stack that led to it, as <code>wp_debug_backtrace_summary()</code> writes it (Lesson 8.1). One <code>get_posts()</code> from WP-CLI, with the start of each query it made and the last function in its caller:</p>
+                <pre data-cli><code class="language-bash">wp eval 'global $wpdb; $start = count( $wpdb-&gt;queries ); get_posts( array( "post_type" =&gt; "book", "posts_per_page" =&gt; 2 ) ); foreach ( array_slice( $wpdb-&gt;queries, $start ) as $query ) { $caller = explode( ", ", $query[2] ); printf( "%-58s %s\n", substr( preg_replace( "/\s+/", " ", $query[0] ), 0, 58 ), end( $caller ) ); }'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>SELECT wp_posts.ID FROM wp_posts WHERE 1=1 AND wp_posts.po WP_Query-&gt;get_posts
+SELECT wp_posts.* FROM wp_posts WHERE ID IN (40,39)        _prime_post_caches
+SELECT post_id, meta_key, meta_value FROM wp_postmeta WHER update_meta_cache
+SELECT DISTINCT t.term_id, tr.object_id FROM wp_terms AS t WP_Term_Query-&gt;get_terms
+SELECT t.*, tt.* FROM wp_terms AS t INNER JOIN wp_term_tax _prime_term_caches</code></pre>
+                </div>
+                <p>Five queries for two books: the IDs, then the two posts' rows, their meta, and their genre terms (two queries), each for both books at once; the last function of each caller names the job. The full caller string is the whole path from the command to the query; in a web request it starts at <code>wp-blog-header.php</code>. Recording costs memory on every request, so <code>SAVEQUERIES</code> is for measuring sessions only; the project turns it off again. Now a tool that reports each web request's total. Create <code>wordpress/wp-content/mu-plugins/pagesco-query-report.php</code>:</p>
+                <pre data-file="wp-content/mu-plugins/pagesco-query-report.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Pages &amp; Co. Query Report (temporary)
+ * Description: Writes how many database queries each web request made to the debug log. Needs SAVEQUERIES.
+ */
+
+add_action(
+	'shutdown',
+	function () {
+		global $wpdb;
+
+		if ( ! defined( 'SAVEQUERIES' ) || ! SAVEQUERIES || wp_doing_cron() || defined( 'WP_CLI' ) ) {
+			return;
+		}
+
+		// WP-Cron's own check runs on some requests and not on others: leave it out, so runs compare.
+		$queries = array_filter(
+			$wpdb-&gt;queries ?? array(),
+			fn( $query ) =&gt; ! str_contains( $query[2], 'wp_cron' )
+		);
+
+		// Options something asked for that do not exist (WordPress remembers them for the request).
+		$missing = array_filter(
+			array_keys( (array) wp_cache_get( 'notoptions', 'options' ) ),
+			fn( $name ) =&gt; ! str_starts_with( $name, '_' )
+		);
+
+		error_log(
+			sprintf(
+				'%s: %d queries; missing options: %s',
+				strtok( $_SERVER['REQUEST_URI'], '?' ),
+				count( $queries ),
+				$missing ? implode( ', ', $missing ) : 'none'
+			)
+		);
+	}
+);</code></pre>
+                <ul>
+                    <li><strong>On <code>shutdown</code></strong>, the last action of every request, after the page was sent.</li>
+                    <li><strong>WP-Cron's check is left out.</strong> When a scheduled job is due, the request that notices it makes a few extra queries to start WP-Cron (Lesson 7.3). That happens on some requests and not on others, and would make two measurements of the same page differ.</li>
+                    <li><strong>Missing options.</strong> When <code>get_option()</code> asks for an option that has no row, WordPress remembers the name in the <code>notoptions</code> cache for the rest of the request. The report prints those names (without transients, whose names start with <code>_</code>).</li>
+                </ul>
+                <p>Four pages and the shop's REST route (Lesson 7.2), as an anonymous visitor, and the lines they added to the debug log:</p>
+                <pre data-cli data-log><code class="language-bash">for page in / /books/dune/ /find-a-book/ /events/ "/wp-json/pagesco/v1/books?orderby=price"; do
+  curl -s -o /dev/null "http://localhost:8080$page"
+done</code></pre>
+                <div class="card card-output">
+                    <h4>Output (the new lines of debug.log)</h4>
+                    <pre><code>[26-Oct-2026 06:01:53 UTC] /: 24 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings
+[26-Oct-2026 06:01:53 UTC] /books/dune/: 27 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings
+[26-Oct-2026 06:01:53 UTC] /find-a-book/: 27 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings
+[26-Oct-2026 06:01:53 UTC] /events/: 24 queries; missing options: WPLANG, can_compress_scripts, pagesco_books_settings, site_logo
+[26-Oct-2026 06:01:53 UTC] /wp-json/pagesco/v1/books: 14 queries; missing options: WPLANG, can_compress_scripts, pagesco_books_settings, medium_crop, medium_large_crop, large_crop</code></pre>
+                </div>
+                <p>Two dozen queries for a page, fourteen for the REST route: modest for WordPress. They are the main query, the theme's template and template parts (core looks for Site Editor copies, Lesson 3.2), the navigation menu and its pages, the user who wrote the post, and the shop's own: the Book List on Dune's page, the events table on the Events page. If your counts are one lower, look at the missing options: <code>can_compress_scripts</code> is created the first time an administrator opens wp-admin in a browser (a small JavaScript test), and the course's measuring site never had a browser. Your totals are then one lower everywhere, and every comparison in this lesson still holds.</p>
+                <p>That list of missing options is worth a second look. Each name in it cost one query on this request, to find out that there is nothing. Three are core's (<code>WPLANG</code> exists only once a site language is chosen, <code>site_logo</code> once a logo is set). One is ours: <code>pagesco_books_settings</code>, the settings option from Lesson 5.4, which has had no row since that lesson's uninstall test. Every page and every REST request asks for it, gets nothing, and falls back to the defaults. One query is cheap; one query on every request of every visitor, for nothing, is the kind of waste that only a measurement shows. The project removes it.</p>
+
+                <h3>Reading the cost of one query: EXPLAIN</h3>
+                <p>In Lesson 8.1, PHPCS warned about "possible slow" meta and taxonomy queries in the books route and the Book List, and the ruleset documented them for this lesson. Here is the query behind <code>?orderby=price</code>, from <code>WP_Query</code> itself:</p>
+                <pre data-cli><code class="language-bash">wp eval '$q = new WP_Query( array( "post_type" =&gt; "book", "post_status" =&gt; "publish", "posts_per_page" =&gt; 6, "meta_key" =&gt; "pagesco_price", "orderby" =&gt; "meta_value_num", "order" =&gt; "ASC" ) ); echo preg_replace( "/\s+/", " ", $q-&gt;request ), "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>SELECT SQL_CALC_FOUND_ROWS wp_posts.ID FROM wp_posts INNER JOIN wp_postmeta ON ( wp_posts.ID = wp_postmeta.post_id ) WHERE 1=1 AND ( wp_postmeta.meta_key = 'pagesco_price' ) AND wp_posts.post_type = 'book' AND ((wp_posts.post_status = 'publish')) GROUP BY wp_posts.ID ORDER BY wp_postmeta.meta_value+0 ASC LIMIT 0, 6</code></pre>
+                </div>
+                <p>A join of <code>wp_posts</code> and <code>wp_postmeta</code>, sorted by the meta value turned into a number (<code>meta_value+0</code>), the shape Lesson 2.2 took apart. <code>EXPLAIN</code> shows how MySQL plans to run it (without the <code>SQL_CALC_FOUND_ROWS</code> keyword, which MySQL 9.7 marks as deprecated):</p>
+                <pre data-cli><code class="language-bash">wp db query "EXPLAIN SELECT wp_posts.ID FROM wp_posts INNER JOIN wp_postmeta ON ( wp_posts.ID = wp_postmeta.post_id ) WHERE 1=1 AND ( wp_postmeta.meta_key = 'pagesco_price' ) AND wp_posts.post_type = 'book' AND ((wp_posts.post_status = 'publish')) GROUP BY wp_posts.ID ORDER BY wp_postmeta.meta_value+0 ASC LIMIT 0, 6\G"</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>*************************** 1. row ***************************
+EXPLAIN: -&gt; Limit: 6 row(s)
+    -&gt; Sort: (wp_postmeta.meta_value + 0), limit input to 6 row(s) per chunk
+        -&gt; Table scan on &lt;temporary&gt;  (cost=7.24..9.08 rows=3.67)
+            -&gt; Temporary table with deduplication  (cost=6.54..6.54 rows=3.67)
+                -&gt; Nested loop inner join  (cost=5.7 rows=3.67)
+                    -&gt; Filter: (wp_postmeta.meta_key = 'pagesco_price')  (cost=1.85 rows=11)
+                        -&gt; Index lookup on wp_postmeta using meta_key (meta_key = 'pagesco_price')  (cost=1.85 rows=11)
+                    -&gt; Filter: ((wp_posts.post_type = 'book') and (wp_posts.post_status = 'publish'))  (cost=0.253 rows=0.333)
+                        -&gt; Single-row index lookup on wp_posts using PRIMARY (ID = wp_postmeta.post_id)  (cost=0.253 rows=1)</code></pre>
+                </div>
+                <p>Read it from the innermost line out. MySQL finds the price rows through the <code>meta_key</code> index (a lookup, not a scan of the whole table), joins each to its post by the primary key, removes duplicates in a temporary table (the <code>GROUP BY</code>), and then sorts, because no index can sort by a value that has to be converted first. With eleven books that sort is instant. With fifty thousand it means sorting fifty thousand rows on every request that asks for the cheapest books, and that is what the PHPCS warning means by "possible": the cost grows with the catalog. The honest conclusion for Pages &amp; Co. is to keep the query and know its limit (Exercise 3 measures it with two thousand made-up books); a shop that outgrows it caches the answer, or stores prices where an index can sort them (a custom table, Lesson 5.5).</p>
+            </section>
+
+            <section id="object-cache" class="lesson-section">
+                <h2>🗄️ The Object Cache and Transients</h2>
+                <p>Why only two dozen queries? Because WordPress remembers. The <strong>object cache</strong> is a key-value store in memory: <code>wp_cache_set( $key, $value, $group )</code>, <code>wp_cache_get( $key, $group )</code>, <code>wp_cache_delete()</code>. Core puts nearly everything it loads into it: all autoloaded options in one go (Lesson 2.2), each post, each post's meta, terms, users. Ask twice, and the second answer comes from memory:</p>
+                <pre data-cli><code class="language-bash">wp eval 'global $wpdb; $before = $wpdb-&gt;num_queries; get_post_meta( 30, "pagesco_price", true ); get_post_meta( 30, "pagesco_author", true ); echo $wpdb-&gt;num_queries - $before, " query for two meta values\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>1 query for two meta values</code></pre>
+                </div>
+                <p>The first read loaded all of Dune's meta into the cache group <code>post_meta</code>; the second cost nothing. Since WordPress 6.1, <code>WP_Query</code> caches its own results the same way, under a key made from its arguments:</p>
+                <pre data-cli><code class="language-bash">wp eval 'global $wpdb; $args = array( "post_type" =&gt; "book", "meta_key" =&gt; "pagesco_price", "orderby" =&gt; "meta_value_num", "posts_per_page" =&gt; 3 ); $start = $wpdb-&gt;num_queries; $first = new WP_Query( $args ); $middle = $wpdb-&gt;num_queries; $second = new WP_Query( $args ); printf( "first query: %d database queries, the same query again: %d\n", $middle - $start, $wpdb-&gt;num_queries - $middle );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>first query: 6 database queries, the same query again: 0</code></pre>
+                </div>
+                <p>But this cache lives in PHP's memory, and PHP forgets everything at the end of each request. Two WP-CLI commands are two requests:</p>
+                <pre data-cli><code class="language-bash">wp eval 'wp_cache_set( "note", "Gatsby: back November 15", "pagesco_demo" ); var_dump( wp_cache_get( "note", "pagesco_demo" ) );'
+wp eval 'var_dump( wp_cache_get( "note", "pagesco_demo" ) );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>string(24) "Gatsby: back November 15"
+bool(false)</code></pre>
+                </div>
+                <p>The second request starts with an empty cache: <code>false</code>. So on a normal site the object cache saves repeated work <em>within</em> one request, and every request starts from zero. That is why the transients of Lesson 7.3 exist: a value with an expiry that survives between requests, stored as two non-autoloaded rows of <code>wp_options</code>. Reading one costs one query, once per request:</p>
+                <pre data-cli><code class="language-bash">wp eval 'global $wpdb; $start = $wpdb-&gt;num_queries; get_transient( "pagesco_books_supplier_availability" ); $middle = $wpdb-&gt;num_queries; get_transient( "pagesco_books_supplier_availability" ); printf( "first read: %d query, second read: %d\n", $middle - $start, $wpdb-&gt;num_queries - $middle );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>first read: 1 query, second read: 0</code></pre>
+                </div>
+                <p>One query instead of a call to the supplier, which takes a hundred times longer and may fail: a good trade, and the reason the Supplier column reads a transient. Which tool for which job:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th></th><th>Object cache (<code>wp_cache_*</code>)</th><th>Transient (<code>*_transient</code>)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Lives</td><td>for the request; with a persistent object cache, until it is deleted, expires or is evicted</td><td>until it expires (two <code>wp_options</code> rows), or in the persistent object cache when there is one</td></tr>
+                            <tr><td>Good for</td><td>results you read several times, that you could rebuild from the database: query results, computed lists</td><td>results that are expensive to get again and must outlive the request on any site: an API answer, a slow calculation</td></tr>
+                            <tr><td>Costs without a persistent cache</td><td>nothing between requests: every request rebuilds</td><td>one query per request that reads it</td></tr>
+                            <tr><td>Never put in it</td><td colspan="2">anything you cannot get again: both may vanish early (Lesson 7.3)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Caching your own query: a key that knows when the data changed</h3>
+                <p>The hard part of any cache is not storing, it is knowing when the stored answer is no longer true. Core's answer, used for posts, terms and comments, is the <strong>last-changed</strong> pattern: a group has one timestamp, <code>wp_cache_get_last_changed( $group )</code>, that every write to the data renews (<code>wp_cache_set_last_changed( $group )</code>, WordPress 6.3). Each cached result's key includes that timestamp. After a write, every key is new, so every old answer is simply never read again, without anyone having to find and delete it:</p>
+                <pre data-norun><code class="language-php">$key    = 'find:' . md5( $limit . '|' . $location ) . ':' . wp_cache_get_last_changed( 'pagesco_events' );
+$events = wp_cache_get( $key, 'pagesco_events' );
+if ( ! is_array( $events ) ) {
+	$events = /* the query */;
+	wp_cache_set( $key, $events, 'pagesco_events' );
+}
+// ...and after every insert or delete:
+wp_cache_set_last_changed( 'pagesco_events' );</code></pre>
+                <p>The key names <em>everything</em> the answer depends on: the arguments and the state of the data. The project caches the events table's query this way, and the PHPCS warning <code>DirectDatabaseQuery.NoCaching</code> from Lesson 8.1 was suggesting exactly that. On a normal site it saves nothing (the Events page asks only once per request). It pays off with a persistent object cache.</p>
+            </section>
+
+            <section id="persistent" class="lesson-section">
+                <h2>💾 A Persistent Object Cache</h2>
+                <p>A <strong>persistent object cache</strong> keeps the object cache between requests, in a store outside PHP. WordPress supports it through the <code>object-cache.php</code> drop-in (Lesson 2.2): if <code>wp-content/object-cache.php</code> exists, WordPress loads it instead of its own in-memory cache, very early in <code>wp-settings.php</code>. On production that store is usually Redis or Memcached, which hosts offer as a feature (with plugins such as Redis Object Cache to connect them). Your site has neither, but there is a way to try the real thing without a new container: the free <a href="https://wordpress.org/plugins/sqlite-object-cache/" target="_blank" rel="noopener">SQLite Object Cache</a> plugin keeps the cache in a SQLite file inside <code>wp-content</code>, using PHP's SQLite extension, which the course's WordPress image has. It is a measuring instrument for this lesson, not part of the project, and you remove it in the project. It needs an internet connection to install:</p>
+                <pre data-cli><code class="language-bash">wp plugin install sqlite-object-cache --activate
+wp eval 'var_dump( wp_using_ext_object_cache() );'
+wp plugin list --status=dropin --fields=name,title</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your version number may differ)</h4>
+                    <pre><code>Installing SQLite Object Cache (1.6.6)
+Downloading installation package from https://downloads.wordpress.org/plugin/sqlite-object-cache.1.6.6.zip...
+Unpacking the package...
+Installing the plugin...
+Plugin installed successfully.
+Activating 'sqlite-object-cache'...
+Plugin 'sqlite-object-cache' activated.
+Success: Installed 1 of 1 plugins.
+bool(true)
++------------------+-------------------------------+
+| name             | title                         |
++------------------+-------------------------------+
+| object-cache.php | SQLite Object Cache (Drop-in) |
++------------------+-------------------------------+</code></pre>
+                </div>
+                <p>Activation wrote the drop-in, and <code>wp_using_ext_object_cache()</code> is now <code>true</code> (it printed <code>NULL</code> in Lesson 7.3). Measure the same five addresses twice: once right after emptying the cache (<code>wp cache flush</code>), once more right after:</p>
+                <pre data-cli data-log><code class="language-bash">wp cache flush
+for round in 1 2; do
+  for page in / /books/dune/ /find-a-book/ /events/ "/wp-json/pagesco/v1/books?orderby=price"; do
+    curl -s -o /dev/null "http://localhost:8080$page"
+  done
+done</code></pre>
+                <div class="card card-output">
+                    <h4>Output (the new lines of debug.log)</h4>
+                    <pre><code>[26-Oct-2026 06:01:59 UTC] /: 23 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings
+[26-Oct-2026 06:02:00 UTC] /books/dune/: 11 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings
+[26-Oct-2026 06:02:00 UTC] /find-a-book/: 10 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings
+[26-Oct-2026 06:02:00 UTC] /events/: 6 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings
+[26-Oct-2026 06:02:00 UTC] /wp-json/pagesco/v1/books: 5 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings, medium_crop, medium_large_crop, large_crop
+[26-Oct-2026 06:02:00 UTC] /: 0 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings, medium_crop, medium_large_crop, large_crop
+[26-Oct-2026 06:02:00 UTC] /books/dune/: 0 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings, medium_crop, medium_large_crop, large_crop
+[26-Oct-2026 06:02:00 UTC] /find-a-book/: 0 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings, medium_crop, medium_large_crop, large_crop
+[26-Oct-2026 06:02:00 UTC] /events/: 1 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings, medium_crop, medium_large_crop, large_crop
+[26-Oct-2026 06:02:00 UTC] /wp-json/pagesco/v1/books: 0 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings, medium_crop, medium_large_crop, large_crop</code></pre>
+                </div>
+                <p>The first round fills the cache as it goes (the front page still makes almost all its queries, Dune's page already finds more than half of what it needs in the cache). The second round is the steady state of a busy site: zero queries for the front page, Dune's page, Find a Book and the REST route. Options, posts, meta, terms, users and even <code>WP_Query</code>'s results come from the cache. (With a persistent cache, the report's list of missing options is the cache's memory of every request so far.) One page still asks the database once: the Events page, whose events table query the plugin does not cache. That is the first step of the project.</p>
+                <p>Where each layer sits in a request, from the outside in (the page cache is described below):</p>
+                <div class="mermaid">
+graph TD
+    A["page request"] --> B{"page cached?"}
+    B -->|"yes"| Z["send stored HTML"]
+    B -->|"no"| C["run WordPress"]
+    C --> D{"in object cache?"}
+    D -->|"no"| F["query the database"]
+    F --> G["store in cache"]
+    D -->|"yes"| E["use the value"]
+    G --> E
+    E --> H["send the HTML"]
+                </div>
+                <p>Transients move too. With a persistent cache, <code>set_transient()</code> writes to the cache instead of <code>wp_options</code>:</p>
+                <pre data-cli><code class="language-bash">wp transient set pagesco_books_demo 'Gatsby: back November 15' 600
+wp db query "SELECT COUNT(*) AS 'rows' FROM wp_options WHERE option_name LIKE '%pagesco_books_demo'"
+wp transient get pagesco_books_demo
+wp transient delete pagesco_books_demo</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Transient added.
+rows
+0
+
+Gatsby: back November 15
+Success: Transient deleted.</code></pre>
+                </div>
+                <p>Zero rows, and the value is there: it lives only in the cache now, which is why Lesson 7.3 insisted that a transient may vanish (remove the cache, and it is gone). Code that uses the transient and cache functions does not change at all; that is the point of the drop-in.</p>
+                <div class="card card-warning">
+                    <h4>⚠️ What a persistent cache asks of your code</h4>
+                    <p>Without one, a stale entry dies at the end of the request. With one, a wrong answer stays until something deletes it: every cached value needs an invalidation plan (Common Mistake 1). Writes that bypass the APIs (SQL typed into <code>wp db query</code>, an import tool) bypass the invalidation too: run <code>wp cache flush</code> after them. Sites that share one Redis need different key prefixes (Redis Object Cache uses <code>WP_CACHE_KEY_SALT</code>). And Site Health recommends a persistent object cache only for larger sites (more than 1,000 posts, comments, terms or users, or more than 500 autoloaded options); for a small shop it is a nice extra, not a must.</p>
+                </div>
+                <div class="card card-info">
+                    <h4>💡 Page caching: the next level</h4>
+                    <p>An object cache makes building a page cheaper; a <strong>page cache</strong> skips building it. The finished HTML of an anonymous page view is stored and sent to the next visitor without running PHP at all: by the host (Nginx or Varnish), a CDN, or a plugin through the <code>advanced-cache.php</code> drop-in and <code>define( 'WP_CACHE', true )</code>. Page caches serve only logged-out visitors (anyone logged in sees their own toolbar and nonces), and they must be emptied when content changes, which caching plugins and hosts do on save. The Book Filter caches well: its <code>?genre=</code> addresses are separate pages, and the filtering itself happens in the browser. Lesson 8.4 looks at what your host provides.</p>
+                </div>
+            </section>
+
+            <section id="assets" class="lesson-section">
+                <h2>📦 What the Browser Downloads</h2>
+                <p>The HTML is only the beginning: the browser then fetches what it names. Files in <code>&lt;head&gt;</code> that the page needs before it can draw anything (stylesheets, and scripts without <code>defer</code>/<code>async</code>) are <strong>render-blocking</strong>: each one is a round trip before the first pixel. WordPress 7.1 does several things to keep that short for block themes. Look at the front page:</p>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ &gt; /tmp/front.html
+echo "inline style elements: $(grep -c '&lt;style' /tmp/front.html)"
+grep -o "&lt;link rel='stylesheet'[^&gt;]*&gt;" /tmp/front.html
+grep -o '&lt;script[^&gt;]*&gt;' /tmp/front.html</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>inline style elements: 20
+&lt;link rel='stylesheet' id='wp-block-navigation-css' href='http://localhost:8080/wp-includes/blocks/navigation/style.css?ver=7.1.3' media='all' /&gt;
+&lt;script id="wp-importmap" type="importmap"&gt;
+&lt;script type="speculationrules"&gt;
+&lt;script data-wp-router-options="{&amp;quot;loadOnClientNavigation&amp;quot;:true}" fetchpriority="low" id="@wordpress/block-library/navigation/view-js-module" src="http://localhost:8080/wp-includes/js/dist/script-modules/block-library/navigation/view.js?ver=1bf28ded04f9f188bdcb" type="module"&gt;
+&lt;script id="wp-emoji-settings" type="application/json"&gt;
+&lt;script type="module"&gt;</code></pre>
+                </div>
+                <ul>
+                    <li><strong>Only the CSS of blocks on the page.</strong> Block themes load each core block's stylesheet separately, only when the block is on the page, not one big <code>block-library</code> file. The plugin's blocks do the same through <code>block.json</code>'s <code>style</code> (Lesson 6.1).</li>
+                    <li><strong>Small stylesheets are inlined.</strong> <code>wp_maybe_inline_styles()</code> sorts the page's block stylesheets by size and prints the smallest inside <code>&lt;style&gt;</code> elements, up to a budget of 40,000 bytes (since 6.9, filter <code>styles_inline_size_limit</code>), saving a request each. What does not fit stays a <code>&lt;link&gt;</code>: here the Navigation block's 24,866-byte stylesheet. <code>SCRIPT_DEBUG</code> (on since Lesson 1.2) loads the unminified files; on production the minified ones are smaller, and more of them fit.</li>
+                    <li><strong>Script modules are deferred by nature.</strong> The Navigation block's <code>view.js</code> is a module (<code>type="module"</code> runs after the HTML is parsed) with <code>fetchpriority="low"</code>, so it never competes with the content. The import map lists only the modules this page uses.</li>
+                    <li><strong>The rest is small and inline:</strong> the emoji loader (a module) with its settings, and the speculation rules below.</li>
+                </ul>
+                <p>The same commands on Find a Book, which uses fewer core blocks and has the plugin's interactive Book Filter (Lesson 6.4):</p>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/find-a-book/ &gt; /tmp/find.html
+echo "inline style elements: $(grep -c '&lt;style' /tmp/find.html)"
+grep -c "&lt;link rel='stylesheet'" /tmp/find.html
+grep -o 'id="[^"]*-js-module[^"]*"' /tmp/find.html
+grep -A1 'type="importmap"' /tmp/find.html | tail -1</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>inline style elements: 15
+0
+id="@wordpress/interactivity-js-modulepreload"
+id="@wordpress/block-library/navigation/view-js-module"
+id="pagesco-book-filter-view-script-module-js-module"
+{"imports":{"@wordpress/interactivity":"http://localhost:8080/wp-includes/js/dist/script-modules/interactivity/index.js?ver=efaa5193bbad9c60ffd1"}}</code></pre>
+                </div>
+                <p>Zero external stylesheets: without the front page's images and columns, even the Navigation CSS fits the inline budget. Two modules, the Navigation's and the Book Filter's, and the import map that tells the browser where <code>@wordpress/interactivity</code> lives. A page without interactive blocks loads none of it.</p>
+                <p>For your own classic scripts (Lesson 4.3), <code>wp_enqueue_script()</code>'s fifth argument chooses when they run: <code>array( 'strategy' =&gt; 'defer' )</code> runs after parsing, in order; <code>'async'</code> runs as soon as it arrives, in any order (only for scripts that depend on nothing and that nothing depends on); <code>'in_footer' =&gt; true</code> prints the tag at the end of the body. The plugin's Stock widget script loads in the footer, on the Dashboard only (Lesson 7.1): the cheapest script is the one a page does not load.</p>
+                <h3>Prefetching the next page: speculative loading</h3>
+                <p>Since WordPress 6.8, pages for logged-out visitors on sites with pretty permalinks carry <strong>speculation rules</strong>:</p>
+                <pre data-cli><code class="language-bash">grep -A1 'type="speculationrules"' /tmp/front.html | tail -1</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":["/wp-*.php","/wp-admin/*","/wp-content/uploads/*","/wp-content/*","/wp-content/plugins/*","/wp-content/themes/pagesco/*","/*\\?(.+)"]}},{"not":{"selector_matches":"a[rel~=\"nofollow\"]"}},{"not":{"selector_matches":".no-prefetch, .no-prefetch a"}}]},"eagerness":"conservative"}]}</code></pre>
+                </div>
+                <p>Chromium browsers read them and <strong>prefetch</strong> a link's page with <code>conservative</code> eagerness: when the visitor presses the mouse button or touches the link, a moment before the click completes, so the next page often appears instantly. Excluded are admin and login addresses, files in <code>wp-content</code>, addresses with a query string (such as the Book Filter's <code>?genre=</code>), <code>rel="nofollow"</code> links, and anything inside an element with the class <code>no-prefetch</code>. Other browsers ignore the rules. The <code>wp_speculation_rules_configuration</code> filter changes the mode or the eagerness, and WordPress 7.1 adds the <code>WP_SPECULATIVE_LOADING_DEFAULT_MODE</code> and <code>WP_SPECULATIVE_LOADING_DEFAULT_EAGERNESS</code> constants.</p>
+            </section>
+
+            <section id="images" class="lesson-section">
+                <h2>🖼️ Images</h2>
+                <p>Images are usually most of a page's bytes, and often its largest element. WordPress does a lot automatically for images in the Media Library. To see it, a small script that builds a test page with one image four times (create it as <code>wordpress/pagesco-image-test.php</code>):</p>
+                <pre data-file="pagesco-image-test.php"><code class="language-php">&lt;?php
+/**
+ * Creates a test page with one Media Library image four times. Usage: wp eval-file pagesco-image-test.php &lt;attachment ID&gt;
+ */
+
+$pagesco_image  = (int) ( $args[0] ?? 0 );
+$pagesco_blocks = '';
+foreach ( array( 'First', 'Second', 'Third', 'Fourth' ) as $pagesco_alt ) {
+	$pagesco_blocks .= sprintf(
+		'&lt;!-- wp:image {"id":%1$d,"sizeSlug":"large"} --&gt;&lt;figure class="wp-block-image size-large"&gt;&lt;img src="%2$s" alt="%3$s copy" class="wp-image-%1$d"/&gt;&lt;/figure&gt;&lt;!-- /wp:image --&gt;' . "\n\n",
+		$pagesco_image,
+		esc_url( wp_get_attachment_image_url( $pagesco_image, 'large' ) ),
+		$pagesco_alt
+	);
+}
+
+$pagesco_page = wp_insert_post(
+	array(
+		'post_type'    =&gt; 'page',
+		'post_status'  =&gt; 'publish',
+		'post_title'   =&gt; 'Image test',
+		'post_name'    =&gt; 'image-test',
+		'post_content' =&gt; $pagesco_blocks,
+	)
+);
+echo $pagesco_page ? "Created the Image test page.\n" : "The page was not created.\n";</code></pre>
+                <p>Add the theme's book image to the Media Library (Lesson 2.1 did the same with Twenty Twenty-Five's), print it at the "large" size, and build the test page. <code>--porcelain</code> makes <code>wp media import</code> print only the new ID, which the shell keeps in <code>$ID</code>; <code>wp eval-file</code> passes extra arguments to the script as <code>$args</code>:</p>
+                <pre data-cli><code class="language-bash">ID=$(wp media import wp-content/themes/pagesco/assets/images/book-image.webp --title="Book image" --porcelain)
+wp eval "echo wp_get_attachment_image( $ID, 'large' ), PHP_EOL;"
+wp eval-file pagesco-image-test.php "$ID"</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your ID and upload folder will differ)</h4>
+                    <pre><code>&lt;img width="730" height="1024" src="http://localhost:8080/wp-content/uploads/2026/10/book-image-730x1024.webp" class="attachment-large size-large" alt="" decoding="async" loading="lazy" srcset="http://localhost:8080/wp-content/uploads/2026/10/book-image-730x1024.webp 730w, http://localhost:8080/wp-content/uploads/2026/10/book-image-214x300.webp 214w, http://localhost:8080/wp-content/uploads/2026/10/book-image-768x1077.webp 768w, http://localhost:8080/wp-content/uploads/2026/10/book-image.webp 826w" sizes="auto, (max-width: 730px) 100vw, 730px" /&gt;
+Created the Image test page.</code></pre>
+                </div>
+<ul>
+                    <li><strong><code>width</code> and <code>height</code></strong>: the browser knows the image's shape before it arrives and reserves the space, so nothing jumps when it loads.</li>
+                    <li><strong><code>srcset</code></strong> lists every size WordPress generated on upload; <strong><code>sizes</code></strong> tells the browser how wide the image will be on screen, so it downloads the smallest file that is sharp enough, a phone a much smaller one than a large monitor. <code>auto</code> (WordPress 6.7) lets the browser use the real layout width for lazy-loaded images.</li>
+                    <li><strong><code>loading="lazy"</code></strong>: the browser fetches the image only when it nears the viewport; <strong><code>decoding="async"</code></strong> keeps decoding it from blocking the page.</li>
+                </ul>
+                <p>In post content WordPress also decides <code>loading</code> and <code>fetchpriority</code> per image: images likely to be above the fold are not lazy, and the first large one gets <code>fetchpriority="high"</code>, the browser's signal to fetch it before other images. The test page's three images, with the long <code>src</code>, <code>srcset</code> and <code>class</code> values removed by <code>sed</code>:</p>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/image-test/ | grep -o '&lt;img[^&gt;]*&gt;' | sed -E 's/ (src|srcset|class)="[^"]*"//g'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;img fetchpriority="high" decoding="async" width="730" height="1024" alt="First copy" sizes="(max-width: 730px) 100vw, 730px" /&gt;
+&lt;img decoding="async" width="730" height="1024" alt="Second copy" sizes="(max-width: 730px) 100vw, 730px" /&gt;
+&lt;img decoding="async" width="730" height="1024" alt="Third copy" sizes="(max-width: 730px) 100vw, 730px" /&gt;
+&lt;img loading="lazy" decoding="async" width="730" height="1024" alt="Fourth copy" sizes="auto, (max-width: 730px) 100vw, 730px" /&gt;</code></pre>
+                </div>
+                <p>The first image got <code>fetchpriority="high"</code>; the first three are not lazy (<code>wp_omit_loading_attr_threshold()</code>, 3 by default, assumes the first few content images may be visible on arrival); the fourth is lazy, and its <code>sizes</code> starts with <code>auto</code>. (The single image that WP-CLI printed above was lazy because outside a page view WordPress cannot tell where it will appear.) Now the front page's hero image, which comes from the theme's pattern, not from the Media Library:</p>
+                <pre data-web="/" data-select=".wp-block-image img"><code class="language-text">http://localhost:8080/   (the hero image)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;img src="http://localhost:8080/wp-content/themes/pagesco/assets/images/book-image.webp" alt="A hardcover book with a black-and-white photo on its cover" style="width:280px"/&gt;</code></pre>
+                </div>
+                <p>None of it: no <code>width</code> and <code>height</code>, no <code>fetchpriority</code>, not even <code>decoding</code>. WordPress adds these attributes in <code>wp_filter_content_tags()</code>, and for block templates it deliberately does nothing (<code>wp_get_loading_optimization_attributes()</code> returns early for the <code>template</code> context, because it cannot know where a template's images sit on the page). So a block theme's own images get exactly the markup the theme wrote, and the theme has to take care of them itself. The front page's largest element is this image, it has no reserved space, and it is fetched like any other image. The project fixes both. Clean up the test first:</p>
+                <pre data-cli><code class="language-bash">wp post delete $(wp post list --post_type=page --name=image-test --field=ID) $(wp post list --post_type=attachment --name=book-image --field=ID) --force
+rm pagesco-image-test.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output (the IDs on your site may not match)</h4>
+                    <pre><code>Success: Deleted post 55.
+Success: Deleted post 54.</code></pre>
+                </div>
+                <div class="card card-info">
+                    <h4>💡 Formats and sizes</h4>
+                    <p>WebP (used here) and AVIF (supported for uploads since WordPress 6.5, where the server's image library can handle it) are much smaller than JPEG and PNG at the same quality; the <code>image_editor_output_format</code> filter can convert uploads automatically. Uploads larger than 2560 pixels are scaled down (<code>big_image_size_threshold</code>), and every registered size (Settings &gt; Media, <code>add_image_size()</code>) is generated for every upload, so register only the sizes your theme really uses.</p>
+                </div>
+            </section>
+
+            <section id="web-vitals" class="lesson-section">
+                <h2>📈 Core Web Vitals, Honestly</h2>
+                <p>Server time and bytes are causes; visitors feel effects. Google's <strong>Core Web Vitals</strong> name three effects, and search ranking uses them as one signal among many:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Metric</th><th>Measures</th><th>Good</th><th>Poor</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><strong>LCP</strong>, Largest Contentful Paint</td><td>when the largest image or text block in the viewport was drawn: "the page looks loaded"</td><td>2.5 s or less</td><td>over 4 s</td></tr>
+                            <tr><td><strong>INP</strong>, Interaction to Next Paint</td><td>how long the page takes to show a response to clicks, taps and key presses (the slowest of a visit, roughly)</td><td>200 ms or less</td><td>over 500 ms</td></tr>
+                            <tr><td><strong>CLS</strong>, Cumulative Layout Shift</td><td>how much visible content jumps around unexpectedly, as a score</td><td>0.1 or less</td><td>over 0.25</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The thresholds apply to the 75th percentile of <strong>field data</strong>: measurements from real visitors' Chrome browsers over 28 days, published in the Chrome UX Report and shown by PageSpeed Insights for public sites with enough traffic. A local site has no field data at all. What you can do locally is <strong>lab</strong> measurement: one browser, one machine, a simulated network. Lab numbers are good for comparing before and after a change on the same machine, and bad at predicting what a visitor on a mid-range phone will see. Chrome's DevTools have both tools you need: the <strong>Lighthouse</strong> panel (a lab report with scores and advice; it cannot measure INP, which needs real interactions) and the <strong>Performance</strong> panel, which shows LCP, CLS and INP live while you use the page.</p>
+                <p>The browser exposes the same numbers to JavaScript through <code>PerformanceObserver</code>. This snippet prints LCP and CLS; paste it into the Console after a page has loaded:</p>
+                <pre><code class="language-js">// Load the page, wait until it has finished, then paste this into the browser's console.
+// buffered: true hands each observer the entries recorded since the page started loading.
+let lcp;
+let cls = 0;
+
+new PerformanceObserver( ( list ) =&gt; {
+	lcp = list.getEntries().at( -1 ); // the last candidate is the final LCP
+} ).observe( { type: 'largest-contentful-paint', buffered: true } );
+
+new PerformanceObserver( ( list ) =&gt; {
+	for ( const shift of list.getEntries() ) {
+		if ( ! shift.hadRecentInput ) { // shifts right after a click or key press do not count
+			cls += shift.value;
+		}
+	}
+} ).observe( { type: 'layout-shift', buffered: true } );
+
+setTimeout( () =&gt; {
+	console.log( 'LCP', Math.round( lcp.startTime ), 'ms:', lcp.url || lcp.element.tagName, '| CLS', cls.toFixed( 3 ) );
+}, 500 );</code></pre>
+                <p>To make the lab a little more like the field, set the Network panel's throttling to <strong>Slow 4G</strong> (a mobile connection of about 1.6 Mbps with a long round trip) and tick <strong>Disable cache</strong>, then reload, wait, and paste. Recorded that way on the course's machine (Chromium with DevTools' Slow 4G settings, a 1280×800 window), three runs of the front page:</p>
+                <div class="card card-output">
+                    <h4>Output (recorded; your numbers will differ)</h4>
+                    <pre><code>LCP 1480 ms: http://localhost:8080/wp-content/themes/pagesco/assets/images/book-image.webp | CLS 0.101
+LCP 1472 ms: http://localhost:8080/wp-content/themes/pagesco/assets/images/book-image.webp | CLS 0.101
+LCP 1472 ms: http://localhost:8080/wp-content/themes/pagesco/assets/images/book-image.webp | CLS 0.101</code></pre>
+                </div>
+                <p>The LCP element is the hero image, as expected, at about 1.5 seconds: inside the "good" 2.5 s, even throttled. The CLS of 0.101 is not: just over the "good" limit, and every run the same. The cause is the image without dimensions. The browser lays the page out without knowing how tall the image will be, and when it arrives, 392 pixels taller than nothing, everything below it moves. You will see the number fall in the project. For INP, click the Book Filter's genre links with the Performance panel open (its live metrics show INP). Recorded with the browser's Event Timing API, the source INP is computed from, and the Performance panel's 4× CPU slowdown, which imitates a mid-range phone's processor:</p>
+                <div class="card card-output">
+                    <h4>Output (recorded; your numbers will differ)</h4>
+                    <pre><code>click on Fantasy: 16 ms until the next paint, 9 ms in event handlers -&gt; Showing 2 of 11 books
+click on Dystopian: 16 ms until the next paint, 8 ms in event handlers -&gt; Showing 3 of 11 books
+click on All books: 16 ms until the next paint, 12 ms in event handlers -&gt; Showing 11 of 11 books</code></pre>
+                </div>
+                <p>16 ms per interaction, one frame (the API rounds to 8 ms), with 8 to 12 ms of JavaScript even at a quarter of the processor's speed: Lesson 6.4's store does very little work per click, far from the 200 ms limit. What these numbers cannot tell you: how a five-year-old phone over a weak connection really does, how the site behaves with a full catalog and real traffic, or what a page cache in front of it changes. That is what field data is for, once the site is live (Lesson 8.4).</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <p>The SQLite Object Cache is still active: the first two mistakes need it.</p>
+
+                <h3>1. A cache nobody clears</h3>
+                <p>A quick way to make the Events page faster seems to be caching the shortcode's whole HTML for a day, in a must-use plugin:</p>
+                <pre data-file="wp-content/mu-plugins/mistake-cache.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Mistake: a Cache Nobody Clears
+ */
+
+// Before WordPress runs [pagesco_events], answer with the HTML saved last time, if there is any.
+add_filter(
+	'pre_do_shortcode_tag',
+	function ( $output, $tag ) {
+		if ( 'pagesco_events' !== $tag ) {
+			return $output;
+		}
+		$cached = wp_cache_get( 'events_html', 'pagesco_mistake' );
+		return false === $cached ? $output : $cached;
+	},
+	10,
+	2
+);
+
+// After it ran, save the HTML for a day.
+add_filter(
+	'do_shortcode_tag',
+	function ( $output, $tag ) {
+		if ( 'pagesco_events' === $tag ) {
+			wp_cache_set( 'events_html', $output, 'pagesco_mistake', DAY_IN_SECONDS );
+		}
+		return $output;
+	},
+	10,
+	2
+);</code></pre>
+                <p>View the Events page (it fills the cache), then add an event that comes before all the others, and view the page again:</p>
+                <pre data-web="/events/" data-select="li.pagesco-event strong" data-text><code class="language-text">http://localhost:8080/events/   (the first event)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Book club: Dune</code></pre>
+                </div>
+                <pre data-cli><code class="language-bash">wp eval 'PagesCo\Books\EventsTable::add( "Book club: Animal Farm", "2027-10-28 19:00:00", "Reading corner", 20 );'
+wp db query "SELECT title FROM wp_pagesco_events ORDER BY starts_at LIMIT 1"</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>title
+Book club: Animal Farm</code></pre>
+                </div>
+                <pre data-web="/events/" data-select="li.pagesco-event strong" data-text><code class="language-text">http://localhost:8080/events/   (the first event, again)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Book club: Dune</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the database has the new event, the page does not, and it will not for a day, or until someone flushes the cache. No error, no warning: a cache without an invalidation plan simply tells visitors something that is no longer true. Without a persistent cache you would never have seen it, which is how such code passes local testing. <strong>Fix:</strong> cache data at the layer that knows when it changes (the events table's own methods), with a key that changes when the data does: the last-changed pattern, in the project. Remove the file and the test event:</p>
+                <pre data-cli><code class="language-bash">rm wp-content/mu-plugins/mistake-cache.php
+wp db query "DELETE FROM wp_pagesco_events WHERE title = 'Book club: Animal Farm'"
+wp cache flush</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Query succeeded. Rows affected: 1
+Success: The cache was flushed.</code></pre>
+                </div>
+
+                <h3>2. One query per item: N+1</h3>
+                <p>Lesson 7.3's <code>Supplier\Availability</code> collects the catalog's ISBNs before it calls the supplier. Count what that lookup costs, with an empty cache, and group the queries by their shape (numbers replaced by <code>N</code>). Create <code>wordpress/pagesco-count-isbns.php</code>:</p>
+                <pre data-file="pagesco-count-isbns.php"><code class="language-php">&lt;?php
+/**
+ * Counts the database queries of the supplier feature's catalog lookup. Usage: wp eval-file pagesco-count-isbns.php
+ */
+
+global $wpdb;
+
+// catalog_isbns() is private: ReflectionMethod lets this measuring script call it directly.
+$pagesco_feature = PagesCo\Books\Plugin::instance()-&gt;feature( PagesCo\Books\Supplier\Availability::class );
+$pagesco_lookup  = new ReflectionMethod( $pagesco_feature, 'catalog_isbns' );
+
+$pagesco_start   = count( $wpdb-&gt;queries ?? array() );
+$pagesco_isbns   = $pagesco_lookup-&gt;invoke( $pagesco_feature );
+$pagesco_queries = array_slice( $wpdb-&gt;queries ?? array(), $pagesco_start );
+
+printf( "%d ISBNs, %d queries:\n", count( $pagesco_isbns ), count( $pagesco_queries ) );
+
+// The same query with other numbers counts as one shape: 11 x "... post_id IN (N) ...".
+$pagesco_shapes = array_count_values(
+	array_map(
+		fn( $query ) =&gt; substr( preg_replace( '/\b\d+\b/', 'N', preg_replace( '/\s+/', ' ', $query[0] ) ), 0, 90 ),
+		$pagesco_queries
+	)
+);
+foreach ( $pagesco_shapes as $pagesco_shape =&gt; $pagesco_count ) {
+	printf( "%3d x %s\n", $pagesco_count, $pagesco_shape );
+}</code></pre>
+                <pre data-cli><code class="language-bash">wp cache flush
+wp eval-file pagesco-count-isbns.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: The cache was flushed.
+11 ISBNs, 12 queries:
+  1 x SELECT wp_posts.ID FROM wp_posts WHERE N=N AND wp_posts.post_type = 'book' AND ((wp_posts.
+ 11 x SELECT post_id, meta_key, meta_value FROM wp_postmeta WHERE post_id IN (N) ORDER BY meta_i</code></pre>
+                </div>
+                <p><strong>What it means:</strong> one query for the book IDs, then one query <em>per book</em> for its meta: N+1 queries for N books. <code>get_posts()</code> with <code>'fields' =&gt; 'ids'</code> returns only IDs and, for speed, skips loading the posts' meta into the cache, so each <code>get_post_meta()</code> in the loop goes to the database. Eleven books, eleven queries; five thousand books, five thousand. A warm persistent cache hides it (that is why the command flushed first), so measure with an empty cache. <strong>Fix:</strong> load the meta of all IDs in one query before the loop, with <code>update_postmeta_cache( $ids )</code>, in the project. Remove the script:</p>
+                <pre data-cli><code class="language-bash">rm pagesco-count-isbns.php</code></pre>
+
+                <h3>3. Lazy-loading the image that matters most</h3>
+                <p>"Lazy-load every image" is a popular tip, and some optimization plugins do exactly that. As a must-use plugin:</p>
+                <pre data-file="wp-content/mu-plugins/mistake-lazy.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Mistake: Lazy-Load Every Image
+ */
+
+add_filter(
+	'render_block_core/image',
+	function ( $html ) {
+		$image = new WP_HTML_Tag_Processor( $html );
+		if ( $image-&gt;next_tag( 'img' ) ) {
+			$image-&gt;set_attribute( 'loading', 'lazy' );
+		}
+		return $image-&gt;get_updated_html();
+	}
+);</code></pre>
+                <pre data-web="/" data-select=".wp-block-image img"><code class="language-text">http://localhost:8080/   (the hero image)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;img loading="lazy" src="http://localhost:8080/wp-content/themes/pagesco/assets/images/book-image.webp" alt="A hardcover book with a black-and-white photo on its cover" style="width:280px"/&gt;</code></pre>
+                </div>
+                <p>Recorded with the snippet and Slow 4G, as before:</p>
+                <div class="card card-output">
+                    <h4>Output (recorded; your numbers will differ)</h4>
+                    <pre><code>LCP 2012 ms: http://localhost:8080/wp-content/themes/pagesco/assets/images/book-image.webp | CLS 0.101
+LCP 1980 ms: http://localhost:8080/wp-content/themes/pagesco/assets/images/book-image.webp | CLS 0.101
+LCP 2004 ms: http://localhost:8080/wp-content/themes/pagesco/assets/images/book-image.webp | CLS 0.101</code></pre>
+                </div>
+                <p><strong>What it means:</strong> LCP went from about 1.48 to about 2.0 seconds, half a second worse, close to the 2.5-second limit. A lazy image is fetched only after the browser has laid out the page and seen that the image is near the viewport, so the most important image of the page starts downloading later, behind everything else. No message tells you. <strong>Fix:</strong> lazy-load what is below the fold, never the LCP image; give the LCP image priority instead (WordPress's own logic for content images does exactly that, as the test page showed). Remove the file:</p>
+                <pre data-cli><code class="language-bash">rm wp-content/mu-plugins/mistake-lazy.php</code></pre>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: A Faster Shop, with Numbers</h2>
+                <p>Four improvements, each measured: two that the measurements in this lesson found in the plugin, one that the persistent cache made visible, and one in the theme for the visitor's eyes. Allow about 55 minutes. The query report and <code>SAVEQUERIES</code> stay on until the last step.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: Cache the events query, and clear it on every change <span class="step-time">(15 min)</span></h3>
+                    <p>Replace <code>src/EventsTable.php</code>. New are the cache group constant, the cached <code>find()</code>, and a private <code>flush_cache()</code> that <code>install()</code>, <code>add()</code> and <code>delete_before()</code> call after they change the table:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/EventsTable.php"><code class="language-php">&lt;?php
+/**
+ * The shop's events, kept in a custom table.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books;
+
+/**
+ * Creates and upgrades the {prefix}pagesco_events table, and reads and writes its rows.
+ */
+final class EventsTable implements Feature {
+
+	/**
+	 * The schema version this code expects. Raise it whenever schema() changes.
+	 */
+	public const DB_VERSION = 2;
+
+	/**
+	 * The option that records the schema version installed in this database.
+	 */
+	public const VERSION_OPTION = 'pagesco_books_db_version';
+
+	/**
+	 * The object cache group for the table's query results.
+	 */
+	public const CACHE_GROUP = 'pagesco_events';
+
+	/**
+	 * Checks the schema on every request, so a plugin update upgrades the table without a reactivation.
+	 */
+	public function register(): void {
+		add_action( 'init', array( $this, 'maybe_upgrade' ) );
+	}
+
+	/**
+	 * The table's full name, with this site's table prefix.
+	 */
+	public static function name(): string {
+		global $wpdb;
+
+		return $wpdb-&gt;prefix . 'pagesco_events';
+	}
+
+	/**
+	 * Runs install() when the database is older than this code.
+	 */
+	public function maybe_upgrade(): void {
+		if ( (int) get_option( self::VERSION_OPTION, 0 ) &lt; self::DB_VERSION ) {
+			self::install();
+		}
+	}
+
+	/**
+	 * Creates the table, or brings an existing one up to schema(), and records the version.
+	 */
+	public static function install(): void {
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+		dbDelta( self::schema() );
+		update_option( self::VERSION_OPTION, self::DB_VERSION );
+		self::flush_cache();
+	}
+
+	/**
+	 * The CREATE TABLE statement in the exact shape dbDelta() expects.
+	 */
+	private static function schema(): string {
+		global $wpdb;
+
+		$table   = self::name();
+		$collate = $wpdb-&gt;get_charset_collate();
+
+		return "CREATE TABLE {$table} (
+			id bigint unsigned NOT NULL AUTO_INCREMENT,
+			title varchar(200) NOT NULL,
+			starts_at datetime NOT NULL,
+			location varchar(200) NOT NULL DEFAULT '',
+			capacity smallint unsigned NOT NULL DEFAULT 0,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			KEY starts_at (starts_at)
+		) {$collate};";
+	}
+
+	/**
+	 * Adds one event and returns its ID (0 if the insert failed).
+	 *
+	 * @param string $title     The event's name.
+	 * @param string $starts_at Local date and time, Y-m-d H:i:s.
+	 * @param string $location  Where in the shop.
+	 * @param int    $capacity  Seats, or 0 for an open event.
+	 */
+	public static function add( string $title, string $starts_at, string $location, int $capacity ): int {
+		global $wpdb;
+
+		$inserted = $wpdb-&gt;insert(
+			self::name(),
+			array(
+				'title'      =&gt; $title,
+				'starts_at'  =&gt; $starts_at,
+				'location'   =&gt; $location,
+				'capacity'   =&gt; $capacity,
+				'created_at' =&gt; current_time( 'mysql', true ),
+			),
+			array( '%s', '%s', '%s', '%d', '%s' )
+		);
+
+		if ( ! $inserted ) {
+			return 0;
+		}
+
+		self::flush_cache();
+		return (int) $wpdb-&gt;insert_id;
+	}
+
+	/**
+	 * Returns events in date order, optionally only those at one location.
+	 *
+	 * @param int    $limit    How many events at most.
+	 * @param string $location Exact location, or '' for every location.
+	 * @return object[] Rows with id, title, starts_at, location, capacity.
+	 */
+	public static function find( int $limit, string $location = '' ): array {
+		global $wpdb;
+
+		// The key names everything the result depends on: the arguments, and when the table last changed.
+		$key    = 'find:' . md5( $limit . '|' . $location ) . ':' . wp_cache_get_last_changed( self::CACHE_GROUP );
+		$events = wp_cache_get( $key, self::CACHE_GROUP );
+		if ( is_array( $events ) ) {
+			return $events;
+		}
+
+		if ( '' === $location ) {
+			$sql = $wpdb-&gt;prepare(
+				'SELECT id, title, starts_at, location, capacity FROM %i ORDER BY starts_at ASC LIMIT %d',
+				self::name(),
+				$limit
+			);
+		} else {
+			$sql = $wpdb-&gt;prepare(
+				'SELECT id, title, starts_at, location, capacity FROM %i WHERE location = %s ORDER BY starts_at ASC LIMIT %d',
+				self::name(),
+				$location,
+				$limit
+			);
+		}
+
+		$events = $wpdb-&gt;get_results( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- $sql comes from $wpdb-&gt;prepare() above.
+		wp_cache_set( $key, $events, self::CACHE_GROUP );
+
+		return $events;
+	}
+
+	/**
+	 * Deletes the events that start before a date and time, and returns how many it deleted.
+	 *
+	 * @param string $datetime Local date and time, Y-m-d H:i:s.
+	 */
+	public static function delete_before( string $datetime ): int {
+		global $wpdb;
+
+		$deleted = (int) $wpdb-&gt;query(
+			$wpdb-&gt;prepare( 'DELETE FROM %i WHERE starts_at &lt; %s', self::name(), $datetime )
+		);
+
+		if ( $deleted ) {
+			self::flush_cache();
+		}
+		return $deleted;
+	}
+
+	/**
+	 * Marks every cached query result as outdated. Call it after each change to the table.
+	 */
+	private static function flush_cache(): void {
+		wp_cache_set_last_changed( self::CACHE_GROUP );
+	}
+}</code></pre>
+                    <ul>
+                        <li><strong>The key</strong> contains the arguments (hashed, so any location string is safe in a key) and the group's last-changed value.</li>
+                        <li><strong><code>is_array()</code></strong>, not a truthiness check such as <code>if ( $events )</code>: a cache miss is <code>false</code>, and an empty result is an empty array, which is falsy but a valid answer worth caching too.</li>
+                        <li><strong><code>flush_cache()</code></strong> renews the last-changed value after each change. Every place that writes to the table is in this class (Lesson 5.5's rule: <code>EventsTable</code> is the table's query layer), so no write can forget it. <code>install()</code> calls it too, because a plugin reinstalled after an uninstall starts with an empty table, and an old cached list must not survive that.</li>
+                    </ul>
+                    <p>Measure the Events page and the REST events route (Lesson 7.2), with an empty cache and again:</p>
+                    <pre data-cli data-log><code class="language-bash">wp cache flush
+for round in 1 2; do
+  for page in /events/ /wp-json/pagesco/v1/events; do
+    curl -s -o /dev/null "http://localhost:8080$page"
+  done
+done</code></pre>
+                    <div class="card card-output">
+                        <h4>Output (the new lines of debug.log)</h4>
+                        <pre><code>[26-Oct-2026 06:02:06 UTC] /events/: 23 queries; missing options: WPLANG, can_compress_scripts, pagesco_books_settings, site_logo
+[26-Oct-2026 06:02:06 UTC] /wp-json/pagesco/v1/events: 3 queries; missing options: WPLANG, can_compress_scripts, pagesco_books_settings, site_logo, medium_crop, medium_large_crop, large_crop
+[26-Oct-2026 06:02:06 UTC] /events/: 0 queries; missing options: WPLANG, can_compress_scripts, pagesco_books_settings, site_logo, medium_crop, medium_large_crop, large_crop
+[26-Oct-2026 06:02:06 UTC] /wp-json/pagesco/v1/events: 0 queries; missing options: WPLANG, can_compress_scripts, pagesco_books_settings, site_logo, medium_crop, medium_large_crop, large_crop</code></pre>
+                    </div>
+                    <p>The second round: zero queries for both. Now prove the invalidation. Add an event that is already over (it sorts first), look, run the daily job from Lesson 7.3 (which deletes past events through <code>delete_before()</code>), and look again:</p>
+                    <pre data-cli><code class="language-bash">wp eval 'PagesCo\Books\EventsTable::add( "Summer reading kickoff", "2025-06-12 18:00:00", "Reading corner", 0 );'
+curl -s http://localhost:8080/events/ | grep -o '&lt;li class="pagesco-event"&gt;&lt;strong&gt;[^&lt;]*' | head -1
+wp eval 'do_action( "pagesco_books_daily_sync" );'
+curl -s http://localhost:8080/events/ | grep -o '&lt;li class="pagesco-event"&gt;&lt;strong&gt;[^&lt;]*' | head -1</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;li class="pagesco-event"&gt;&lt;strong&gt;Summer reading kickoff
+&lt;li class="pagesco-event"&gt;&lt;strong&gt;Book club: Dune</code></pre>
+                    </div>
+                    <p>The new event appeared at once, and disappeared at once: no stale answers, with a cache in between. Your site will not keep the persistent cache (Pages &amp; Co.'s host decides that in Lesson 8.4), so remove the plugin and check that its drop-in went with it:</p>
+                    <pre data-cli><code class="language-bash">wp plugin uninstall sqlite-object-cache --deactivate
+wp plugin list --status=dropin --format=count; echo
+wp eval 'var_dump( wp_using_ext_object_cache() );'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Deactivating 'sqlite-object-cache'...
+Plugin 'sqlite-object-cache' deactivated.
+Uninstalled and deleted 'sqlite-object-cache' plugin.
+Success: Uninstalled 1 of 1 plugins.
+0
+NULL</code></pre>
+                    </div>
+                    <p>No drop-in, no persistent cache. Without it, the events cache lasts one request, so the Events page still makes its one events query, as before: the change costs nothing here and pays off on any host with Redis or Memcached.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: The missing settings row <span class="step-time">(10 min)</span></h3>
+                    <p>Every request asked for <code>pagesco_books_settings</code> and found nothing. The fix is a row, created on activation. Which value it holds matters: the defaults include a translated sentence (<code>__( 'Open until 9 p.m. on Thursdays.' )</code>), and storing it would freeze it in the language of the moment of activation. An <em>empty</em> array is the right row: it is autoloaded (<code>add_option()</code>'s default, Lesson 2.2), so reading it costs nothing, and empty, so <code>Settings::get()</code> still fills in every default at runtime, in the site's language. Replace <code>src/Activator.php</code> (the new lines are at the end of <code>activate()</code>):</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/Activator.php"><code class="language-php">&lt;?php
+/**
+ * What happens when the plugin is activated or deactivated.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books;
+
+/**
+ * Activation and deactivation callbacks (uninstall.php cleans up for good).
+ */
+final class Activator {
+
+	/**
+	 * Runs once, when an administrator activates the plugin.
+	 */
+	public static function activate(): void {
+		$author = get_role( 'author' );
+
+		add_role(
+			'pagesco_bookseller',
+			'Bookseller',
+			$author ? $author-&gt;capabilities : array( 'read' =&gt; true )
+		);
+
+		// init has already run on this request: register the post type and taxonomy now, so their rules exist.
+		( new BookPostType() )-&gt;register_post_type();
+		( new GenreTaxonomy() )-&gt;register_taxonomy();
+		flush_rewrite_rules();
+
+		// Create the events table, or bring it up to date (Lesson 5.5).
+		EventsTable::install();
+
+		// Start the daily WP-Cron job (Lesson 7.3).
+		DailySync::schedule();
+
+		// The settings row, empty: it is autoloaded, so reading the settings costs no query on any
+		// request, and empty, so every default still applies, in the site's language (Lesson 8.2).
+		add_option( Settings::OPTION, array() );
+	}
+
+	/**
+	 * Runs once, when the plugin is deactivated. Keeps all data.
+	 */
+	public static function deactivate(): void {
+		// Remove the post type's and taxonomy's rules, so /books/ stops answering while the plugin is off.
+		unregister_post_type( BookPostType::NAME );
+		unregister_taxonomy( GenreTaxonomy::NAME );
+		flush_rewrite_rules();
+
+		// A deactivated plugin's cron job would still be due every day, with no callback to run.
+		DailySync::unschedule();
+	}
+}</code></pre>
+                    <p>Activation code runs only on activation, so deactivate and activate (as in Lesson 7.3), then look at the option and its autoload value:</p>
+                    <pre data-cli><code class="language-bash">wp plugin deactivate pagesco-books
+wp plugin activate pagesco-books
+wp db query "SELECT option_value, autoload FROM wp_options WHERE option_name = 'pagesco_books_settings'"
+wp eval 'var_dump( PagesCo\Books\Settings::get( "books_per_page" ) );'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Plugin 'pagesco-books' deactivated.
+Success: Deactivated 1 of 1 plugins.
+Plugin 'pagesco-books' activated.
+Success: Activated 1 of 1 plugins.
+option_value	autoload
+a:0:{}	auto
+
+int(6)</code></pre>
+                    </div>
+                    <p>An empty serialized array (<code>a:0:{}</code>), autoloaded (<code>auto</code>: WordPress decides, and loads it unless it grows very large), and the defaults still apply. The same five addresses as in the baseline:</p>
+                    <pre data-cli data-log><code class="language-bash">for page in / /books/dune/ /find-a-book/ /events/ "/wp-json/pagesco/v1/books?orderby=price"; do
+  curl -s -o /dev/null "http://localhost:8080$page"
+done</code></pre>
+                    <div class="card card-output">
+                        <h4>Output (the new lines of debug.log)</h4>
+                        <pre><code>[26-Oct-2026 06:02:09 UTC] /: 23 queries; missing options: WPLANG, can_compress_scripts, site_logo
+[26-Oct-2026 06:02:09 UTC] /books/dune/: 26 queries; missing options: WPLANG, can_compress_scripts, site_logo
+[26-Oct-2026 06:02:09 UTC] /find-a-book/: 26 queries; missing options: WPLANG, can_compress_scripts, site_logo
+[26-Oct-2026 06:02:09 UTC] /events/: 23 queries; missing options: WPLANG, can_compress_scripts, site_logo
+[26-Oct-2026 06:02:09 UTC] /wp-json/pagesco/v1/books: 13 queries; missing options: WPLANG, can_compress_scripts, medium_crop, medium_large_crop, large_crop</code></pre>
+                    </div>
+                    <p>One query fewer on every page and every REST request, and the plugin's name is gone from the missing options. Activation creates the row on every new installation; a site that only <em>updates</em> the plugin never runs activation, so a change like this one, if existing sites need it, belongs in an upgrade routine like <code>EventsTable::maybe_upgrade()</code> (Lesson 5.5).</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: One query instead of eleven <span class="step-time">(10 min)</span></h3>
+                    <p>First the number to beat, now without a persistent cache: recreate Mistake 2's script and run it.</p>
+                    <pre data-file="pagesco-count-isbns.php"><code class="language-php">&lt;?php
+/**
+ * Counts the database queries of the supplier feature's catalog lookup. Usage: wp eval-file pagesco-count-isbns.php
+ */
+
+global $wpdb;
+
+// catalog_isbns() is private: ReflectionMethod lets this measuring script call it directly.
+$pagesco_feature = PagesCo\Books\Plugin::instance()-&gt;feature( PagesCo\Books\Supplier\Availability::class );
+$pagesco_lookup  = new ReflectionMethod( $pagesco_feature, 'catalog_isbns' );
+
+$pagesco_start   = count( $wpdb-&gt;queries ?? array() );
+$pagesco_isbns   = $pagesco_lookup-&gt;invoke( $pagesco_feature );
+$pagesco_queries = array_slice( $wpdb-&gt;queries ?? array(), $pagesco_start );
+
+printf( "%d ISBNs, %d queries:\n", count( $pagesco_isbns ), count( $pagesco_queries ) );
+
+// The same query with other numbers counts as one shape: 11 x "... post_id IN (N) ...".
+$pagesco_shapes = array_count_values(
+	array_map(
+		fn( $query ) =&gt; substr( preg_replace( '/\b\d+\b/', 'N', preg_replace( '/\s+/', ' ', $query[0] ) ), 0, 90 ),
+		$pagesco_queries
+	)
+);
+foreach ( $pagesco_shapes as $pagesco_shape =&gt; $pagesco_count ) {
+	printf( "%3d x %s\n", $pagesco_count, $pagesco_shape );
+}</code></pre>
+                    <pre data-cli><code class="language-bash">wp eval-file pagesco-count-isbns.php</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>11 ISBNs, 12 queries:
+  1 x SELECT wp_posts.ID FROM wp_posts WHERE N=N AND wp_posts.post_type = 'book' AND ((wp_posts.
+ 11 x SELECT post_id, meta_key, meta_value FROM wp_postmeta WHERE post_id IN (N) ORDER BY meta_i</code></pre>
+                    </div>
+                    <p>In <code>src/Supplier/Availability.php</code>, in <code>catalog_isbns()</code>, add two lines between the <code>get_posts()</code> call and the <code>$isbns = array_map(</code> line:</p>
+                    <pre data-norun><code class="language-php">		// One query for the meta of all books, not one per book (Lesson 8.2).
+		update_postmeta_cache( $ids );</code></pre>
+                    <p>Here with <code>sed</code>, from the WordPress folder, followed by the method as it is now, and the count again:</p>
+                    <pre data-cli><code class="language-bash">sed -i '/^\t\t\$isbns = array_map/i\		// One query for the meta of all books, not one per book (Lesson 8.2).\n\t\tupdate_postmeta_cache( $ids );\n' wp-content/plugins/pagesco-books/src/Supplier/Availability.php
+sed -n '/private function catalog_isbns/,/^\t}/p' wp-content/plugins/pagesco-books/src/Supplier/Availability.php
+wp eval-file pagesco-count-isbns.php</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>	private function catalog_isbns(): array {
+		$ids = get_posts(
+			array(
+				'post_type'      =&gt; BookPostType::NAME,
+				'post_status'    =&gt; 'publish',
+				'posts_per_page' =&gt; 100,
+				'fields'         =&gt; 'ids',
+			)
+		);
+
+		// One query for the meta of all books, not one per book (Lesson 8.2).
+		update_postmeta_cache( $ids );
+
+		$isbns = array_map( fn( $id ) =&gt; (string) get_post_meta( $id, 'pagesco_isbn', true ), $ids );
+
+		return array_values( array_filter( $isbns ) );
+	}
+11 ISBNs, 2 queries:
+  1 x SELECT wp_posts.ID FROM wp_posts WHERE N=N AND wp_posts.post_type = 'book' AND ((wp_posts.
+  1 x SELECT post_id, meta_key, meta_value FROM wp_postmeta WHERE post_id IN (N,N,N,N,N,N,N,N,N,</code></pre>
+                    </div>
+                    <p>From twelve queries to two: the ID query, and one meta query for all eleven books, the same pattern core uses inside <code>WP_Query</code>. With five thousand books it would be two queries instead of five thousand and one. The supplier refresh calls this lookup, so ask the real supplier once more to see the feature still works, and remove the script:</p>
+                    <pre data-cli><code class="language-bash">wp eval 'echo count( PagesCo\Books\Plugin::instance()-&gt;feature( PagesCo\Books\Supplier\Availability::class )-&gt;refresh()["items"] ), " books\n";'
+rm pagesco-count-isbns.php</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>11 books</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 4: A hero image that keeps its place and comes first <span class="step-time">(15 min)</span></h3>
+                    <p>Two problems, two fixes, both in the theme. <strong>The shift</strong>: the image needs a known shape before it loads. Core cannot add <code>width</code> and <code>height</code> to a template image, and the Image block's markup would be invalid with them, but the block has an <code>aspectRatio</code> attribute that saves a CSS <code>aspect-ratio</code>: with the width fixed at 280 pixels, the browser can reserve the right height. In <code>patterns/hero.php</code>, change the image block's two lines (826 by 1158 pixels is the image file's size):</p>
+                    <pre data-norun><code class="language-html">&lt;!-- wp:image {"width":"280px","aspectRatio":"826/1158","sizeSlug":"full","linkDestination":"none","align":"center"} --&gt;
+&lt;figure class="wp-block-image aligncenter size-full is-resized"&gt;&lt;img src="…" alt="…" style="aspect-ratio:826/1158;width:280px;height:auto"/&gt;&lt;/figure&gt;</code></pre>
+                    <p>This is exactly what the editor saves when you set the block's aspect ratio (checked in the 7.1 editor: the block parses as valid, with nothing to update). <strong>The priority</strong>: the image should be fetched first. <code>wp_preload_resources</code> (WordPress 6.1, with <code>fetchpriority</code> since 6.6) prints <code>&lt;link rel="preload"&gt;</code> tags in the head, where the browser finds them before it reads the body. Add this to the end of the theme's <code>functions.php</code>:</p>
+                    <pre data-append="wp-content/themes/pagesco/functions.php"><code class="language-php">/**
+ * Tells the browser, in the head of the front page, to fetch the hero image early and first:
+ * it is the page's largest element, so it decides the Largest Contentful Paint (Lesson 8.2).
+ *
+ * @param array $resources Resources to preload, each an array of link attributes.
+ * @return array
+ */
+function pagesco_preload_hero_image( $resources ) {
+	if ( is_front_page() ) {
+		$resources[] = array(
+			'href'          =&gt; get_theme_file_uri( 'assets/images/book-image.webp' ),
+			'as'            =&gt; 'image',
+			'fetchpriority' =&gt; 'high',
+		);
+	}
+	return $resources;
+}
+add_filter( 'wp_preload_resources', 'pagesco_preload_hero_image' );</code></pre>
+                    <p>The pattern edit with <code>sed</code>, then the two results in the front page's HTML:</p>
+                    <pre data-cli><code class="language-bash">sed -i 's|&lt;!-- wp:image {"width":"280px","sizeSlug"|&lt;!-- wp:image {"width":"280px","aspectRatio":"826/1158","sizeSlug"|; s|style="width:280px"/&gt;|style="aspect-ratio:826/1158;width:280px;height:auto"/&gt;|' wp-content/themes/pagesco/patterns/hero.php
+grep -c 'aspect-ratio:826/1158' wp-content/themes/pagesco/patterns/hero.php</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>1</code></pre>
+                    </div>
+                    <pre data-web="/" data-select=".wp-block-image img"><code class="language-text">http://localhost:8080/   (the hero image)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;img src="http://localhost:8080/wp-content/themes/pagesco/assets/images/book-image.webp" alt="A hardcover book with a black-and-white photo on its cover" style="aspect-ratio:826/1158;width:280px;height:auto"/&gt;</code></pre>
+                    </div>
+                    <pre data-web="/" data-select="link[rel=preload]"><code class="language-text">http://localhost:8080/   (View Source: the preload link in the head)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;link rel='preload' href='http://localhost:8080/wp-content/themes/pagesco/assets/images/book-image.webp' as='image' fetchpriority='high' /&gt;</code></pre>
+                    </div>
+                    <p>And the visitor's view, measured as before (Slow 4G, cache disabled, three runs), first with only the aspect ratio, then with the preload too:</p>
+                    <div class="card card-output">
+                        <h4>Output (recorded; your numbers will differ)</h4>
+                        <pre><code>With the aspect ratio:
+LCP 1480 ms: http://localhost:8080/wp-content/themes/pagesco/assets/images/book-image.webp | CLS 0.001
+LCP 1480 ms: http://localhost:8080/wp-content/themes/pagesco/assets/images/book-image.webp | CLS 0.001
+LCP 1472 ms: http://localhost:8080/wp-content/themes/pagesco/assets/images/book-image.webp | CLS 0.001
+
+With the aspect ratio and the preload:
+LCP 1428 ms: http://localhost:8080/wp-content/themes/pagesco/assets/images/book-image.webp | CLS 0.001
+LCP 1404 ms: http://localhost:8080/wp-content/themes/pagesco/assets/images/book-image.webp | CLS 0.001
+LCP 1404 ms: http://localhost:8080/wp-content/themes/pagesco/assets/images/book-image.webp | CLS 0.001</code></pre>
+                    </div>
+                    <p>CLS from 0.101 to 0.001: the image's space is reserved, so nothing moves when it arrives. (The 0.001 left is the Vollkorn web font replacing the fallback font, a few pixels in the header; Lesson 3.3 chose <code>font-display: fallback</code>, which keeps that small.) The aspect ratio alone does not change LCP; the preload brings it from about 1.48 to about 1.41 seconds, because the browser starts fetching the image while it is still reading the head, ahead of the web fonts. A modest gain, honestly reported: here the image is in the HTML and found early anyway. Preloading pays most when the LCP image is discovered late, for example a CSS background or an image added by JavaScript.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 5: Before and after, then put the instruments away <span class="step-time">(5 min)</span></h3>
+                    <p>The baseline's addresses one last time:</p>
+                    <pre data-cli data-log><code class="language-bash">for page in / /books/dune/ /find-a-book/ /events/ "/wp-json/pagesco/v1/books?orderby=price"; do
+  curl -s -o /dev/null "http://localhost:8080$page"
+done</code></pre>
+                    <div class="card card-output">
+                        <h4>Output (the new lines of debug.log)</h4>
+                        <pre><code>[26-Oct-2026 06:02:10 UTC] /: 23 queries; missing options: WPLANG, can_compress_scripts, site_logo
+[26-Oct-2026 06:02:10 UTC] /books/dune/: 26 queries; missing options: WPLANG, can_compress_scripts, site_logo
+[26-Oct-2026 06:02:10 UTC] /find-a-book/: 26 queries; missing options: WPLANG, can_compress_scripts, site_logo
+[26-Oct-2026 06:02:10 UTC] /events/: 23 queries; missing options: WPLANG, can_compress_scripts, site_logo
+[26-Oct-2026 06:02:10 UTC] /wp-json/pagesco/v1/books: 13 queries; missing options: WPLANG, can_compress_scripts, medium_crop, medium_large_crop, large_crop</code></pre>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr><th>Measured</th><th>Before</th><th>After</th><th>Change</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>Queries per page (front page, Dune, Find a Book, Events)</td><td>24, 27, 27, 24</td><td>23, 26, 26, 23</td><td>the settings row (Step 2)</td></tr>
+                                <tr><td>Queries for <code>/pagesco/v1/books</code></td><td>14</td><td>13</td><td>the settings row</td></tr>
+                                <tr><td>Queries to collect the ISBNs of eleven books</td><td>12</td><td>2</td><td><code>update_postmeta_cache()</code> (Step 3)</td></tr>
+                                <tr><td>Events page and events route, warm persistent cache</td><td>1 and 1</td><td>0 and 0</td><td>the events cache (Step 1)</td></tr>
+                                <tr><td>Front page CLS, lab, Slow 4G</td><td>0.101</td><td>0.001</td><td><code>aspectRatio</code> (Step 4)</td></tr>
+                                <tr><td>Front page LCP, lab, Slow 4G</td><td>about 1.48 s</td><td>about 1.41 s</td><td>the preload with <code>fetchpriority</code> (Step 4)</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p>Now remove the measuring tools: <code>SAVEQUERIES</code> costs memory on every request, and the report writes to the log on every request.</p>
+                    <pre data-cli><code class="language-bash">wp config delete SAVEQUERIES
+rm wp-content/mu-plugins/pagesco-query-report.php
+wp plugin list --status=must-use --field=name</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Success: Deleted the constant 'SAVEQUERIES' from the 'wp-config.php' file.
+mailpit-smtp
+pagesco-site</code></pre>
+                    </div>
+                    <p>And Lesson 8.1's rule: new code stays clean. In the plugin's folder:</p>
+                    <pre data-composer="wp-content/plugins/pagesco-books" data-checkpoint><code class="language-bash">composer lint; echo "exit status $?"</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Composer could not detect the root package (pagesco/pagesco-books) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version
+...
+exit status 0</code></pre>
+                    </div>
+                    <p>(The <code>...</code> line stands for a warning about Composer's cache folder that the course's Composer container sometimes prints; it is harmless.) In <code>pagesco-plan.txt</code>, under a new heading "Performance", note the table above and: "Measure first (SAVEQUERIES + report, DevTools Slow 4G + snippet). EventsTable caches find() (last-changed group pagesco_events). Settings row autoloaded (empty). update_postmeta_cache before meta loops. Hero: aspectRatio + preload with fetchpriority. A persistent object cache is the host's job (8.4)."</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>EventsTable::find()</code> caches its results under a key with the group's last-changed value, and every write calls <code>flush_cache()</code>; you saw a new event appear and a deleted one disappear through the cache</li>
+                        <li>The SQLite Object Cache plugin and its drop-in are gone</li>
+                        <li><code>pagesco_books_settings</code> has an autoloaded row, and no page asks for it in vain</li>
+                        <li><code>catalog_isbns()</code> loads all meta with one query (<code>update_postmeta_cache()</code>)</li>
+                        <li>The hero image has an aspect ratio and a high-priority preload, and you measured CLS and LCP before and after</li>
+                        <li><code>SAVEQUERIES</code> and the query report are removed, and <code>composer lint</code> exits with 0</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Each exercise undoes its own changes.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: What the Emoji Script Costs</h3>
+                    <p>Every front-end page carries WordPress's emoji support: a settings script, a loader module and a small stylesheet, so that browsers without emoji fonts can show them as images. Measure how many bytes of the front page's HTML that is, by removing it in a temporary must-use plugin and comparing. Would you remove it on the shop's site?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Core adds it with <code>add_action( 'wp_head', 'print_emoji_detection_script', 7 )</code> and <code>add_action( 'wp_enqueue_scripts', 'wp_enqueue_emoji_styles' )</code> in <code>default-filters.php</code>; remove both with the same priority. <code>curl -s … | wc -c</code> counts bytes.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | wc -c</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>84469</code></pre>
+                        </div>
+                        <pre data-file="wp-content/mu-plugins/exercise-no-emoji.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Exercise: No Emoji Script
+ */
+
+remove_action( 'wp_head', 'print_emoji_detection_script', 7 );
+remove_action( 'wp_enqueue_scripts', 'wp_enqueue_emoji_styles' );
+remove_action( 'wp_print_styles', 'print_emoji_styles' );</code></pre>
+                        <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | wc -c
+curl -s http://localhost:8080/ | grep -c 'emoji'
+rm wp-content/mu-plugins/exercise-no-emoji.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>70255
+0</code></pre>
+                        </div>
+                        <p>About 14 KB of the front page's 84 KB, almost all of it the loader module, printed unminified because of <code>SCRIPT_DEBUG</code>; on production the minified loader is about 3 KB. Modern browsers draw emoji themselves, so the loader then fetches nothing more. All three lines are needed: remove only the first two, and WordPress falls back to the old <code>print_emoji_styles()</code> on <code>wp_print_styles</code>, which logs "Function print_emoji_styles is deprecated since version 6.4.0!" on every page. Removing emoji support is a common, harmless trim for an audience on current browsers, and a small one: a few kilobytes, no request. Measured, not assumed.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: The Inline CSS Budget</h3>
+                    <p>On the front page, the Navigation block's stylesheet is the one render-blocking <code>&lt;link&gt;</code>. Raise the inline budget with the <code>styles_inline_size_limit</code> filter in a temporary must-use plugin so that it is inlined too, and count external stylesheets and inline style elements before and after. Then argue: is inlining always better?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The filter receives the budget in bytes (40,000). The Navigation stylesheet alone is 24,866 bytes unminified.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/mu-plugins/exercise-inline-budget.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Exercise: A Bigger Inline CSS Budget
+ */
+
+add_filter( 'styles_inline_size_limit', fn() =&gt; 80000 );</code></pre>
+                        <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ &gt; /tmp/front.html
+echo "external: $(grep -c "&lt;link rel='stylesheet'" /tmp/front.html), inline: $(grep -c '&lt;style' /tmp/front.html), HTML: $(wc -c &lt; /tmp/front.html) bytes"
+rm wp-content/mu-plugins/exercise-inline-budget.php
+curl -s http://localhost:8080/ &gt; /tmp/front.html
+echo "external: $(grep -c "&lt;link rel='stylesheet'" /tmp/front.html), inline: $(grep -c '&lt;style' /tmp/front.html), HTML: $(wc -c &lt; /tmp/front.html) bytes"</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>external: 0, inline: 21, HTML: 109322 bytes
+external: 1, inline: 20, HTML: 84469 bytes</code></pre>
+                        </div>
+                        <p>With the bigger budget, no external stylesheet is left and the Navigation CSS is a 21st inline style, but every page's HTML grew by about 25 KB (84,469 to 109,322 bytes). Inline CSS saves a round trip on the first visit and is downloaded again with every page, while an external file is cached by the browser after the first page. Core's 40,000-byte budget is a compromise between the two; change it only with measurements of real visits.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: The Price Query at Two Thousand Books (Stretch)</h3>
+                    <p>How does the "possible slow" price query from the EXPLAIN section do with a bigger catalog? Add 2,000 test books with prices (fast, with SQL, on this local site only), time the query from <code>/pagesco/v1/books?orderby=price</code> with <code>SAVEQUERIES</code>, compare with the eleven-book catalog, and remove the test books again.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>WITH RECURSIVE</code> (MySQL 8 and MariaDB 10.2 or newer) generates numbers 1 to 2000 for an <code>INSERT … SELECT</code> into <code>wp_posts</code>, and a second one inserts a <code>pagesco_price</code> row for each new post. Inserting rows behind WordPress's back skips its caches: run <code>wp cache flush</code> afterwards, and never do this on a real site. Time a query with <code>SAVEQUERIES</code> in a <code>wp eval</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="pagesco-time-price.php"><code class="language-php">&lt;?php
+/**
+ * Times the price query behind GET /pagesco/v1/books?orderby=price. Needs SAVEQUERIES. Usage: wp eval-file pagesco-time-price.php
+ */
+
+global $wpdb;
+
+$pagesco_request = new WP_REST_Request( 'GET', '/pagesco/v1/books' );
+$pagesco_request-&gt;set_query_params( array( 'orderby' =&gt; 'price' ) );
+
+$pagesco_start    = count( $wpdb-&gt;queries ?? array() );
+$pagesco_response = rest_do_request( $pagesco_request );
+
+foreach ( array_slice( $wpdb-&gt;queries ?? array(), $pagesco_start ) as $pagesco_query ) {
+	if ( str_contains( $pagesco_query[0], 'SQL_CALC_FOUND_ROWS' ) ) {
+		printf( "%s books: the price query took %.2f ms\n", $pagesco_response-&gt;get_headers()['X-WP-Total'], $pagesco_query[1] * 1000 );
+	}
+}</code></pre>
+                        <pre data-cli><code class="language-bash">wp config set SAVEQUERIES true --raw
+wp eval-file pagesco-time-price.php
+wp db query "SET SESSION cte_max_recursion_depth = 5000; INSERT INTO wp_posts (post_author, post_date, post_date_gmt, post_content, post_title, post_excerpt, post_status, post_name, post_type, to_ping, pinged, post_content_filtered, post_modified, post_modified_gmt) WITH RECURSIVE n (i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i &lt; 2000) SELECT 1, NOW(), UTC_TIMESTAMP(), '', CONCAT('Test book ', i), '', 'publish', CONCAT('test-book-', i), 'book', '', '', '', NOW(), UTC_TIMESTAMP() FROM n"
+wp db query "INSERT INTO wp_postmeta (post_id, meta_key, meta_value) SELECT ID, 'pagesco_price', ROUND(5 + RAND() * 20, 2) FROM wp_posts WHERE post_name LIKE 'test-book-%'"
+wp cache flush
+wp eval-file pagesco-time-price.php
+wp db query "DELETE wp_posts, wp_postmeta FROM wp_posts LEFT JOIN wp_postmeta ON wp_postmeta.post_id = wp_posts.ID WHERE wp_posts.post_name LIKE 'test-book-%'"
+wp cache flush
+wp eval-file pagesco-time-price.php
+wp config delete SAVEQUERIES
+rm pagesco-time-price.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output (your times will differ)</h4>
+                            <pre><code>Success: Added the constant 'SAVEQUERIES' to the 'wp-config.php' file with the raw value 'true'.
+11 books: the price query took 0.34 ms
+Success: Query succeeded. Rows affected: 2000
+Success: Query succeeded. Rows affected: 2000
+Success: The cache was flushed.
+2011 books: the price query took 3.94 ms
+Success: Query succeeded. Rows affected: 4000
+Success: The cache was flushed.
+11 books: the price query took 0.38 ms
+Success: Deleted the constant 'SAVEQUERIES' from the 'wp-config.php' file.</code></pre>
+                        </div>
+                        <p>About a third of a millisecond for eleven books, about 4 ms for 2,011, and back to a third with the test books gone: the cost grew roughly in step with the number of rows MySQL has to sort, as the <code>EXPLAIN</code> predicted. At this catalog size, still nothing to worry about, and the query result is cached by <code>WP_Query</code> anyway. The <code>DELETE</code> with a join removed each test post with its meta in one statement (4,000 rows), and <code>wp cache flush</code> made sure no cached copy of them survived.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> The query report lists <code>pagesco_books_settings</code> under missing options on every request. What does that cost, and what fixes it?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="WordPress remembers a missing option, but only until the request ends. What happens on the next request?">
+                                A) Nothing after the first request: WordPress remembers missing options forever
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Each request asks the database once and learns that the row does not exist; an autoloaded row is read with all other autoloaded options, for no extra query.">
+                                B) One query per request; an autoloaded row for the option removes it
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The defaults come from register_setting and Settings::get(), so the page works. What is wasted, then?">
+                                C) The settings page breaks until the option is saved
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> A plugin stores a computed list with <code>wp_cache_set()</code> on a site without a persistent object cache. How long is the value kept?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Without an expiration argument, what limits the lifetime of a value in PHP's memory?">
+                                A) Until it is deleted, because no expiration was given
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That is a transient's storage. Where does the object cache keep values by default?">
+                                B) In wp_options, until it expires
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The default object cache is an array in PHP's memory, emptied at the end of every request; only a drop-in such as Redis keeps it between requests.">
+                                C) Until the end of the current request
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> Why does <code>EventsTable::find()</code> put <code>wp_cache_get_last_changed( 'pagesco_events' )</code> into its cache key?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="Every write renews the group's last-changed value, so all keys built before the write are never read again: no stale result without having to find and delete each entry.">
+                                A) So that every change to the table makes all older cached results unreachable
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Keys do not expire by themselves. What does flush_cache() change about the next key?">
+                                B) So that cached results expire after a day
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The arguments are in the key already, through md5(). What else does the answer depend on?">
+                                C) So that two different limits do not share an entry
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> The theme's hero image, from a pattern in a block template, has no <code>width</code>, <code>height</code> or <code>fetchpriority</code> in the HTML. Why did WordPress not add them, as it does for images in post content?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The image is a WebP, and WordPress supports WebP fully. What did the code return for the template context?">
+                                A) Because WebP images cannot have dimensions
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="wp_get_loading_optimization_attributes() returns early for the template context, and width and height are only added for Media Library images; the theme must take care of its own images.">
+                                B) Because WordPress skips loading optimizations for block templates, and the image is not in the Media Library
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Lazy loading is about when an image is fetched, not about which attributes WordPress adds. Look at the context argument.">
+                                C) Because the image is lazy-loaded by default
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> Your lab measurement on a laptop, with Slow 4G throttling, shows an LCP of 1.4 s for the front page. What can you conclude?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The Core Web Vitals thresholds apply to field data from real visitors. Whose device and network did you measure?">
+                                A) The site passes Core Web Vitals
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Lab numbers do vary, but on the same machine and settings they compare well. What are they good for?">
+                                B) Nothing: lab numbers are random
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Lab measurements compare changes on one machine with the same settings; real visitors' phones and networks, measured as field data after launch, decide the Core Web Vitals.">
+                                C) That a change you make can be compared against it on the same machine; field data from real visitors decides the rest
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Should I install a caching or optimization plugin?</summary>
+                    <p>On most real sites, yes, for page caching, if the host does not cache pages itself (many managed WordPress hosts do, and then a page caching plugin only adds a second layer to debug). Be careful with "optimize everything" plugins that combine, minify, defer and lazy-load automatically: each switch can break a script or slow the LCP image (Common Mistake 3). Turn features on one at a time, and measure each, with the snippet and the Performance panel, before and after.</p>
+                </details>
+                <details>
+                    <summary>Is the Book Filter's server rendering of up to 100 books a performance problem?</summary>
+                    <p>Measured: Find a Book makes 27 queries, the same as Dune's page, because <code>get_posts()</code> loads all books, their meta and their terms in a handful of queries, however many there are, and the cached version makes none. What grows with the catalog is the HTML (every book's card) and the state JSON. Past a few hundred books, the REST-backed "Load more" design from Lesson 7.2 is the better shape.</p>
+                </details>
+                <details>
+                    <summary>What about <code>autoload</code> for my plugin's other options?</summary>
+                    <p>Autoload what is read on most requests (settings, the database version), and nothing big that is rarely needed: every autoloaded option is loaded on every request, used or not. Site Health warns when autoloaded options pass 800 KB in total (Lesson 2.2). Transients without an expiration are autoloaded, a reason to always give one. <code>wp option list --autoload=on --fields=option_name,size_bytes</code> shows what a site loads.</p>
+                </details>
+                <details>
+                    <summary>Do <code>SCRIPT_DEBUG</code> and <code>WP_DEBUG</code> distort my measurements?</summary>
+                    <p>Yes, a little: <code>SCRIPT_DEBUG</code> loads unminified CSS and JavaScript (more bytes, and different inlining, as the Navigation stylesheet showed), and <code>SAVEQUERIES</code> or Query Monitor add work to every request. That is fine for comparing before and after on the same setup, which is what this lesson did. For absolute numbers, measure a staging copy with production settings (Lesson 8.4).</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Cache the shop's catalog route: make <code>GET /pagesco/v1/books</code> keep each answer (the books and the two total headers) in the object cache under a key made of the request's arguments and <code>wp_cache_get_last_changed( 'posts' )</code>, which core renews whenever any post is saved. Prove with the query report and the SQLite Object Cache that a repeated request makes no query, and that changing Dune's price with <code>wp post meta update</code> shows the new price at once. Then find the case this key misses: core renews <code>posts</code> when a post is saved, but does a meta update alone renew it? (Look for <code>wp_cache_set_posts_last_changed</code> in <code>wp-includes/post.php</code> and <code>default-filters.php</code>.)</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Think of a WordPress site you know that feels slow (or open one in Chrome with the Performance panel). Write down your guess for why, before measuring. Then measure: what is its LCP element, its CLS, how big is its HTML, how many external stylesheets and scripts does it load? Was your guess right? Write one change you would make first, and how you would prove that it helped.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Measure first, several times, one change at a time: <code>SAVEQUERIES</code> in <code>wp-config.php</code> and <code>$wpdb-&gt;queries</code> for the server, the Network and Performance panels for the browser</li>
+                        <li>Missing options cost a query per request; loops of <code>get_post_meta()</code> over IDs cost a query per item (N+1): <code>update_postmeta_cache()</code> loads them in one</li>
+                        <li><code>EXPLAIN</code> shows how a meta query runs: an index lookup by <code>meta_key</code>, then a sort that grows with the catalog</li>
+                        <li>The object cache remembers within a request; a persistent object cache (an <code>object-cache.php</code> drop-in with Redis or Memcached) keeps it between requests and moves transients out of <code>wp_options</code>; transients outlive requests on any site</li>
+                        <li>Cache with a plan to invalidate: keys that include <code>wp_cache_get_last_changed()</code>, renewed on every write</li>
+                        <li>Block themes load only the CSS of blocks on the page and inline it up to 40,000 bytes; script modules are deferred and loaded only where used; speculation rules prefetch the next page</li>
+                        <li>WordPress optimizes Media Library and content images (<code>srcset</code>, <code>sizes</code>, lazy loading, <code>fetchpriority</code>), but not a block theme's own template images: give them an aspect ratio, and preload the LCP image with <code>wp_preload_resources</code></li>
+                        <li>Core Web Vitals (LCP, INP, CLS) are judged on field data; local lab numbers are for comparing changes</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Record every query</td><td><code>wp config set SAVEQUERIES true --raw</code> (and <code>wp config delete SAVEQUERIES</code> afterwards)</td></tr>
+                            <tr><td>Count queries in code</td><td><code>$wpdb-&gt;num_queries</code>; the list: <code>$wpdb-&gt;queries</code> (SQL, seconds, caller)</td></tr>
+                            <tr><td>Load meta for many posts at once</td><td><code>update_postmeta_cache( $ids )</code></td></tr>
+                            <tr><td>Cache a query result</td><td><code>wp_cache_get( $key, $group )</code> / <code>wp_cache_set( $key, $value, $group )</code></td></tr>
+                            <tr><td>Invalidate a group's results</td><td>key with <code>wp_cache_get_last_changed( $group )</code>; <code>wp_cache_set_last_changed( $group )</code> on writes</td></tr>
+                            <tr><td>Empty the cache</td><td><code>wp cache flush</code></td></tr>
+                            <tr><td>Preload the LCP image</td><td><code>add_filter( 'wp_preload_resources', … 'as' =&gt; 'image', 'fetchpriority' =&gt; 'high' … )</code></td></tr>
+                            <tr><td>Reserve an image's space in a block</td><td>the Image block's <code>aspectRatio</code> attribute, or <code>width</code>/<code>height</code> for Media Library images</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You measured what the shop's pages cost the database, and found waste no code review would have spotted</li>
+                        <li>You ran WordPress with a persistent object cache and watched pages drop to zero queries</li>
+                        <li>You cached the events query correctly and proved that it never shows a stale answer</li>
+                        <li>You removed a query from every request and ten from every supplier refresh (and five thousand, one day, from a big catalog)</li>
+                        <li>You fixed the front page's layout shift and sped up its largest element, with lab numbers to prove it</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>The shop is fast enough for its visitors; next it should welcome more of them. In <a href="lesson_28.html"><strong>Lesson 8.3: Internationalization, Accessibility &amp; Distribution</strong></a> you generate the plugin's translation template with <code>wp i18n make-pot</code>, translate it into Spanish (PHP strings and the blocks' JavaScript), check the theme and blocks for accessibility (contrast, keyboard, an automated audit), and prepare the plugin for distribution: a <code>readme.txt</code>, a version number, the Plugin Check tool, and the opt-in "remove all data on uninstall" setting Lesson 5.4 promised.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure the instruments are gone: <code>wp config get SAVEQUERIES</code> should report that the constant is not defined, and <code>wp plugin list --status=dropin</code> should be empty</li>
+                    <li>Open the front page once more with the DevTools Performance panel and look at the LCP element and the layout shifts yourself</li>
+                    <li>Run Lesson 8.1's test suite once more (<code>npx @wordpress/env run cli --env-cwd=wp-content/plugins/pagesco-books vendor/bin/phpunit</code> in the plugin folder): today's cache in <code>EventsTable::find()</code> must not change a single result, and the twelve tests still pass (the test framework empties the object cache before every test, so a cached value never leaks from one test into the next)</li>
+                    <li>Lesson 8.3 installs the Spanish language files for WordPress and the Plugin Check plugin: keep the internet connection</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Performance advice is everywhere, and most of it is somebody's guess about somebody else's site. Today you learned to replace guesses with numbers: you counted, changed one thing, and counted again, and two of your four improvements were problems nobody would have found by reading the code. That habit, more than any trick, is what makes a developer trusted with a site that matters. When a client says "the site feels slow", you now know how to start: with a measurement.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_26.html" class="prev-lesson">← Previous: Debugging &amp; Testing</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_28.html" class="next-lesson">Next: Internationalization, Accessibility &amp; Distribution →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

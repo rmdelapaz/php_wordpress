@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facilitator Guide: Session 15</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">contains answers &amp; timing · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Facilitator Guide</div>
+    <h1>Session 15: Debugging, Testing and Performance</h1>
+    <p class="sub">How to teach Lessons 8.1 and 8.2: debugging with evidence instead of guesses (the debug log, a hook that logs, a backtrace, recovery mode, --skip-plugins), checks that machines run (PHPUnit in wp-env, shown as recorded; PHPCS to zero findings), and performance work that starts with a number: the query report, the object cache, N+1, and the Core Web Vitals of the front page.</p>
+    <div class="meta-row">
+      <span class="chip"><b>2</b> lessons</span>
+      <span class="chip"><b>3 hrs</b> session</span>
+      <span class="chip">Lessons <b>8.1–8.2</b></span>
+      <span class="chip">Session <b>15</b> of 18 · Part 2</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>How to Use This Guide</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Same rhythm for both lessons: frame (the goal and one mental model) → live demo (you type, they type along) → guided lab (a kit lab, new practice on the lesson's ideas) → start the lesson's own project. The lesson exercises, quiz and journal are homework.</li>
+  <li>Type, do not paste. Every command below was run to produce the output printed under it, on WordPress 7.1.3, PHP 8.5, MySQL 9.7 and WP-CLI 2.12: Lesson 8.1's demos on the site as Lesson 7.3 leaves it, Lesson 8.2's on the site as Lesson 8.1 leaves it, which is what your projector site has at that point. Four kinds of output are <b>recordings quoted from the lessons</b>, and say so: the PHPUnit runs in wp-env, the SQLite Object Cache, the browser measurements (LCP, CLS, INP) and the PHPCS reports of the project.</li>
+  <li>The lessons are the reference. Keep <code class="inline">lesson_26.html</code> and <code class="inline">lesson_27.html</code> open in browser tabs. Labs live in <code class="inline">labs/module-15/</code> (learners keep the folder in their project folder, next to compose.yaml): <code class="inline">_starter</code> files and <code class="inline">next_event_starter/</code> are handouts, <code class="inline">_solution</code> files and <code class="inline">next_event_solution/</code> are yours.</li>
+  <li>Each lesson was written for 150 minutes of work alone (Lesson 8.2: 150); the room has 130 minutes for both. The room does the mental models, the demos, two labs and the first three steps of each project; the tests in wp-env (8.1 Step 4), the browser measurements (8.2 Step 4) and the exercises go home. The Agenda says exactly what.</li>
+  <li>Part 2 (Sessions 9 to 18) builds on the site each lesson leaves; a learner who is a lesson behind does the guided labs from their own state and catches up on the projects at home. Teal blocks are hands-on, amber blocks are watch-outs. Lesson codes (8.1, 8.2) match the course site.</li>
+</ul>
+<div class="note warn"><div class="t">The #1 risk of Session 15: the tooling eats the session</div>
+<p>Lesson 8.1's project installs 34 Composer packages (PHPUnit, PHPCS, the WordPress Coding Standards) from the internet, and its tests need Node.js 22.13 or newer for wp-env, which downloads images and WordPress on its first start. Lesson 8.2 installs a plugin from WordPress.org. On venue Wi-Fi, all of it at once is half an hour of progress bars. <b>Before:</b> ask learners to run <code class="inline">composer update</code> in the plugin folder at home (Step 1 of Lesson 8.1, with the alias), and to start wp-env once (<code class="inline">npx @wordpress/env start</code>, then <code class="inline">stop</code>). <b>In the room:</b> the 8.1 project starts with <code class="inline">composer show --direct</code> on every machine; whoever has no packages yet runs <code class="inline">composer update</code> during the demo, not during the project. wp-env runs at home only. <b>Instead of installing in the room:</b> Query Monitor and the SQLite Object Cache are shown from the lesson's recorded cards; nothing later depends on either.</p>
+</div>
+
+  <div class="sec"><h2>Before the Session</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ <b>A week before:</b> remind learners that Lesson 8.1's Step 1 (<code class="inline">composer update</code>) and a first <code class="inline">npx @wordpress/env start</code> need the internet and Node.js 24 (Session 9's Part 2 check); ask them to do both at home and to bring the site as Lesson 7.3 leaves it (the 7.3 project finished, <code class="inline">wp cron event list</code> shows <code class="inline">pagesco_books_daily_sync</code>).</li>
+  <li>☐ <b>Run the kit check once:</b> <code class="inline">python3 labs/check_labs.py module-15</code> from this kit's folder (every line PASS; 14 results in about two minutes). With your own course project: <code class="inline">WP_LABS_COMPOSE=~/pagesco-dev python3 labs/check_labs.py module-15</code> (labs/README.md); <code class="inline">labs/module-15/l8_1-debugging-testing/test_next_event.sh</code> needs the site after Lesson 8.1's Step 2.</li>
+  <li>☐ <b>Projector machine:</b> the course site as Lesson 7.3 leaves it, a copy of it (or a database export) as Lesson 8.1 leaves it for the second half (<code class="inline">wp db export ~/s15-after-8-1.sql</code> after your own run-through of 8.1's project, and its plugin folder), the <code class="inline">wp</code> and <code class="inline">composer</code> shortcuts, VS Code on the plugin folder, two terminals (one for commands, one for <code class="inline">tail -f wordpress/wp-content/debug.log</code>), a browser with the Books screen as Maria, http://localhost:8025 (Mailpit) and Chrome's DevTools, plus <code class="inline">lesson_26.html</code> and <code class="inline">lesson_27.html</code>.</li>
+  <li>☐ <b>Rehearse the crash once:</b> activating <code class="inline">pagesco-crash</code> takes the whole site down for WP-CLI; know the <code class="inline">--skip-plugins</code> line by heart before you do it in front of the room, and delete the two recovery-mode options afterwards so the next run sends a fresh email.</li>
+  <li>☐ <b>Board, before learners arrive:</b> "symptom → suspects → evidence"; the debug constants table (local | production); the three piles of PHPCS findings (fix · auto-fix · document); the measuring loop "measure, change one thing, measure again"; and the request with its three places where time goes (server, network, browser).</li>
+  <li>☐ <b>Print or share:</b> the workbook (Session 15), sticky notes for help flags and the exit ticket.</li>
+</ul>
+<div class="blk warn"><div class="h">Known environment traps</div>
+<table class="timing">
+<thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td><code class="inline">composer update</code> hangs or fails with a network error</td><td>No internet, or a proxy</td><td>Pair with a neighbor whose plugin has vendor/ for the lab; run Step 1 at home. Nothing in the room's labs needs the packages except <code class="inline">test_next_event.sh</code>.</td></tr>
+<tr><td><code class="inline">Cannot create cache directory</code> in Composer's output</td><td>The course's composer container cannot write its cache folder</td><td>Harmless (Lesson 8.1's cards show it as <code class="inline">...</code>).</td></tr>
+<tr><td><code class="inline">phpunit</code> in wp-env: <code class="inline">Call to undefined method PHPUnit\Framework\TestSuite::empty()</code></td><td>The container's global PHPUnit 10.5</td><td><code class="inline">vendor/bin/phpunit</code> (Lesson 8.1, Common Mistake 2).</td></tr>
+<tr><td><code class="inline">npx @wordpress/env start</code> says the Node.js version is too old</td><td>wp-env 12 needs Node.js 22.13 or newer</td><td>Node.js 24 as in Lesson 6.1 (Session 9's check); at home.</td></tr>
+<tr><td><code class="inline">npx wp-env</code> installs something odd</td><td>The unscoped package is not WordPress's</td><td>Always <code class="inline">npx @wordpress/env</code>.</td></tr>
+<tr><td>Every WP-CLI command dies with the crash plugin's fatal error</td><td>WP-CLI loads all active plugins</td><td><code class="inline">wp --skip-plugins=pagesco-crash plugin deactivate pagesco-crash</code>.</td></tr>
+<tr><td>No recovery email the second time</td><td>Rate-limited: one per day per error (<code class="inline">recovery_mode_email_last_sent</code>)</td><td><code class="inline">wp option delete recovery_mode_email_last_sent recovery_keys</code>, as the lesson does.</td></tr>
+<tr><td>The query report's counts are one lower than the lesson's</td><td><code class="inline">can_compress_scripts</code> is created the first time an administrator opens wp-admin in a browser</td><td>Expected (the lesson says so); every comparison still holds.</td></tr>
+<tr><td>The Events page still makes a query after the events cache</td><td>No persistent object cache: the cache lasts one request</td><td>Expected; it pays off with Redis or Memcached (Lesson 8.4).</td></tr>
+<tr><td><code class="inline">Function print_emoji_styles is deprecated</code> after removing the emoji script</td><td>Only two of the three remove_action lines</td><td>All three lines of Exercise 1.</td></tr>
+<tr><td><code class="inline">Undefined global variable</code> in a lab script that uses <code class="inline">global $pagesco_x</code></td><td><code class="inline">wp eval-file --use-include</code> runs the file inside a function: its variables are local</td><td>Pass values as arguments, or a static variable in a function (<code class="inline">fake_supplier</code> does); <code class="inline">global $wpdb;</code> still works.</td></tr>
+</tbody>
+</table>
+</div>
+
+  <div class="sec"><h2>Session 15 Agenda (3 hours)</h2><span class="rule"></span></div>
+  <table class="timing">
+    <thead><tr><th>Clock</th><th>Minutes</th><th>Segment</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="t">0:00</td><td class="t">10</td><td>Warm-up</td><td>Five retrieval questions on Lessons 7.2 and 7.3, homework check (the 7.3 project and its pagesco-plan.txt note).</td></tr>
+      <tr><td class="t">0:10</td><td class="t">10</td><td><b>8.1</b> Frame and mental model</td><td>Debugging is detective work: evidence, not guesses. The debug constants, local against production. Unit and integration tests; a fake network.</td></tr>
+      <tr><td class="t">0:20</td><td class="t">20</td><td><b>8.1</b> Live demo</td><td>"Supplier not reachable" solved from the log, a notice traced to its file, a crash and recovery mode, --skip-plugins, the public debug.log; the recorded PHPUnit run.</td></tr>
+      <tr><td class="t">0:40</td><td class="t">15</td><td><b>8.1</b> Guided lab</td><td><code class="inline">labs/module-15/l8_1-debugging-testing/fake_supplier_starter.php</code>: the supplier client against four fake answers.</td></tr>
+      <tr><td class="t">0:55</td><td class="t">20</td><td><b>8.1</b> Start the lesson project</td><td>Lint and Test, Steps 1 to 3: development packages, the ruleset, the first report, fix, auto-fix or document, until composer lint exits 0. Step 4 (wp-env and the tests) goes home.</td></tr>
+      <tr><td class="t">1:15</td><td class="t">10</td><td>Break</td><td>Machines still running composer update keep running. Leave the "three piles" table (fix, auto-fix, document) on the board.</td></tr>
+      <tr><td class="t">1:25</td><td class="t">10</td><td><b>8.2</b> Frame and mental model</td><td>Measure before you optimize: the server, the network, the browser. The object cache, its persistent version, transients.</td></tr>
+      <tr><td class="t">1:35</td><td class="t">20</td><td><b>8.2</b> Live demo</td><td>First byte, SAVEQUERIES and a query report, the object cache within a request, N+1 counted, the lazy hero image; the persistent cache and the browser numbers as recorded in the lesson.</td></tr>
+      <tr><td class="t">1:55</td><td class="t">15</td><td><b>8.2</b> Guided lab</td><td><code class="inline">labs/module-15/l8_2-performance-caching/query_count_starter.php</code>: predict, then count, what five everyday calls cost.</td></tr>
+      <tr><td class="t">2:10</td><td class="t">25</td><td><b>8.2</b> Start the lesson project</td><td>A Faster Shop, Steps 1 to 3: the events cache with last-changed, the settings row, update_postmeta_cache(). Step 4 (the hero image, measured in the browser) and Step 5 go home.</td></tr>
+      <tr><td class="t">2:35</td><td class="t">15</td><td><b>8.1</b> + <b>8.2</b> Debrief</td><td>Before and after: lint 58 to 0, queries per page, 12 to 2. What each check proves and what it cannot. The Quality and Performance notes in pagesco-plan.txt.</td></tr>
+      <tr><td class="t">2:50</td><td class="t">10</td><td>Wrap-up</td><td>Exit ticket (3 questions), homework, bring list for Session 16.</td></tr>
+      <tr><td class="t"><b>Total</b></td><td class="t"><b>180</b></td><td></td><td>Ends at 3:00.</td></tr>
+    </tbody>
+  </table>
+<p><b>In the room.</b> The lesson pages estimate 150 + 150 = 300 minutes for a learner working alone, and after the warm-up, the break, the debrief and the wrap-up the room has 130. Each lesson keeps its shape (model, demo, lab, project start); the demos lean on the lessons' recorded cards for what needs the internet or a browser, and each project starts with the steps that are typing and reading (8.1 Steps 1 to 3, 8.2 Steps 1 to 3), not the ones that wait for downloads or a browser.</p>
+<p><b>Goes home (about 2 to 3 hours).</b> Lesson 8.1: Step 4, the test suite in wp-env (twelve tests green, one broken on purpose and fixed), the Quality note in pagesco-plan.txt. Lesson 8.2: Step 4 (the hero image's aspect ratio and preload, CLS and LCP measured in DevTools) and Step 5 (the before-and-after table, SAVEQUERIES and the report removed, <code class="inline">composer lint</code> 0). Both lessons' Hands-on Exercises, both Quick Quizzes, both journal entries, both "Before the Next Lesson" lists, and the labs not reached.</p>
+<p><b>Protect, in this order:</b> the 8.1 "Supplier not reachable" case (the habit of evidence the whole lesson teaches); the 8.1 project to a clean <code class="inline">composer lint</code> (every later lesson keeps it at 0); the 8.2 query report and the missing option (the measurement that finds what reading cannot); the 8.2 project Step 1 (the last-changed pattern). <b>Cut first:</b> the 8.1 public-log step and the 8.2 first-byte step (both are one curl the learners repeat at home), then the recorded PHPUnit cards (show only the green run), then the 8.2 lazy-image mistake (tell it, with the numbers).</p>
+
+  <div class="sec"><h2>Opening Segment</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">0:00</span><h3>Warm-up and Homework Check</h3><span class="dur">10 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Timing</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">6m</td><td>Five retrieval questions on Lessons 7.2 and 7.3 (workbook, Warm-up), pairs compare</td></tr>
+<tr><td class="t">4m</td><td>Homework check: the 7.3 project's checkpoint (<code class="inline">wp cron event list</code>, the Supplier column), the APIs note in pagesco-plan.txt</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Questions and answers</div>
+<ol class="steps">
+  <li><b>W1 (Lesson 7.3).</b> Name the three ways a call to the supplier can go wrong, and what wp_remote_get() returns for each. <b>Answer:</b> No answer at all (a WP_Error: DNS, refused, timeout); an answer that is not a success (an array with a 401 or 503 status); a success whose body is not the JSON you expect. Only the first is a WP_Error.</li>
+  <li><b>W2 (Lesson 7.3).</b> The Supplier column reads a transient. What happens when the transient has vanished? <b>Answer:</b> Availability::get() reads through: it calls the supplier, stores the answer again (12 hours, 5 minutes after an error) and returns it. A transient may vanish at any time, so code never relies on it being there.</li>
+  <li><b>W3 (Lesson 7.3).</b> Why does the lesson run the daily job with wp eval 'do_action( "pagesco_books_daily_sync" );' instead of wp cron event run? <b>Answer:</b> wp cron event run on a recurring event reschedules it to now plus the interval: the 03:00 job would move to whenever you ran it.</li>
+  <li><b>W4 (Lesson 7.2).</b> Your REST route returns a WP_Error without a status. What does the client get? <b>Answer:</b> A 500. The route's callback should give its WP_Error array( 'status' =&gt; 404 ) (or the right code); permission callbacks use rest_authorization_required_code().</li>
+  <li><b>W5 (Lesson 7.3).</b> Where do the supplier's address and key live on your site, and why there? <b>Answer:</b> In wp-config.php (PAGESCO_BOOKS_SUPPLIER_URL and _KEY, set with wp config set): configuration per environment, never in the plugin's code. Lesson 8.4 moves them to the server's environment.</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Watch-outs</div>
+<ul class="tick">
+  <li><b>A learner without the 7.3 state</b> (no supplier sandbox, no daily job): Lesson 8.1's case cannot be reproduced on their site. Pair them for the demo; their guided lab works anyway (<code class="inline">fake_supplier</code> fakes the supplier), and the 7.3 project is the first homework item.</li>
+  <li><b>W2 and W3 come back in today's demos:</b> the transient holds the evidence of the 8.1 case, and the 8.2 project's invalidation proof runs the daily job with <code class="inline">do_action()</code>.</li>
+</ul>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Lesson Plans</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">8.1</span><h3>Debugging &amp; Testing</h3><span class="dur">65 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Configure WP_DEBUG, the debug log and error display for development and production, and keep the log private</li>
+  <li>Trace a problem with error_log(), hooks such as http_api_debug and doing_it_wrong_run, and wp_debug_backtrace_summary()</li>
+  <li>Recover from a fatal error with recovery mode and WP-CLI's --skip-plugins, and use Query Monitor to look inside a request</li>
+  <li>Write PHPUnit integration tests with WP_UnitTestCase, factories and pre_http_request, and run them in a wp-env test environment</li>
+  <li>Set up PHPCS with the WordPress Coding Standards for a plugin, fix what it finds, and justify the exceptions with a ruleset or phpcs:ignore</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing in the room</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame: the detective (symptom, suspects, evidence); the debug constants; unit and integration tests, and why tests never use the network</td></tr>
+<tr><td class="t">20m</td><td>Live demo: the supplier case from the log, a backtrace, a crash and recovery mode, --skip-plugins, the public log, the recorded PHPUnit run</td></tr>
+<tr><td class="t">15m</td><td>Guided lab: <code class="inline">fake_supplier_starter.php</code></td></tr>
+<tr><td class="t">20m</td><td>Start the lesson project: Steps 1 to 3 (composer update, phpcs.xml.dist, fix, auto-fix, document, 0 findings)</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Mental model to say</div>
+<p>"Debugging is detective work. A symptom: the Supplier column says 'not reachable'. Suspects: the network, the address, the key, the code. Evidence rules them out, one by one. The worst habit is changing code until the symptom goes away. The best is making the program tell you what it is doing." Write <b>symptom → suspects → evidence</b> on the board.</p>
+<p>Then the two professional habits in one sentence each: "When something goes wrong, find out why with evidence: the log, a hook that logs, a backtrace, recovery mode. Before anything goes wrong, let machines check the code: tests that run the plugin inside a real WordPress, and PHPCS, which reads every line for what tests rarely catch."</p>
+<p>Then the testing picture: <b>unit tests</b> run one function without WordPress (fakes for WordPress), <b>integration tests</b> run your code in a freshly installed WordPress with a test database: WP_UnitTestCase, a rollback after each test, factories for data. "And one rule: tests never use the network. pre_http_request answers instead, so a test decides exactly what the supplier says, including its bad days."</p>
+</div>
+<div class="blk"><div class="h">Live demo (you type, they follow)</div>
+<p>In the WP-CLI container shell (<code class="inline">docker compose run --rm wpcli sh</code>) and the browser, on the site as Lesson 7.3 leaves it. The outputs below come from that site; on yours the time stamps differ and everything else matches.</p>
+<ol class="steps">
+  <li><b>The debug constants (2m).</b> "Since Lesson 1.2 your site runs with debugging on. Here is all of it, from the WP-CLI container."
+<pre class="code">wp eval 'foreach ( array( "WP_DEBUG", "WP_DEBUG_LOG", "WP_DEBUG_DISPLAY", "SCRIPT_DEBUG" ) as $name ) { printf( "%-17s %s\n", $name, var_export( constant( $name ), true ) ); } printf( "%-17s %s\n%-17s %s\n", "environment", wp_get_environment_type(), "error_log", ini_get( "error_log" ) );'</pre>
+<pre class="out">WP_DEBUG          true
+WP_DEBUG_LOG      true
+WP_DEBUG_DISPLAY  true
+SCRIPT_DEBUG      true
+environment       local
+error_log         /var/www/html/wp-content/debug.log</pre>
+Put the lesson's local-against-production table on the board next to it: display on here, never on a live site; the log here, outside the web root there (Lesson 8.4 sets that up).</li>
+  <li><b>A case: "Supplier not reachable" (5m).</b> "A colleague edited wp-config.php. A few minutes later Maria's Books screen says the supplier is not reachable. No guessing: evidence." Break the key by one character, then look as Maria:
+<pre class="code">wp config set PAGESCO_BOOKS_SUPPLIER_KEY 'sandbox-7f3a9d'
+wp transient delete pagesco_books_supplier_availability</pre>
+<pre class="out">Success: Updated the constant 'PAGESCO_BOOKS_SUPPLIER_KEY' in the 'wp-config.php' file with the value 'sandbox-7f3a9d'.
+Success: Transient deleted.
+Supplier not reachable</pre>
+Evidence 1, what the code already recorded (Availability keeps the error in its transient):
+<pre class="code">wp eval 'echo get_transient( "pagesco_books_supplier_availability" )["error"], "\n";'</pre>
+<pre class="out">The supplier answered 401: Send a valid API key in the X-Api-Key header.</pre>
+Evidence 2, make the code talk: save the lesson's temporary logger as <code class="inline">wordpress/wp-content/mu-plugins/pagesco-debug-http.php</code>, delete the cached failure, reload the Books screen, and read the new line of debug.log:
+<pre class="code"><span class="k">&lt;?php</span>
+<span class="c">/**
+ * Plugin Name: Pages &amp; Co. Debug: HTTP requests (temporary)
+ */</span>
+
+add_action(
+	<span class="s">'http_api_debug'</span>,
+	<span class="k">function</span> ( <span class="v">$response</span>, <span class="v">$context</span>, <span class="v">$transport</span>, <span class="v">$args</span>, <span class="v">$url</span> ) {
+		<span class="v">$key</span> = <span class="v">$args</span>[<span class="s">'headers'</span>][<span class="s">'X-Api-Key'</span>] ?? <span class="s">''</span>;
+		error_log(
+			sprintf(
+				<span class="s">'HTTP %s %s, key %s, answer %s'</span>,
+				<span class="v">$args</span>[<span class="s">'method'</span>],
+				strtok( <span class="v">$url</span>, <span class="s">'?'</span> ),
+				<span class="s">''</span> === <span class="v">$key</span> ? <span class="s">'none'</span> : substr( <span class="v">$key</span>, <span class="s">0</span>, <span class="s">8</span> ) . <span class="s">'…'</span>,
+				is_wp_error( <span class="v">$response</span> ) ? <span class="v">$response</span>-&gt;get_error_message() : wp_remote_retrieve_response_code( <span class="v">$response</span> )
+			)
+		);
+	},
+	<span class="s">10</span>,
+	<span class="s">5</span>
+);</pre>
+<pre class="out">[26-Oct-2026 13:22:07 UTC] HTTP GET http://localhost:8080/supplier-sandbox/v1/availability, key sandbox-…, answer 401</pre>
+"Right address, a key is sent, the answer is 401: the key is wrong, not the network or the code. And notice what the logger does NOT write: the whole key." The fix, the logger removed, the column refreshed:
+<pre class="code">wp config get PAGESCO_BOOKS_SUPPLIER_KEY
+wp config set PAGESCO_BOOKS_SUPPLIER_KEY 'sandbox-7f3a9c'
+rm wp-content/mu-plugins/pagesco-debug-http.php
+wp eval 'echo PagesCo\Books\Plugin::instance()-&gt;feature( PagesCo\Books\Supplier\Availability::class )-&gt;refresh()["error"] ?: "no error", "\n";'</pre>
+<pre class="out">sandbox-7f3a9d
+Success: Updated the constant 'PAGESCO_BOOKS_SUPPLIER_KEY' in the 'wp-config.php' file with the value 'sandbox-7f3a9c'.
+no error</pre></li>
+  <li><b>Who called that? A backtrace (4m).</b> "A 'called incorrectly' notice names the function, not the code that misused it. On a site with thirty plugins that is the question." Save the lesson's two must-use plugins (the one that asks too early, and the <code class="inline">0-</code> logger that loads before it), request /about/, read debug.log:
+<pre class="code"><span class="k">&lt;?php</span>
+<span class="c">/**
+ * Plugin Name: Too Early (a mistake to find)
+ */</span>
+
+<span class="k">if</span> ( is_search() ) {
+	remove_action( <span class="s">'wp_head'</span>, <span class="s">'wp_generator'</span> );
+}
+
+&lt;?php
+<span class="c">/**
+ * Plugin Name: Pages &amp; Co. Debug: who did it wrong? (temporary)
+ */</span>
+
+add_action(
+	<span class="s">'doing_it_wrong_run'</span>,
+	<span class="k">function</span> ( <span class="v">$function_name</span> ) {
+		error_log( <span class="s">"$function_name called incorrectly. Call stack: "</span> . wp_debug_backtrace_summary() );
+	}
+);</pre>
+The new lines of debug.log:
+<pre class="out">[26-Oct-2026 13:22:08 UTC] is_search called incorrectly. Call stack: require('wp-blog-header.php'), require_once('wp-load.php'), require_once('wp-config.php'), require_once('wp-settings.php'), include_once('/mu-plugins/pagesco-too-early.php'), is_search, _doing_it_wrong, do_action('doing_it_wrong_run'), WP_Hook-&gt;do_action, WP_Hook-&gt;apply_filters, {closure:/var/www/html/wp-content/mu-plugins/0-pagesco-debug-backtrace.php:8}
+[26-Oct-2026 13:22:08 UTC] PHP Notice:  Function is_search was called &lt;strong&gt;incorrectly&lt;/strong&gt;. Conditional query tags do not work before the query is run. Before then, they always return false. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 3.1.0.) in /var/www/html/wp-includes/functions.php on line 6260</pre>
+Read the first line from the left, outermost call first: WordPress loading, then <code class="inline">include_once('/mu-plugins/pagesco-too-early.php')</code>. That is the file. Then <code class="inline">rm wp-content/mu-plugins/pagesco-too-early.php wp-content/mu-plugins/0-pagesco-debug-backtrace.php</code>.</li>
+  <li><b>When the site goes down (5m).</b> "A plugin that crashes on every request, but only on init, so activation succeeds." Save <code class="inline">wordpress/wp-content/plugins/pagesco-crash/pagesco-crash.php</code> from the lesson, activate it, open the login page (a 'protected' page, where WordPress sends the recovery email):
+<pre class="code">wp plugin activate pagesco-crash</pre>
+<pre class="out">Plugin 'pagesco-crash' activated.
+Success: Activated 1 of 1 plugins.</pre>
+The login page (WP_DEBUG_DISPLAY shows PHP's own message; a live site shows only "There has been a critical error" with status 500):
+<pre class="out">Fatal error: Uncaught Error: Call to undefined function pagesco_crash_missing_function() in /var/www/html/wp-content/plugins/pagesco-crash/pagesco-crash.php:9
+Stack trace:
+#0 /var/www/html/wp-includes/class-wp-hook.php(353): pagesco_crash_test('')
+#1 /var/www/html/wp-includes/class-wp-hook.php(377): WP_Hook-&gt;apply_filters(NULL, Array)
+#2 /var/www/html/wp-includes/plugin.php(523): WP_Hook-&gt;do_action(Array)
+#3 /var/www/html/wp-settings.php(779): do_action('init')
+#4 /var/www/html/wp-config.php(142): require_once('/var/www/html/w...')
+#5 /var/www/html/wp-load.php(50): require_once('/var/www/html/w...')
+#6 /var/www/html/wp-login.php(12): require('/var/www/html/w...')
+#7 {main}
+  thrown in /var/www/html/wp-content/plugins/pagesco-crash/pagesco-crash.php on line 9</pre>
+Mailpit, the newest message (the <code class="inline">...</code> lines are the recovery link, different every time, and the PHP version):
+<pre class="out">From: WordPress &lt;wordpress@example.com&gt;
+To: wordpress@example.com
+Subject: [Pages &amp; Co.] Your Site is Experiencing a Technical Issue
+
+Howdy!
+
+WordPress has a built-in feature that detects when a plugin or theme causes a fatal error on your site, and notifies you with this automated email.
+
+In this case, WordPress caught an error with one of your plugins, Pages &amp; Co. Crash Test.
+
+First, visit your website (http://localhost:8080/) and check for any visible issues. Next, visit the page where the error was caught (http://localhost:8080/wp-login.php) and check for any visible issues.
+
+Please contact your host for assistance with investigating this issue further.
+
+If your site appears broken and you can't access your dashboard normally, WordPress now has a special "recovery mode". This lets you safely login to your dashboard and investigate further.
+
+...
+
+To keep your site safe, this link will expire in 1 day. Don't worry about that, though: a new link will be emailed to you if the error occurs again after it expires.
+
+When seeking help with this issue, you may be asked for some of the following information:
+WordPress version 7.1.3
+Active theme: Pages &amp;amp; Co. (version 1.0.0)
+Current plugin: Pages &amp; Co. Crash Test (version )
+...
+
+Error Details
+=============
+An error of type E_ERROR was caused in line 9 of the file /var/www/html/wp-content/plugins/pagesco-crash/pagesco-crash.php. Error message: Uncaught Error: Call to undefined function pagesco_crash_missing_function() in /var/www/html/wp-content/plugins/pagesco-crash/pagesco-crash.php:9
+Stack trace:
+#0 /var/www/html/wp-includes/class-wp-hook.php(353): pagesco_crash_test('')
+#1 /var/www/html/wp-includes/class-wp-hook.php(377): WP_Hook-&gt;apply_filters(NULL, Array)
+#2 /var/www/html/wp-includes/plugin.php(523): WP_Hook-&gt;do_action(Array)
+#3 /var/www/html/wp-settings.php(779): do_action('init')
+#4 /var/www/html/wp-config.php(142): require_once('/var/www/html/w...')
+#5 /var/www/html/wp-load.php(50): require_once('/var/www/html/w...')
+#6 /var/www/html/wp-login.php(12): require('/var/www/html/w...')
+#7 {main}
+  thrown</pre>
+"Now fix it from the command line." It does not work, because WP-CLI loads the same plugins (the stack is trimmed here):
+<pre class="code">wp plugin deactivate pagesco-crash</pre>
+<pre class="out">Fatal error: Uncaught Error: Call to undefined function pagesco_crash_missing_function() in /var/www/html/wp-content/plugins/pagesco-crash/pagesco-crash.php:9
+Stack trace:
+#0 /var/www/html/wp-includes/class-wp-hook.php(353): pagesco_crash_test('')
+#1 /var/www/html/wp-includes/class-wp-hook.php(377): WP_Hook-&gt;apply_filters(NULL, Array)
+#2 /var/www/html/wp-includes/plugin.php(523): WP_Hook-&gt;do_action(Array)
+...
+  thrown in /var/www/html/wp-content/plugins/pagesco-crash/pagesco-crash.php on line 9
+Error: There has been a critical error on this website.Learn more about troubleshooting WordPress. There has been a critical error on this website.</pre>
+<code class="inline">--skip-plugins</code> loads WordPress without it:
+<pre class="code">wp --skip-plugins=pagesco-crash plugin deactivate pagesco-crash
+wp plugin delete pagesco-crash
+wp option delete recovery_mode_email_last_sent recovery_keys</pre>
+<pre class="out">Plugin 'pagesco-crash' deactivated.
+Success: Deactivated 1 of 1 plugins.
+Deleted 'pagesco-crash' plugin.
+Success: Deleted 1 of 1 plugins.
+Success: Deleted 'recovery_mode_email_last_sent' option.
+Success: Deleted 'recovery_keys' option.</pre></li>
+  <li><b>Mistake 1: a debug log anyone can download (1m).</b> "Ask for the log like a stranger would."
+<pre class="code">curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/wp-content/debug.log
+curl -s http://localhost:8080/wp-content/debug.log | grep -c 'PHP '</pre>
+<pre class="out">200
+27</pre>
+200, and the second number is how many PHP messages a stranger can read (yours differs). Locally it does not matter; on a server, the log goes outside the web root (Lesson 8.4).</li>
+  <li><b>The tests, as recorded (3m).</b> "The lesson runs its twelve tests in a wp-env test environment on port 8889: a WordPress of its own, because the test library reinstalls its database on every run." Show the lesson's recorded run on the projector (wp-env needs Node.js and a minute to start; learners do it at home in Step 4):
+<pre class="code">npx @wordpress/env run cli --env-cwd=wp-content/plugins/pagesco-books vendor/bin/phpunit</pre>
+<pre class="out">ℹ Starting 'vendor/bin/phpunit' on the cli container.
+
+Installing...
+Running as single site... To run multisite, use -c tests/phpunit/multisite.xml
+Not running ajax tests. To execute these, use --group ajax.
+Not running ms-files tests. To execute these, use --group ms-files.
+Not running external-http tests. To execute these, use --group external-http.
+PHPUnit 9.6.38 by Sebastian Bergmann and contributors.
+
+............                                                      12 / 12 (100%)
+
+Time: 00:00.095, Memory: 46.50 MB
+
+OK (12 tests, 30 assertions)
+✔ Ran `vendor/bin/phpunit` in 'cli'. (in 2s 20ms)</pre>
+Then the red run after the one-character slip in Client.php (<code class="inline">$code &gt; 599</code>): the test names the exact code it expected. "A test that only asked 'is it an error?' would have passed."
+<pre class="out">PHPUnit 9.6.38 by Sebastian Bergmann and contributors.
+
+.........F..                                                      12 / 12 (100%)
+
+Time: 00:00.084, Memory: 46.50 MB
+
+There was 1 failure:
+
+1) PagesCo\Books\Tests\SupplierClientTest::test_turns_an_error_status_into_a_wp_error
+Failed asserting that two strings are identical.
+--- Expected
++++ Actual
+@@ @@
+-'pagesco_supplier_http_error'
++'pagesco_supplier_bad_response'
+
+/var/www/html/wp-content/plugins/pagesco-books/tests/SupplierClientTest.php:85
+
+FAILURES!
+Tests: 12, Assertions: 29, Failures: 1.
+✖ Command failed with exit code 1</pre></li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b>Changing code until the symptom disappears.</b> A learner edits Client.php to "fix" the 401. Coach: "What is your evidence? What did the transient say, what did the log say?" The answer was in wp-config.php all along. (Self-check Q2, the debug handout.)</li>
+  <li><b>Logging secrets.</b> The quick logger writes the whole API key, or the whole request. Coach: "Who reads this log, and for how long does it live?" Eight characters are enough to compare. (The debug handout's silent bug.)</li>
+  <li><b>Making PHPCS quiet instead of making the code right.</b> A plugin-wide exclude, or <code class="inline">// phpcs:ignore</code> without a rule and a reason. Coach with the three piles on the board: fix, auto-fix, document; every exception names its rule and says why. (Self-check Q5, the lesson quiz Q4.)</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<p><b>File:</b> learners copy <code class="inline">labs/module-15/l8_1-debugging-testing/fake_supplier_starter.php</code> into wordpress/ and run it with <code class="inline">wp eval-file --use-include</code>; your reference is <code class="inline">labs/module-15/l8_1-debugging-testing/fake_supplier_solution.php</code>. It practices the lesson's central testing idea on the learner's own site, without wp-env: each check fakes one answer of the supplier with <code class="inline">pre_http_request</code> and asserts the exact error code the client returns.</p>
+<ul class="tick">
+  <li><b>Run it as shipped (2m).</b> <code class="inline">cp labs/module-15/l8_1-debugging-testing/fake_supplier_starter.php wordpress/</code> then <code class="inline">wp eval-file --use-include fake_supplier_starter.php</code>: check 1 passes, checks 2 to 4 print TODO.</li>
+  <li><b>Checks 2 to 4 in pairs (10m).</b> Each is one <code class="inline">pagesco_lab_fake()</code> call (the answer) and one <code class="inline">pagesco_lab_check()</code> (the condition). Circulate for <code class="inline">get_error_data()['status']</code> compared with <code class="inline">'401'</code> (a string: <code class="inline">===</code> fails) and for check 4, where the fake returns a WP_Error instead of an array.</li>
+  <li><b>Expected when done:</b></li>
+</ul>
+<pre class="out">PASS a good answer is keyed by ISBN
+PASS a 401 becomes pagesco_supplier_http_error with the status in its data
+PASS a 200 that is not JSON becomes pagesco_supplier_bad_response
+PASS a network failure comes back unchanged
+4 of 4 checks passed, 4 requests answered by the fake, none by the network</pre><ul class="tick">
+  <li><b>Debrief (3m):</b> "Why does the last line say none by the network?" (The filter answered every request; the sandbox was never called: the test would pass on a train.) "Which check would have caught the <code class="inline">$code &gt; 599</code> slip of the lesson's red run?" (Check 2.)</li>
+  <li><b>Fast finishers:</b> <code class="inline">labs/module-15/l8_1-debugging-testing/debug_supplier_log.php</code> (two Warnings and a silent bug in what it logs), then the folder lab <code class="inline">labs/module-15/l8_1-debugging-testing/next_event_starter/</code> with <code class="inline">labs/module-15/l8_1-debugging-testing/test_next_event.sh</code> once their project has the packages (a must-use plugin to zero PHPCS findings).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Start the lesson project</div>
+<p>The lesson project is <b>Lint and Test the Plugin</b>. In the room: Steps 1 to 3 (20 minutes), the coding standards to zero findings; the test suite (Step 4) needs wp-env and goes home.</p>
+<ul class="tick">
+  <li>Step 1: the new composer.json, the <code class="inline">composer</code> alias, <code class="inline">composer update</code> (or <code class="inline">composer show --direct</code> for learners who ran it at home), three packages listed.</li>
+  <li>Step 2: <code class="inline">phpcs.xml.dist</code> from the lesson, then <code class="inline">composer lint -- --report=summary</code>. The recorded report (yours matches it, file for file):</li>
+</ul>
+<pre class="out">Composer could not detect the root package (pagesco/pagesco-books) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version
+
+PHP CODE SNIFFER REPORT SUMMARY
+----------------------------------------------------------------------
+FILE                                                  ERRORS  WARNINGS
+----------------------------------------------------------------------
+uninstall.php                                         0       3
+src/EventsTable.php                                   1       5
+src/Plugin.php                                        0       1
+src/blocks/book-filter/render.php                     18      3
+src/blocks/book-list/render.php                       13      2
+src/blocks/book-list/variations.php                   4       0
+src/Rest/BooksEndpoint.php                            3       3
+src/Rest/EventsEndpoint.php                           2       0
+----------------------------------------------------------------------
+A TOTAL OF 41 ERRORS AND 17 WARNINGS WERE FOUND IN 8 FILES
+----------------------------------------------------------------------
+PHPCBF CAN FIX 6 OF THESE SNIFF VIOLATIONS AUTOMATICALLY
+----------------------------------------------------------------------
+
+...
+
+Script phpcs handling the lint event returned with error code 2</pre><ul class="tick">
+  <li>Step 3: the decision table, read aloud row by row before anyone edits: <code class="inline">composer lint:fix</code> (6 fixed), the parameter rename, the phpcs:ignore comments (the lesson's sed commands, or by hand), <code class="inline">npm run build</code>, the full ruleset, then <code class="inline">composer lint; echo "exit status $?"</code> until it says 0.</li>
+  <li><b>Done in the room</b> = <code class="inline">exit status 0</code> and the Find a Book count line still <code class="inline">Showing 2 of 11 books</code>. <b>Goes home:</b> Step 4 (.wp-env.json, phpunit.xml.dist, the bootstrap, four test classes, the green run, the red run on purpose) and the Quality note.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<p>Ask these out loud during the demo and the lab:</p>
+<ul class="tick">
+  <li>The Books screen says "Supplier not reachable". Where do you look first? <b>Answer:</b> at what the code already recorded: the transient's <code class="inline">error</code> (the 401 message), then make the code talk with an <code class="inline">http_api_debug</code> logger.</li>
+  <li>Which page triggers the recovery email: the home page or wp-login.php? <b>Answer:</b> a protected page such as wp-login.php or wp-admin; and at most once a day per error.</li>
+  <li>Why does a test fake the supplier instead of calling the sandbox? <b>Answer:</b> so the test controls the answer, bad days included, and passes or fails because of your code only (lesson quiz Q3).</li>
+  <li>PHPCS flags <code class="inline">echo get_block_wrapper_attributes();</code>. Wrap it in esc_html()? <b>Answer:</b> no: core escapes it; a <code class="inline">phpcs:ignore</code> for that rule on that line, with the reason (lesson quiz Q4).</li>
+</ul>
+<p>Workbook self-check, items Q1 to Q6 (learners do them at the end of the block or at home).</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q1</b> <span data-sc="1">B) A file outside the web root, such as <code class="inline">/home/pagesco/logs/wordpress.log</code></span>; <b>Q2</b> <span data-sc="2"><code class="inline">pagesco_supplier_http_error 503</code></span>; <b>Q3</b> <span data-sc="3">D) <code class="inline">wp --skip-plugins=pagesco-crash plugin deactivate pagesco-crash</code></span>; <b>Q4</b> <span data-sc="4">A) Must-use plugins load in alphabetical order: it must be there before the plugin that asks too early</span>; <b>Q5</b> <span data-sc="5">C) Excluded that rule for those two file patterns in phpcs.xml.dist, with a comment: WordPress includes them inside a function, so the variables are local</span>; <b>Q6</b> <span data-sc="6"><code class="inline">npx @wordpress/env run cli --env-cwd=wp-content/plugins/pagesco-books vendor/bin/phpunit</code>: the plugin's own PHPUnit 9.6; the container's global phpunit is 10.5, which the WordPress 7.1 test library does not support</span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> learners new to testing do the guided lab with the lesson's SupplierClientTest open next to it: each <code class="inline">pagesco_lab_check()</code> is one <code class="inline">assertSame()</code>. For PHPCS, hand out the decision table as the only reference: every finding goes into one of three piles.</p>
+<p><b>Stretch:</b> <code class="inline">debug_supplier_log.php</code> and the PHPCS folder lab; the lesson's Exercise 1 (SettingsTest) and Exercise 3 (what PHPCS sees in insecure code); the Bonus Challenge (PHPCompatibilityWP and a render_block() test).</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">8.2</span><h3>Performance &amp; Caching</h3><span class="dur">70 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Measure what a request costs with SAVEQUERIES and $wpdb-&gt;queries, read an EXPLAIN of a meta query, and recognize missing options and N+1 queries</li>
+  <li>Explain the object cache, its persistent version and transients, choose between them, and cache your own query with a key that is invalidated when the data changes</li>
+  <li>Describe how WordPress 7.1 loads block CSS, script modules and classic scripts, and use wp_preload_resources and fetchpriority where they help</li>
+  <li>Explain srcset, sizes, lazy loading and why block templates get no automatic image optimization</li>
+  <li>Measure LCP, CLS and interaction timing in a browser, and say honestly what a local lab measurement can and cannot tell you</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing in the room</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame: the line at the register; three places where time goes; object cache, persistent cache, transients</td></tr>
+<tr><td class="t">20m</td><td>Live demo: first byte, SAVEQUERIES and the query report, the object cache, N+1, the lazy hero image, the recorded numbers</td></tr>
+<tr><td class="t">15m</td><td>Guided lab: <code class="inline">query_count_starter.php</code></td></tr>
+<tr><td class="t">25m</td><td>Start the lesson project: Steps 1 to 3 (the events cache, the settings row, update_postmeta_cache)</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Mental model to say</div>
+<p>"A busy Saturday at Pages &amp; Co., a long line at the register. You could hire a second cashier, buy a faster card reader or move the gift wrapping. A good manager first stands next to the register for ten minutes with a notepad: if the time goes into wrapping, the card reader money is wasted." Then the rule on the board: <b>measure, change one thing, measure again</b>.</p>
+<p>Then the three places, each with its tool: "The <b>server</b> builds the HTML (SAVEQUERIES, the query report). The <b>network</b> carries it and every file it names (View Source, the Network panel). The <b>browser</b> turns it into pixels (Core Web Vitals: LCP, INP, CLS)."</p>
+<p>Then the caches, as a table on the board: the <b>object cache</b> remembers within one request; a <b>persistent object cache</b> (an object-cache.php drop-in: Redis, Memcached) keeps it between requests; a <b>transient</b> outlives the request on any site, in wp_options or in the persistent cache. "And every cache needs an invalidation plan: a key that knows when the data changed."</p>
+</div>
+<div class="blk"><div class="h">Live demo (you type, they follow)</div>
+<p>From the project folder and the WP-CLI container, on the site as Lesson 8.1 leaves it. Recorded cards (the persistent cache, the browser numbers) are marked as such.</p>
+<ol class="steps">
+  <li><b>How long until the first byte? (2m).</b> "Before any idea, a number." Three pages, the server's share of the time (yours differ, and differ between two runs: run it twice):
+<pre class="code">for page in / /books/dune/ /find-a-book/; do
+  curl -s -o /dev/null -w "$page  %{http_code}  %{size_download} bytes  first byte after %{time_starttransfer} s\n" "http://localhost:8080$page"
+done</pre>
+<pre class="out">/  200  84295 bytes  first byte after 0.398305 s
+/books/dune/  200  80250 bytes  first byte after 0.057047 s
+/find-a-book/  200  83202 bytes  first byte after 0.053838 s</pre>
+"The first one is slower: PHP compiling WordPress after a restart. Never trust one measurement; change one thing at a time."</li>
+  <li><b>What a page costs the database (5m).</b> "SAVEQUERIES in wp-config.php records every query of the request, with its caller." One get_posts() from WP-CLI:
+<pre class="code">wp config set SAVEQUERIES true --raw
+wp eval 'global $wpdb; $start = count( $wpdb-&gt;queries ); get_posts( array( "post_type" =&gt; "book", "posts_per_page" =&gt; 2 ) ); foreach ( array_slice( $wpdb-&gt;queries, $start ) as $query ) { $caller = explode( ", ", $query[2] ); printf( "%-58s %s\n", substr( preg_replace( "/\s+/", " ", $query[0] ), 0, 58 ), end( $caller ) ); }'</pre>
+<pre class="out">Success: Added the constant 'SAVEQUERIES' to the 'wp-config.php' file with the raw value 'true'.
+SELECT wp_posts.ID FROM wp_posts WHERE 1=1 AND wp_posts.po WP_Query-&gt;get_posts
+SELECT wp_posts.* FROM wp_posts WHERE ID IN (40,39)        _prime_post_caches
+SELECT post_id, meta_key, meta_value FROM wp_postmeta WHER update_meta_cache
+SELECT DISTINCT t.term_id, tr.object_id FROM wp_terms AS t WP_Term_Query-&gt;get_terms
+SELECT t.*, tt.* FROM wp_terms AS t INNER JOIN wp_term_tax _prime_term_caches</pre>
+Five queries for two books: the IDs, the posts, their meta, their genres (two). Then the lesson's query report, <code class="inline">wordpress/wp-content/mu-plugins/pagesco-query-report.php</code>, and five addresses as an anonymous visitor:
+<pre class="code">for page in / /books/dune/ /find-a-book/ /events/ "/wp-json/pagesco/v1/books?orderby=price"; do
+  curl -s -o /dev/null "http://localhost:8080$page"
+done</pre>
+<pre class="out">[26-Oct-2026 13:22:22 UTC] /: 24 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings
+[26-Oct-2026 13:22:22 UTC] /books/dune/: 27 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings
+[26-Oct-2026 13:22:22 UTC] /find-a-book/: 27 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings
+[26-Oct-2026 13:22:22 UTC] /events/: 24 queries; missing options: WPLANG, can_compress_scripts, pagesco_books_settings, site_logo
+[26-Oct-2026 13:22:22 UTC] /wp-json/pagesco/v1/books: 14 queries; missing options: WPLANG, can_compress_scripts, pagesco_books_settings, medium_crop, medium_large_crop, large_crop</pre>
+Point at the missing options: <code class="inline">pagesco_books_settings</code> costs one query on every page and every REST request, to learn that there is nothing. "No code review finds that; a measurement does. The project removes it."</li>
+  <li><b>What WordPress remembers, and for how long (4m).</b> "Why only two dozen? Because WordPress caches." Two meta values, one query; the same WP_Query twice:
+<pre class="code">wp eval 'global $wpdb; $before = $wpdb-&gt;num_queries; get_post_meta( 30, "pagesco_price", true ); get_post_meta( 30, "pagesco_author", true ); echo $wpdb-&gt;num_queries - $before, " query for two meta values\n";'
+wp eval 'global $wpdb; $args = array( "post_type" =&gt; "book", "meta_key" =&gt; "pagesco_price", "orderby" =&gt; "meta_value_num", "posts_per_page" =&gt; 3 ); $start = $wpdb-&gt;num_queries; $first = new WP_Query( $args ); $middle = $wpdb-&gt;num_queries; $second = new WP_Query( $args ); printf( "first query: %d database queries, the same query again: %d\n", $middle - $start, $wpdb-&gt;num_queries - $middle );'</pre>
+<pre class="out">1 query for two meta values
+first query: 6 database queries, the same query again: 0</pre>
+"But in PHP's memory, which ends with the request." Two WP-CLI commands are two requests:
+<pre class="code">wp eval 'wp_cache_set( "note", "Gatsby: back November 15", "pagesco_demo" ); var_dump( wp_cache_get( "note", "pagesco_demo" ) );'
+wp eval 'var_dump( wp_cache_get( "note", "pagesco_demo" ) );'</pre>
+<pre class="out">string(24) "Gatsby: back November 15"
+bool(false)</pre>
+Then the recorded persistent cache (the lesson's SQLite Object Cache needs the internet; show the card): after <code class="inline">wp cache flush</code>, round 1 fills the cache, round 2 is the steady state of a busy site:
+<pre class="out">[26-Oct-2026 06:01:59 UTC] /: 23 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings
+[26-Oct-2026 06:02:00 UTC] /books/dune/: 11 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings
+[26-Oct-2026 06:02:00 UTC] /find-a-book/: 10 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings
+[26-Oct-2026 06:02:00 UTC] /events/: 6 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings
+[26-Oct-2026 06:02:00 UTC] /wp-json/pagesco/v1/books: 5 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings, medium_crop, medium_large_crop, large_crop
+[26-Oct-2026 06:02:00 UTC] /: 0 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings, medium_crop, medium_large_crop, large_crop
+[26-Oct-2026 06:02:00 UTC] /books/dune/: 0 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings, medium_crop, medium_large_crop, large_crop
+[26-Oct-2026 06:02:00 UTC] /find-a-book/: 0 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings, medium_crop, medium_large_crop, large_crop
+[26-Oct-2026 06:02:00 UTC] /events/: 1 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings, medium_crop, medium_large_crop, large_crop
+[26-Oct-2026 06:02:00 UTC] /wp-json/pagesco/v1/books: 0 queries; missing options: WPLANG, can_compress_scripts, site_logo, pagesco_books_settings, medium_crop, medium_large_crop, large_crop</pre></li>
+  <li><b>Mistake 2: N+1, counted (3m).</b> "The supplier feature collects the catalog's ISBNs. What does that cost?" Save the lesson's <code class="inline">wordpress/pagesco-count-isbns.php</code> (it calls the private method through ReflectionMethod) and run it:
+<pre class="code">wp eval-file pagesco-count-isbns.php</pre>
+<pre class="out">11 ISBNs, 12 queries:
+  1 x SELECT wp_posts.ID FROM wp_posts WHERE N=N AND wp_posts.post_type = 'book' AND ((wp_posts.
+ 11 x SELECT post_id, meta_key, meta_value FROM wp_postmeta WHERE post_id IN (N) ORDER BY meta_i</pre>
+"One query for the IDs, then one per book. Eleven books, eleven; five thousand, five thousand. The fix is two lines, in the project."</li>
+  <li><b>Mistake 3: lazy-loading the image that matters most (4m).</b> "The hero image, as the theme's pattern wrote it:"
+<pre class="out">&lt;img src="http://localhost:8080/wp-content/themes/pagesco/assets/images/book-image.webp" alt="A hardcover book with a black-and-white photo on its cover" style="width:280px"/&gt;</pre>
+No width, no height, no fetchpriority: WordPress skips block templates. Then the lesson's "lazy-load everything" must-use plugin, <code class="inline">mistake-lazy.php</code>:
+<pre class="code"><span class="k">&lt;?php</span>
+<span class="c">/**
+ * Plugin Name: Mistake: Lazy-Load Every Image
+ */</span>
+
+add_filter(
+	<span class="s">'render_block_core/image'</span>,
+	<span class="k">function</span> ( <span class="v">$html</span> ) {
+		<span class="v">$image</span> = <span class="k">new</span> WP_HTML_Tag_Processor( <span class="v">$html</span> );
+		<span class="k">if</span> ( <span class="v">$image</span>-&gt;next_tag( <span class="s">'img'</span> ) ) {
+			<span class="v">$image</span>-&gt;set_attribute( <span class="s">'loading'</span>, <span class="s">'lazy'</span> );
+		}
+		<span class="k">return</span> <span class="v">$image</span>-&gt;get_updated_html();
+	}
+);</pre>
+<pre class="out">&lt;img loading="lazy" src="http://localhost:8080/wp-content/themes/pagesco/assets/images/book-image.webp" alt="A hardcover book with a black-and-white photo on its cover" style="width:280px"/&gt;</pre>
+In the lesson's lab measurement (Chromium, Slow 4G) LCP went from about 1480 ms to about 2012 ms: "no message tells you". Then <code class="inline">rm pagesco-count-isbns.php wp-content/mu-plugins/mistake-lazy.php wp-content/mu-plugins/pagesco-query-report.php; wp config delete SAVEQUERIES</code>.</li>
+  <li><b>Core Web Vitals, honestly (2m).</b> Show the lesson's console snippet and its recorded numbers: LCP about 1480 ms with the hero image as the LCP element, CLS 0.101 (over 0.1), interactions on the Book Filter 16 ms. Say: "Lab numbers compare a change on one machine. Field data from real visitors, after the launch, decides the rest."</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b>Optimizing without a number.</b> "I added a cache, it feels faster." Coach: "What was the count before, and after? Same page, same machine, twice." (The guided lab, self-check Q7.)</li>
+  <li><b>A cache nobody clears.</b> A learner caches the shortcode's HTML for a day. Coach: "Add an event. When does the page show it?" Then the last-changed pattern: the key changes when the data does. (Lesson Mistake 1, self-check Q10, the debug handout.)</li>
+  <li><b>Trusting a warm cache.</b> N+1 disappears behind a persistent cache and comes back after <code class="inline">wp cache flush</code>. Coach: "Measure with an empty cache." (Self-check Q9.)</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<p><b>File:</b> <code class="inline">labs/module-15/l8_2-performance-caching/query_count_starter.php</code>; your reference is <code class="inline">labs/module-15/l8_2-performance-caching/query_count_solution.php</code>. It practices the lesson's measuring habit on five calls learners already write every day: each row runs a call twice and prints its queries, so the object cache becomes visible. The rule of the lab: <b>write the prediction in the comment before you run.</b></p>
+<ul class="tick">
+  <li><b>Run it as shipped (2m).</b> <code class="inline">cp labs/module-15/l8_2-performance-caching/query_count_starter.php wordpress/</code>, <code class="inline">wp eval-file --use-include query_count_starter.php</code>: row 1 (an autoloaded option: 0 and 0), then TODO.</li>
+  <li><b>Rows 2 to 6 in pairs (10m).</b> Predict, then write the <code class="inline">pagesco_lab_row()</code> call. Circulate for row 5: <code class="inline">pagesco_lab_forget_meta()</code> first, or row 4's WP_Query has already cached some of the meta and the count is lower.</li>
+  <li><b>Expected when done:</b></li>
+</ul>
+<pre class="out">call                                                                     first     again
+get_option( 'blogname' )                                                     0         0
+get_option( 'pagesco_lab_missing' )                                          1         0
+get_post_meta( 33, 'pagesco_price' ) and 'pagesco_author'                    1         0
+WP_Query: the three cheapest books                                           6         0
+get_post_meta() over 11 books, one by one                                   11         0
+get_post_meta() over 11 books, after update_postmeta_cache()                 1         0</pre><ul class="tick">
+  <li><b>Debrief (3m):</b> "Which predictions were wrong?" (Usually row 2: a missing option costs one query, then none; and row 4's six.) "Which row is the supplier feature's lookup before the project, and which after?" (Rows 5 and 6.)</li>
+  <li><b>Fast finishers:</b> <code class="inline">labs/module-15/l8_2-performance-caching/cheapest_cache_starter.php</code> (the last-changed pattern on a query of their own), <code class="inline">labs/module-15/l8_2-performance-caching/page_weight_starter.sh</code> (what the pages download), then <code class="inline">labs/module-15/l8_2-performance-caching/debug_events_cache.php</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Start the lesson project</div>
+<p>The lesson project is <b>A Faster Shop, with Numbers</b>: four improvements, each measured. In the room: Steps 1 to 3 (25 minutes); the hero image (Step 4) needs a browser with DevTools and time, and goes home with Step 5.</p>
+<ul class="tick">
+  <li>Before Step 1: the query report and SAVEQUERIES from the demo stay on (the lesson says so). Learners who skipped the demo create both now.</li>
+  <li>Step 1: the new EventsTable.php (type it: the key, <code class="inline">is_array()</code>, <code class="inline">flush_cache()</code> in install, add and delete_before), the measurement, and the invalidation proof with the past event and <code class="inline">do_action( "pagesco_books_daily_sync" )</code>. Learners without the SQLite Object Cache (no internet) skip its rounds: the proof works without it.</li>
+  <li>Step 2: the new Activator.php, deactivate and activate, the empty autoloaded row (<code class="inline">a:0:{}</code>, <code class="inline">auto</code>), the five addresses again: one query fewer each.</li>
+  <li>Step 3: Mistake 2's script, the two lines with sed (or by hand), 12 queries to 2, <code class="inline">refresh()</code> still finds 11 books.</li>
+  <li><b>Done in the room</b> = the settings row exists and <code class="inline">pagesco-count-isbns.php</code> says 2 queries. <b>Goes home:</b> Step 4 (pattern edit, <code class="inline">pagesco_preload_hero_image()</code>, measured with the console snippet and Slow 4G) and Step 5 (the table, the instruments removed, <code class="inline">composer lint</code> 0).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<p>Ask these out loud during the demo and the lab:</p>
+<ul class="tick">
+  <li>The report lists pagesco_books_settings under missing options on every request. What does it cost? <b>Answer:</b> one query per request; an autoloaded row removes it (lesson quiz Q1).</li>
+  <li>A value stored with wp_cache_set(), no persistent cache: how long does it live? <b>Answer:</b> until the end of the request (lesson quiz Q2, self-check Q8).</li>
+  <li>Why the group's last-changed value in the key? <b>Answer:</b> every write renews it, so every older cached result becomes unreachable without anyone deleting it (lesson quiz Q3).</li>
+  <li>A laptop measurement says LCP 1.4 s. What do you know? <b>Answer:</b> a baseline to compare a change against on the same machine; field data decides the rest (lesson quiz Q5).</li>
+</ul>
+<p>Workbook self-check, items Q7 to Q12 (learners do them at the end of the block or at home).</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q7</b> <span data-sc="7"><code class="inline">1</code></span>; <b>Q8</b> <span data-sc="8">B) <code class="inline">bool(false)</code></span>; <b>Q9</b> <span data-sc="9">C) 501 queries; the fix is update_postmeta_cache( $ids ) before the loop: 2 queries</span>; <b>Q10</b> <span data-sc="10">B) A cached empty result, array(), would count as a miss: a location without events would query the database on every call</span>; <b>Q11</b> <span data-sc="11">D) The hero image had no reserved space; the Image block's aspectRatio attribute fixed it</span>; <b>Q12</b> <span data-sc="12"><code class="inline">wp_preload_resources</code>, with <code class="inline">'fetchpriority' =&gt; 'high'</code> (and <code class="inline">'as' =&gt; 'image'</code>)</span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> a learner who is lost in the numbers gets one question per row: "first time, second time, why the difference?" The table in the lesson's Step 5 is the map; every row of it is one step.</p>
+<p><b>Stretch:</b> <code class="inline">cheapest_cache_starter.php</code> and <code class="inline">debug_events_cache.php</code>; the lesson's Exercise 3 (the price query at two thousand books) and the Bonus Challenge (caching the catalog route, and the case its key misses).</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Debrief</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">2:35</span><h3>Before and After: What the Checks Prove</h3><span class="dur">15 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Sequence</div>
+<ul class="tick">
+  <li><b>Two numbers per lesson (5m).</b> Ask pairs for their before and after: PHPCS 58 findings to 0 (or how far they got); <code class="inline">pagesco-count-isbns.php</code> 12 queries to 2; the missing option gone. Write them on the board next to the morning's "measure, change one thing, measure again".</li>
+  <li><b>What each check proves, and what it cannot (5m).</b> composer lint: the code follows the standard and escapes, prepares, checks nonces where it can see it; not that it works. The tests: the behaviors they name, on a fresh WordPress; not the browser, not the theme. The query report: the server's work; not what the visitor feels. Lab Web Vitals: a comparison on one machine; not the field. "Which of these would have caught the 401 of this morning?" (None: the log did. Debugging and testing are two different habits.)</li>
+  <li><b>The notes (5m).</b> Learners write the Quality and Performance headings into pagesco-plan.txt now, with today's numbers. Lesson 9.1's final project asks for exactly this kind of proof ("composer lint clean, the PHPUnit suite green in wp-env, the numbers before and after").</li>
+</ul>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Closing</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Exit ticket (3 questions, no notes, 4 minutes)</div>
+<p>Put the three questions on the slide. Learners answer in the workbook's Exit Ticket box or on a sticky note and leave it on the way out. Question 2's pile tells you whether Session 16's warm-up repeats the last-changed pattern.</p>
+<ol class="steps">
+  <li>A live site shows "There has been a critical error on this website." Name two places to look, and one command that still works when a plugin is the cause. <b>Answer:</b> the server's error log (or debug.log on development), the recovery mode email; <code class="inline">wp --skip-plugins=&lt;plugin&gt; plugin deactivate &lt;plugin&gt;</code>.</li>
+  <li>Why does EventsTable::find() put <code class="inline">wp_cache_get_last_changed( 'pagesco_events' )</code> into its cache key? <b>Answer:</b> every change to the table renews it (flush_cache()), so after a write every old key is unreachable and no stale list is ever read.</li>
+  <li>Name one thing a lab measurement on your laptop can tell you, and one it cannot. <b>Answer:</b> whether a change made the page better or worse on the same machine; not what real visitors on their phones experience (field data, after the launch).</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Homework (about 2 to 3 hours)</div>
+<ul class="tick">
+  <li><b>Finish both lesson projects.</b> 8.1: Step 4 (the test environment, twelve tests green, the red run on purpose, the fix) and the Quality note; if Steps 1 to 3 did not finish, those first. 8.2: Step 4 (the hero image, measured) and Step 5 (the table, the instruments removed, <code class="inline">composer lint</code> 0), and the Performance note.</li>
+  <li><b>Lesson exercises.</b> 8.1: Exercises 1 and 3 (SettingsTest; what PHPCS sees in insecure code); Exercise 2 is a stretch. 8.2: Exercises 1 and 2 (the emoji script; the inline CSS budget); Exercise 3 is a stretch. Remove the exercise test files afterwards if you want your counts to match the later lessons.</li>
+  <li><b>Both Quick Quizzes</b> on the lesson pages (five questions each; answers are in the Answer Key).</li>
+  <li><b>Journal:</b> both entries. The 8.1 prompt asks about the last bug you chased; the 8.2 prompt asks you to measure a slow site before you guess.</li>
+  <li><b>Before the Next Lesson (from 8.2):</b> <code class="inline">wp config get SAVEQUERIES</code> says it is not defined, <code class="inline">wp plugin list --status=dropin</code> is empty, and the twelve tests pass once more in wp-env.</li>
+  <li><b>Optional:</b> the labs not reached in class: <code class="inline">labs/module-15/l8_1-debugging-testing/debug_supplier_log.php</code>, the PHPCS folder lab <code class="inline">next_event_starter/</code>, <code class="inline">labs/module-15/l8_2-performance-caching/cheapest_cache_starter.php</code>, <code class="inline">labs/module-15/l8_2-performance-caching/page_weight_starter.sh</code> (run it before and after your Step 4) and <code class="inline">labs/module-15/l8_2-performance-caching/debug_events_cache.php</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Bring list for Session 16</div>
+<ul class="tick">
+  <li>The site as Lesson 8.2 leaves it: <code class="inline">composer lint</code> exits 0, the events cache, the settings row, the hero image with its aspect ratio and preload, and no SAVEQUERIES or query report left.</li>
+  <li>An internet connection at home before the session: Lesson 8.3 installs the Spanish core translation (<code class="inline">wp language core install es_ES</code>) and the Plugin Check plugin, and Lesson 8.4 downloads the rehearsal server <code class="inline">pagesco-live.zip</code> from the course site. Download the ZIP at home.</li>
+  <li>Git on your computer (on Windows inside WSL: <code class="inline">git --version</code>), Node.js 24 and the node:24 image (Lesson 6.1) for <code class="inline">npm ci</code> in Lesson 8.4.</li>
+  <li>pagesco-plan.txt with the Quality and Performance notes, the journal, and the workbook.</li>
+</ul>
+</div>
+
+  <div class="sec"><h2>If You Run Long or Short</h2><span class="rule"></span></div>
+<div class="blk warn"><div class="h">Running long: what to protect and what to cut first</div>
+<ul class="tick">
+  <li><b>Protect:</b> the 8.1 supplier case; the 8.1 project to <code class="inline">exit status 0</code>; the 8.2 query report with the missing option; the 8.2 project Step 1.</li>
+  <li><b>Cut first (saves 3m):</b> the 8.1 public-log step and the 8.2 first-byte step: one curl each, at home.</li>
+  <li><b>Cut second (saves 3m):</b> the recorded red PHPUnit run (show it in the debrief instead, or leave it to Step 4 at home).</li>
+  <li><b>Cut third (saves 4m):</b> the 8.2 lazy-image mistake: tell it with the lesson's numbers instead of typing it.</li>
+  <li><b>Cut fourth (saves 10m):</b> the debrief shrinks to the notes in pagesco-plan.txt.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Running short: what to add</div>
+<ul class="tick">
+  <li>The 8.1 Exercise 3 live: <code class="inline">scratch-search.php</code> linted with the project's ruleset, every finding sorted into the three piles by the room.</li>
+  <li>The 8.2 EXPLAIN of the price query, read from the innermost line out, and the question "what grows with the catalog?"</li>
+  <li>Run <code class="inline">page_weight_solution.sh</code> for everyone before and after a volunteer's Step 4, on the projector.</li>
+</ul>
+</div>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · PHP and WordPress Development</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 15 · Facilitator Guide · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

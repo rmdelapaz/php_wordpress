@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Common WordPress development errors explained: what each PHP, WordPress and WP-CLI message means and how to fix it.">
+    <meta name="description" content="Common WordPress development errors explained: PHP fatal errors, called-incorrectly notices, WP-CLI, REST API and HTTP errors and silent failures from PHP and WordPress Development, each with its cause, its fix and the lesson that shows it.">
     <meta name="author" content="Ray de la Paz">
     <title>Common Errors - PHP and WordPress Development</title>
     <script src="js/theme-init.js"></script>
@@ -43,15 +43,619 @@
         <div class="container">
             <header>
                 <h1>❌ Common Errors</h1>
-                <p class="lead">The error messages you are most likely to meet while building themes, plugins and blocks, what each one means, and how to fix it.</p>
+                <p class="lead">The 56 error messages you are most likely to meet while building the Pages &amp; Co. site, exactly as WordPress 7.1, PHP 8.5, WP-CLI and the REST API print them, plus 45 silent failures that print nothing. Each entry says what the message means, how to fix it, and which lesson shows it.</p>
             </header>
 
-            <!-- STUB: the reference-pages agent fills this page (see SHELL_REFERENCE.md section 14). -->
-            <section class="lesson-section">
-                <div class="card card-info">
-                    <h4>💡 This page is being written</h4>
-                    <p>It fills in as the lessons are published. Until then, every lesson has its own Common Mistakes section and quick-reference summary.</p>
-                </div>
+<details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">On This Page</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#reading" class="toc-link">Reading a WordPress Error</a></li>
+                        <li><a href="#setup" class="toc-link">Docker and Setup</a></li>
+                        <li><a href="#fatal" class="toc-link">Fatal Errors</a></li>
+                        <li><a href="#notices" class="toc-link">Notices, Warnings and "Called Incorrectly"</a></li>
+                        <li><a href="#wp-cli-admin" class="toc-link">WP-CLI and Admin Messages</a></li>
+                        <li><a href="#rest" class="toc-link">REST API Errors</a></li>
+                        <li><a href="#http-cron" class="toc-link">HTTP, Cron and Database Server Errors</a></li>
+                        <li><a href="#tools" class="toc-link">Build, Lint and Test Messages</a></li>
+                        <li><a href="#silent" class="toc-link">Silent Failures: No Message at All</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="reading" class="lesson-section">
+                <h2>🔎 Reading a WordPress Error</h2>
+                <p>A PHP message has a level (<code>Fatal error</code>, <code>Warning</code>, <code>Notice</code>, <code>Deprecated</code>), the message, a file and a line; uncaught exceptions add a stack trace, newest call first. WordPress adds its own "called incorrectly" and "deprecated" notices, which always name <code>wp-includes/functions.php on line 6260</code> (the function that prints them): the useful part is the function name and the sentence. Where a message turns up tells you a lot:</p>
+                <div class="table-wrap">
+<table>
+<thead><tr><th>You see it</th><th>Because</th></tr></thead>
+<tbody>
+<tr><td>above <code>&lt;!DOCTYPE html&gt;</code></td><td>a block theme renders the whole template (blocks, filters, shortcodes) before it prints the <code>&lt;head&gt;</code> (<a href="lesson_06.html#mistakes">Lesson 2.3</a>)</td></tr>
+<tr><td>inside the content</td><td>it came from a dynamic block's <code>render.php</code> (<a href="lesson_21.html#mistakes">Lesson 6.3</a>)</td></tr>
+<tr><td>only in an <code>X-WP-DoingItWrong</code> header</td><td>it happened during a REST request (<a href="lesson_24.html#mistakes">Lesson 7.2</a>)</td></tr>
+<tr><td>only in <code>wp-content/debug.log</code></td><td>a background request (the editor, WP-Cron, REST), or display is off; <code>tail -f wordpress/wp-content/debug.log</code> (<a href="lesson_02.html#debugging">Lesson 1.2</a>)</td></tr>
+<tr><td>as "There has been a critical error on this website."</td><td>a fatal error with display off: the log has the details (<a href="lesson_26.html#fatal">Lesson 8.1</a>)</td></tr>
+<tr><td>as <code>{closure}()</code> without a file</td><td>PHP 8.3 or older; 8.4+ prints <code>{closure:/path/file.php:LINE}()</code> (<a href="lesson_06.html#mistakes">Lesson 2.3</a>)</td></tr>
+<tr><td>as <code>EvalFile_Command.php(85) : eval()'d code</code></td><td>the code ran through <code>wp eval-file</code>, not from your file's own name</td></tr>
+</tbody>
+</table>
+</div>
+                <p>Every message below was printed on the course site (WordPress 7.1.3, PHP 8.5) and appears in the lesson linked under it; long stack traces are cut after the first lines. Your paths are the same (<code>/var/www/html/…</code> is your <code>wordpress/</code> folder); IDs, timestamps and addresses may differ. Search this page with <kbd>Ctrl</kbd>+<kbd>F</kbd> for a few words of your message. Setup problems without a message are on the <a href="troubleshooting.html">Troubleshooting</a> page; terms are explained in the <a href="glossary.html">Glossary</a>.</p>
+            </section>
+
+            <section id="setup" class="lesson-section">
+                <h2>🐳 Docker and Setup</h2>
+                <p>All from <a href="lesson_02.html">Lesson 1.2</a>, where the environment is built. Most are environment problems rather than code: the <a href="troubleshooting.html">Troubleshooting</a> page has the longer checklists.</p>
+
+                <h3>mkdir: cannot create directory ... Permission denied</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>mkdir: cannot create directory ‘wordpress/wp-content/mu-plugins’: Permission denied</code></pre>
+</div>
+                <p><strong>What it means:</strong> Linux or WSL: the containers ran as user 33 (www-data), so the files in <code>wordpress/</code> belong to it and your user can read but not write them.</p>
+                <p><strong>Fix:</strong> The Linux setup of Lesson 1.2 (<code>.env</code> with your user and group numbers plus <code>compose.override.yaml</code>), or its repair box if you already started without it. Not <code>sudo</code> in front of your editor, not <code>chmod -R 777</code>. <em>(<a href="lesson_02.html#linux-owner">Lesson 1.2</a>)</em></p>
+
+                <h3>required variable PAGESCO_UID is missing a value</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>Error while interpolating services.wordpress.user: required variable PAGESCO_UID is missing a value: run the Linux setup from Lesson 1.2 first</code></pre>
+</div>
+                <p><strong>What it means:</strong> <code>compose.override.yaml</code> is there but the <code>.env</code> file with your user and group numbers is not, so Compose refuses to start.</p>
+                <p><strong>Fix:</strong> In the project folder: <code>printf 'PAGESCO_UID=%s\nPAGESCO_GID=%s\n' "$(id -u)" "$(id -g)" &gt; .env</code>, then <code>docker compose up -d</code>. <em>(<a href="lesson_02.html#mistakes">Lesson 1.2</a>)</em></p>
+
+                <h3>Bind for 0.0.0.0:8080 failed: port is already allocated</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>Error response from daemon: failed to set up container networking: driver failed programming external connectivity on endpoint pagesco-wordpress-1 (f3189481e620...): Bind for 0.0.0.0:8080 failed: port is already allocated</code></pre>
+</div>
+                <p><strong>What it means:</strong> Something else already listens on port 8080 (or 8025 for Mailpit): another Compose project, an old container, a local Apache, another course's server.</p>
+                <p><strong>Fix:</strong> Find it in the PORTS column of <code>docker ps</code> and stop it. Changing the course port means changing <code>"8080:8080"</code>, the <code>Listen</code> line in <code>config/apache-8080.conf</code> and the site URL: freeing the port is easier. <em>(<a href="lesson_02.html#mistakes">Lesson 1.2</a>)</em></p>
+
+                <h3>Error establishing a database connection (Access denied for user 'wordpress')</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>Warning: mysqli_real_connect(): (HY000/1045): Access denied for user 'wordpress'@'172.19.0.4' (using password: YES) in /var/www/html/wp-includes/class-wpdb.php on line 1990
+Error: `Access denied for user 'wordpress'@'172.19.0.4' (using password: YES)`
+Error establishing a database connection</code></pre>
+</div>
+                <p><strong>What it means:</strong> The database password in <code>compose.yaml</code> was changed after the first start. The MySQL image reads <code>MYSQL_PASSWORD</code> only when it creates the database in an empty volume, so WordPress now sends a password MySQL never heard of.</p>
+                <p><strong>Fix:</strong> Put the old password back and run <code>docker compose up -d</code>; or change it inside MySQL first; or start over with <code>docker compose down -v</code>. The address in the message changes from computer to computer. <em>(<a href="lesson_02.html#mistakes">Lesson 1.2</a>)</em></p>
+
+                <h3>no configuration file provided: not found</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>no configuration file provided: not found</code></pre>
+</div>
+                <p><strong>What it means:</strong> The <code>wp</code> shortcut (or any <code>docker compose</code> command) ran outside the project folder: Compose found no <code>compose.yaml</code> in the folder or above it. In a new terminal without the alias you get <code>wp: command not found</code> instead.</p>
+                <p><strong>Fix:</strong> <code>cd ~/pagesco-dev</code> (or any folder inside it), and put the alias in <code>~/.bashrc</code> or <code>~/.zshrc</code>. <em>(<a href="lesson_02.html#mistakes">Lesson 1.2</a>)</em></p>
+
+                <h3>Invalid address: (From): wordpress@localhost</h3>
+                <div class="card card-output">
+    <h4>Output (with a wp_mail_failed listener)</h4>
+    <pre><code>Invalid address:  (From): wordpress@localhost
+bool(false)</code></pre>
+</div>
+                <p><strong>What it means:</strong> <code>mailpit-smtp.php</code> is missing from <code>mu-plugins/</code> (for example after a reset). WordPress builds the sender from the site's domain, <code>localhost</code>, and the mail library rejects it; <code>wp_mail()</code> returns false and only the <code>wp_mail_failed</code> action says why. wp-env sites have the same problem.</p>
+                <p><strong>Fix:</strong> Copy <code>config/mailpit-smtp.php</code> back into <code>wordpress/wp-content/mu-plugins/</code>. <em>(<a href="lesson_02.html#mailpit">Lesson 1.2</a>)</em></p>
+
+                <h3>Deprecated: Using null as an array offset ... Colors.php</h3>
+                <div class="card card-output">
+    <h4>Message (shortened in the lesson)</h4>
+    <pre><code>Deprecated: Using null as an array offset is deprecated ... php-cli-tools/lib/cli/Colors.php on line 95</code></pre>
+</div>
+                <p><strong>What it means:</strong> WP-CLI 2.12's own code on PHP 8.5, printed after its Success and Error lines when <code>WP_DEBUG</code> is on. It is not your code. The course's WP-CLI image hides it; a natively installed WP-CLI or another PHP 8.5 image shows it.</p>
+                <p><strong>Fix:</strong> Ignore it, or use the course container. It does not appear on PHP 8.4. <em>(<a href="lesson_02.html#debugging">Lesson 1.2</a>)</em></p>
+
+                <h3>Failed to get current SQL modes ... TLS/SSL error: self-signed certificate</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>Error: Failed to get current SQL modes. Reason: ERROR 2026 (HY000): TLS/SSL error: self-signed certificate in certificate chain</code></pre>
+</div>
+                <p><strong>What it means:</strong> You ran <code>wp db query</code> (or <code>export</code>, <code>check</code>) with the official <code>wordpress:cli</code> image against MySQL 9.7, whose development certificate that image's client refuses. Reproduced for this page with <code>wordpress:cli-php8.5</code>; the same command in the course's <code>pagesco-wpcli</code> image works.</p>
+                <p><strong>Fix:</strong> Use the course's <code>wpcli</code> service (the <code>wp</code> shortcut): its image adds the fixes in <code>config/wpcli.Dockerfile</code> and <code>config/mariadb-local.sh</code>. Against MariaDB (wp-env) the official image works. <em>(<a href="lesson_02.html#starter">Lesson 1.2</a>)</em></p>
+            </section>
+
+            <section id="fatal" class="lesson-section">
+                <h2>💥 Fatal Errors</h2>
+                <p>A fatal error stops the request. With <code>WP_DEBUG_DISPLAY</code> on you see the message in the page; visitors of a live site see "There has been a critical error on this website." and the details go to the log. A fatal error in a must-use plugin, or at load time in any plugin, takes the admin and WP-CLI down too.</p>
+
+                <h3>Cannot redeclare function get_the_title()</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>Fatal error: Cannot redeclare function get_the_title() (previously declared in /var/www/html/wp-includes/post-template.php:118) in /var/www/html/wp-content/mu-plugins/mistake-redeclare.php on line 2</code></pre>
+</div>
+                <p><strong>What it means:</strong> Two functions with the same name: core declared it first. The same happens when two plugins forget a prefix.</p>
+                <p><strong>Fix:</strong> Prefix every function (<code>pagesco_get_title()</code>); to change what a core function returns, use its filter. PHP 8.5 adds a stack trace under this message; 8.4 and older print the single line. <em>(<a href="lesson_03.html#mistakes">Lesson 1.3</a>)</em></p>
+
+                <h3>TypeError: str_repeat(): Argument #2 ($times) must be of type int, string given</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>Fatal error: Uncaught TypeError: str_repeat(): Argument #2 ($times) must be of type int, string given in /var/www/html/wp-content/mu-plugins/mistake-strict.php:4</code></pre>
+</div>
+                <p><strong>What it means:</strong> <code>declare(strict_types=1)</code> met a WordPress value: options come out of the database as strings (<code>get_option( 'posts_per_page' )</code> is <code>"10"</code>).</p>
+                <p><strong>Fix:</strong> Leave strict types out of code that talks to WordPress, or cast where the value enters: <code>(int) get_option( 'posts_per_page' )</code>. <em>(<a href="lesson_03.html#mistakes">Lesson 1.3</a>)</em></p>
+
+                <h3>ArgumentCountError: Too few arguments to function {closure:...}(), 1 passed ... exactly 2 expected</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>Fatal error: Uncaught ArgumentCountError: Too few arguments to function {closure:/var/www/html/wp-content/mu-plugins/mistake-args.php:2}(), 1 passed in /var/www/html/wp-includes/class-wp-hook.php on line 355 and exactly 2 expected in /var/www/html/wp-content/mu-plugins/mistake-args.php:2</code></pre>
+</div>
+                <p><strong>What it means:</strong> A callback asks for two arguments, but <code>add_filter()</code> was given the default of one.</p>
+                <p><strong>Fix:</strong> Pass the number of arguments: <code>add_filter( 'the_title', $callback, 10, 2 );</code>. PHP 8.3 and older name the closure just <code>{closure}()</code>; the <code>thrown in</code> line then points to your file. <em>(<a href="lesson_06.html#mistakes">Lesson 2.3</a>)</em></p>
+
+                <h3>call_user_func_array(): Argument #1 ($callback) must be a valid callback</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>Fatal error: Uncaught TypeError: call_user_func_array(): Argument #1 ($callback) must be a valid callback, function "pagesco_register_thing" not found or invalid function name in /var/www/html/wp-includes/class-wp-hook.php:353</code></pre>
+</div>
+                <p><strong>What it means:</strong> A typo in a callback name: <code>add_action()</code> stores the string without checking, and the error happens when the hook fires (here <code>init</code>, so on every request, admin and WP-CLI included). Editors do not catch it: to them it is a string.</p>
+                <p><strong>Fix:</strong> Copy the name from the function definition. When a hook seems to do nothing, ask <code>has_action()</code>. <em>(<a href="lesson_06.html#mistakes">Lesson 2.3</a>)</em></p>
+
+                <h3>Failed opening required ... vendor/autoload.php</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>Warning: require(/var/www/html/wp-content/plugins/pagesco-books/vendor/autoload.php): Failed to open stream: No such file or directory in /var/www/html/wp-content/plugins/pagesco-books/pagesco-books.php on line 24
+Fatal error: Uncaught Error: Failed opening required '/var/www/html/wp-content/plugins/pagesco-books/vendor/autoload.php' (include_path='.:/usr/local/lib/php') in /var/www/html/wp-content/plugins/pagesco-books/pagesco-books.php:24</code></pre>
+</div>
+                <p><strong>What it means:</strong> The plugin was copied or checked out without running Composer, so <code>vendor/</code> is missing. On activation WordPress includes the file in a sandbox first and refuses ("Plugin could not be activated because it triggered a fatal error.").</p>
+                <p><strong>Fix:</strong> Run <code>composer dump-autoload</code> (or <code>composer install</code>) where the plugin is installed, or deploy a release that contains <code>vendor/</code>. <em>(<a href="lesson_14.html#mistakes">Lesson 5.1</a>, <a href="lesson_29.html#builds">Lesson 8.4</a>)</em></p>
+
+                <h3>Class "PagesCo\Books\StoreNotice" not found</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>Fatal error: Uncaught Error: Class "PagesCo\Books\StoreNotice" not found in /var/www/html/wp-content/plugins/pagesco-books/src/Plugin.php:54</code></pre>
+</div>
+                <p><strong>What it means:</strong> The autoloader looked for <code>src/StoreNotice.php</code> and the file is named differently (<code>src/Storenotice.php</code>): PSR-4 file names must match the class name exactly, capitalization included. It runs on <code>plugins_loaded</code>, so the whole site is down.</p>
+                <p><strong>Fix:</strong> Rename the file to the class name. In a release (Lesson 9.1), the same message for <code>PagesCo\Books\Holds\HoldsTable</code> meant the ZIP was missing a new folder of <code>src/</code>: add it to the <code>"files"</code> list in <code>package.json</code>. <em>(<a href="lesson_14.html#project">Lesson 5.1</a>, <a href="lesson_30.html#mistakes">Lesson 9.1</a>)</em></p>
+
+                <h3>Call to undefined function plugin_dir_path() (a plugin file requested directly)</h3>
+                <div class="card card-output">
+    <h4>Server log</h4>
+    <pre><code>PHP Fatal error:  Uncaught Error: Call to undefined function plugin_dir_path() in /var/www/html/wp-content/plugins/pagesco-books/pagesco-books.php:22</code></pre>
+</div>
+                <p><strong>What it means:</strong> Someone requested the plugin's PHP file by URL; without WordPress loaded it dies on the first WordPress function (HTTP 500, this line in <code>docker compose logs wordpress</code>). A file with top-level actions would perform them for anyone.</p>
+                <p><strong>Fix:</strong> <code>defined( 'ABSPATH' ) || exit;</code> at the top of every PHP file that can run on its own. <em>(<a href="lesson_14.html#mistakes">Lesson 5.1</a>)</em></p>
+
+                <h3>There has been a critical error on this website.</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>Fatal error: Uncaught Error: Call to undefined function pagesco_crash_missing_function() in /var/www/html/wp-content/plugins/pagesco-crash/pagesco-crash.php:9
+...
+Error: There has been a critical error on this website.Learn more about troubleshooting WordPress. There has been a critical error on this website.</code></pre>
+</div>
+                <p><strong>What it means:</strong> A fatal error after WordPress started (here in an <code>init</code> callback). Visitors see only the last sentence; the details are in <code>debug.log</code> or the server log. On wp-login.php and wp-admin, WordPress also emails the administrator a recovery-mode link ("[Pages &amp; Co.] Your Site is Experiencing a Technical Issue").</p>
+                <p><strong>Fix:</strong> Read the first line of the log entry. To get the site back while you fix it: <code>wp --skip-plugins=pagesco-crash plugin deactivate pagesco-crash</code>, or the recovery-mode link. Must-use plugins cannot be paused: fix or move the file. <em>(<a href="lesson_26.html#fatal">Lesson 8.1</a>)</em></p>
+
+                <h3>Object of class WP_Error could not be converted to string</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>Fatal error: Uncaught Error: Object of class WP_Error could not be converted to string in /var/www/html/wp-includes/formatting.php:1128
+Stack trace:
+#0 /var/www/html/wp-includes/formatting.php(4752): wp_check_invalid_utf8(Object(WP_Error))
+#1 /var/www/html/wp-content/mu-plugins/pagesco-ai-blurb.php(15): esc_html(Object(WP_Error))</code></pre>
+</div>
+                <p><strong>What it means:</strong> A function that returns "a value or a <code>WP_Error</code>" (here the AI client's <code>generate_text()</code>, with no provider) was treated as if it always returned a string.</p>
+                <p><strong>Fix:</strong> Check <code>is_wp_error()</code> before using any such result (<code>wp_remote_get()</code>, <code>wp_insert_post( …, true )</code>, the AI client) and fall back to something useful. <em>(<a href="lesson_31.html#mistakes">Lesson 9.2</a>)</em></p>
+
+                <h3>Failed opening required ... myclabs/deep-copy ... deep_copy.php</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>PHP Fatal error:  Uncaught Error: Failed opening required '/tmp/zip-test/vendor/composer/../myclabs/deep-copy/src/DeepCopy/deep_copy.php' (include_path='.:/usr/local/lib/php') in /tmp/zip-test/vendor/composer/autoload_real.php:41</code></pre>
+</div>
+                <p><strong>What it means:</strong> A release ZIP contains Composer's development autoloader, which requires files of PHPUnit and its helpers on every load, but not those packages.</p>
+                <p><strong>Fix:</strong> <code>composer dump-autoload --no-dev</code> before packaging (and <code>composer dump-autoload</code> afterwards), or build releases in a clean copy with <code>composer install --no-dev --optimize-autoloader</code>. <em>(<a href="lesson_28.html#mistakes">Lesson 8.3</a>, <a href="lesson_29.html#builds">Lesson 8.4</a>)</em></p>
+            </section>
+
+            <section id="notices" class="lesson-section">
+                <h2>🔔 Notices, Warnings and "Called Incorrectly"</h2>
+                <p>These do not stop the page. In a block theme a notice from a template or filter prints <em>above</em> <code>&lt;!DOCTYPE html&gt;</code>, because the whole template is rendered before the <code>&lt;head&gt;</code>; notices from a dynamic block's <code>render.php</code> print inside the content. All of them also go to <code>debug.log</code>.</p>
+
+                <h3>Deprecated: str_replace(): Passing null to parameter #3 ($subject) ... formatting.php on line 5777</h3>
+                <div class="card card-output">
+    <h4>Output (top of the page)</h4>
+    <pre><code>Deprecated: str_replace(): Passing null to parameter #3 ($subject) of type array|string is deprecated in /var/www/html/wp-includes/formatting.php on line 5777</code></pre>
+</div>
+                <p><strong>What it means:</strong> A filter callback forgot to <code>return</code>, so the value became null; the next callback on <code>the_title</code>, core's <code>capital_P_dangit()</code>, passed it on. The notice blames core, the title is gone everywhere, and on a live site nothing is printed at all.</p>
+                <p><strong>Fix:</strong> Every filter callback ends with <code>return $value;</code>, also when it changes nothing. When a notice points into core, look at what your code handed to it. <em>(<a href="lesson_06.html#mistakes">Lesson 2.3</a>)</em></p>
+
+                <h3>Function get_currentuserinfo is deprecated since version 4.5.0!</h3>
+                <div class="card card-output">
+    <h4>Output</h4>
+    <pre><code>Deprecated: Function get_currentuserinfo is &lt;strong&gt;deprecated&lt;/strong&gt; since version 4.5.0! Use wp_get_current_user() instead. in /var/www/html/wp-includes/functions.php on line 6260</code></pre>
+</div>
+                <p><strong>What it means:</strong> Code copied from an old tutorial. The message names the version that deprecated the function and its replacement (the <code>&lt;strong&gt;</code> tags are there because it is formatted for a web page).</p>
+                <p><strong>Fix:</strong> Use the replacement. The same pattern appears in Lesson 8.2: removing the emoji scripts with only two of the three <code>remove_action()</code> lines logs "Function print_emoji_styles is deprecated since version 6.4.0!" on every page. <em>(<a href="lesson_01.html#mistakes">Lesson 1.1</a>, <a href="lesson_27.html#exercises">Lesson 8.2</a>)</em></p>
+
+                <h3>Function is_home was called incorrectly. Conditional query tags do not work before the query is run.</h3>
+                <div class="card card-output">
+    <h4>Output</h4>
+    <pre><code>Notice: Function is_home was called &lt;strong&gt;incorrectly&lt;/strong&gt;. Conditional query tags do not work before the query is run. Before then, they always return false. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 3.1.0.) in /var/www/html/wp-includes/functions.php on line 6260</code></pre>
+</div>
+                <p><strong>What it means:</strong> A conditional tag at the top level of a plugin file runs while plugins load, long before the main query. It returns false.</p>
+                <p><strong>Fix:</strong> Ask inside a callback on a hook that runs after the query: <code>template_redirect</code>, <code>wp</code>, or the hook that prints your output. <em>(<a href="lesson_11.html#mistakes">Lesson 4.1</a>)</em></p>
+
+                <h3>Function wp_enqueue_style was called incorrectly. Scripts and styles should not be registered or enqueued until ...</h3>
+                <div class="card card-output">
+    <h4>Output (shortened)</h4>
+    <pre><code>Notice: Function wp_enqueue_style was called &lt;strong&gt;incorrectly&lt;/strong&gt;. Scripts and styles should not be registered or enqueued until the &lt;code&gt;wp_enqueue_scripts&lt;/code&gt;, &lt;code&gt;admin_enqueue_scripts&lt;/code&gt;, or &lt;code&gt;login_enqueue_scripts&lt;/code&gt; hooks. This notice was triggered by the &lt;code&gt;pagesco-hours&lt;/code&gt; handle. ...
+Notice: Function wp_is_block_theme was called &lt;strong&gt;incorrectly&lt;/strong&gt;. This function should not be called before the theme directory is registered. ...
+Notice: Function is_feed was called &lt;strong&gt;incorrectly&lt;/strong&gt;. Conditional query tags do not work before the query is run. ...</code></pre>
+</div>
+                <p><strong>What it means:</strong> An enqueue call at the top level of a file instead of in a callback. One misplaced line, three notices: read the first one. The style still loads, on every screen, the admin and login page included.</p>
+                <p><strong>Fix:</strong> Wrap it in a function hooked to <code>wp_enqueue_scripts</code> (or <code>admin_enqueue_scripts</code>, <code>login_enqueue_scripts</code>). <em>(<a href="lesson_13.html#mistakes">Lesson 4.3</a>)</em></p>
+
+                <h3>register_sidebar ... No id was set ... Defaulting to "sidebar-1"</h3>
+                <div class="card card-output">
+    <h4>Output (shortened)</h4>
+    <pre><code>Notice: Function register_sidebar was called &lt;strong&gt;incorrectly&lt;/strong&gt;. No &lt;code&gt;id&lt;/code&gt; was set in the arguments array for the "Shop sidebar" sidebar. Defaulting to "sidebar-1". Manually set the &lt;code&gt;id&lt;/code&gt; to "sidebar-1" to silence this notice and keep existing sidebar content. ...</code></pre>
+</div>
+                <p><strong>What it means:</strong> A widget area registered without an <code>id</code>. The generated number shifts when areas are added or removed, and the owner's widgets move or vanish into Inactive Widgets.</p>
+                <p><strong>Fix:</strong> Always pass a fixed <code>id</code> (<code>footer</code>) and never change it on a live site. <em>(<a href="lesson_13.html#mistakes">Lesson 4.3</a>)</em></p>
+
+                <h3>get_block_patterns was called incorrectly ... ("Slug" field missing)</h3>
+                <div class="card card-output">
+    <h4>Output (visible text of the page)</h4>
+    <pre><code>Notice: Function get_block_patterns was called incorrectly. Could not register file "/var/www/html/wp-content/themes/pagesco/patterns/visit-us.php" as a block pattern ("Slug" field missing) Please see Debugging in WordPress for more information. (This message was added in version 6.0.0.) in /var/www/html/wp-includes/functions.php on line 6260</code></pre>
+</div>
+                <p><strong>What it means:</strong> A pattern file without a <code>Slug:</code> header line is skipped. Without development mode the file list is cached, so the notice may appear only once and the pattern is simply missing afterwards.</p>
+                <p><strong>Fix:</strong> Add <code>Slug: pagesco/visit-us</code> (letters, digits, <code>/</code>, <code>_</code> and <code>-</code> only). <em>(<a href="lesson_09.html#mistakes">Lesson 3.3</a>)</em></p>
+
+                <h3>wp_json_file_decode(): Error when decoding a JSON file at path .../theme.json: Syntax error</h3>
+                <div class="card card-output">
+    <h4>Output (top of every page)</h4>
+    <pre><code>Notice: wp_json_file_decode(): Error when decoding a JSON file at path /var/www/html/wp-content/themes/pagesco/theme.json: Syntax error in /var/www/html/wp-includes/functions.php on line 6260</code></pre>
+</div>
+                <p><strong>What it means:</strong> Invalid JSON in <code>theme.json</code> (here a trailing comma). WordPress then uses no <code>theme.json</code> at all: palette, fonts and colors fall back to core's defaults. On a live site there is no message, only a suddenly plain design.</p>
+                <p><strong>Fix:</strong> Fix the syntax: no comma after the last item, double quotes only, no comments. With the <code>$schema</code> line, VS Code underlines the error. <em>(<a href="lesson_08.html#mistakes">Lesson 3.2</a>)</em></p>
+
+                <h3>register_collection was called incorrectly. The specified manifest file does not exist.</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>Notice: Function WP_Block_Metadata_Registry::register_collection was called &lt;strong&gt;incorrectly&lt;/strong&gt;. The specified manifest file does not exist. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 6.7.0.) in /var/www/html/wp-includes/functions.php on line 6260</code></pre>
+</div>
+                <p><strong>What it means:</strong> The plugin's <code>build/</code> folder is missing (a fresh checkout, a forgotten build), so the block registration finds no manifest; a second notice follows. With display on, the notices print above every admin screen and break the block editor.</p>
+                <p><strong>Fix:</strong> Run <code>npm install</code> and <code>npm run build</code> in the plugin folder, or deploy a release that contains <code>build/</code>. <em>(<a href="lesson_19.html#mistakes">Lesson 6.1</a>)</em></p>
+
+                <h3>register_rest_route was called incorrectly ... missing the required permission_callback argument</h3>
+                <div class="card card-output">
+    <h4>Error (shortened)</h4>
+    <pre><code>Notice: Function register_rest_route was called &lt;strong&gt;incorrectly&lt;/strong&gt;. The REST API route definition for &lt;code&gt;pagesco/v1/hours&lt;/code&gt; is missing the required &lt;code&gt;permission_callback&lt;/code&gt; argument. For REST API routes that are intended to be public, use &lt;code&gt;__return_true&lt;/code&gt; as the permission callback. ... (This message was added in version 5.5.0.) in /var/www/html/wp-includes/functions.php on line 6260</code></pre>
+</div>
+                <p><strong>What it means:</strong> A route without <code>permission_callback</code>. It still answers, as if public. During REST requests the notice is not printed (it would break the JSON) but sent as an <code>X-WP-DoingItWrong</code> response header; WP-CLI (<code>wp eval 'rest_get_server();'</code>) prints it.</p>
+                <p><strong>Fix:</strong> Always write the key; <code>'__return_true'</code> for deliberately public reads, a capability check for everything else. <em>(<a href="lesson_24.html#mistakes">Lesson 7.2</a>)</em></p>
+
+                <h3>Warning: Undefined array key "..."</h3>
+                <div class="card card-output">
+    <h4>Error (three lessons)</h4>
+    <pre><code>Warning: Undefined array key "show_events_link" in /var/www/html/wp-content/mu-plugins/mistake-checkbox.php on line 15
+Warning: Undefined array key "title" in /var/www/html/wp-content/mu-plugins/mistake-card-title.php on line 9
+Warning: Undefined array key &amp;#8220;count&amp;#8221; in /var/www/html/wp-content/plugins/pagesco-books/build/blocks/book-list/render.php on line 19</code></pre>
+</div>
+                <p><strong>What it means:</strong> Three course situations: an unticked checkbox is not sent at all (Lesson 5.4); a block attribute with a <code>source</code> lives in the HTML, not in <code>$block['attrs']</code> (Lesson 6.2); a block attribute without a default is missing from <code>$attributes</code> (Lesson 6.3, where <code>wptexturize</code> even curled the quotes, because <code>render.php</code> output is content).</p>
+                <p><strong>Fix:</strong> Test the key: <code>! empty( $input['show_events_link'] )</code>, <code>isset()</code> or <code>??</code>; give block attributes defaults; read sourced attributes from the HTML with the HTML API, or make the block dynamic. Note the path in the third message: <code>build/</code>, the copy WordPress runs; edit the one in <code>src/</code>. <em>(<a href="lesson_17.html#mistakes">Lesson 5.4</a>, <a href="lesson_20.html#mistakes">Lesson 6.2</a>, <a href="lesson_21.html#mistakes">Lesson 6.3</a>)</em></p>
+
+                <h3>Warning: Trying to access array offset on null / foreach() argument must be of type array|object, null given</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>Warning: Trying to access array offset on null in /var/www/html/wp-content/mu-plugins/mistake-supplier.php on line 14
+
+Warning: foreach() argument must be of type array|object, null given in /var/www/html/wp-content/mu-plugins/mistake-supplier.php on line 14
+Copies at the supplier: 0</code></pre>
+</div>
+                <p><strong>What it means:</strong> Code checked <code>is_wp_error()</code> and trusted the rest: the supplier answered 503 with an HTML page, <code>json_decode()</code> returned null. Worse than the warnings is the confident, wrong "0".</p>
+                <p><strong>Fix:</strong> Check the three ways an HTTP call fails, in order: <code>is_wp_error()</code>, the status code, the shape of the decoded data. <em>(<a href="lesson_25.html#mistakes">Lesson 7.3</a>)</em></p>
+
+                <h3>Using the synchronous event.preventDefault() function in a store action without wrapping it in withSyncEvent() is deprecated</h3>
+                <div class="card card-output">
+    <h4>Browser console (recorded)</h4>
+    <pre><code>Console: [warning] Using the synchronous event.preventDefault() function in a store action without wrapping it in withSyncEvent() is deprecated and will stop working in WordPress 7.0. Please wrap the store action in withSyncEvent().</code></pre>
+</div>
+                <p><strong>What it means:</strong> An Interactivity API action uses the event (<code>preventDefault()</code>, <code>stopPropagation()</code>, <code>currentTarget</code>) without <code>withSyncEvent()</code>. It still works in 7.1, with this warning in the browser console.</p>
+                <p><strong>Fix:</strong> Wrap the action: <code>selectGenre: withSyncEvent( ( event ) =&gt; { … } )</code>. <em>(<a href="lesson_22.html#mistakes">Lesson 6.4</a>)</em></p>
+            </section>
+
+            <section id="wp-cli-admin" class="lesson-section">
+                <h2>🖥️ WP-CLI and Admin Messages</h2>
+
+                <h3>Error: Template is missing. Standalone themes need to have a templates/index.html or index.php template file.</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>Error: Template is missing. Standalone themes need to have a &lt;code&gt;templates/index.html&lt;/code&gt; or &lt;code&gt;index.php&lt;/code&gt; template file. &lt;a href="https://developer.wordpress.org/themes/advanced-topics/child-themes/"&gt;Child themes&lt;/a&gt; need to have a &lt;code&gt;Template&lt;/code&gt; header in the &lt;code&gt;style.css&lt;/code&gt; stylesheet.</code></pre>
+</div>
+                <p><strong>What it means:</strong> A theme folder with only a <code>style.css</code>. Appearance &gt; Themes lists it under Broken Themes.</p>
+                <p><strong>Fix:</strong> Add <code>templates/index.html</code> (block theme) or <code>index.php</code> (classic theme); a child theme needs a <code>Template:</code> header instead. <em>(<a href="lesson_07.html#mistakes">Lesson 3.1</a>)</em></p>
+
+                <h3>Error: The parent theme is missing. Please install the "..." parent theme.</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>Error: The parent theme is missing. Please install the "twenty-twenty-five" parent theme.</code></pre>
+</div>
+                <p><strong>What it means:</strong> A child theme's <code>Template:</code> header names something that is not a theme folder (the parent's display name, a typo), or the parent is not installed. <code>wp theme list</code> does not show the broken child at all.</p>
+                <p><strong>Fix:</strong> Use the parent's folder name (<code>twentytwentyfive</code>) and install the parent first. <em>(<a href="lesson_10.html#mistakes">Lesson 3.4</a>)</em></p>
+
+                <h3>does not meet minimum requirements</h3>
+                <div class="card card-output">
+    <h4>Error (theme, then plugin)</h4>
+    <pre><code>Error: Error: Current WordPress version does not meet minimum requirements for Pages &amp; Co..
+Warning: Failed to activate plugin. Current PHP version (8.5.12) does not meet minimum requirements for Pages &amp;amp; Co. Books. The plugin requires PHP 9.0..
+Error: No plugins activated.</code></pre>
+</div>
+                <p><strong>What it means:</strong> The theme's or plugin's <code>Requires at least</code> / <code>Requires PHP</code> header asks for more than the site has. WordPress checks them on activation and refuses. (The doubled "Error:" and the escaped <code>&amp;amp;</code> are WP-CLI's.)</p>
+                <p><strong>Fix:</strong> Fix the header if it is wrong; otherwise update WordPress or PHP. On hosts still on PHP 8.1, Pages &amp; Co. Books (Requires PHP 8.2) will not activate. <em>(<a href="lesson_08.html#mistakes">Lesson 3.2</a>, <a href="lesson_14.html#exercises">Lesson 5.1</a>)</em></p>
+
+                <h3>Error: Could not get '...' option. Does it exist?</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>Error: Could not get 'pagesco_demo_shop' option. Does it exist?</code></pre>
+</div>
+                <p><strong>What it means:</strong> Three different causes in the course: the option really does not exist (an activation hook that never ran, Lesson 5.1; a cron callback that never ran, Lesson 7.3); or it exists but its serialized value is broken, so <code>unserialize()</code> fails (an SQL <code>REPLACE()</code> changed a string's length, Lesson 2.2).</p>
+                <p><strong>Fix:</strong> Check with <code>wp db query "SELECT option_value FROM wp_options WHERE option_name = …"</code>. Change serialized values through WordPress (<code>update_option()</code>, <code>wp option patch</code>, <code>wp search-replace</code>), never with SQL. Register activation hooks at the top level of the main file. <em>(<a href="lesson_05.html#mistakes">Lesson 2.2</a>, <a href="lesson_14.html#mistakes">Lesson 5.1</a>, <a href="lesson_25.html#mistakes">Lesson 7.3</a>)</em></p>
+
+                <h3>WordPress database error: Table '...' doesn't exist</h3>
+                <div class="card card-output">
+    <h4>Output</h4>
+    <pre><code>&lt;div id="error"&gt;&lt;p class="wpdberror"&gt;&lt;strong&gt;WordPress database error:&lt;/strong&gt; [Table &amp;#039;wordpress.wp_post&amp;#039; doesn&amp;#039;t exist]&lt;br /&gt;&lt;code&gt;SELECT COUNT(*) FROM wp_post&lt;/code&gt;&lt;/p&gt;&lt;/div&gt;NULL</code></pre>
+</div>
+                <p><strong>What it means:</strong> A table name typed by hand (and mistyped), or a table that really is missing: Lesson 8.4's launch database made without <code>--all-tables-with-prefix</code> left out <code>wp_pagesco_events</code>, and only the server log said so. With <code>WP_DEBUG</code> on, <code>$wpdb</code> prints the error as HTML; the query returns NULL either way.</p>
+                <p><strong>Fix:</strong> Use <code>{$wpdb-&gt;posts}</code> and <code>$wpdb-&gt;prefix</code>, never <code>wp_</code>; check <code>$wpdb-&gt;last_error</code> when a query returns nothing; migrate with <code>--all-tables-with-prefix</code> and count the tables in the file. <em>(<a href="lesson_05.html#mistakes">Lesson 2.2</a>, <a href="lesson_29.html#mistakes">Lesson 8.4</a>)</em></p>
+
+                <h3>Error: The pagesco-books options page is not in the allowed options list.</h3>
+                <div class="card card-output">
+    <h4>Output</h4>
+    <pre><code>options.php answered: 500
+Error: The pagesco-books options page is not in the allowed options list.</code></pre>
+</div>
+                <p><strong>What it means:</strong> The settings form called <code>settings_fields()</code> with the page slug (<code>pagesco-books</code>) instead of the option group (<code>pagesco_books</code>).</p>
+                <p><strong>Fix:</strong> <code>settings_fields()</code> takes the first argument of <code>register_setting()</code>; <code>do_settings_sections()</code> takes the page slug. Keep both in constants. <em>(<a href="lesson_17.html#mistakes">Lesson 5.4</a>)</em></p>
+
+                <h3>The link you followed has expired.</h3>
+                <div class="card card-output">
+    <h4>Output</h4>
+    <pre><code>HTTP/1.1 403 Forbidden
+
+&lt;div class="wp-die-message"&gt;The link you followed has expired.&lt;/div&gt;</code></pre>
+</div>
+                <p><strong>What it means:</strong> A nonce check failed: <code>check_admin_referer()</code> got no nonce, a nonce for another action (or another book ID), or an old one. The handler stopped before changing anything.</p>
+                <p><strong>Fix:</strong> Build links with <code>wp_nonce_url( $url, $action )</code> and forms with <code>wp_nonce_field()</code>, and check the <em>same</em> action string. Reload the form page to get a fresh nonce. <em>(<a href="lesson_16.html#nonces">Lesson 5.3</a>, <a href="lesson_17.html#saving">Lesson 5.4</a>)</em></p>
+
+                <h3>Sorry, you are not allowed to access this page.</h3>
+                <div class="card card-output">
+    <h4>Output</h4>
+    <pre><code>HTTP/1.1 403 Forbidden
+
+&lt;div class="wp-die-message"&gt;Sorry, you are not allowed to access this page.&lt;/div&gt;</code></pre>
+</div>
+                <p><strong>What it means:</strong> The admin page was registered with a capability the user lacks (the shop's settings need <code>manage_options</code>; Maria is an editor).</p>
+                <p><strong>Fix:</strong> Correct if intended. Otherwise pick the capability the job needs, not a role. <em>(<a href="lesson_17.html#admin-pages">Lesson 5.4</a>)</em></p>
+
+                <h3>Your theme does not support navigation menus or widgets.</h3>
+                <div class="card card-output">
+    <h4>Output</h4>
+    <pre><code>Your theme does not support navigation menus or widgets.</code></pre>
+</div>
+                <p><strong>What it means:</strong> Appearance &gt; Menus (<code>nav-menus.php</code>) or Widgets with a block theme such as Twenty Twenty-Five, whose menus are Navigation blocks and whose layout is in templates.</p>
+                <p><strong>Fix:</strong> Edit navigation in the Site Editor; the classic screens open with a classic theme that registers menu locations and widget areas (Lesson 4.3). <em>(<a href="lesson_07.html#three-kinds">Lesson 3.1</a>, <a href="lesson_13.html#menus">Lesson 4.3</a>)</em></p>
+
+                <h3>Template part has been deleted or is unavailable: heder</h3>
+                <div class="card card-output">
+    <h4>Output (logged in)</h4>
+    <pre><code>Template part has been deleted or is unavailable: heder</code></pre>
+</div>
+                <p><strong>What it means:</strong> A template part block with a slug that matches no part (here a typo for <code>header</code>). Visitors simply see no header; only logged-in users get this hint, and nothing is logged.</p>
+                <p><strong>Fix:</strong> The slug is the file name in <code>parts/</code> without <code>.html</code>. When a header or footer is missing, check the slug while logged in. <em>(<a href="lesson_08.html#mistakes">Lesson 3.2</a>)</em></p>
+
+                <h3>Block contains unexpected or invalid content.</h3>
+                <div class="card card-output">
+    <h4>Browser console (recorded)</h4>
+    <pre><code>Block validation: Expected token of type `StartTag` (Object), instead saw `Chars` (Object).
+Block validation: Block validation failed for `pagesco/book-card` (Object).</code></pre>
+</div>
+                <p><strong>What it means:</strong> The editor's warning on a static block whose saved HTML no longer matches its <code>save()</code>: <code>save()</code> changed without a deprecation, a <code>source</code> selector caught more than its own value, or <code>save()</code> used <code>__()</code> ("Expected text `Recomendado`, saw `Staff pick`."). The console says what differs.</p>
+                <p><strong>Fix:</strong> Add the old version to the block's <code>deprecated</code> array (with <code>migrate()</code> if attributes changed); keep <code>save()</code> deterministic, with literal text. After every change to <code>save()</code>: insert, save, reload. <em>(<a href="lesson_20.html#deprecations">Lesson 6.2</a>, <a href="lesson_20.html#mistakes">Lesson 6.2</a>)</em></p>
+            </section>
+
+            <section id="rest" class="lesson-section">
+                <h2>🌐 REST API Errors</h2>
+                <p>REST errors arrive as JSON with a <code>code</code>, a <code>message</code> and <code>data.status</code>. Overview in <a href="lesson_23.html#errors">Lesson 7.1</a>.</p>
+
+                <h3>rest_not_logged_in: You are not currently logged in.</h3>
+                <div class="card card-output">
+    <h4>Output</h4>
+    <pre><code>{"code":"rest_not_logged_in","message":"You are not currently logged in.","data":{"status":401}}</code></pre>
+</div>
+                <p><strong>What it means:</strong> The request ran as nobody. Causes in the course: <code>fetch()</code> from wp-admin without the <code>X-WP-Nonce</code> header (the cookie alone does not count), Basic authentication with the account password instead of an application password, or a mistyped or revoked application password (the API deliberately does not say which).</p>
+                <p><strong>Fix:</strong> Use <code>wp.apiFetch</code> (it adds the nonce) or send <code>X-WP-Nonce</code>; for scripts, an application password (Users &gt; Profile shows when it was last used). <em>(<a href="lesson_23.html#mistakes">Lesson 7.1</a>)</em></p>
+
+                <h3>rest_cookie_invalid_nonce: Cookie check failed</h3>
+                <div class="card card-output">
+    <h4>Output</h4>
+    <pre><code>{"code":"rest_cookie_invalid_nonce","message":"Cookie check failed","data":{"status":403}}</code></pre>
+</div>
+                <p><strong>What it means:</strong> A nonce was sent, but it is not valid for this user's session (expired, from another login, or made by another tool).</p>
+                <p><strong>Fix:</strong> Get a fresh nonce from the page (apiFetch does) or from <code>admin-ajax.php?action=rest-nonce</code> with the same cookies. <em>(<a href="lesson_23.html#auth">Lesson 7.1</a>)</em></p>
+
+                <h3>rest_cannot_edit / rest_forbidden: Sorry, you are not allowed to ...</h3>
+                <div class="card card-output">
+    <h4>Output</h4>
+    <pre><code>{"code":"rest_cannot_edit","message":"Sorry, you are not allowed to edit this post.","data":{"status":401}}
+{"code":"rest_cannot_edit","message":"Sorry, you are not allowed to edit this post.","data":{"status":403}}
+{"code":"rest_forbidden","message":"Sorry, you are not allowed to manage events.","data":{"status":403}}</code></pre>
+</div>
+                <p><strong>What it means:</strong> The permission check said no. 401 means nobody is logged in (fix the authentication); 403 means the user is known but may not do this (Devon, an author, editing Maria's Dune). Your own routes return the same through <code>rest_authorization_required_code()</code>.</p>
+                <p><strong>Fix:</strong> Authenticate (401) or use an account with the capability (403). Never "fix" it by loosening <code>permission_callback</code> to <code>__return_true</code> for a write. <em>(<a href="lesson_23.html#errors">Lesson 7.1</a>, <a href="lesson_24.html#permissions">Lesson 7.2</a>)</em></p>
+
+                <h3>rest_invalid_param: Invalid parameter(s) ...</h3>
+                <div class="card card-output">
+    <h4>Output</h4>
+    <pre><code>{"code":"rest_invalid_param","message":"Invalid parameter(s): per_page","data":{"status":400,"params":{"per_page":"per_page must be between 1 (inclusive) and 100 (inclusive)"},"details":{"per_page":{"code":"rest_out_of_bounds","message":"per_page must be between 1 (inclusive) and 100 (inclusive)","data":null}}}}</code></pre>
+</div>
+                <p><strong>What it means:</strong> An argument failed its schema: out of range (<code>rest_out_of_bounds</code>), not in the list (<code>rest_not_in_enum</code>: "orderby is not one of title, newest, and price."), the wrong type (<code>rest_invalid_type</code>, also for registered meta), or your own <code>validate_callback</code> (<code>pagesco_unknown_genre</code>). <code>data.params</code> names each one.</p>
+                <p><strong>Fix:</strong> Send a valid value. When writing routes: one failing <code>validate_callback</code> hides the other arguments' errors, so fix them one round at a time. <em>(<a href="lesson_23.html#reading">Lesson 7.1</a>, <a href="lesson_24.html#args">Lesson 7.2</a>, <a href="lesson_15.html#mistakes">Lesson 5.2</a>)</em></p>
+
+                <h3>rest_no_route: No route was found matching the URL and request method.</h3>
+                <div class="card card-output">
+    <h4>Output</h4>
+    <pre><code>{"code":"rest_no_route","message":"No route was found matching the URL and request method.","data":{"status":404}}
+{"code":"rest_post_invalid_id","message":"Invalid post ID.","data":{"status":404}}</code></pre>
+</div>
+                <p><strong>What it means:</strong> A typo in the route (<code>/bookz</code>), the wrong HTTP method for it, or a route registered on the wrong hook; the second message is a real route with an ID that does not exist.</p>
+                <p><strong>Fix:</strong> Compare with the index (<code>/wp-json/</code> or <code>/wp-json/pagesco/v1</code>); register routes on <code>rest_api_init</code>. <em>(<a href="lesson_23.html#errors">Lesson 7.1</a>)</em></p>
+
+                <h3>HTTP/1.1 500 Internal Server Error with "data":null</h3>
+                <div class="card card-output">
+    <h4>Output</h4>
+    <pre><code>HTTP/1.1 500 Internal Server Error
+{"code":"pagesco_book_not_found","message":"No book was found with that ID.","data":null}</code></pre>
+</div>
+                <p><strong>What it means:</strong> A REST callback returned a <code>WP_Error</code> without a status, which is sent as 500: clients believe the server broke and may retry.</p>
+                <p><strong>Fix:</strong> Give every error its status: <code>new WP_Error( 'pagesco_book_not_found', $message, array( 'status' =&gt; 404 ) )</code>. <em>(<a href="lesson_24.html#mistakes">Lesson 7.2</a>)</em></p>
+            </section>
+
+            <section id="http-cron" class="lesson-section">
+                <h2>📞 HTTP, Cron and Database Server Errors</h2>
+
+                <h3>http_request_failed: cURL error 28 (timeout) / cURL error 6 (could not resolve host)</h3>
+                <div class="card card-output">
+    <h4>Output</h4>
+    <pre><code>http_request_failed: cURL error 28: Operation timed out after 2056 milliseconds with 0 bytes received
+No host:    WP_Error http_request_failed: cURL error 6: Could not resolve host: supplier.invalid (Domain name not found)</code></pre>
+</div>
+                <p><strong>What it means:</strong> The request got no answer at all: too slow for the <code>timeout</code>, or a host name that does not exist. These are <code>WP_Error</code>s; a 401 or 503 is an answer, an array.</p>
+                <p><strong>Fix:</strong> Treat it as "the supplier is not reachable": cache the failure briefly (the course caches it for 5 minutes) and show a clear message. Keep timeouts short on page views. <em>(<a href="lesson_25.html#http">Lesson 7.3</a>)</em></p>
+
+                <h3>A valid URL was not provided.</h3>
+                <div class="card card-output">
+    <h4>Output</h4>
+    <pre><code>http://192.168.1.10/                                      A valid URL was not provided.
+http://127.0.0.1:8080/                                    A valid URL was not provided.</code></pre>
+</div>
+                <p><strong>What it means:</strong> <code>wp_safe_remote_get()</code> refused an address on a private network: the protection against SSRF for URLs that come from users.</p>
+                <p><strong>Fix:</strong> Correct for user-supplied URLs. For your own configured service use <code>wp_remote_get()</code>. <em>(<a href="lesson_25.html#http">Lesson 7.3</a>)</em></p>
+
+                <h3>invalid_schedule: Event schedule does not exist.</h3>
+                <div class="card card-output">
+    <h4>Output</h4>
+    <pre><code>invalid_schedule: Event schedule does not exist.</code></pre>
+</div>
+                <p><strong>What it means:</strong> <code>wp_schedule_event()</code> got a recurrence name WordPress does not know (with <code>$wp_error</code> set to true; otherwise it just returns false).</p>
+                <p><strong>Fix:</strong> Use <code>hourly</code>, <code>twicedaily</code>, <code>daily</code>, <code>weekly</code>, or add your own on the <code>cron_schedules</code> filter (<code>wp cron schedule list</code> shows them). <em>(<a href="lesson_25.html#cron">Lesson 7.3</a>)</em></p>
+
+                <h3>Error: The DISABLE_WP_CRON constant is set to true. WP-Cron spawning is disabled.</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>Error: The DISABLE_WP_CRON constant is set to true. WP-Cron spawning is disabled.</code></pre>
+</div>
+                <p><strong>What it means:</strong> <code>wp cron test</code> on a production-configured site, where page views no longer trigger WP-Cron. Expected, as long as a real cron job runs <code>wp cron event run --due-now</code>.</p>
+                <p><strong>Fix:</strong> Check the scheduler instead (the rehearsal site: <code>docker compose logs cron</code>). <em>(<a href="lesson_29.html#project">Lesson 8.4</a>)</em></p>
+
+                <h3>mariadb-dump: Got error: 1044 ... when using LOCK TABLES</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>mariadb-dump: Got error: 1044: "Access denied for user 'pagesco_app'@'%' to database 'pagesco'" when using LOCK TABLES</code></pre>
+</div>
+                <p><strong>What it means:</strong> <code>wp db export</code> with a least-privilege database account that may not lock tables. It also leaves a header-only file with the backup's name (831 bytes). The related <code>ERROR 1044 (42000) ... to database 'test'</code> after <code>CREATE DATABASE</code> is the same restriction, working as intended.</p>
+                <p><strong>Fix:</strong> Grant exactly that right, as root: <code>GRANT LOCK TABLES ON pagesco.* TO 'pagesco_app'@'%';</code>. Judge a backup by its size and a restore test, not by its file name; read the whole output of <code>wp db import</code>, which can print errors and still end with "Success". <em>(<a href="lesson_29.html#project">Lesson 8.4</a>)</em></p>
+            </section>
+
+            <section id="tools" class="lesson-section">
+                <h2>🧪 Build, Lint and Test Messages</h2>
+
+                <h3>make-pot: contains placeholders but has no "translators:" comment / Multiple placeholders should be ordered.</h3>
+                <div class="card card-output">
+    <h4>Output</h4>
+    <pre><code>Warning: The string "Showing %s of %s books" contains placeholders but has no "translators:" comment to clarify their meaning. (strings.php:11)
+Warning: Multiple placeholders should be ordered. (strings.php:11)</code></pre>
+</div>
+                <p><strong>What it means:</strong> <code>wp i18n make-pot</code> found strings a translator cannot handle well. It still writes the file and exits successfully, and it says nothing about fragments (<code>'Books in '</code>) or <code>__( $variable )</code>, which produces no entry at all.</p>
+                <p><strong>Fix:</strong> A <code>/* translators: */</code> comment, numbered placeholders (<code>%1$s</code>), whole sentences, <code>_n()</code> for numbers. <em>(<a href="lesson_28.html#mistakes">Lesson 8.3</a>)</em></p>
+
+                <h3>Overriding WordPress globals is prohibited. Found assignment to $title</h3>
+                <div class="card card-output">
+    <h4>Output</h4>
+    <pre><code> 10 | ERROR | Overriding WordPress globals is prohibited. Found assignment to
+    |       | $title (WordPress.WP.GlobalVariablesOverride.Prohibited)</code></pre>
+</div>
+                <p><strong>What it means:</strong> PHPCS (WPCS) sees a top-level variable named like a WordPress global. In a block's <code>render.php</code> it happens to be local, but the sniff cannot know that.</p>
+                <p><strong>Fix:</strong> A specific name (<code>$book_title</code>) costs nothing. Fix cheap findings; document real exceptions with <code>// phpcs:ignore Rule -- reason</code>. <em>(<a href="lesson_30.html#mistakes">Lesson 9.1</a>, <a href="lesson_26.html#phpcs">Lesson 8.1</a>)</em></p>
+
+                <h3>An error occurred inside PHPUnit: Call to undefined method TestSuite::empty()</h3>
+                <div class="card card-output">
+    <h4>Error</h4>
+    <pre><code>An error occurred inside PHPUnit.
+
+Message:  Call to undefined method PHPUnit\Framework\TestSuite::empty()</code></pre>
+</div>
+                <p><strong>What it means:</strong> Bare <code>phpunit</code> in the wp-env container starts the global PHPUnit 10.5, which meets the plugin's PHPUnit 9 classes and the WordPress test library written for 9.</p>
+                <p><strong>Fix:</strong> Run the project's copy: <code>npx @wordpress/env run cli --env-cwd=wp-content/plugins/pagesco-books vendor/bin/phpunit</code>. <em>(<a href="lesson_26.html#mistakes">Lesson 8.1</a>)</em></p>
+
+                <h3>prompt_invalid_argument: No models found that support text_generation for this prompt.</h3>
+                <div class="card card-output">
+    <h4>Output</h4>
+    <pre><code>prompt_invalid_argument: No models found that support text_generation for this prompt.</code></pre>
+</div>
+                <p><strong>What it means:</strong> The AI client has no provider: none ships with core. With <code>WP_AI_SUPPORT</code> false the answer is <code>prompt_prevented</code> (503) "AI features are not supported in this environment." instead.</p>
+                <p><strong>Fix:</strong> Install a provider plugin and add its key under Settings &gt; Connectors; in code, always handle the <code>WP_Error</code>. <em>(<a href="lesson_31.html#ai">Lesson 9.2</a>)</em></p>
+            </section>
+
+            <section id="silent" class="lesson-section">
+                <h2>🤫 Silent Failures: No Message at All</h2>
+                <p>The course shows these on purpose because nothing warns you: WordPress does exactly what the code says. If something "just does not work", look for your symptom here.</p>
+                <div class="table-wrap">
+<table>
+<thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th><th>Lesson</th></tr></thead>
+<tbody>
+<tr><td>A new page answers 404</td><td><code>wp post create</code> and <code>wp_insert_post()</code> default to <code>draft</code>, which has no slug yet</td><td>pass <code>--post_status=publish</code></td><td><a href="lesson_04.html#mistakes">Lesson 2.1</a></td></tr>
+<tr><td>Links to <code>/sample-page/</code> open the old page</td><td>the slug was taken, so the new page became <code>sample-page-2</code></td><td>check <code>post_name</code>; set it with <code>--post_name</code></td><td><a href="lesson_04.html#mistakes">Lesson 2.1</a></td></tr>
+<tr><td>An administrator is locked out of a feature</td><td>the code checked a role (<code>editor</code>), not a capability</td><td><code>current_user_can( 'edit_others_posts' )</code></td><td><a href="lesson_04.html#mistakes">Lesson 2.1</a></td></tr>
+<tr><td>A "long read" label on a two-minute post</td><td><code>get_post_meta()</code> without <code>true</code> returns an array</td><td>pass <code>true</code> for single values</td><td><a href="lesson_05.html#mistakes">Lesson 2.2</a></td></tr>
+<tr><td>Meta and term rows of deleted posts remain</td><td>rows deleted with SQL leave orphans</td><td><code>wp_delete_post()</code> / <code>wp post delete --force</code></td><td><a href="lesson_05.html#mistakes">Lesson 2.2</a></td></tr>
+<tr><td>A dangerous link survives "escaping"</td><td><code>esc_html()</code> used for an <code>href</code></td><td><code>esc_url()</code> for URLs, <code>esc_attr()</code> for attributes</td><td><a href="lesson_03.html#mistakes">Lesson 1.3</a></td></tr>
+<tr><td>Text appears before an empty heading</td><td><code>_e()</code> or <code>the_title()</code> inside a concatenation (they print, return null)</td><td><code>__()</code>, <code>get_the_title()</code>, or <code>the_title( '&lt;h2&gt;', '&lt;/h2&gt;' )</code></td><td><a href="lesson_11.html#mistakes">Lesson 4.1</a></td></tr>
+<tr><td><code>remove_action()</code> "does nothing"</td><td>wrong priority, or called before the <code>add_action()</code> it undoes</td><td>same priority; remove parent-theme hooks on <code>after_setup_theme</code></td><td><a href="lesson_06.html#mistakes">Lesson 2.3</a></td></tr>
+<tr><td><code>home.html</code> does not style the front page</td><td>with a static front page, <code>home</code> is the blog index</td><td><code>front-page.html</code></td><td><a href="lesson_07.html#mistakes">Lesson 3.1</a></td></tr>
+<tr><td>The store notice is missing in a classic theme</td><td>the template never calls <code>wp_body_open()</code></td><td>call <code>wp_head()</code>, <code>wp_body_open()</code>, <code>wp_footer()</code></td><td><a href="lesson_07.html#mistakes">Lesson 3.1</a></td></tr>
+<tr><td>Changes to a template file do not appear</td><td>a Site Editor copy (<code>wp_template</code>, source <code>custom</code>) wins over the file</td><td>Reset in the Site Editor or <code>wp post delete ID --force</code>; export first to keep it</td><td><a href="lesson_08.html#mistakes">Lesson 3.2</a></td></tr>
+<tr><td>A new pattern file is not in the inserter</td><td>the pattern list is cached per theme Version (without development mode)</td><td>raise the theme's <code>Version</code>; <code>WP_DEVELOPMENT_MODE</code> <code>theme</code> locally</td><td><a href="lesson_29.html#configuration">Lesson 8.4</a></td></tr>
+<tr><td>The web font never appears</td><td>a typo in the <code>fontFace</code> path: the browser gets a 404, PHP says nothing</td><td>the Network panel, filter Font</td><td><a href="lesson_09.html#mistakes">Lesson 3.3</a></td></tr>
+<tr><td>Opening hours vanish from two pages</td><td>the synced pattern they reference was deleted (permanently)</td><td>recreate it with <code>--import_id</code>; detach before deleting</td><td><a href="lesson_09.html#mistakes">Lesson 3.3</a></td></tr>
+<tr><td>Accent colors are gone in a child theme</td><td>a child's preset list replaces the parent's, it does not merge</td><td>repeat every slug the parent uses</td><td><a href="lesson_10.html#mistakes">Lesson 3.4</a></td></tr>
+<tr><td>Raw block comments in the page</td><td><code>get_the_content()</code> returns stored markup; only <code>the_content()</code> renders blocks</td><td><code>the_content()</code> or <code>apply_filters( 'the_content', … )</code></td><td><a href="lesson_11.html#mistakes">Lesson 4.1</a></td></tr>
+<tr><td>A template part prints nothing</td><td><code>get_template_part( '…/content.php' )</code>: WordPress adds <code>.php</code> itself</td><td>leave the extension off; <code>false</code> means not found</td><td><a href="lesson_11.html#mistakes">Lesson 4.1</a></td></tr>
+<tr><td>Page 2 of a custom list is a 404</td><td>the main query decides the page count before your template runs</td><td>change the main query in <code>pre_get_posts</code></td><td><a href="lesson_12.html#mistakes">Lesson 4.2</a></td></tr>
+<tr><td>Previous/next links point to the wrong posts</td><td>a secondary Loop without <code>wp_reset_postdata()</code></td><td>reset after every secondary Loop</td><td><a href="lesson_12.html#mistakes">Lesson 4.2</a></td></tr>
+<tr><td>WP-CLI and the admin list one post</td><td>a <code>pre_get_posts</code> callback without guards changes every query</td><td><code>is_admin()</code>, <code>is_main_query()</code>, the page type</td><td><a href="lesson_12.html#mistakes">Lesson 4.2</a></td></tr>
+<tr><td>A category filter returns every post</td><td><code>'cat' =&gt; 'news'</code>: <code>cat</code> takes IDs</td><td><code>'category_name' =&gt; 'news'</code></td><td><a href="lesson_12.html#mistakes">Lesson 4.2</a></td></tr>
+<tr><td>A stylesheet change "did not work"</td><td>enqueued without a version: <code>?ver=7.1.3</code> stays cached</td><td>pass the theme's or plugin's Version</td><td><a href="lesson_13.html#mistakes">Lesson 4.3</a></td></tr>
+<tr><td>A menu shows every page, Sample Page included</td><td>a typo in <code>theme_location</code> falls back to <code>wp_page_menu()</code></td><td>copy the location ID; <code>'fallback_cb' =&gt; false</code></td><td><a href="lesson_13.html#mistakes">Lesson 4.3</a></td></tr>
+<tr><td>Single books return 404</td><td>rewrite rules not flushed after registering the post type</td><td>flush on activation, after registering the type (never on every request)</td><td><a href="lesson_15.html#mistakes">Lesson 5.2</a></td></tr>
+<tr><td>Genres set in a script vanish</td><td><code>tax_input</code> is dropped when the current user may not assign terms (WP-CLI runs as no user)</td><td><code>wp_set_object_terms()</code></td><td><a href="lesson_15.html#mistakes">Lesson 5.2</a></td></tr>
+<tr><td>An author could create books through your handler</td><td><code>wp_insert_post()</code> never checks capabilities; a nonce is not a permission</td><td><code>current_user_can()</code> for the specific object</td><td><a href="lesson_16.html#mistakes">Lesson 5.3</a></td></tr>
+<tr><td>Settings lose their other values</td><td><code>update_option()</code> with part of the array replaces the whole value</td><td>merge first, or <code>wp option patch update</code></td><td><a href="lesson_17.html#mistakes">Lesson 5.4</a></td></tr>
+<tr><td>Shortcode output above <code>&lt;!DOCTYPE html&gt;</code></td><td>the callback echoes instead of returning</td><td><code>return</code> the HTML (or <code>ob_start()</code> … <code>ob_get_clean()</code>)</td><td><a href="lesson_18.html#mistakes">Lesson 5.5</a></td></tr>
+<tr><td>A new table column never appears</td><td>the schema changed but <code>DB_VERSION</code> did not</td><td>raise the version with every schema change</td><td><a href="lesson_18.html#mistakes">Lesson 5.5</a></td></tr>
+<tr><td>A "renamed" column is empty, the old one still there</td><td><code>dbDelta()</code> only adds; it never renames or drops</td><td>an explicit, versioned <code>ALTER TABLE</code> step</td><td><a href="lesson_18.html#mistakes">Lesson 5.5</a></td></tr>
+<tr><td>A block change in <code>src/</code> has no effect</td><td>WordPress reads only <code>build/</code></td><td><code>npm run build</code> or keep <code>npm start</code> running</td><td><a href="lesson_19.html#mistakes">Lesson 6.1</a></td></tr>
+<tr><td>A hot fix in <code>build/</code> disappears</td><td>the next build empties <code>build/blocks/</code></td><td>edit <code>src/</code>, then build</td><td><a href="lesson_21.html#mistakes">Lesson 6.3</a></td></tr>
+<tr><td>A bound paragraph shows "Author"</td><td>the binding's meta key is misspelled, protected (<code>_</code>) or not <code>show_in_rest</code></td><td>keys from <code>BookMeta::fields()</code>; <code>get_registered_meta_keys()</code></td><td><a href="lesson_21.html#mistakes">Lesson 6.3</a></td></tr>
+<tr><td>Every filter click reloads the page</td><td>no <code>--experimental-modules</code> (no <code>view.js</code> built), or a store namespace typo</td><td>check <code>build/</code> for <code>view.js</code>; one spelling of the namespace</td><td><a href="lesson_22.html#mistakes">Lesson 6.4</a></td></tr>
+<tr><td><code>_embed</code> embeds nothing</td><td><code>_fields</code> without <code>_links</code> and <code>_embedded</code></td><td>add both to <code>_fields</code></td><td><a href="lesson_23.html#mistakes">Lesson 7.1</a></td></tr>
+<tr><td><code>per_page=500</code> is accepted</td><td>a custom <code>sanitize_callback</code> switches off the schema check</td><td>add <code>'validate_callback' =&gt; 'rest_validate_request_arg'</code></td><td><a href="lesson_24.html#mistakes">Lesson 7.2</a></td></tr>
+<tr><td>Four daily events of the same hook</td><td>scheduling on <code>init</code> without <code>wp_next_scheduled()</code></td><td>schedule once, on activation</td><td><a href="lesson_25.html#mistakes">Lesson 7.3</a></td></tr>
+<tr><td>A cron job runs and does nothing</td><td>its callback is added only inside <code>is_admin()</code></td><td>add cron callbacks unconditionally</td><td><a href="lesson_25.html#mistakes">Lesson 7.3</a></td></tr>
+<tr><td>The Events page shows yesterday's list</td><td>a cache without invalidation</td><td>cache at the data layer with a last-changed key</td><td><a href="lesson_27.html#mistakes">Lesson 8.2</a></td></tr>
+<tr><td>One query per book</td><td>N+1: <code>'fields' =&gt; 'ids'</code> skips the meta cache</td><td><code>update_postmeta_cache( $ids )</code></td><td><a href="lesson_27.html#mistakes">Lesson 8.2</a></td></tr>
+<tr><td>LCP half a second slower</td><td>the hero (LCP) image was lazy-loaded</td><td>lazy-load only below the fold; preload the LCP image</td><td><a href="lesson_27.html#mistakes">Lesson 8.2</a></td></tr>
+<tr><td>An uninstall leaves the genres behind</td><td><code>get_terms()</code> on a taxonomy that is not registered returns <code>WP_Error</code> ("Invalid taxonomy.")</td><td>register the taxonomy in <code>uninstall.php</code> first</td><td><a href="lesson_28.html#mistakes">Lesson 8.3</a></td></tr>
+<tr><td>The site name reads "Pages &amp;amp; Co." in a front end</td><td>the field is already HTML (<code>blogname</code> is stored escaped) and was escaped again</td><td>turn HTML into text once, then use <code>textContent</code></td><td><a href="lesson_31.html#mistakes">Lesson 9.2</a></td></tr>
+<tr><td>A headless front end shows six of eleven books</td><td>it read only the first page</td><td>loop until <code>X-WP-TotalPages</code></td><td><a href="lesson_31.html#mistakes">Lesson 9.2</a></td></tr>
+<tr><td>Anyone who may delete their own posts can delete everyone's</td><td>the handler checked <code>delete_posts</code> ("any post"), not this post</td><td><code>current_user_can( 'delete_post', $id )</code>; ownership in the SQL for custom tables</td><td><a href="lesson_30.html#mistakes">Lesson 9.1</a></td></tr>
+</tbody>
+</table>
+</div>
             </section>
 
             <nav class="lesson-nav" aria-label="Page Navigation">
