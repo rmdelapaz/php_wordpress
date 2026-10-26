@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Set up a professional local WordPress 7.1 development site on PHP 8.5 and MySQL 9.7 with Docker Compose: WP-CLI and the wp shortcut, WP_DEBUG and debug.log, Mailpit for email, VS Code, Linux and WSL file permissions, plus wp-env and WordPress Playground as alternatives. PHP and WordPress Development Lesson 1.2.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Your Local Development Environment - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 1: Getting Started</a></li>
+            <li aria-current="page">Lesson 1.2: Your Local Development Environment</li>
+        </ul>
+    </nav>
+
+    <main id="main-content" data-state="fresh">
+        <div class="container">
+            <header>
+                <h1>🐳 Lesson 1.2: Your Local Development Environment</h1>
+                <p class="lead">Professional WordPress developers never write code on the live site. They work on a copy that runs on their own computer, where they can break things, read every error and try again in seconds. In this lesson you set up that copy for Pages &amp; Co.: WordPress 7.1 on PHP 8.5 and MySQL 9.7, running in Docker containers, with WP-CLI to control it from the command line, a debug log that catches every error, and a mail catcher that keeps test emails off the internet. It is the site every remaining lesson builds on, so take your time and get it right once.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Install Docker and start the course's Docker Compose project: WordPress, MySQL, WP-CLI and Mailpit</li>
+                        <li>Install WordPress from the command line with WP-CLI and use the <code>wp</code> shortcut for everyday tasks</li>
+                        <li>Fix the Linux and WSL file-ownership problem so your editor can save into <code>wp-content/</code></li>
+                        <li>Find and read PHP errors on the page and in <code>wp-content/debug.log</code>, and catch WordPress email in Mailpit</li>
+                        <li>Start, stop and reset the site safely, and know when <code>wp-env</code> or WordPress Playground is the better tool</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 150 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_01.html">Lesson 1.1: WordPress for Developers</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> the Pages &amp; Co. development site at <code>http://localhost:8080</code>, checked end to end by a health-check script</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1.3 on PHP 8.5, MySQL 9.7, WP-CLI 2.12 (notes for PHP 8.4 and MariaDB where they differ)</li>
+                    <li><span class="meta-label">🧱 Site</span> Docker Desktop (Windows with WSL 2, macOS) or Docker Engine (Linux), the course starter <a href="downloads/pagesco-dev.zip"><code>pagesco-dev.zip</code></a>, VS Code</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#overview" class="toc-link">What You Are Setting Up</a></li>
+                        <li><a href="#docker" class="toc-link">Install Docker</a></li>
+                        <li><a href="#starter" class="toc-link">Get the Starter Project</a></li>
+                        <li><a href="#linux-owner" class="toc-link">Linux and WSL: Run WordPress as You</a></li>
+                        <li><a href="#start" class="toc-link">Start and Install WordPress</a></li>
+                        <li><a href="#wp-cli" class="toc-link">WP-CLI and the wp Shortcut</a></li>
+                        <li><a href="#debugging" class="toc-link">Debugging: WP_DEBUG and debug.log</a></li>
+                        <li><a href="#mailpit" class="toc-link">Email with Mailpit</a></li>
+                        <li><a href="#editor" class="toc-link">Your Editor</a></li>
+                        <li><a href="#workflow" class="toc-link">Everyday Commands: Start, Stop, Reset</a></li>
+                        <li><a href="#alternatives" class="toc-link">Alternatives: wp-env and Playground</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: The Dev Site Health Check</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="overview" class="lesson-section">
+                <h2>🧩 What You Are Setting Up</h2>
+                <p>WordPress needs a web server with PHP and a MySQL database. You could install Apache, PHP and MySQL directly on your computer, as you may have done in the Foundations courses, but then your computer's versions decide what you test against, and the next project needs different ones. <strong>Docker</strong> runs each piece in its own <em>container</em>: a small, isolated Linux system started from an <em>image</em> that contains exactly one version of the software. <strong>Docker Compose</strong> starts several containers together from one file, <code>compose.yaml</code>, and connects them on a private network. Everyone taking this course runs the same images, so your site behaves like the one the lessons were tested on, on Windows, macOS and Linux alike.</p>
+
+                <div class="mermaid">
+graph TD
+    A["Browser"] --> B["wordpress: Apache, PHP"]
+    F["Editor: wordpress/"] --> B
+    B --> C["db: MySQL"]
+    D["wpcli: WP-CLI"] --> C
+    B --> E["mailpit: email"]
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Service</th><th>Image</th><th>What it does</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>wordpress</code></td><td><code>wordpress:7.1-php8.5-apache</code></td><td>Apache with PHP 8.5.12 and WordPress 7.1.3; serves the site on <code>http://localhost:8080</code></td></tr>
+                            <tr><td><code>db</code></td><td><code>mysql:9.7</code></td><td>The database server; your data lives in a Docker volume called <code>db_data</code></td></tr>
+                            <tr><td><code>wpcli</code></td><td><code>pagesco-wpcli:php8.5</code>, built from <code>wordpress:cli-php8.5</code></td><td>WP-CLI 2.12, the command-line tool for WordPress; started only when you run a command</td></tr>
+                            <tr><td><code>mailpit</code></td><td><code>axllent/mailpit</code></td><td>A fake mail server with a web inbox on <code>http://localhost:8025</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: a food truck, not a restaurant</h4>
+                    <p>Installing a server stack on your computer is like building a restaurant kitchen into your home: it works, but it is hard to change and hard to remove. A Docker setup is a food truck you park next to the house. Everything the kitchen needs comes with the truck, you can drive it away (<code>docker compose down</code>) and park an identical one tomorrow, and nothing in the house changes. The one thing that stays in the house is your work: the <code>wordpress/</code> folder with your theme and plugin is a normal folder on your disk that the truck can reach through a window (a <em>bind mount</em>), so your editor and WordPress see the same files.</p>
+                </div>
+            </section>
+
+            <section id="docker" class="lesson-section">
+                <h2>📥 Install Docker</h2>
+                <p>Skip this section if <code>docker compose version</code> already prints a version 2 or newer in your terminal (the Docker lessons of PHP Foundations or MySQL Foundations may have set you up). Otherwise follow the part for your system. Docker Desktop is free for personal use, education and small businesses; larger companies need a paid subscription, so check if you install it on a work computer.</p>
+
+                <h3>🪟 Windows 10 and 11: WSL 2 plus Docker Desktop</h3>
+                <ol>
+                    <li>Install WSL 2 with Ubuntu. Open PowerShell <strong>as administrator</strong>, run the command below, restart when asked, and create a Linux user name and password when Ubuntu starts for the first time.</li>
+                </ol>
+                <pre data-norun><code class="language-powershell">wsl --install</code></pre>
+                <ol start="2">
+                    <li>Install <a href="https://www.docker.com/products/docker-desktop/" target="_blank" rel="noopener">Docker Desktop for Windows</a> with the WSL 2 backend (the installer's default). Start it, open <strong>Settings &gt; Resources &gt; WSL integration</strong> and switch on your Ubuntu distribution.</li>
+                    <li>From now on, open the <strong>Ubuntu</strong> app for every command in this course, and keep your project inside the Linux file system (your Linux home folder, <code>~</code>), not under <code>/mnt/c/</code>. Files on the Windows drive work, but every page load then crosses from Linux to Windows and WordPress becomes many times slower.</li>
+                </ol>
+                <p>Inside Ubuntu you are on Linux: follow the Linux steps in "Linux and WSL: Run WordPress as You" below as well.</p>
+
+                <h3>🍎 macOS</h3>
+                <p>Install <a href="https://www.docker.com/products/docker-desktop/" target="_blank" rel="noopener">Docker Desktop for Mac</a> (pick Apple silicon or Intel to match your Mac), start it once from Applications and wait until it says it is running. All the course images run natively on both kinds of Mac. Use the Terminal app for the commands.</p>
+
+                <h3>🐧 Linux</h3>
+                <p>Install Docker Engine and the Compose plugin from Docker's own package repository by following <a href="https://docs.docker.com/engine/install/" target="_blank" rel="noopener">docs.docker.com/engine/install</a> for your distribution (the packages your distribution ships are often too old). Then let your user run Docker without <code>sudo</code>, and log out and back in for it to take effect:</p>
+                <pre data-norun><code class="language-bash">sudo usermod -aG docker "$USER"</code></pre>
+
+                <h3>Check the installation</h3>
+                <pre data-norun><code class="language-bash">docker --version
+docker compose version
+docker run --rm hello-world</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your version numbers will differ)</h4>
+                    <pre><code>Docker version 29.6.2, build ...
+Docker Compose version v5.3.1
+
+Hello from Docker!
+This message shows that your installation appears to be working correctly.
+...</code></pre>
+                </div>
+                <p>Write <code>docker compose</code> with a space. The old separate program <code>docker-compose</code>, with a hyphen, is retired; tutorials that use it, and the <code>version: '3.8'</code> line they put at the top of the file, are from before Compose version 2.</p>
+            </section>
+
+            <section id="starter" class="lesson-section">
+                <h2>📦 Get the Starter Project</h2>
+                <p>The course ships a ready-made Compose project, <code>pagesco-dev</code>. Download <a href="downloads/pagesco-dev.zip"><strong>pagesco-dev.zip</strong></a> and unpack it in your home folder, or do both from the terminal (on Ubuntu and WSL, <code>sudo apt install unzip</code> first if <code>unzip</code> is missing):</p>
+                <pre data-norun><code class="language-bash">cd ~
+curl -LO https://rays-php-wordpress.netlify.app/downloads/pagesco-dev.zip
+unzip pagesco-dev.zip
+cd pagesco-dev</code></pre>
+                <p>From here on, <strong>your project folder</strong> means <code>pagesco-dev</code>, and every <code>docker compose</code> command runs inside it. (You can browse the same files online in <a href="downloads/pagesco-dev/compose.yaml"><code>downloads/pagesco-dev/</code></a>.) This is what you unpacked:</p>
+                <pre data-norun><code class="language-text">pagesco-dev/
+  compose.yaml                          the four services
+  config/apache-8080.conf               Apache also listens on port 8080 inside the container
+  config/php-dev.ini                    development PHP settings: show every error, 64 MB uploads
+  config/wpcli.Dockerfile               the WP-CLI image: official image + three fixes
+  config/mariadb-local.sh               lets "wp db ..." talk to MySQL 9.7's dev certificate
+  config/wp-cli.yml                     WP-CLI settings (used inside the image)
+  config/quiet-wp-cli-deprecations.php  hides WP-CLI's own PHP 8.5 notices, not yours
+  config/mailpit-smtp.php               a must-use plugin you install later in this lesson
+  config/compose.linux.yaml             Linux and WSL only: run WordPress as your user</code></pre>
+
+                <p>Open <code>compose.yaml</code> and read it once; you already know YAML's shape from configuration files, and every line is commented or obvious. The <code>wordpress</code> service, shortened:</p>
+                <pre data-norun><code class="language-yaml">  wordpress:
+    image: wordpress:7.1-php8.5-apache
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment: *wp-env
+    volumes:
+      - ./wordpress:/var/www/html
+      - ./config/apache-8080.conf:/etc/apache2/conf-enabled/zz-port-8080.conf:ro
+      - ./config/php-dev.ini:/usr/local/etc/php/conf.d/zz-dev.ini:ro</code></pre>
+                <ul>
+                    <li><code>ports: "8080:8080"</code> connects port 8080 on your computer to port 8080 in the container. Most Docker tutorials map <code>8080:80</code>. The course serves 8080 <em>inside</em> the container too, because WordPress sometimes calls its own address (scheduled tasks, Site Health, the REST self-test): with <code>8080:80</code> those calls to <code>http://localhost:8080</code> from inside the container reach nothing.</li>
+                    <li><code>./wordpress:/var/www/html</code> is the bind mount: the folder <code>wordpress/</code> next to <code>compose.yaml</code> <em>is</em> the WordPress root inside the container. The first start fills it with WordPress, and your theme and plugin will live in <code>wordpress/wp-content/</code>.</li>
+                    <li><code>environment: *wp-env</code> reuses the block of settings at the top of the file: the database name, user and password (<code>wordpress</code> / <code>wordpress-dev-only</code>, fine for a site that only exists on your computer), <code>WORDPRESS_DEBUG: 1</code>, and extra lines for <code>wp-config.php</code>. You will see where they end up in the debugging section.</li>
+                    <li><code>depends_on ... service_healthy</code> waits until MySQL answers before WordPress starts, so you never see "Error establishing a database connection" just because the database was still booting.</li>
+                </ul>
+            </section>
+
+            <section id="linux-owner" class="lesson-section">
+                <h2>🐧 Linux and WSL: Run WordPress as You</h2>
+                <p><strong>macOS and Windows users who keep the project on the Windows drive: skip this section.</strong> Docker Desktop on those systems makes files from the container appear as yours automatically. On Linux, and inside WSL (where Docker Desktop's containers write straight into your Linux file system), the files in a bind mount belong to whichever user the container ran as. The WordPress image runs Apache as <code>www-data</code>, user number 33, and creates every WordPress file as that user. The result, measured on WSL 2 with Docker Desktop:</p>
+                <pre data-norun><code class="language-bash">ls -ln wordpress/wp-content
+mkdir wordpress/wp-content/mu-plugins</code></pre>
+                <div class="card card-output">
+                    <h4>Error (Linux and WSL, without the fix)</h4>
+                    <pre><code>total 12
+-rw-r--r-- 1 33 33   28 Jan  8  2012 index.php
+drwxr-xr-x 3 33 33 4096 Aug 18 16:42 plugins
+drwxr-xr-x 5 33 33 4096 Aug 12 07:45 themes
+mkdir: cannot create directory ‘wordpress/wp-content/mu-plugins’: Permission denied</code></pre>
+                </div>
+                <p>Owner 33, group 33, and only the owner may write. Your user (usually number 1000) can read the files but not save a theme, a plugin or even a new folder. You could hand everything back to yourself with <code>sudo chown</code>, but WordPress would then be unable to write uploads and the debug log, and every file it creates later would again belong to 33. The clean fix is to run the <code>wordpress</code> and <code>wpcli</code> containers <strong>as your own user</strong>, so everyone writes files as the same person: you. The starter ships the setting in <code>config/compose.linux.yaml</code>. Do this once, in the project folder, <strong>before the first start</strong>:</p>
+                <pre data-norun><code class="language-bash">printf 'PAGESCO_UID=%s\nPAGESCO_GID=%s\n' "$(id -u)" "$(id -g)" &gt; .env
+cp config/compose.linux.yaml compose.override.yaml
+mkdir wordpress
+cat .env</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your numbers may differ)</h4>
+                    <pre><code>PAGESCO_UID=1000
+PAGESCO_GID=1000</code></pre>
+                </div>
+                <p>What the three steps do:</p>
+                <ul>
+                    <li><code>.env</code> holds your user and group numbers (<code>id -u</code>, <code>id -g</code>). Docker Compose reads a file with that name automatically and fills in <code>${PAGESCO_UID}</code> wherever <code>compose.yaml</code> or an override uses it.</li>
+                    <li><code>compose.override.yaml</code> is another name Compose looks for: it merges it over <code>compose.yaml</code> on every command. Ours adds one line to two services, <code>user: "${PAGESCO_UID}:${PAGESCO_GID}"</code>. Apache in the official image is happy to run as any user, because it serves port 8080, not one of the ports below 1024 that need root.</li>
+                    <li><code>mkdir wordpress</code> creates the mount folder as you. If Docker has to create it, it creates it as root, and the first start then fails to unpack WordPress into it (<code>tar: ./index.php: Cannot open: Permission denied</code> in <code>docker compose logs wordpress</code>).</li>
+                </ul>
+                <p>After the first start in the next section, check the result: the same listing now shows your number, and <code>mkdir</code> works.</p>
+                <pre data-norun><code class="language-bash">ls -ln wordpress/wp-content
+mkdir wordpress/wp-content/mu-plugins</code></pre>
+                <div class="card card-output">
+                    <h4>Output (Linux and WSL, with the fix)</h4>
+                    <pre><code>total 16
+-rw-r--r-- 1 1000 1000   28 Jan  8  2012 index.php
+drwxr-xr-x 3 1000 1000 4096 Aug 18 16:42 plugins
+drwxr-xr-x 5 1000 1000 4096 Aug 12 07:45 themes
+drwxr-xr-x 3 1000 1000 4096 Oct 25 13:36 uploads</code></pre>
+                </div>
+
+                <div class="card card-warning">
+                    <h4>⚠️ Already started without the fix?</h4>
+                    <p>Then <code>wordpress/</code> is full of files owned by 33. You do not need <code>sudo</code> to repair it: let a container, which runs as root when you ask, give them to you, then add the two files and recreate the containers.</p>
+                    <pre data-norun><code class="language-bash">docker compose run --rm --user root wpcli chown -R "$(id -u):$(id -g)" /var/www/html
+printf 'PAGESCO_UID=%s\nPAGESCO_GID=%s\n' "$(id -u)" "$(id -g)" &gt; .env
+cp config/compose.linux.yaml compose.override.yaml
+docker compose up -d</code></pre>
+                    <p>Your site, database and content stay as they were; only the owner of the files and the user the containers run as change. (Tested on the course setup: after these four commands WordPress, WP-CLI and your editor all write to <code>wordpress/</code> again.)</p>
+                </div>
+            </section>
+
+            <section id="start" class="lesson-section">
+                <h2>🚀 Start and Install WordPress</h2>
+                <p>In the project folder, start the services in the background (<code>-d</code>, "detached"). The first time, Docker downloads the images, about a gigabyte, which takes a minute or a few depending on your connection; later starts take seconds.</p>
+                <pre data-norun><code class="language-bash">docker compose up -d
+docker compose ps</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your times will differ)</h4>
+                    <pre><code>...
+ Container pagesco-db-1 Healthy
+ Container pagesco-wordpress-1 Starting
+ Container pagesco-wordpress-1 Started
+NAME                  IMAGE                         COMMAND                  SERVICE     CREATED          STATUS                    PORTS
+pagesco-db-1          mysql:9.7                     "docker-entrypoint.s…"   db          16 seconds ago   Up 15 seconds (healthy)   3306/tcp, 33060/tcp
+pagesco-mailpit-1     axllent/mailpit:latest        "/mailpit"               mailpit     16 seconds ago   Up 15 seconds (healthy)   0.0.0.0:8025-&gt;8025/tcp, [::]:8025-&gt;8025/tcp
+pagesco-wordpress-1   wordpress:7.1-php8.5-apache   "docker-entrypoint.s…"   wordpress   15 seconds ago   Up 7 seconds              0.0.0.0:8080-&gt;8080/tcp, [::]:8080-&gt;8080/tcp</code></pre>
+                </div>
+                <p>Three services are up; <code>wpcli</code> is not in the list because it only runs when you call it. The container names start with <code>pagesco</code>, the project name set at the top of <code>compose.yaml</code>. WordPress's files are now in <code>wordpress/</code>, but the database is empty: WordPress is not installed yet. If you opened <code>http://localhost:8080</code> now, you would land on the famous five-minute installer. Install from the command line instead, with the same settings every lesson assumes:</p>
+                <pre data-norun><code class="language-bash">docker compose run --rm wpcli wp core install --url=http://localhost:8080 --title="Pages &amp; Co." --admin_user=admin --admin_password=password --admin_email=wordpress@example.com --skip-email
+docker compose run --rm wpcli wp rewrite structure '/%postname%/'</code></pre>
+                <div class="card card-output">
+                    <h4>Output (the first run also builds the WP-CLI image; its build lines are left out)</h4>
+                    <pre><code>Success: WordPress installed successfully.
+Success: Rewrite structure set.
+Success: Rewrite rules flushed.</code></pre>
+                </div>
+                <ul>
+                    <li><code>docker compose run --rm wpcli</code> starts a one-off <code>wpcli</code> container, runs the command after it and removes the container again (<code>--rm</code>). The first time, Compose builds the course WP-CLI image from <code>config/wpcli.Dockerfile</code>, which takes about a minute.</li>
+                    <li><code>wp core install</code> creates the database tables, the site title "Pages &amp; Co." and the administrator <strong>admin</strong> with the password <strong>password</strong>. That password is only acceptable because this site exists on your computer alone; Lesson 8.4 is about real ones. (These are also the defaults of <code>wp-env</code>, so the lessons work there too.)</li>
+                    <li><code>wp rewrite structure '/%postname%/'</code> turns on "pretty permalinks": <code>/hello-world/</code> instead of <code>/?p=1</code>. A WP-CLI install leaves the plain style, because the installer cannot test the server from the command line.</li>
+                </ul>
+                <p>Now open <code>http://localhost:8080</code>: the Pages &amp; Co. home page in the default theme, Twenty Twenty-Five, with the "Hello world!" post. Then log in at <code>http://localhost:8080/wp-admin/</code> as admin / password:</p>
+                <figure>
+                    <img src="images/lesson_02_dashboard.png" alt="The WordPress 7.1 dashboard of the Pages &amp; Co. site: a dark admin menu on the left with Dashboard, Posts, Media, Pages, Comments, Appearance, Plugins, Users, Tools and Settings, a Welcome to WordPress panel linking to the 7.1.3 release, and Site Health Status and Quick Draft boxes" width="1100" height="700" loading="lazy">
+                    <figcaption>The WordPress 7.1 dashboard on your development site. The toolbar's search shows the keyboard shortcut of the command palette (<kbd>Ctrl</kbd>+<kbd>K</kbd>, <kbd>⌘</kbd>+<kbd>K</kbd> on a Mac).</figcaption>
+                </figure>
+            </section>
+
+            <section id="wp-cli" class="lesson-section">
+                <h2>⌨️ WP-CLI and the wp Shortcut</h2>
+                <p><strong>WP-CLI</strong> is the official command-line interface for WordPress: almost anything you can do in the admin, and plenty you cannot, is one command. Developers use it constantly, and the lessons use it to show you what WordPress is doing. Typing <code>docker compose run --rm wpcli wp</code> every time gets old fast, so define a shortcut. In bash or zsh (Linux, WSL, macOS):</p>
+                <pre data-norun><code class="language-bash">alias wp='docker compose --progress quiet run --rm wpcli wp'</code></pre>
+                <p><code>--progress quiet</code> hides Compose's "Container ... Created" lines so you only see WP-CLI's output. To keep the shortcut in new terminal windows, add that line to the end of <code>~/.bashrc</code> (Linux, WSL) or <code>~/.zshrc</code> (macOS) and open a new terminal.</p>
+                <h4>Windows PowerShell (only if you run the project from Windows instead of WSL)</h4>
+                <pre data-norun><code class="language-powershell">function wp { docker compose --progress quiet run --rm wpcli wp @args }</code></pre>
+                <p>Put it in your PowerShell profile (<code>notepad $PROFILE</code>) to keep it. Either way, the shortcut works from the project folder and from any folder inside it, because Docker Compose looks for <code>compose.yaml</code> in the current folder and its parents.</p>
+
+                <div class="card card-info">
+                    <h4>💡 What "wp" means in this course</h4>
+                    <p>From here on, every <code>wp ...</code> command in a lesson means "WP-CLI in the course container", typed in your project folder. Each one starts a fresh container, so it takes a second or two. Inside the container the current folder is always the WordPress root, <code>/var/www/html</code>, which is your <code>wordpress/</code> folder: a file path such as <code>wp eval-file priorities.php</code> means <code>wordpress/priorities.php</code> on your disk, wherever you typed the command. If you use wp-env instead (end of this lesson), type <code>npx @wordpress/env run cli wp ...</code> where the lessons say <code>wp ...</code>.</p>
+                </div>
+
+                <p>Try it. These outputs are from the course site, which is exactly what you have now:</p>
+                <pre data-cli><code class="language-bash">wp core version --extra
+wp eval 'echo "PHP ", PHP_VERSION, "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>WordPress version: 7.1.3
+Database revision: 61833
+TinyMCE version:   4.9110 (49110-20250317)
+Package language:  en_US
+PHP 8.5.12</code></pre>
+                </div>
+                <pre data-cli><code class="language-bash">wp option get siteurl
+wp option get blogname
+wp option get permalink_structure</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>http://localhost:8080
+Pages &amp;amp; Co.
+/%postname%/</code></pre>
+                </div>
+                <p>The site title prints as <code>Pages &amp;amp; Co.</code>: WordPress stores the title HTML-escaped, so the ampersand is saved as <code>&amp;amp;</code>. Browsers show a plain "&amp;", but code that reads the option gets the escaped form, which matters when you compare strings or send the title in an email. Lists come out as tables:</p>
+                <pre data-cli><code class="language-bash">wp user list --fields=ID,user_login,user_email,roles
+wp theme list</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+----+------------+-----------------------+---------------+
+| ID | user_login | user_email            | roles         |
++----+------------+-----------------------+---------------+
+| 1  | admin      | wordpress@example.com | administrator |
++----+------------+-----------------------+---------------+
++-------------------+----------+--------+---------+----------------+-------------+
+| name              | status   | update | version | update_version | auto_update |
++-------------------+----------+--------+---------+----------------+-------------+
+| twentytwentyfive  | active   | none   | 1.5     |                | off         |
+| twentytwentyfour  | inactive | none   | 1.6     |                | off         |
+| twentytwentythree | inactive | none   | 1.7     |                | off         |
++-------------------+----------+--------+---------+----------------+-------------+</code></pre>
+                </div>
+                <p><code>wp help</code> lists every command, and <code>wp help option</code> (or any command name) explains one, with examples. The full reference is at <a href="https://developer.wordpress.org/cli/commands/" target="_blank" rel="noopener">developer.wordpress.org/cli/commands</a>.</p>
+
+                <h3>Remember the self-test? It works here</h3>
+                <p>The port-8080 setup from the starter section is what makes WordPress's calls to itself work. WP-CLI can test the one that matters most, the request that runs scheduled tasks (WP-Cron, Lesson 7.3):</p>
+                <pre data-cli><code class="language-bash">wp cron test</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: WP-Cron spawning is working as expected.</code></pre>
+                </div>
+
+                <h3>A shell inside the container</h3>
+                <p>Some lessons run ordinary commands such as <code>ls</code>, <code>grep</code>, <code>cat</code> or <code>curl</code> "from the WP-CLI container". That means a shell in the same container, where the current folder is the WordPress root and <code>http://localhost:8080</code> reaches the site (the container shares the <code>wordpress</code> service's network). Open one with:</p>
+                <pre data-norun><code class="language-bash">docker compose run --rm wpcli sh</code></pre>
+                <p>The prompt changes to <code>/var/www/html $</code>. You can type <code>wp</code> commands here too, without the shortcut, and <code>exit</code> leaves the shell. Try a few, they are the commands lessons show this way:</p>
+                <pre data-cli><code class="language-bash">pwd
+ls wp-content/themes
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>/var/www/html
+index.php          twentytwentyfive   twentytwentyfour   twentytwentythree
+200</code></pre>
+                </div>
+                <p>The three themes that ship with WordPress 7.1, and <code>200</code>, the HTTP status "OK" for the home page.</p>
+            </section>
+
+            <section id="debugging" class="lesson-section">
+                <h2>🐞 Debugging: WP_DEBUG and debug.log</h2>
+                <p>A live site must never show PHP errors to visitors, so by default WordPress hides them. A development site must show every one, or you write bugs without knowing. WordPress controls this with constants in <code>wp-config.php</code>. The Docker image writes <code>wp-config.php</code> for you from the <code>WORDPRESS_*</code> settings in <code>compose.yaml</code>; open <code>wordpress/wp-config.php</code> and you find lines such as <code>define( 'WP_DEBUG', !!getenv_docker('WORDPRESS_DEBUG', '') );</code>, which read those settings, plus the lines from <code>WORDPRESS_CONFIG_EXTRA</code>. Ask the running site what it ended up with:</p>
+                <pre data-cli><code class="language-bash">wp eval 'var_dump( WP_DEBUG, WP_DEBUG_LOG, WP_DEBUG_DISPLAY, SCRIPT_DEBUG, wp_get_environment_type() );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>bool(true)
+bool(true)
+bool(true)
+bool(true)
+string(5) "local"</code></pre>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Setting</th><th>Value here</th><th>What it does</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>WP_DEBUG</code></td><td><code>true</code></td><td>Report every PHP error, warning, notice and deprecation, plus WordPress's own "called incorrectly" and "deprecated" messages</td></tr>
+                            <tr><td><code>WP_DEBUG_LOG</code></td><td><code>true</code></td><td>Also write them to <code>wp-content/debug.log</code></td></tr>
+                            <tr><td><code>WP_DEBUG_DISPLAY</code></td><td><code>true</code></td><td>Also print them in the page (never on a live site)</td></tr>
+                            <tr><td><code>SCRIPT_DEBUG</code></td><td><code>true</code></td><td>Load the unminified versions of core's CSS and JavaScript, readable in the browser's developer tools</td></tr>
+                            <tr><td><code>WP_ENVIRONMENT_TYPE</code></td><td><code>local</code></td><td>Tells WordPress and plugins this is a development copy: it allows application passwords over plain HTTP, turns off pings, and lets your own code behave differently on <code>local</code> (the Mailpit plugin does)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>See it catch a real mistake. Create the folder for must-use plugins (Lesson 1.1: every PHP file in it runs on every request) and a small one with a bug: it uses a variable that was never set. In your editor, save this as <code>wordpress/wp-content/mu-plugins/pagesco-debug-demo.php</code>:</p>
+                <pre data-cli><code class="language-bash">mkdir -p wp-content/mu-plugins</code></pre>
+                <pre data-file="wp-content/mu-plugins/pagesco-debug-demo.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Pages &amp; Co. Debug Demo
+ * Description: Lesson 1.2 demo: a deliberate bug in the page footer.
+ */
+
+function pagesco_debug_demo_footer() {
+	echo '&lt;p class="pagesco-demo"&gt;Hello, ' . $pagesco_name . '!&lt;/p&gt;';
+}
+add_action( 'wp_footer', 'pagesco_debug_demo_footer' );</code></pre>
+                <p>(<code>mkdir -p</code> runs in the WP-CLI container shell, or create the folder in your editor; <code>-p</code> means "no error if it already exists".) Reload <code>http://localhost:8080/</code>. At the bottom of the page, just above the greeting, PHP printed a warning, and the greeting has no name. The same warning went into the log, with a timestamp:</p>
+                <pre data-web="/" data-log data-raises="Warning"><code class="language-text">http://localhost:8080/</code></pre>
+                <div class="card card-output">
+                    <h4>Output (the new lines in wordpress/wp-content/debug.log; your timestamps will differ)</h4>
+                    <pre><code>[25-Oct-2026 20:55:07 UTC] PHP Warning:  Undefined variable $pagesco_name in /var/www/html/wp-content/mu-plugins/pagesco-debug-demo.php on line 8</code></pre>
+                </div>
+                <p>Read it the way you learned in PHP Foundations: the level (<code>Warning</code>), what happened (<code>Undefined variable $pagesco_name</code>), the file <em>inside the container</em> (<code>/var/www/html/...</code> is your <code>wordpress/...</code>) and the line. The log keeps every message, including ones from requests you did not see, such as the editor's background requests, scheduled tasks and REST calls. Watch it live while you work, from the project folder:</p>
+                <pre data-norun><code class="language-bash">tail -f wordpress/wp-content/debug.log</code></pre>
+                <p>(<kbd>Ctrl</kbd>+<kbd>C</kbd> stops it.) Fix the bug, give the variable a value, and reload: the warning is gone.</p>
+                <pre data-file="wp-content/mu-plugins/pagesco-debug-demo.php" data-web="/" data-select="p.pagesco-demo"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Pages &amp; Co. Debug Demo
+ * Description: Lesson 1.2 demo: a deliberate bug in the page footer, fixed.
+ */
+
+function pagesco_debug_demo_footer() {
+	$pagesco_name = 'reader';
+	echo '&lt;p class="pagesco-demo"&gt;Hello, ' . esc_html( $pagesco_name ) . '!&lt;/p&gt;';
+}
+add_action( 'wp_footer', 'pagesco_debug_demo_footer' );</code></pre>
+                <div class="card card-output">
+                    <h4>Output (View Source, search for pagesco-demo)</h4>
+                    <pre><code>&lt;p class="pagesco-demo"&gt;Hello, reader!&lt;/p&gt;</code></pre>
+                </div>
+                <p>(<code>esc_html()</code> is WordPress's version of <code>htmlspecialchars()</code>; Lesson 1.3 introduces the whole family.) Delete the demo file; you will write real must-use plugins from Lesson 2.3 on.</p>
+                <pre data-cli><code class="language-bash">rm wp-content/mu-plugins/pagesco-debug-demo.php</code></pre>
+                <p>Two more places to look when something is wrong. <code>docker compose logs wordpress</code> shows Apache's log, including each request and anything that went wrong while the container started; add <code>-f</code> to follow it. And when a page shows "There has been a critical error on this website.", the details are always in <code>debug.log</code>.</p>
+
+                <div class="card card-info">
+                    <h4>🧩 Version note: WP-CLI 2.12 on PHP 8.5 outside the course container</h4>
+                    <p>WP-CLI 2.12, the current release, has a small incompatibility with PHP 8.5: with <code>WP_DEBUG</code> on it prints <code>Deprecated: Using null as an array offset is deprecated ... php-cli-tools/lib/cli/Colors.php on line 95</code> after its Success and Error lines. That is WP-CLI's own code, not yours. The course image hides deprecations that come from inside WP-CLI's program file (<code>config/quiet-wp-cli-deprecations.php</code>), and nothing else; if you install WP-CLI natively or use another PHP 8.5 image, you will see the message and can ignore it. On PHP 8.4 it does not appear.</p>
+                </div>
+            </section>
+
+            <section id="mailpit" class="lesson-section">
+                <h2>📬 Email with Mailpit</h2>
+                <p>WordPress sends email all the time: new-user notices, password resets, comment notifications, and later your own messages from Pages &amp; Co. On a development site you want those emails <em>caught</em>, never delivered to real people. Mailpit is a mail server that accepts everything and shows it in a web inbox at <code>http://localhost:8025</code>. WordPress just needs to be told to send there, and that is what the must-use plugin in <code>config/mailpit-smtp.php</code> does. Copy it into the folder you created (from the project folder):</p>
+                <pre data-norun><code class="language-bash">cp config/mailpit-smtp.php wordpress/wp-content/mu-plugins/</code></pre>
+                <pre data-cli><code class="language-bash">wp plugin list --status=must-use</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+--------------+----------+--------+---------+----------------+-------------+
+| name         | status   | update | version | update_version | auto_update |
++--------------+----------+--------+---------+----------------+-------------+
+| mailpit-smtp | must-use |        |         |                | off         |
++--------------+----------+--------+---------+----------------+-------------+</code></pre>
+                </div>
+                <p>It has two jobs, both done with hooks (Lesson 2.3 explains exactly how): it tells PHPMailer, the library inside <code>wp_mail()</code>, to deliver over SMTP to the <code>mailpit</code> service, but only when the environment type is <code>local</code>; and it replaces the sender address <code>wordpress@localhost</code>, which the mail library rejects as invalid, with <code>wordpress@example.com</code>. Send a test with <code>wp_mail()</code>, WordPress's mail function; it returns <code>true</code> when the message was handed over:</p>
+                <pre data-cli><code class="language-bash">wp eval 'var_dump( wp_mail( "admin@example.com", "Hello from Pages &amp; Co.", "If you can read this in Mailpit, email works." ) );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>bool(true)</code></pre>
+                </div>
+                <p>Open <code>http://localhost:8025</code>: the message is in the inbox. Click it to see the headers and the body:</p>
+                <pre data-mail><code class="language-text">http://localhost:8025   (the newest message)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>From: WordPress &lt;wordpress@example.com&gt;
+To: admin@example.com
+Subject: Hello from Pages &amp; Co.
+
+If you can read this in Mailpit, email works.</code></pre>
+                </div>
+                <figure>
+                    <img src="images/lesson_02_mailpit.png" alt="The Mailpit inbox in a browser with one message from WordPress to admin@example.com, subject Hello from Pages &amp; Co., preview text If you can read this in Mailpit, email works." width="1100" height="700" loading="lazy">
+                    <figcaption>Mailpit at <code>http://localhost:8025</code>: every email your site sends ends up here and nowhere else.</figcaption>
+                </figure>
+            </section>
+
+            <section id="editor" class="lesson-section">
+                <h2>🧑‍💻 Your Editor</h2>
+                <p>Any code editor works; the course assumes <a href="https://code.visualstudio.com/" target="_blank" rel="noopener">Visual Studio Code</a> because it is free and runs everywhere. Set it up once:</p>
+                <ol>
+                    <li><strong>Open the project folder</strong> (File &gt; Open Folder &gt; <code>pagesco-dev</code>), not a single file. On Windows with WSL, install the <strong>WSL</strong> extension, then type <code>code .</code> in the Ubuntu terminal inside <code>pagesco-dev</code>: VS Code opens the Linux folder directly.</li>
+                    <li><strong>Add PHP support.</strong> Install a PHP language extension such as <strong>PHP Intelephense</strong>. Because the project folder contains the whole of WordPress in <code>wordpress/</code>, it indexes core: <code>add_action</code>, <code>esc_html</code> and every other WordPress function autocomplete with their parameters and documentation, and a misspelled function name is underlined.</li>
+                    <li><strong>Use tabs for PHP indentation.</strong> WordPress's coding standards (Lesson 1.3) indent with tabs. In Settings, search "Insert Spaces" and turn it off for PHP, or leave it to the formatter you set up in Lesson 8.1.</li>
+                </ol>
+                <p>The <code>wordpress/</code> folder holds thousands of core files you must not edit (Lesson 1.1). The ones you will work in are <code>wordpress/wp-content/themes/pagesco/</code>, <code>wordpress/wp-content/plugins/pagesco-books/</code> and <code>wordpress/wp-content/mu-plugins/</code>.</p>
+            </section>
+
+            <section id="workflow" class="lesson-section">
+                <h2>🔁 Everyday Commands: Start, Stop, Reset</h2>
+                <p>Your site keeps its state between sessions: the files are in <code>wordpress/</code>, the database in the <code>db_data</code> volume. These are the commands you will use, all from the project folder:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want to</th><th>Run</th><th>Files</th><th>Database</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Start working</td><td><code>docker compose up -d</code></td><td>kept</td><td>kept</td></tr>
+                            <tr><td>See what is running</td><td><code>docker compose ps</code></td><td>-</td><td>-</td></tr>
+                            <tr><td>Pause for the day</td><td><code>docker compose stop</code></td><td>kept</td><td>kept</td></tr>
+                            <tr><td>Remove the containers (e.g. after editing <code>compose.yaml</code>)</td><td><code>docker compose down</code>, then <code>up -d</code></td><td>kept</td><td>kept</td></tr>
+                            <tr><td>Apply an edit to <code>compose.yaml</code></td><td><code>docker compose up -d</code> (recreates what changed)</td><td>kept</td><td>kept</td></tr>
+                            <tr><td>Start over completely</td><td><code>docker compose down -v</code>, delete <code>wordpress/</code>, then the install steps again</td><td><strong>deleted</strong></td><td><strong>deleted</strong></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p><code>-v</code> means "and the volumes": it deletes the database. Use it only when you really want a blank site, and on Linux and WSL keep your <code>.env</code> and <code>compose.override.yaml</code> (and recreate <code>wordpress/</code> with <code>mkdir</code> before the next <code>up</code>). Lesson 8.4 shows how to back up and restore a site with <code>wp db export</code> before you try anything risky.</p>
+
+                <div class="card card-success">
+                    <h4>✅ One project, one site</h4>
+                    <p>Keep <code>pagesco-dev</code> for the course site only. To try something unrelated, unpack the zip again under another folder name and change the project name and the ports (<code>8080</code>, <code>8025</code>) in its <code>compose.yaml</code>, or use wp-env or Playground for the experiment. Two projects cannot both use port 8080 at the same time (Common Mistakes 2).</p>
+                </div>
+            </section>
+
+            <section id="alternatives" class="lesson-section">
+                <h2>🧪 Alternatives: wp-env and Playground</h2>
+                <p>The Docker Compose project is the course's main setup because you see and control every piece. Two official tools from the WordPress project are worth knowing as well; you will use the first in Lesson 8.1 for automated tests.</p>
+
+                <h3>wp-env</h3>
+                <p><code>@wordpress/env</code> ("wp-env") is the WordPress project's own Docker-based tool, run with Node.js (Node 24 LTS, which you install for Module 6 anyway). It reads a small <code>.wp-env.json</code> file and builds a site for you. Plugin and block developers use it to spin up a site around the plugin folder they are working in. In an empty folder:</p>
+                <pre data-norun><code class="language-json">{
+  "core": null,
+  "phpVersion": "8.5",
+  "port": 8888,
+  "testsEnvironment": false
+}</code></pre>
+                <pre data-norun><code class="language-bash">npx @wordpress/env start
+npx @wordpress/env run cli wp option get siteurl
+npx @wordpress/env stop</code></pre>
+                <p><code>"core": null</code> means the latest WordPress (7.1.3 for this course); the site is at <code>http://localhost:8888</code> with the same admin / password, debugging on and the environment type <code>local</code>. <code>npx @wordpress/env destroy</code> removes it. The first start takes about a minute and a half. Two differences from the course project: wp-env's database is <strong>MariaDB</strong>, not MySQL (WordPress supports both; Lesson 2.2 notes the few places you could notice), and Mailpit is not included. wp-env 12 no longer creates a separate test site automatically, which is why the file says <code>"testsEnvironment": false</code>; Lesson 8.1 sets up testing its new way.</p>
+
+                <div class="card card-danger">
+                    <h4>🛑 Always type <code>npx @wordpress/env</code>, never <code>npx wp-env</code></h4>
+                    <p>The tool's short name is wp-env, but the npm package called <code>wp-env</code> is <em>not</em> it: <code>npx wp-env</code> downloads and runs an unrelated package published by someone else, which describes itself as a security proof of concept. <code>npx</code> runs whatever package matches the name, so a typo in a package name can run a stranger's code on your computer. Copy package names from official documentation, and install the official one into a project (<code>npm install --save-dev @wordpress/env</code>) when you use it regularly.</p>
+                </div>
+
+                <h3>WordPress Playground</h3>
+                <p>You met Playground in Lesson 1.1: WordPress compiled to WebAssembly, running in a browser tab at <a href="https://playground.wordpress.net/" target="_blank" rel="noopener">playground.wordpress.net</a>. It also has a command-line version that serves a folder you are working in, which is handy for a quick test of a theme or plugin on several WordPress or PHP versions, with nothing else installed:</p>
+                <pre data-norun><code class="language-bash">npx @wp-playground/cli@latest server --wp=7.1 --php=8.5 --auto-mount --login</code></pre>
+                <p>Run in a plugin or theme folder, <code>--auto-mount</code> mounts it into the site, and <code>--login</code> logs you in; the site is at <code>http://localhost:9400</code>. Playground's default PHP is older than 8.5, so pass <code>--php</code>. Its file paths start with <code>/wordpress/</code> rather than <code>/var/www/html/</code>, its database is SQLite instead of MySQL, and it cannot run everything (no WP-CLI in the same way, limited networking), so the course's outputs are not checked against it. Use it for quick experiments and for showing someone a plugin without a server.</p>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th></th><th>Docker Compose (course)</th><th>wp-env</th><th>Playground</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Needs</td><td>Docker</td><td>Docker + Node</td><td>A browser, or Node for the CLI</td></tr>
+                            <tr><td>Database</td><td>MySQL 9.7</td><td>MariaDB</td><td>SQLite</td></tr>
+                            <tr><td>WP-CLI, email catching, debug log</td><td>All three</td><td>WP-CLI and debug log</td><td>Limited</td></tr>
+                            <tr><td>Best for</td><td>The course site, client projects</td><td>Plugin and block development, automated tests</td><td>Quick tries, demos, testing versions</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <p>Setup problems are frustrating because they happen before you have written a line of code. These are the ones learners actually hit, with the messages exactly as Docker and WordPress print them. Docker messages were measured on Docker Desktop 29 with Compose 5 (only the container IDs and network addresses change on your computer).</p>
+
+                <h3>1. Linux or WSL: "Permission denied" in wordpress/</h3>
+                <pre data-norun><code class="language-bash">mkdir wordpress/wp-content/mu-plugins</code></pre>
+                <div class="card card-output">
+                    <h4>Error</h4>
+                    <pre><code>mkdir: cannot create directory ‘wordpress/wp-content/mu-plugins’: Permission denied</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the files belong to user 33 (<code>www-data</code>) because the containers ran as that user. <strong>Fix:</strong> the repair box in "Linux and WSL: Run WordPress as You". Do not reach for <code>sudo</code> in front of your editor or <code>chmod -R 777</code>: the first leaves root-owned files behind, the second makes every file writable by every user on the machine. A related one: if you copy <code>compose.linux.yaml</code> but forget the <code>.env</code> file, Compose refuses to start and tells you so:</p>
+                <div class="card card-output">
+                    <h4>Error</h4>
+                    <pre><code>Error while interpolating services.wordpress.user: required variable PAGESCO_UID is missing a value: run the Linux setup from Lesson 1.2 first</code></pre>
+                </div>
+
+                <h3>2. "Port is already allocated"</h3>
+                <pre data-norun><code class="language-bash">docker compose up -d</code></pre>
+                <div class="card card-output">
+                    <h4>Error</h4>
+                    <pre><code>Error response from daemon: failed to set up container networking: driver failed programming external connectivity on endpoint pagesco-wordpress-1 (f3189481e620...): Bind for 0.0.0.0:8080 failed: port is already allocated</code></pre>
+                </div>
+                <p><strong>What it means:</strong> something else on your computer already listens on port 8080 (or 8025 for Mailpit): another Compose project, an old container, a local Apache or a development server from another course. <strong>Fix:</strong> find it with <code>docker ps</code> (look at the PORTS column) and stop it, or stop the other program. Changing the course port is possible but then <em>both</em> numbers in <code>"8080:8080"</code>, the <code>Listen</code> line in <code>config/apache-8080.conf</code> and the site URL must change, and the lessons' URLs no longer match yours: freeing the port is easier.</p>
+
+                <h3>3. Emails silently fail (no mail plugin)</h3>
+                <p>If <code>mailpit-smtp.php</code> is missing from <code>mu-plugins/</code>, for example after a reset, <code>wp_mail()</code> returns <code>false</code> and nothing tells you why. WordPress does report the reason through an action, <code>wp_mail_failed</code>; this test listens for it. Move the plugin out of the way first (from the WP-CLI container shell):</p>
+                <pre data-cli><code class="language-bash">mv wp-content/mu-plugins/mailpit-smtp.php wp-content/mailpit-smtp.php.off
+wp eval 'add_action( "wp_mail_failed", function ( $error ) { echo $error-&gt;get_error_message(), "\n"; } ); var_dump( wp_mail( "admin@example.com", "Test", "Hello" ) );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Invalid address:  (From): wordpress@localhost
+bool(false)</code></pre>
+                </div>
+                <p><strong>What it means:</strong> without the plugin, WordPress sends from <code>wordpress@localhost</code> (it builds the sender from the site's domain, <code>localhost</code>), and PHPMailer refuses that address before any mail server is involved. On a real domain this works, which is why the bug only shows up on development sites, wp-env included. <strong>Fix:</strong> put the plugin back.</p>
+                <pre data-cli><code class="language-bash">mv wp-content/mailpit-smtp.php.off wp-content/mu-plugins/mailpit-smtp.php
+wp eval 'var_dump( wp_mail( "admin@example.com", "Test", "Hello" ) );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>bool(true)</code></pre>
+                </div>
+
+                <h3>4. Changing a database password after the first start</h3>
+                <p>It is tempting to replace <code>wordpress-dev-only</code> with a password of your own in <code>compose.yaml</code>. Do it after the first start and the site stops:</p>
+                <pre data-norun><code class="language-bash">wp option get blogname</code></pre>
+                <div class="card card-output">
+                    <h4>Error</h4>
+                    <pre><code>Warning: mysqli_real_connect(): (HY000/1045): Access denied for user 'wordpress'@'172.19.0.4' (using password: YES) in /var/www/html/wp-includes/class-wpdb.php on line 1990
+Error: `Access denied for user 'wordpress'@'172.19.0.4' (using password: YES)`
+Error establishing a database connection
+...</code></pre>
+                </div>
+                <p>The browser shows the same "Error establishing a database connection" page. <strong>What it means:</strong> the MySQL image reads <code>MYSQL_USER</code> and <code>MYSQL_PASSWORD</code> only once, when it creates the database in an empty volume. Afterwards the user's password lives inside the database, so WordPress now sends a password MySQL never heard of. <strong>Fix:</strong> put the old password back and run <code>docker compose up -d</code>; or, if you really want a new one, change it inside MySQL first, or start over with <code>docker compose down -v</code>. On a local-only site the default password is fine.</p>
+
+                <h3>5. Running commands in the wrong folder</h3>
+                <pre data-norun><code class="language-bash">cd ~
+wp core version</code></pre>
+                <div class="card card-output">
+                    <h4>Error</h4>
+                    <pre><code>no configuration file provided: not found</code></pre>
+                </div>
+                <p><strong>What it means:</strong> Docker Compose looked for <code>compose.yaml</code> in the current folder and every folder above it and found none. In a brand-new terminal where the shortcut is not defined you get <code>wp: command not found</code> instead. <strong>Fix:</strong> <code>cd ~/pagesco-dev</code> (or any folder inside it), and add the alias to <code>~/.bashrc</code> or <code>~/.zshrc</code> so every terminal has it.</p>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: The Dev Site Health Check</h2>
+                <p>You have a working site; now prove it, the way you will check every environment you ever set up for a client. You will write a small PHP script that WP-CLI runs with WordPress loaded, which checks each piece this lesson set up and prints one line per check. Allow about 30 minutes, after the setup sections are done.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: Confirm the setup <span class="step-time">(5 min)</span></h3>
+                    <p>Go through the setup once more: <code>docker compose ps</code> shows <code>db</code>, <code>wordpress</code> and <code>mailpit</code> up; <code>http://localhost:8080</code> shows the site; you can log in as admin; <code>http://localhost:8025</code> shows Mailpit; <code>wp core version</code> prints <code>7.1.3</code> through the shortcut. On Linux and WSL, <code>ls -ln wordpress</code> shows your user number. Fix anything that fails before you go on: the next step checks the rest.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: Write the health check <span class="step-time">(12 min)</span></h3>
+                    <p>In VS Code, create <code>wordpress/pagesco-check.php</code> (in the WordPress root, so WP-CLI can find it). Type it rather than pasting; it uses only PHP you know plus a few WordPress functions, each explained in the comments:</p>
+                    <pre data-file="pagesco-check.php"><code class="language-php">&lt;?php
+/**
+ * Pages &amp; Co. development site health check (Lesson 1.2).
+ * Run it with: wp eval-file pagesco-check.php
+ */
+
+$pagesco_checks = array(
+	// get_bloginfo( 'version' ) is the WordPress version.
+	'WordPress 7.1'        =&gt; str_starts_with( get_bloginfo( 'version' ), '7.1' ),
+	'PHP 8.5'              =&gt; str_starts_with( PHP_VERSION, '8.5' ),
+	// home_url() is the site address stored in the database.
+	'Site address'         =&gt; 'http://localhost:8080' === home_url(),
+	'Pretty permalinks'    =&gt; '/%postname%/' === get_option( 'permalink_structure' ),
+	'Environment is local' =&gt; 'local' === wp_get_environment_type(),
+	'Debugging on'         =&gt; WP_DEBUG &amp;&amp; WP_DEBUG_LOG,
+	// WP_CONTENT_DIR is the full path of wp-content inside the container.
+	'wp-content writable'  =&gt; wp_is_writable( WP_CONTENT_DIR ),
+	'Mail plugin present'  =&gt; file_exists( WPMU_PLUGIN_DIR . '/mailpit-smtp.php' ),
+	// wp_mail() returns true when the message was handed to the mail server.
+	'Test email sent'      =&gt; wp_mail( 'admin@example.com', 'Pages &amp; Co. health check', 'The development site can send email.' ),
+);
+
+$pagesco_failed = 0;
+foreach ( $pagesco_checks as $pagesco_label =&gt; $pagesco_ok ) {
+	printf( "%-22s %s\n", $pagesco_label, $pagesco_ok ? 'OK' : 'FAILED' );
+	if ( ! $pagesco_ok ) {
+		++$pagesco_failed;
+	}
+}
+echo 0 === $pagesco_failed ? "All checks passed.\n" : "{$pagesco_failed} check(s) failed.\n";</code></pre>
+                    <p>Every variable starts with <code>pagesco_</code>, a habit you will understand in Lesson 2.3: code run by <code>wp eval-file</code> shares its variables with WordPress, so short names like <code>$checks</code> could collide with someone else's.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: Run it <span class="step-time">(5 min)</span></h3>
+                    <p>From the project folder:</p>
+                    <pre data-cli><code class="language-bash">wp eval-file pagesco-check.php</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>WordPress 7.1          OK
+PHP 8.5                OK
+Site address           OK
+Pretty permalinks      OK
+Environment is local   OK
+Debugging on           OK
+wp-content writable    OK
+Mail plugin present    OK
+Test email sent        OK
+All checks passed.</code></pre>
+                    </div>
+                    <p>If a line says FAILED, the label tells you which section of this lesson to revisit. Then look in Mailpit: the health-check email is the newest message.</p>
+                    <pre data-mail><code class="language-text">http://localhost:8025   (the newest message)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>From: WordPress &lt;wordpress@example.com&gt;
+To: admin@example.com
+Subject: Pages &amp; Co. health check
+
+The development site can send email.</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 4: Break it, read it, clean up <span class="step-time">(8 min)</span></h3>
+                    <p>A check that cannot fail proves nothing. Stop the mail catcher and run the check again: the mail line must now fail. Then start it and run once more.</p>
+                    <pre data-norun><code class="language-bash">docker compose stop mailpit
+wp eval-file pagesco-check.php
+docker compose start mailpit
+wp eval-file pagesco-check.php</code></pre>
+                    <p>With Mailpit stopped, <code>Test email sent</code> reads FAILED and the last line says <code>1 check(s) failed.</code>; with it running again, all checks pass. Finally, delete the script from the WordPress root (you can recreate it any time from this lesson), and leave the site exactly as the next lessons expect it:</p>
+                    <pre data-cli><code class="language-bash">rm pagesco-check.php
+ls wp-content/mu-plugins</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>mailpit-smtp.php</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>docker compose ps</code> shows <code>db</code> (healthy), <code>wordpress</code> and <code>mailpit</code> up, and the site opens at <code>http://localhost:8080</code></li>
+                        <li>You can log in at <code>/wp-admin/</code> as admin / password, and <code>wp</code> works as a shortcut in a new terminal</li>
+                        <li>Linux and WSL only: the files in <code>wordpress/</code> belong to your user and VS Code can save in <code>wp-content/</code></li>
+                        <li>The health check printed "All checks passed." and its email is in Mailpit</li>
+                        <li>You watched a PHP warning arrive in <code>wp-content/debug.log</code></li>
+                        <li><code>wp-content/mu-plugins/</code> contains only <code>mailpit-smtp.php</code>, and <code>pagesco-check.php</code> is deleted</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Try each one before you open the solution. Undo any change an exercise makes, so your site stays the way the next lessons expect.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Does It Survive a Restart?</h3>
+                    <p>Prove to yourself that stopping the containers loses nothing. Change the site's tagline (the <code>blogdescription</code> option) to "Independent books, friendly people" with WP-CLI, take the whole project down with <code>docker compose down</code>, start it again, and read the tagline back. Then put the original tagline back. Which command would have lost it?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>wp option get</code> / <code>wp option update</code>. Read the original value first so you can restore it. Look at the "Database" column of the everyday-commands table.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">wp option get blogdescription
+wp option update blogdescription "Independent books, friendly people"</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Success: Updated 'blogdescription' option.</code></pre>
+                        </div>
+                        <p>The original tagline on a new 7.1 install is empty, so <code>get</code> printed an empty line. Now restart and read it back:</p>
+                        <pre data-norun><code class="language-bash">docker compose down
+docker compose up -d</code></pre>
+                        <pre data-cli><code class="language-bash">wp option get blogdescription
+wp option update blogdescription ""</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Independent books, friendly people
+Success: Updated 'blogdescription' option.</code></pre>
+                        </div>
+                        <p><code>down</code> removed the containers, but the database lives in the <code>db_data</code> volume, which only <code>docker compose down -v</code> deletes. That is the one to be careful with.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Your MySQL Skills, Inside WordPress</h3>
+                    <p>WP-CLI can send SQL to the site's database with <code>wp db query</code>. List the tables WordPress created, then write a query that shows the ID, title, type and status of every row in <code>wp_posts</code> whose type is <code>post</code> or <code>page</code>. Which page is a draft?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>SHOW TABLES</code>, and a <code>SELECT</code> with <code>WHERE post_type IN (...)</code>. Put the SQL in double quotes and the string values in single quotes. The course image includes the fixes that let <code>wp db</code> talk to MySQL 9.7.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">wp db query "SHOW TABLES"
+wp db query "SELECT ID, post_title, post_type, post_status FROM wp_posts WHERE post_type IN ('post', 'page') ORDER BY ID"</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Tables_in_wordpress
+wp_commentmeta
+wp_comments
+wp_links
+wp_options
+wp_postmeta
+wp_posts
+wp_term_relationships
+wp_term_taxonomy
+wp_termmeta
+wp_terms
+wp_usermeta
+wp_users
+
+ID	post_title	post_type	post_status
+1	Hello world!	post	publish
+2	Sample Page	page	publish
+3	Privacy Policy	page	draft</code></pre>
+                        </div>
+                        <p>Twelve tables, all starting with <code>wp_</code>, the table prefix. The Privacy Policy page is a draft: WordPress creates it so you can edit and publish it. (<code>wp db query</code> prints rows separated by tabs; Lesson 2.2 shows <code>wp db cli</code> for an interactive MySQL prompt with the familiar <code>+----+</code> tables, and tours these tables properly.)</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: A Second Shortcut</h3>
+                    <p>Make your own shortcut <code>wplog</code> that shows the last 20 lines of the debug log from anywhere inside the project folder, and a second one, <code>wpclean</code>, that empties the log so the next error is easy to spot. Test both with a deliberate notice: <code>wp eval 'trigger_error( "Pages &amp; Co. test notice" );'</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Run them in the container, like <code>wp</code>, so the path is always the same: <code>docker compose --progress quiet run --rm wpcli tail -n 20 wp-content/debug.log</code>. Emptying a file without deleting it: <code>: &gt; file</code> or <code>truncate -s 0 file</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-norun><code class="language-bash">alias wplog='docker compose --progress quiet run --rm wpcli tail -n 20 wp-content/debug.log'
+alias wpclean='docker compose --progress quiet run --rm wpcli truncate -s 0 wp-content/debug.log'</code></pre>
+                        <p>Here is the test, with the log emptied first and read afterwards (the two aliases expand to the commands in this block):</p>
+                        <pre data-cli data-raises="Notice"><code class="language-bash">truncate -s 0 wp-content/debug.log
+wp eval 'trigger_error( "Pages &amp; Co. test notice" );'
+tail -n 20 wp-content/debug.log</code></pre>
+                        <div class="card card-output">
+                            <h4>Output (the timestamp is the time of your test)</h4>
+                            <pre><code>Notice: Pages &amp; Co. test notice in phar:///usr/local/bin/wp/vendor/wp-cli/eval-command/src/Eval_Command.php(39) : eval()'d code on line 1
+[25-Oct-2026 20:55:12 UTC] PHP Notice:  Pages &amp; Co. test notice in phar:///usr/local/bin/wp/vendor/wp-cli/eval-command/src/Eval_Command.php(39) : eval()'d code on line 1</code></pre>
+                        </div>
+                        <p>The notice appears twice: once printed in your terminal (display is on) and once in the log. <code>trigger_error()</code> raises an <code>E_USER_NOTICE</code>, which PHP labels <code>Notice</code>. The location points into WP-CLI's own program file (<code>phar:///usr/local/bin/wp/...</code>) and says <code>eval()'d code</code> because the code came from <code>wp eval</code>, not from a file of yours; in a plugin it names your file and line.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 4: Meet wp-env (Stretch)</h3>
+                    <p>Install Node 24 LTS if you do not have it (for example with nvm), create an empty folder <code>wpenv-try</code> outside <code>pagesco-dev</code>, add the <code>.wp-env.json</code> from the alternatives section and start the site. Answer with WP-CLI commands: which WordPress and PHP versions does it run, and which database server? Then destroy it. Why can it run at the same time as your course site?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>npx @wordpress/env run cli wp core version</code>; for PHP, <code>wp eval</code> with <code>PHP_VERSION</code>; for the database, <code>wp db query "SELECT VERSION()"</code> or <code>$wpdb-&gt;db_server_info()</code>. Mind the package name.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-norun><code class="language-bash">mkdir ~/wpenv-try &amp;&amp; cd ~/wpenv-try
+# create .wp-env.json as shown in the lesson, then:
+npx @wordpress/env start
+npx @wordpress/env run cli wp core version
+npx @wordpress/env run cli wp eval 'echo PHP_VERSION, "\n";'
+npx @wordpress/env run cli wp db query "SELECT VERSION()"
+npx @wordpress/env destroy</code></pre>
+                        <p>WordPress 7.1.3 and PHP 8.5.12, as in the course project, but the database reports a MariaDB version (wp-env uses the <code>mariadb:lts</code> image). It runs alongside your course site because it uses its own containers and port 8888, so nothing collides with 8080. <code>destroy</code> asks for confirmation and then removes its containers, volumes and downloaded WordPress.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> You type <code>wp option get blogname</code> in your project folder. Where does the command actually run?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Nothing WordPress-related is installed on your computer itself. What does the alias expand to?">
+                                A) In a WP-CLI program installed on your computer
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The wordpress service runs Apache. Which service in compose.yaml contains WP-CLI?">
+                                B) Inside the running wordpress container
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The alias runs docker compose run --rm wpcli wp: a one-off wpcli container that shares the WordPress files and the network, runs the command in /var/www/html and is removed afterwards.">
+                                C) In a new wpcli container that is removed when the command ends
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> On Ubuntu, VS Code cannot save a new file in <code>wordpress/wp-content/plugins/</code>, and <code>ls -ln</code> shows owner 33. What is the right fix?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="Running the wordpress and wpcli containers as your own user means you, Apache and WP-CLI all create files as the same user. Repair the existing files with a root chown in a container first.">
+                                A) Run the containers as your user (.env plus compose.override.yaml) after giving the existing files to your user
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That makes every file writable by every user on the machine. Is there a fix that gives the files one right owner instead?">
+                                B) chmod -R 777 wordpress
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="It works once, but who will own the uploads and log files WordPress writes next?">
+                                C) Run VS Code with sudo
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> You run <code>docker compose down</code>, go to lunch and run <code>docker compose up -d</code>. What happened to your posts and your theme files?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="down removes containers. Where are the database and the files actually stored?">
+                                A) Both are gone: down deletes everything
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The posts are in the db_data volume and the theme files in the wordpress folder on your disk; down only removes containers. Only down -v deletes the volume.">
+                                B) Both are still there: the database is in a volume and the files are in wordpress/
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The files are in a folder on your own disk. Is the database inside a container, or somewhere that survives it?">
+                                C) The files are still there, but the database starts empty
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> After a reset, <code>wp eval 'var_dump( wp_mail( ... ) );'</code> prints <code>bool(false)</code>. What is the most likely cause on this setup?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Mailpit accepts every message for every address. What happens before the message even reaches a mail server?">
+                                A) Mailpit does not accept mail for admin@example.com
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Without mailpit-smtp.php in mu-plugins, WordPress sends from wordpress@localhost, PHPMailer rejects that address, and wp_mail returns false. Copy the plugin back.">
+                                B) mailpit-smtp.php is not in wp-content/mu-plugins/, so the sender wordpress@localhost is rejected
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Debugging changes which messages you see, not whether mail is sent. What does the wp_mail_failed action report?">
+                                C) WP_DEBUG is on, which blocks email
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> A plugin developer wants a throwaway WordPress site around the plugin folder they are in, with WP-CLI and PHP 8.5. Which command is correct?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Check the package name. Which npm package is the official tool, and what does the unscoped one do?">
+                                A) npx wp-env start
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Compose v2 is docker compose with a space, and this would start the course site, not one around the plugin folder.">
+                                B) docker-compose up -d
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The official package is @wordpress/env, run with npx and a .wp-env.json that sets phpVersion 8.5. The unscoped wp-env package is someone else's code.">
+                                C) npx @wordpress/env start, with phpVersion 8.5 in .wp-env.json
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Can I use Local, XAMPP, MAMP or Laravel Herd instead?</summary>
+                    <p>You can run WordPress with any of them, and Local in particular is popular with WordPress freelancers. The course's outputs, paths (<code>/var/www/html/...</code>), port, mail catcher and WP-CLI fixes are all tested on the Docker project, though, so with another tool you will translate as you go: different PHP builds, different database versions, different paths in error messages. If you are new to all of them, use the course project.</p>
+                </details>
+                <details>
+                    <summary>Docker Desktop uses a lot of memory. Can I limit it?</summary>
+                    <p>Yes. On Windows, WSL 2 takes what it needs up to a limit you can set in a <code>.wslconfig</code> file in your Windows user folder (<code>memory=4GB</code> under <code>[wsl2]</code>); on macOS, Docker Desktop's Settings &gt; Resources has a memory slider. The course site runs comfortably in 2 to 3 GB. Run <code>docker compose stop</code> when you are not working, and quit Docker Desktop if you need the memory back.</p>
+                </details>
+                <details>
+                    <summary>Where is phpMyAdmin?</summary>
+                    <p>Not included: <code>wp db query</code> and <code>wp db cli</code> cover what the lessons need, and MySQL Foundations taught you the SQL. If you like a graphical tool, any MySQL client can connect when you publish the database port; a common way is a <code>ports: ["3306:3306"]</code> line under <code>db</code> in your <code>compose.override.yaml</code> (pick another host port if a MySQL server already runs on your computer), then connect as <code>wordpress</code> / <code>wordpress-dev-only</code> to <code>127.0.0.1</code>.</p>
+                </details>
+                <details>
+                    <summary>Should I put the project in Git?</summary>
+                    <p>Not the whole thing: <code>wordpress/</code> holds core files you never edit, and secrets live in <code>wp-config.php</code>. In professional projects you version only your own code, usually the theme and plugin folders, each as its own repository. Lesson 8.4 sets that up for deployment. Until then, the course files in <code>wp-content/</code> are yours to back up however you like.</p>
+                </details>
+                <details>
+                    <summary>Why MySQL 9.7 when many hosts run MySQL 8.4 or MariaDB?</summary>
+                    <p>It matches MySQL Foundations, so everything you learned there applies directly. WordPress uses a conservative subset of SQL that runs the same on MySQL 8.0 and newer and on MariaDB, so code you write here runs on all of them. Lesson 2.2 points out the rare differences you might notice.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Open <strong>Tools &gt; Site Health</strong> in the admin of your site, then the <strong>Info</strong> tab. Find the sections Server, Database and WordPress Constants, and compare them with what you configured: PHP version, the upload size limit from <code>config/php-dev.ini</code>, the database server version, <code>WP_DEBUG</code> and <code>WP_ENVIRONMENT_TYPE</code>. Then look at the <strong>Status</strong> tab: which recommendations does it make for your development site, and which of them would you accept on a live site but ignore here (and why)? Write your answers in your journal. For extra credit, compare the upload limit Site Health reports with <code>wp eval 'echo ini_get( "upload_max_filesize" );'</code>, and explain why the two answers differ.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Write your own "cheat card" for the development site: the five commands you expect to type most often, each with one line saying what it does, plus where to look first when (a) a page shows an error, (b) an email does not arrive, (c) the site will not start. Then note which part of the setup was hardest for you and what finally made it work. Future you, setting up a client site at short notice, will be grateful.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>The course site is a Docker Compose project, <code>pagesco-dev</code>: <code>wordpress</code> (Apache, PHP 8.5, WordPress 7.1.3), <code>db</code> (MySQL 9.7), <code>wpcli</code> (on demand) and <code>mailpit</code></li>
+                        <li><code>wordpress/</code> on your disk is the WordPress root inside the containers (<code>/var/www/html</code>); the database lives in the <code>db_data</code> volume</li>
+                        <li>On Linux and WSL, run the containers as your user (<code>.env</code> + <code>compose.override.yaml</code>, before the first start) so you and WordPress own the same files</li>
+                        <li><code>wp</code> is a shortcut for <code>docker compose --progress quiet run --rm wpcli wp</code>; commands run in the WordPress root</li>
+                        <li><code>WP_DEBUG</code>, <code>WP_DEBUG_LOG</code> and <code>WP_DEBUG_DISPLAY</code> are on: errors show in the page and in <code>wp-content/debug.log</code>; Mailpit catches every email at <code>localhost:8025</code></li>
+                        <li><code>down</code> keeps your work, <code>down -v</code> deletes the database; wp-env and Playground are good second tools, and the official package is <code>@wordpress/env</code></li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Address or file</th><th>What it is</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>http://localhost:8080</code></td><td>The site; <code>/wp-admin/</code> to log in as admin / password</td></tr>
+                            <tr><td><code>http://localhost:8025</code></td><td>Mailpit, the caught email</td></tr>
+                            <tr><td><code>wordpress/wp-content/</code></td><td>Your themes, plugins and must-use plugins</td></tr>
+                            <tr><td><code>wordpress/wp-content/debug.log</code></td><td>Every PHP error and <code>error_log()</code> line</td></tr>
+                            <tr><td><code>wordpress/wp-content/mu-plugins/mailpit-smtp.php</code></td><td>Sends email to Mailpit; keep it</td></tr>
+                            <tr><td><code>compose.yaml</code>, <code>config/</code></td><td>The environment; change with care, apply with <code>docker compose up -d</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You installed Docker and ran a four-service WordPress environment from one Compose file</li>
+                        <li>You installed WordPress 7.1 from the command line and set up pretty permalinks</li>
+                        <li>You made WP-CLI a one-word command and used it to read options, users, plugins and the database</li>
+                        <li>You watched a PHP warning arrive in the page and the log, and fixed it</li>
+                        <li>You caught WordPress email in Mailpit, and wrote a health check that proves the whole setup works</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>In <a href="lesson_03.html"><strong>Lesson 1.3: PHP the WordPress Way</strong></a> you turn your PHP Foundations skills into WordPress habits on this site: the WordPress coding standards, the escaping, sanitizing and translation functions you will use in every file (<code>esc_html()</code>, <code>sanitize_text_field()</code>, <code>__()</code> and friends), callbacks in all their forms, the array-of-arguments pattern, and the few globals core expects you to know.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure the health check passes and <code>wp</code> works in a brand-new terminal</li>
+                    <li>Keep <code>mailpit-smtp.php</code> in <code>wordpress/wp-content/mu-plugins/</code>: later lessons send email</li>
+                    <li>Run <code>docker compose stop</code> when you finish a session and <code>docker compose up -d</code> when you start the next</li>
+                    <li>Bookmark <code>http://localhost:8080/wp-admin/</code>, <code>http://localhost:8025</code> and the <a href="https://developer.wordpress.org/cli/commands/" target="_blank" rel="noopener">WP-CLI command reference</a></li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>If setup took you longer than the lesson said, or you had to read Common Mistakes twice, you are in good company: environment problems are the least fun part of development for everyone, and you have just solved the ones that stop most beginners for days. What you have now is better than what many working developers use, a reproducible site that tells you about every error and catches every email. From here on, the work is WordPress itself.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_01.html" class="prev-lesson">← Previous: WordPress for Developers</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_03.html" class="next-lesson">Next: PHP the WordPress Way →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

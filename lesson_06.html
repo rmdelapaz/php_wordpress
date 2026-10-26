@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="The WordPress hooks system: actions and filters, add_action and add_filter, priorities and accepted arguments, removing hooks, creating your own hooks, and finding the hook you need, verified on WordPress 7.1 and PHP 8.5. PHP and WordPress Development Lesson 2.3.">
+    <meta name="author" content="Ray de la Paz">
+    <title>The Hooks System - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 2: WordPress Inside Out</a></li>
+            <li aria-current="page">Lesson 2.3: The Hooks System</li>
+        </ul>
+    </nav>
+
+    <main id="main-content" data-state="after:lesson_04">
+        <div class="container">
+            <header>
+                <h1>🪝 Lesson 2.3: The Hooks System</h1>
+                <p class="lead">You now know where WordPress keeps its files and its data. But how do you change what WordPress <em>does</em> without editing a single core file? The answer is hooks: named moments where WordPress stops and asks "does anyone want to run code now?" or "does anyone want to change this value?". Every theme, every plugin and every custom block you will write in this course plugs into WordPress through them, so this lesson is the one the rest of the course stands on.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Explain the difference between an action and a filter, and choose the right one for a task</li>
+                        <li>Attach callbacks with <code>add_action()</code> and <code>add_filter()</code>, using priorities and the accepted-arguments count correctly</li>
+                        <li>Remove a hook someone else added with <code>remove_action()</code> / <code>remove_filter()</code>, and say why a removal silently fails</li>
+                        <li>Create your own action and filter hooks with <code>do_action()</code> and <code>apply_filters()</code> so other code can extend yours</li>
+                        <li>Find the hook you need: in the core source, with <code>has_filter()</code> and <code>$wp_filter</code>, and from the command line with WP-CLI</li>
+                        <li>Build the Pages &amp; Co. store notice as a must-use plugin that others can customize through its own hooks</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 120 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_05.html">Lesson 2.2: Core Architecture &amp; the Database</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> <code>pagesco-site.php</code>, a must-use plugin that shows the Pages &amp; Co. store notice and offers its own hooks</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (the hooks API works the same on every supported WordPress version)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. development site from Lesson 1.2, with WP-CLI</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#why-hooks" class="toc-link">Why Hooks?</a></li>
+                        <li><a href="#actions" class="toc-link">Actions: Run Code at the Right Moment</a></li>
+                        <li><a href="#filters" class="toc-link">Filters: Change a Value on Its Way Through</a></li>
+                        <li><a href="#priorities" class="toc-link">Priorities and Accepted Arguments</a></li>
+                        <li><a href="#removing" class="toc-link">Removing Hooks</a></li>
+                        <li><a href="#custom-hooks" class="toc-link">Creating Your Own Hooks</a></li>
+                        <li><a href="#finding-hooks" class="toc-link">Finding the Hook You Need</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: The Pages &amp; Co. Store Notice</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="why-hooks" class="lesson-section">
+                <h2>🤔 Why Hooks?</h2>
+                <p>Every page WordPress serves is one long PHP program: <code>index.php</code> loads <code>wp-load.php</code>, which loads your configuration, the core files, your must-use plugins, your plugins and your theme, works out which content was asked for, and finally prints the HTML. You walked through that load order, line by line in <code>wp-settings.php</code>, in Lesson 2.2. Your code never gets to edit that program. Core files are replaced on every update, so a change you make in <code>wp-includes/</code> disappears the next time WordPress updates itself.</p>
+                <p>Instead, WordPress announces what it is doing as it goes. At hundreds of points it calls a <strong>hook</strong>: a name that your code can register a function against. When the program reaches that point, WordPress calls every function registered for that name. There are two kinds:</p>
+                <ul>
+                    <li>An <strong>action</strong> says "this is happening now": <code>init</code> (WordPress has loaded), <code>wp_head</code> (the page's <code>&lt;head&gt;</code> is being printed), <code>save_post</code> (a post was just saved). Your function <em>does</em> something: prints markup, registers a post type, sends an email.</li>
+                    <li>A <strong>filter</strong> says "here is a value, change it if you want": <code>the_title</code> (a post title about to be displayed), <code>the_content</code>, <code>excerpt_length</code>. Your function receives the value and <em>returns</em> the value to use, changed or not.</li>
+                </ul>
+
+                <div class="mermaid">
+graph TD
+    A["Request: GET /hello-world/"] --> B["wp-config.php, core files"]
+    B --> C["must-use plugins, then plugins"]
+    C --> D["action: plugins_loaded"]
+    D --> E["theme functions.php"]
+    E --> F["action: init"]
+    F --> G["main query finds the post"]
+    G --> H["action: wp_head"]
+    H --> I["filters: the_title, the_content"]
+    I --> J["action: wp_footer"]
+    J --> K["action: shutdown"]
+                </div>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: a radio show with call-ins</h4>
+                    <p>Think of WordPress as a radio host working through a running order. An action is the host saying "we are now at the weather, any callers?": callers may talk, but the show goes on the same way afterwards. A filter is the host saying "here is today's headline, any corrections?": each caller gets the headline, may rewrite it, and hands it to the next caller, and the host reads out whatever comes back from the last one. If a caller keeps the headline and hands back nothing, the host reads out nothing. You will see exactly that bug in Common Mistakes.</p>
+                </div>
+
+                <h3>Your first hook</h3>
+                <p>Hooks live in a plugin or in a theme's <code>functions.php</code>. For the lessons before Module 5, where you write a real plugin, the quickest place is a <strong>must-use plugin</strong>: any PHP file in <code>wp-content/mu-plugins/</code> is loaded on every request, with no activation step, before all normal plugins (Lesson 2.2). You wrote a throwaway one for the debugging demo in Lesson 1.2; now you will see what they are really for. In your Lesson 1.2 project folder that is <code>wordpress/wp-content/mu-plugins/</code>, the folder where you already put <code>mailpit-smtp.php</code>. Create <code>pagesco-hello.php</code> there:</p>
+                <pre data-file="wp-content/mu-plugins/pagesco-hello.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Pages &amp; Co. Hello Hooks
+ * Description: Lesson 2.3 demo: prints a line at the bottom of every page.
+ */
+
+function pagesco_hello_footer() {
+	echo '&lt;p class="pagesco-hello"&gt;Hello from a hook!&lt;/p&gt;';
+}
+add_action( 'wp_footer', 'pagesco_hello_footer' );</code></pre>
+
+                <p>Two lines do the work. The function says <em>what</em> to do. <code>add_action( 'wp_footer', 'pagesco_hello_footer' )</code> says <em>when</em>: "when you reach the <code>wp_footer</code> action, call the function named <code>pagesco_hello_footer</code>". Notice that you pass the function's <em>name</em> as a string, without parentheses: you are not calling it, you are telling WordPress what to call later. Open <code>http://localhost:8080/hello-world/</code> and scroll to the bottom; in View Source the line sits just before <code>&lt;/body&gt;</code>:</p>
+                <pre data-web="/hello-world/" data-select="p.pagesco-hello"><code class="language-text">http://localhost:8080/hello-world/   (View Source, search for pagesco-hello)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;p class="pagesco-hello"&gt;Hello from a hook!&lt;/p&gt;</code></pre>
+                </div>
+
+                <div class="card card-success">
+                    <h4>✅ The prefix rule</h4>
+                    <p>Every function, hook name, option and global your code adds lives in one shared PHP program with WordPress core and every other plugin on the site. Two plugins that both declare <code>hello_footer()</code> stop the site with "Cannot redeclare". So everything you name gets a unique prefix. In this course it is <code>pagesco_</code> (or the <code>PagesCo\</code> namespace once you write classes in Module 5). The WordPress coding standards from Lesson 1.3 check for it.</p>
+                </div>
+            </section>
+
+            <section id="actions" class="lesson-section">
+                <h2>⚡ Actions: Run Code at the Right Moment</h2>
+                <p>The full signature is <code>add_action( $hook_name, $callback, $priority = 10, $accepted_args = 1 )</code>. The callback can be any of the PHP callables from Lesson 1.3 (and PHP Foundations Lesson 2.4): a function name, a closure, a static method <code>[ 'PagesCo\Notice', 'render' ]</code>, or an object method <code>[ $notice, 'render' ]</code>. Named functions are the most common in themes; closures are handy for small things but, as you will see, they are hard for anyone else to remove.</p>
+                <p>Choosing the right hook is half the job, because each one fires at a known moment with known things ready. This mu-plugin writes one line to the debug log at each of the big actions of a front-end request. <code>error_log()</code> writes to <code>wp-content/debug.log</code>, because your <code>wp-config.php</code> has <code>WP_DEBUG_LOG</code> turned on (Lesson 1.2):</p>
+                <pre data-file="wp-content/mu-plugins/pagesco-hook-order.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Pages &amp; Co. Hook Order
+ * Description: Lesson 2.3 demo: logs the order of the main actions of a front-end request.
+ */
+
+$pagesco_hooks = array( 'plugins_loaded', 'after_setup_theme', 'init', 'wp_loaded', 'template_redirect', 'wp_head', 'wp_footer', 'shutdown' );
+
+foreach ( $pagesco_hooks as $pagesco_hook ) {
+	add_action(
+		$pagesco_hook,
+		function () {
+			if ( ! is_admin() &amp;&amp; ! wp_doing_cron() &amp;&amp; ! defined( 'WP_CLI' ) ) {
+				error_log( 'hook order: ' . current_action() );
+			}
+		}
+	);
+}</code></pre>
+                <p>Load <code>http://localhost:8080/hello-world/</code> once, then look at the end of <code>wordpress/wp-content/debug.log</code> (open it in your editor, or run <code>tail wp-content/debug.log</code> in the WP-CLI container). These are the lines that one request added:</p>
+                <pre data-web="/hello-world/" data-log><code class="language-text">http://localhost:8080/hello-world/</code></pre>
+                <div class="card card-output">
+                    <h4>Output (wp-content/debug.log; your timestamps will differ)</h4>
+                    <pre><code>[25-Oct-2026 20:17:49 UTC] hook order: plugins_loaded
+[25-Oct-2026 20:17:49 UTC] hook order: after_setup_theme
+[25-Oct-2026 20:17:49 UTC] hook order: init
+[25-Oct-2026 20:17:49 UTC] hook order: wp_loaded
+[25-Oct-2026 20:17:49 UTC] hook order: template_redirect
+[25-Oct-2026 20:17:49 UTC] hook order: wp_head
+[25-Oct-2026 20:17:49 UTC] hook order: wp_footer
+[25-Oct-2026 20:17:49 UTC] hook order: shutdown</code></pre>
+                </div>
+                <p>Each line starts with the time and zone of the request in square brackets. The callback is the same closure every time; <code>current_action()</code> tells it which hook is running it. The order is the program from the diagram: plugins are loaded before <code>plugins_loaded</code>, the theme is set up before <code>after_setup_theme</code>, everything is loaded at <code>init</code>, and <code>template_redirect</code> fires once WordPress knows which post was asked for and before any HTML is printed, which makes it the place for redirects. The table is the short version you will use for the rest of the course:</p>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Action</th><th>Fires when</th><th>Typical use (lesson)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>plugins_loaded</code></td><td>All plugins are loaded</td><td>Code that needs another plugin to exist (5.1)</td></tr>
+                            <tr><td><code>after_setup_theme</code></td><td>The theme's <code>functions.php</code> has run</td><td><code>add_theme_support()</code>, menus (4.3)</td></tr>
+                            <tr><td><code>init</code></td><td>WordPress is loaded, before any output</td><td>Post types, taxonomies, blocks, shortcodes (5.2, 6.1)</td></tr>
+                            <tr><td><code>wp_enqueue_scripts</code></td><td>Front-end assets are collected</td><td>CSS and JavaScript (4.3)</td></tr>
+                            <tr><td><code>template_redirect</code></td><td>The query is done, nothing printed yet</td><td>Redirects, access checks (5.3)</td></tr>
+                            <tr><td><code>wp_head</code> / <code>wp_body_open</code> / <code>wp_footer</code></td><td>The page's head, start of body, end of body</td><td>Meta tags, banners, tracking code (this lesson)</td></tr>
+                            <tr><td><code>save_post</code></td><td>A post was saved</td><td>Saving meta box fields (5.2)</td></tr>
+                            <tr><td><code>admin_menu</code></td><td>The admin menu is built</td><td>Settings pages (5.4)</td></tr>
+                            <tr><td><code>rest_api_init</code></td><td>The REST API starts</td><td>Custom endpoints (7.2)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p>Once you have seen the order, delete <code>pagesco-hook-order.php</code>; a log line on every request gets noisy fast.</p>
+                <pre data-cli><code class="language-bash">rm wp-content/mu-plugins/pagesco-hook-order.php</code></pre>
+
+                <div class="card card-warning">
+                    <h4>⚠️ "Too early" is the most common hook bug</h4>
+                    <p>Code at the top level of a plugin file runs while plugins are still loading: the current user is not known yet, the theme is not loaded, post types are not registered, and pluggable functions such as <code>wp_get_current_user()</code> do not even exist yet (the <code>wp-settings.php</code> tour in Lesson 2.2). If a function returns nothing useful or WordPress tells you it was "called incorrectly", ask first: <em>is this running too early?</em> The fix is almost always to move the code into a callback on <code>init</code> or a later hook.</p>
+                </div>
+            </section>
+
+            <section id="filters" class="lesson-section">
+                <h2>🔁 Filters: Change a Value on Its Way Through</h2>
+                <p>A filter callback receives a value and must return one. Here is a filter in core, so you can see what calling one looks like from the other side. This is the last line of <code>get_the_title()</code> in <code>wp-includes/post-template.php</code>:</p>
+                <pre data-cli><code class="language-bash">grep -n "apply_filters( 'the_title'" wp-includes/post-template.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>174:	return apply_filters( 'the_title', $post_title, $post_id );</code></pre>
+                </div>
+                <p><code>apply_filters( 'the_title', $post_title, $post_id )</code> hands the title through every callback registered for <code>the_title</code> and returns what comes out. The extra argument, the post ID, is there so callbacks can decide what to do; you will use it in the next section. A small, real filter: WordPress separates the page title and the site name in the browser tab with a dash. The <code>document_title_separator</code> filter lets you choose another character. Add this to <code>pagesco-hello.php</code>:</p>
+                <pre data-append="wp-content/mu-plugins/pagesco-hello.php"><code class="language-php">function pagesco_title_separator( $separator ) {
+	return '|';
+}
+add_filter( 'document_title_separator', 'pagesco_title_separator' );</code></pre>
+                <pre data-web="/hello-world/" data-select="title"><code class="language-text">http://localhost:8080/hello-world/   (the &lt;title&gt; in View Source)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;title&gt;Hello world! | Pages &amp;amp; Co.&lt;/title&gt;</code></pre>
+                </div>
+                <p>The page title, a pipe, the site name. (<code>&amp;amp;</code> is how the <code>&amp;</code> in "Pages &amp; Co." is written in HTML; the browser tab shows a plain ampersand.) The callback ignores the old separator and returns its own. Most filters do something with the value they receive. This one appends a line to the content of every post, using the <code>the_content</code> filter:</p>
+                <pre data-append="wp-content/mu-plugins/pagesco-hello.php"><code class="language-php">function pagesco_content_signature( $content ) {
+	return $content . '&lt;p class="pagesco-signature"&gt;Thanks for reading, from the Pages &amp;amp; Co. team.&lt;/p&gt;';
+}
+add_filter( 'the_content', 'pagesco_content_signature' );</code></pre>
+                <pre data-web="/hello-world/" data-select=".entry-content" data-text><code class="language-text">http://localhost:8080/hello-world/   (the post's content area, as text)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Welcome to WordPress. This is your first post. Edit or delete it, then start writing!
+Thanks for reading, from the Pages &amp; Co. team.</code></pre>
+                </div>
+
+                <div class="card card-info">
+                    <h4>💡 Filters are not only for display</h4>
+                    <p>Plenty of filters change behavior rather than text: <code>upload_mimes</code> decides which file types may be uploaded, <code>excerpt_length</code> how long excerpts are, <code>login_redirect</code> where users land after logging in. The pattern is always the same: take the value, return the value. Under the hood actions and filters are one system. In <code>wp-includes/plugin.php</code> the whole body of <code>add_action()</code> is <code>return add_filter( $hook_name, $callback, $priority, $accepted_args );</code>; an action is a filter whose return value nobody uses.</p>
+                </div>
+            </section>
+
+            <section id="priorities" class="lesson-section">
+                <h2>🔢 Priorities and Accepted Arguments</h2>
+                <p>When several callbacks hang on one hook, the <strong>priority</strong> (third argument, default <code>10</code>) decides the order: lower numbers run first, and callbacks with the same priority run in the order they were added. You can watch it with a hook of your own and <code>wp eval-file</code>, which runs a PHP file with WordPress loaded. Save this as <code>wordpress/priorities.php</code> (the WordPress root, so WP-CLI finds it) and run it from the WP-CLI container:</p>
+                <pre data-file="priorities.php"><code class="language-php">&lt;?php
+add_filter( 'pagesco_demo', fn( $text ) =&gt; $text . ' [priority 20]', 20 );
+add_filter( 'pagesco_demo', fn( $text ) =&gt; $text . ' [priority 5]', 5 );
+add_filter( 'pagesco_demo', fn( $text ) =&gt; $text . ' [default 10, added first]' );
+add_filter( 'pagesco_demo', fn( $text ) =&gt; $text . ' [default 10, added second]' );
+
+echo apply_filters( 'pagesco_demo', 'Start:' ), "\n";</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file priorities.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Start: [priority 5] [default 10, added first] [default 10, added second] [priority 20]</code></pre>
+                </div>
+                <p>Priority 5 first, then the two 10s in the order they were added, then 20. Use a lower number when your callback must run before others (WordPress itself uses <code>1</code> for <code>_wp_render_title_tag</code> on <code>wp_head</code>, so the <code>&lt;title&gt;</code> comes first), and a higher one, often <code>20</code> or <code>99</code>, when you want the last word on a value other plugins have already changed.</p>
+
+                <h3>Accepted arguments</h3>
+                <p>The fourth argument says how many of the hook's values your callback wants. It defaults to <code>1</code>, so even though <code>the_title</code> passes both the title and the post ID, a callback only receives the title unless you ask for two. This filter adds the post ID to titles, which needs both values:</p>
+                <pre data-file="title-ids.php"><code class="language-php">&lt;?php
+function pagesco_title_with_id( $title, $post_id ) {
+	return "{$title} (#{$post_id})";
+}
+add_filter( 'the_title', 'pagesco_title_with_id', 10, 2 );
+
+echo get_the_title( 1 ), "\n";
+echo get_the_title( 2 ), "\n";</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file title-ids.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Hello world! (#1)
+Sample Page (#2)</code></pre>
+                </div>
+                <p><code>10, 2</code> means "default priority, give me two arguments". Leave out the <code>2</code> and PHP stops with a fatal error (Common Mistakes, number 2). Delete the two demo files when you are done: <code>rm priorities.php title-ids.php</code>.</p>
+                <pre data-cli><code class="language-bash">rm priorities.php title-ids.php</code></pre>
+            </section>
+
+            <section id="removing" class="lesson-section">
+                <h2>✂️ Removing Hooks</h2>
+                <p>Sometimes the thing to change is a hook someone else added: core, a theme or a plugin. WordPress adds a <code>&lt;meta name="generator"&gt;</code> tag to every page, which tells the world the exact version you run:</p>
+                <pre data-web="/" data-select="meta[name=generator]"><code class="language-text">http://localhost:8080/   (View Source, search for generator)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;meta name="generator" content="WordPress 7.1.3" /&gt;</code></pre>
+                </div>
+                <p>The tag comes from <code>add_action( 'wp_head', 'wp_generator' );</code> in <code>wp-includes/default-filters.php</code>. To undo an <code>add_action()</code> you call <code>remove_action()</code> with the <strong>same hook, the same callback and the same priority</strong>. Add this to <code>pagesco-hello.php</code>:</p>
+                <pre data-append="wp-content/mu-plugins/pagesco-hello.php"><code class="language-php">remove_action( 'wp_head', 'wp_generator' );</code></pre>
+                <p>Reload the page and search the source for <code>generator</code>: nothing. You can count it from the WP-CLI container too; <code>grep -c</code> prints how many lines match:</p>
+                <pre data-cli data-exit="1"><code class="language-bash">curl -s http://localhost:8080/ | grep -c 'name="generator"'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>0</code></pre>
+                </div>
+                <p>(Hiding the version is a small privacy gain, not real security; keeping WordPress updated is what protects you, Lesson 8.4.)</p>
+
+                <h3>The three rules of removing</h3>
+                <ol>
+                    <li><strong>Match the priority.</strong> A callback added at priority 1 is only removed with <code>remove_action( 'wp_head', '_wp_render_title_tag', 1 )</code>. With the wrong priority <code>remove_action()</code> returns <code>false</code> and changes nothing, with no warning.</li>
+                    <li><strong>Remove after it was added.</strong> Core's own hooks are added before any plugin loads, so a plugin can remove them at the top of its file. A hook that a theme adds inside its <code>after_setup_theme</code> callback does not exist yet when your plugin loads: remove it from a later hook, for example <code>init</code>.</li>
+                    <li><strong>You need a handle on the callback.</strong> Removing <code>[ $object, 'method' ]</code> needs that same object, which is why well-written plugins keep their main object reachable (a function that returns it, or a static <code>instance()</code> method). A closure added as <code>add_action( 'init', function () { ... } )</code> can only be removed by code that kept the closure in a variable. Use named functions or methods for anything someone might want to unhook, and remember that when you are tempted to write a closure in a plugin others will extend.</li>
+                </ol>
+                <p><code>remove_all_actions( 'wp_head' )</code> and <code>remove_all_filters()</code> exist too. Avoid them: they also remove what core and every other plugin needed on that hook.</p>
+            </section>
+
+            <section id="custom-hooks" class="lesson-section">
+                <h2>🧩 Creating Your Own Hooks</h2>
+                <p>Hooks are not only for core. When your theme or plugin calls <code>do_action()</code> or <code>apply_filters()</code> with a name of its own, other developers (or you, six months later) can change its behavior without editing it. That is what makes a plugin extensible, and it is how big plugins such as WooCommerce let thousands of add-ons work with them. The rules:</p>
+                <ul>
+                    <li><strong>Prefix the name</strong> like everything else: <code>pagesco_store_notice</code>, not <code>store_notice</code>.</li>
+                    <li><strong>Use a filter for a value</strong> others may change (text, an array of settings, a true/false decision) and an <strong>action for a moment</strong> others may want to act at ("before the notice is printed").</li>
+                    <li><strong>Pass context</strong> as extra arguments, the way <code>the_title</code> passes the post ID.</li>
+                    <li><strong>Document it</strong> with a DocBlock right above the call (what it is, each <code>@param</code>, <code>@since</code>), the same format core uses. Hooks are part of your public API: once people use one, renaming it breaks their sites.</li>
+                </ul>
+                <pre data-norun><code class="language-php">/**
+ * Filters the text of the Pages &amp; Co. store notice.
+ *
+ * @since 1.0.0
+ *
+ * @param string $text The notice text, plain text (it is escaped when printed).
+ */
+$text = apply_filters( 'pagesco_store_notice', $text );</code></pre>
+                <p>You will build exactly this in the project, with an action around it, and then use your own hook from the outside.</p>
+            </section>
+
+            <section id="finding-hooks" class="lesson-section">
+                <h2>🔍 Finding the Hook You Need</h2>
+                <p>WordPress core has well over two thousand hooks, and nobody memorizes them. Four ways to find the right one, from quickest to most thorough:</p>
+                <ol>
+                    <li><strong>Search the Code Reference.</strong> <a href="https://developer.wordpress.org/reference/hooks/" target="_blank" rel="noopener">developer.wordpress.org/reference/hooks</a> lists every core hook with its arguments and the file it lives in.</li>
+                    <li><strong>Read the function you want to change.</strong> Find the core function that produces the thing (the Code Reference shows its source), then look for <code>apply_filters</code> or <code>do_action</code> inside it, as you did with <code>get_the_title()</code>.</li>
+                    <li><strong>Search the source on your machine.</strong> Every core file is in your <code>wordpress/</code> folder. <code>grep</code> finds where a hook is called; <code>-r</code> searches folders, <code>-n</code> prints line numbers:</li>
+                </ol>
+                <pre data-cli><code class="language-bash">grep -rn "do_action( 'wp_body_open' )" wp-includes/</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>wp-includes/general-template.php:3473:	do_action( 'wp_body_open' );</code></pre>
+                </div>
+                <ol start="4">
+                    <li><strong>Ask the running site.</strong> Every registered callback is stored in the global <code>$wp_filter</code>: an array of <code>WP_Hook</code> objects keyed by hook name, each holding its callbacks grouped by priority. <code>has_filter()</code> (and <code>has_action()</code>) tells you whether something is attached, and returns its priority:</li>
+                </ol>
+                <pre data-cli><code class="language-bash">wp eval 'var_dump( has_action( "wp_head", "_wp_render_title_tag" ), has_filter( "the_content", "pagesco_content_signature" ), has_filter( "the_content", "no_such_function" ) );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>int(1)
+int(10)
+bool(false)</code></pre>
+                </div>
+                <p>Priority 1 and priority 10 (a number means "attached, at this priority"), and <code>false</code> for nothing attached. Careful when you test the result: priority <code>0</code> is a valid answer that <code>if ( has_filter( ... ) )</code> would treat as false, so compare with <code>false !== has_filter( ... )</code>. To see everything on a hook, walk <code>$wp_filter</code>. This prints the callbacks on <code>wp_head</code> that run at priority 2 or earlier. For a named function the ID is simply its name:</p>
+                <pre data-cli><code class="language-bash">wp eval 'foreach ( $GLOBALS["wp_filter"]["wp_head"]-&gt;callbacks as $priority =&gt; $callbacks ) { if ( $priority &lt;= 2 ) { foreach ( $callbacks as $id =&gt; $cb ) { echo "$priority  $id\n"; } } }'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>0  wp_enqueue_img_auto_sizes_contain_css_fix
+1  _wp_render_title_tag
+1  wp_enqueue_scripts
+1  wp_preload_resources
+1  wp_robots
+1  wp_post_preview_js
+1  wp_print_auto_sizes_contain_css_fix
+1  wp_maybe_inline_styles
+2  wp_resource_hints
+2  feed_links</code></pre>
+                </div>
+                <p>Yes, <code>0</code> is a priority too (and negative numbers work), and <code>_wp_render_title_tag</code> at 1 is why the <code>&lt;title&gt;</code> comes so early in the head. For everyday debugging, the free <a href="https://wordpress.org/plugins/query-monitor/" target="_blank" rel="noopener">Query Monitor</a> plugin shows the same information in the admin toolbar for every page you view: which hooks fired, which callbacks ran, in what order, and from which plugin. You will install it in Lesson 8.1.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <p>Make each mistake on purpose in a scratch file in <code>wp-content/mu-plugins/</code>, look at what WordPress tells you, then delete the file. Reading these messages calmly now is what makes them quick to fix later.</p>
+
+                <h3>1. A filter that forgets to return</h3>
+                <pre data-file="wp-content/mu-plugins/mistake-no-return.php" data-norun><code class="language-php">&lt;?php
+add_filter( 'the_title', function ( $title ) {
+	$title = strtoupper( $title );
+} );</code></pre>
+                <p>Reload <code>http://localhost:8080/hello-world/</code>: the post has no title. View Source shows why, at the very top of the page, and <code>grep -c</code> confirms that the title block printed nothing:</p>
+                <pre data-cli data-raises="Deprecated"><code class="language-bash">curl -s http://localhost:8080/hello-world/ | head -n 3
+curl -s http://localhost:8080/hello-world/ | grep -c 'wp-block-post-title'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Deprecated: str_replace(): Passing null to parameter #3 ($subject) of type array|string is deprecated in /var/www/html/wp-includes/formatting.php on line 5777
+&lt;!DOCTYPE html&gt;
+0</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the title is gone, here and in every list, menu and widget that shows titles. The closure changes its own copy of <code>$title</code> and returns nothing, and "nothing" in PHP is <code>null</code>, which becomes the title. The only message is a <code>Deprecated</code> notice that points into core, not at your file: the next filter on <code>the_title</code>, core's <code>capital_P_dangit()</code> at priority 11 (it fixes the spelling "Wordpress"), received your <code>null</code> and passed it to <code>str_replace()</code>. It sits above <code>&lt;!DOCTYPE html&gt;</code> because a block theme renders the whole template before it prints the <code>&lt;head&gt;</code>. On a live site, with <code>WP_DEBUG</code> off, there is no message at all. <strong>Fix:</strong> every filter callback ends with <code>return $title;</code>, also on the paths where it decides to change nothing. When a notice blames a core file, look at what <em>your</em> code handed to it.</p>
+                <pre data-cli><code class="language-bash">rm wp-content/mu-plugins/mistake-no-return.php</code></pre>
+
+                <h3>2. Asking for two arguments but registering for one</h3>
+                <pre data-file="wp-content/mu-plugins/mistake-args.php" data-web="/hello-world/" data-text data-raises="Fatal error"><code class="language-php">&lt;?php
+add_filter( 'the_title', function ( $title, $post_id ) {
+	return "{$title} (#{$post_id})";
+} );</code></pre>
+                <div class="card card-output">
+                    <h4>Error (http://localhost:8080/hello-world/)</h4>
+                    <pre><code>Fatal error: Uncaught ArgumentCountError: Too few arguments to function {closure:/var/www/html/wp-content/mu-plugins/mistake-args.php:2}(), 1 passed in /var/www/html/wp-includes/class-wp-hook.php on line 355 and exactly 2 expected in /var/www/html/wp-content/mu-plugins/mistake-args.php:2
+Stack trace:
+#0 /var/www/html/wp-includes/class-wp-hook.php(355): {closure:/var/www/html/wp-content/mu-plugins/mistake-args.php:2}('Hello world!')
+#1 /var/www/html/wp-includes/plugin.php(206): WP_Hook-&gt;apply_filters('Hello world!', Array)
+#2 /var/www/html/wp-includes/post-template.php(174): apply_filters('the_title', 'Hello world!', 1)
+#3 /var/www/html/wp-includes/blocks/post-title.php(28): get_the_title()
+#4 /var/www/html/wp-includes/class-wp-block.php(665): render_block_core_post_title(Array, '', Object(WP_Block))
+#5 /var/www/html/wp-includes/class-wp-block.php(629): WP_Block-&gt;render()
+#6 /var/www/html/wp-includes/class-wp-block.php(629): WP_Block-&gt;render()
+#7 /var/www/html/wp-includes/blocks.php(2514): WP_Block-&gt;render()
+#8 /var/www/html/wp-includes/blocks.php(2597): render_block(Array)
+#9 /var/www/html/wp-includes/block-template.php(291): do_blocks('&lt;!-- wp:templat...')
+#10 /var/www/html/wp-includes/template-canvas.php(12): get_the_block_template_html()
+#11 /var/www/html/wp-includes/template-loader.php(132): include('/var/www/html/w...')
+#12 /var/www/html/wp-blog-header.php(19): require_once('/var/www/html/w...')
+#13 /var/www/html/index.php(17): require('/var/www/html/w...')
+#14 {main}
+thrown in /var/www/html/wp-content/mu-plugins/mistake-args.php on line 2</code></pre>
+                </div>
+                <p><strong>What it means:</strong> read it from the left. The closure (named <code>{closure:FILE:LINE}</code>, after where it was written) was called with 1 argument from <code>class-wp-hook.php</code>, the class that runs callbacks, and it requires exactly 2: it asked for <code>$post_id</code>, but <code>add_filter()</code> was given the default of one argument. The stack trace, read from the top, is the path back: your closure, <code>WP_Hook-&gt;apply_filters()</code>, <code>apply_filters( 'the_title', ... )</code> in <code>get_the_title()</code>, and the Post Title block (<code>blocks/post-title.php</code>) that asked for the title. <strong>Fix:</strong> <code>add_filter( 'the_title', ..., 10, 2 );</code>.</p>
+                <div class="card card-info">
+                    <h4>🧩 Version note: hosts on PHP 8.3 or older</h4>
+                    <p>Naming closures after their file and line (<code>{closure:/var/www/html/...:2}</code>) arrived in PHP 8.4; PHP 8.5 and 8.4 print the message above. PHP 8.3 and older call every closure just <code>{closure}()</code>: <code>Too few arguments to function {closure}(), 1 passed in ...</code>, and the <code>thrown in</code> line at the end is your only pointer to the file. WordPress 7.1 still runs on PHP 7.4 and up, so you will meet the short form on older client hosts.</p>
+                </div>
+                <pre data-cli><code class="language-bash">rm wp-content/mu-plugins/mistake-args.php</code></pre>
+
+                <h3>3. A typo in the callback name</h3>
+                <pre data-file="wp-content/mu-plugins/mistake-typo.php" data-norun><code class="language-php">&lt;?php
+function pagesco_register_things() {
+	// register post types here (Lesson 5.2)
+}
+add_action( 'init', 'pagesco_register_thing' );</code></pre>
+                <pre data-cli data-raises="Fatal error,Error"><code class="language-bash">wp option get blogname</code></pre>
+                <div class="card card-output">
+                    <h4>Error</h4>
+                    <pre><code>Fatal error: Uncaught TypeError: call_user_func_array(): Argument #1 ($callback) must be a valid callback, function "pagesco_register_thing" not found or invalid function name in /var/www/html/wp-includes/class-wp-hook.php:353
+Stack trace:
+#0 /var/www/html/wp-includes/class-wp-hook.php(377): WP_Hook-&gt;apply_filters(NULL, Array)
+#1 /var/www/html/wp-includes/plugin.php(523): WP_Hook-&gt;do_action(Array)
+#2 /var/www/html/wp-settings.php(779): do_action('init')
+...
+#10 {main}
+  thrown in /var/www/html/wp-includes/class-wp-hook.php on line 353
+Error: There has been a critical error on this website.Learn more about troubleshooting WordPress. There has been a critical error on this website.</code></pre>
+                </div>
+                <p>(The <code>...</code> line stands for seven frames inside WP-CLI's own code, left out here.) <strong>What it means:</strong> <code>add_action()</code> does not check the name; it stores the string. When <code>init</code> fires, WordPress tries to call <code>pagesco_register_thing</code> (no s) and PHP finds no such function. Because <code>init</code> runs on every request, the whole site is down, the admin and WP-CLI included, until you fix the file. That is also why a fatal error in a must-use plugin is more serious than in a normal plugin: WordPress cannot deactivate a must-use plugin for you. <strong>Fix:</strong> correct the name. Do not count on your editor to catch this one: PHP support such as Intelephense (Lesson 1.2) checks the functions you <em>call</em>, but a callback name is just a string to it. Copy the name from the function definition, and when a hook seems to do nothing, ask the site with <code>has_action()</code> (Finding the Hook You Need).</p>
+                <pre data-cli><code class="language-bash">rm wp-content/mu-plugins/mistake-typo.php</code></pre>
+
+                <h3>4. Removing with the wrong priority (silent)</h3>
+                <pre data-file="mistake-remove.php"><code class="language-php">&lt;?php
+var_dump( remove_action( 'wp_head', '_wp_render_title_tag' ) );
+var_dump( remove_action( 'wp_head', '_wp_render_title_tag', 1 ) );</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file mistake-remove.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>bool(false)
+bool(true)</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the first call looks for <code>_wp_render_title_tag</code> at the default priority 10, finds nothing there and returns <code>false</code>. Only the second, with the priority it was added at, removes it. If you never look at the return value, the first version just "does not work". <strong>Fix:</strong> look up the priority where the hook is added (<code>grep -rn "_wp_render_title_tag" wp-includes/default-filters.php</code>), and when a removal seems to do nothing, <code>var_dump()</code> its result. (This script only removed the title tag inside its own WP-CLI run; your pages are unchanged.)</p>
+                <pre data-cli><code class="language-bash">rm mistake-remove.php</code></pre>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: The Pages &amp; Co. Store Notice</h2>
+                <p>Pages &amp; Co. wants a thin notice bar at the top of every page of the shop: "Free shipping on orders over $35." Marketing will change the text, and later lessons will add things next to it, so you will build it the extensible way: a must-use plugin <code>pagesco-site.php</code> that prints the notice from a hook and offers its own hooks for everyone else. This file stays in the site for the rest of the course. Allow about 35 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: Print the notice from <code>wp_body_open</code> <span class="step-time">(8 min)</span></h3>
+                    <p>Block themes such as Twenty Twenty-Five print the page through <code>wp-includes/template-canvas.php</code>, which calls <code>wp_body_open()</code> right after the opening <code>&lt;body&gt;</code> tag, so the <code>wp_body_open</code> action is the right moment for something at the very top. Create <code>wordpress/wp-content/mu-plugins/pagesco-site.php</code>. The text is escaped with <code>esc_html()</code> on output, the habit from Lesson 1.3:</p>
+                    <pre data-file="wp-content/mu-plugins/pagesco-site.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Pages &amp; Co. Site
+ * Description: Site-wide features of the Pages &amp; Co. bookstore: the store notice bar.
+ * Version:     1.0.0
+ * Author:      Pages &amp; Co.
+ */
+
+/**
+ * Prints the store notice at the top of every front-end page.
+ */
+function pagesco_render_store_notice() {
+	$text = 'Free shipping on orders over $35.';
+
+	echo '&lt;div class="pagesco-notice"&gt;' . esc_html( $text ) . '&lt;/div&gt;';
+}
+add_action( 'wp_body_open', 'pagesco_render_store_notice' );</code></pre>
+                    <p>Reload any page: the notice is the first thing inside <code>&lt;body&gt;</code>.</p>
+                    <pre data-web="/" data-select=".pagesco-notice"><code class="language-text">http://localhost:8080/</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;div class="pagesco-notice"&gt;Free shipping on orders over $35.&lt;/div&gt;</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: Give it its own hooks <span class="step-time">(10 min)</span></h3>
+                    <p>Replace the function with this version. It offers a filter for the text, an action just before the bar and one just inside it, and it lets anyone switch the notice off by returning an empty string from the filter. Nothing visible changes yet; you are building the doors other code will use.</p>
+                    <pre data-file="wp-content/mu-plugins/pagesco-site.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Pages &amp; Co. Site
+ * Description: Site-wide features of the Pages &amp; Co. bookstore: the store notice bar.
+ * Version:     1.0.0
+ * Author:      Pages &amp; Co.
+ */
+
+/**
+ * Prints the store notice at the top of every front-end page.
+ */
+function pagesco_render_store_notice() {
+	/**
+	 * Filters the text of the store notice.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param string $text Plain text; it is escaped when printed. Return '' to hide the notice.
+	 */
+	$text = apply_filters( 'pagesco_store_notice', 'Free shipping on orders over $35.' );
+
+	if ( '' === $text ) {
+		return;
+	}
+
+	/**
+	 * Fires before the store notice bar is printed.
+	 *
+	 * @since 1.0.0
+	 */
+	do_action( 'pagesco_before_store_notice' );
+
+	echo '&lt;div class="pagesco-notice"&gt;' . esc_html( $text );
+
+	/**
+	 * Fires inside the store notice bar, after the text.
+	 *
+	 * @since 1.0.0
+	 */
+	do_action( 'pagesco_store_notice_end' );
+
+	echo '&lt;/div&gt;';
+}
+add_action( 'wp_body_open', 'pagesco_render_store_notice' );</code></pre>
+                    <pre data-web="/" data-select=".pagesco-notice"><code class="language-text">http://localhost:8080/   (unchanged)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;div class="pagesco-notice"&gt;Free shipping on orders over $35.&lt;/div&gt;</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: Use your hooks from the outside <span class="step-time">(10 min)</span></h3>
+                    <p>Now be "another developer". Marketing wants Thursday's late opening mentioned and a link to the events page. Put this at the end of <code>pagesco-site.php</code> for now (in Module 5 code like this moves into the <code>pagesco-books</code> plugin). The filter runs at priority 20 so it adds to whatever earlier callbacks produced; the action prints a link inside the bar:</p>
+                    <pre data-append="wp-content/mu-plugins/pagesco-site.php"><code class="language-php">/**
+ * Adds the late-opening hours to the store notice.
+ */
+function pagesco_notice_late_opening( $text ) {
+	return $text . ' Open until 9 p.m. on Thursdays.';
+}
+add_filter( 'pagesco_store_notice', 'pagesco_notice_late_opening', 20 );
+
+/**
+ * Adds a link to the events page inside the notice bar.
+ */
+function pagesco_notice_events_link() {
+	echo ' &lt;a href="' . esc_url( home_url( '/events/' ) ) . '"&gt;See events&lt;/a&gt;';
+}
+add_action( 'pagesco_store_notice_end', 'pagesco_notice_events_link' );
+
+remove_action( 'wp_head', 'wp_generator' );</code></pre>
+                    <p>The last line moves the generator removal from your demo file into the site plugin, where it belongs. (The link goes to the Events page you created in Lesson 2.1; Lesson 5.5 fills it with the real events listing.)</p>
+                    <pre data-web="/" data-select=".pagesco-notice"><code class="language-text">http://localhost:8080/</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;div class="pagesco-notice"&gt;Free shipping on orders over $35. Open until 9 p.m. on Thursdays. &lt;a href="http://localhost:8080/events/"&gt;See events&lt;/a&gt;&lt;/div&gt;</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 4: Clean up and check from the command line <span class="step-time">(7 min)</span></h3>
+                    <p>The demo plugin from the start of the lesson has done its job: delete it. Then check your work the way you will check most things in this course, with WP-CLI and <code>curl</code> from the WP-CLI container (where <code>http://localhost:8080</code> reaches the site, as Lesson 1.2 set up):</p>
+                    <pre data-cli data-checkpoint data-exit="1"><code class="language-bash">rm wp-content/mu-plugins/pagesco-hello.php
+wp eval 'var_dump( has_action( "wp_body_open", "pagesco_render_store_notice" ), has_filter( "pagesco_store_notice", "pagesco_notice_late_opening" ), has_action( "wp_head", "wp_generator" ) );'
+curl -s http://localhost:8080/ | grep -c 'name="generator"'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>int(10)
+int(20)
+bool(false)
+0</code></pre>
+                    </div>
+                    <p>Your callback is attached at 10, your filter at 20, the generator callback is gone (<code>false</code>), and <code>grep -c</code> counts 0 generator tags on the home page. (<code>grep -c</code> exits with status 1 when it counts zero; that is expected here.)</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>wordpress/wp-content/mu-plugins/pagesco-site.php</code> exists with a plugin header and shows up under Plugins &gt; Must-Use in the admin</li>
+                        <li>Every page starts with the notice bar: the text, the Thursday hours and a "See events" link</li>
+                        <li>The notice offers a documented filter (<code>pagesco_store_notice</code>) and two actions (<code>pagesco_before_store_notice</code>, <code>pagesco_store_notice_end</code>)</li>
+                        <li>Returning <code>''</code> from <code>pagesco_store_notice</code> hides the bar (try it, then remove your test)</li>
+                        <li>The generator meta tag is gone, and <code>pagesco-hello.php</code> is deleted</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Write each exercise as its own must-use plugin in <code>wp-content/mu-plugins/</code> (one file each, so you can delete them afterwards without touching <code>pagesco-site.php</code>). Try each one before you open the solution.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Hide the Notice for One Day</h3>
+                    <p>Without editing <code>pagesco-site.php</code>, write <code>exercise-quiet-day.php</code> that hides the store notice completely. Then make it smarter: hide it only when a query string <code>?quiet=1</code> is present, so you can compare <code>http://localhost:8080/</code> and <code>http://localhost:8080/?quiet=1</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The notice function returns early when the filtered text is <code>''</code>. Which priority makes sure your callback runs after the Thursday-hours filter at 20? Read the query string with <code>isset( $_GET['quiet'] )</code>: you only test whether it exists, so there is nothing to sanitize yet (Lesson 5.3).</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/mu-plugins/exercise-quiet-day.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Exercise: Quiet Day
+ */
+
+function pagesco_quiet_day( $text ) {
+	return isset( $_GET['quiet'] ) ? '' : $text;
+}
+add_filter( 'pagesco_store_notice', 'pagesco_quiet_day', 99 );</code></pre>
+                        <p>Priority 99 runs after the late-opening filter at 20, so nothing adds text back after you emptied it. Count the notice bars with and without <code>?quiet=1</code>:</p>
+                        <pre data-cli><code class="language-bash">curl -s "http://localhost:8080/?quiet=1" | grep -c pagesco-notice
+curl -s http://localhost:8080/ | grep -c pagesco-notice</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>0
+1</code></pre>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Brand the Login Page</h3>
+                    <p>The login page shows a WordPress logo that links to wordpress.org. Write <code>exercise-login.php</code> so the logo links to the Pages &amp; Co. home page and its text reads "Pages &amp; Co.". Find the two filters yourself: they are in <code>wp-login.php</code> and their names start with <code>login_header</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>grep -n "apply_filters( 'login_header" wp-login.php</code> lists them. One filters the URL, one the link text. <code>home_url()</code> gives the site's address.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">grep -n "apply_filters( 'login_header" wp-login.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>138:	$login_header_url = apply_filters( 'login_headerurl', $login_header_url );
+167:	$login_header_text = apply_filters( 'login_headertext', $login_header_text );</code></pre>
+                        </div>
+                        <pre data-file="wp-content/mu-plugins/exercise-login.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Exercise: Login Branding
+ */
+
+add_filter( 'login_headerurl', 'pagesco_login_logo_url' );
+function pagesco_login_logo_url( $url ) {
+	return home_url( '/' );
+}
+
+add_filter( 'login_headertext', 'pagesco_login_logo_text' );
+function pagesco_login_logo_text( $text ) {
+	return 'Pages &amp; Co.';
+}</code></pre>
+                        <pre data-web="/wp-login.php" data-fresh data-select="h1 a"><code class="language-text">http://localhost:8080/wp-login.php   (log out first, or use a private window)</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>&lt;a href="http://localhost:8080/"&gt;Pages &amp; Co.&lt;/a&gt;</code></pre>
+                        </div>
+                        <p>Note that <code>add_filter()</code> can come before the function it names: PHP knows every top-level function in a file before it runs the first line. The logo image itself is CSS; replacing it is a <code>login_enqueue_scripts</code> job for Lesson 4.3.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: Who Is on <code>the_content</code>?</h3>
+                    <p>Write a WP-CLI one-liner (or a small file for <code>wp eval-file</code>) that prints every callback attached to <code>the_content</code>, with its priority, in the order WordPress will run them. Which core function turns blank lines into paragraphs, and at which priority does it run?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>$GLOBALS['wp_filter']['the_content']-&gt;callbacks</code> is an array of priority =&gt; callbacks. WordPress keeps it sorted by priority. Each callback is an array whose <code>'function'</code> key holds what was passed to <code>add_filter()</code>: a string, an <code>[ object, 'method' ]</code> array, or a closure.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="list-content-filters.php"><code class="language-php">&lt;?php
+foreach ( $GLOBALS['wp_filter']['the_content']-&gt;callbacks as $priority =&gt; $callbacks ) {
+	foreach ( $callbacks as $callback ) {
+		$function = $callback['function'];
+		if ( is_array( $function ) ) {
+			$class    = is_object( $function[0] ) ? get_class( $function[0] ) : $function[0];
+			$function = $class . '-&gt;' . $function[1];
+		} elseif ( $function instanceof Closure ) {
+			$function = '{closure}';
+		}
+		printf( "%3d  %s\n", $priority, $function );
+	}
+}</code></pre>
+                        <pre data-cli><code class="language-bash">wp eval-file list-content-filters.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>  8  apply_block_hooks_to_content_from_post_object
+  8  WP_Embed-&gt;run_shortcode
+  8  WP_Embed-&gt;autoembed
+  9  do_blocks
+ 10  wptexturize
+ 10  wpautop
+ 10  shortcode_unautop
+ 10  prepend_attachment
+ 10  wp_replace_insecure_home_url
+ 11  capital_P_dangit
+ 11  do_shortcode
+ 12  wp_filter_content_tags
+ 20  convert_smilies</code></pre>
+                        </div>
+                        <p><code>wpautop</code> (WordPress auto-paragraph) adds the <code>&lt;p&gt;</code> tags, at priority 10 together with several others; <code>do_shortcode</code> runs at 11, after it, which is why shortcodes (Lesson 5.5) are not wrapped in stray paragraphs. Your <code>pagesco_</code> filters are not in the list because <code>pagesco-hello.php</code> is deleted.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 4: Count Every Hook on a Page (Stretch)</h3>
+                    <p>WordPress has a special hook name, <code>all</code>, whose callbacks run for every action and filter that fires. Write <code>exercise-hook-count.php</code> that counts how many hooks fire while the home page is built, and how many <em>different</em> hook names that is, and writes both numbers to the debug log on <code>shutdown</code>. Front-end requests only.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>An <code>all</code> callback receives the hook name as its first argument. Keep a static array of name =&gt; count inside the callback, or a global. On <code>shutdown</code>, <code>array_sum()</code> and <code>count()</code> give you the two numbers. Skip admin, cron and WP-CLI requests as the hook-order demo did.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/mu-plugins/exercise-hook-count.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Exercise: Hook Count
+ */
+
+$GLOBALS['pagesco_hook_counts'] = array();
+
+add_action( 'all', function ( $hook_name ) {
+	$GLOBALS['pagesco_hook_counts'][ $hook_name ] = ( $GLOBALS['pagesco_hook_counts'][ $hook_name ] ?? 0 ) + 1;
+} );
+
+add_action( 'shutdown', function () {
+	if ( is_admin() || wp_doing_cron() || defined( 'WP_CLI' ) ) {
+		return;
+	}
+	$counts = $GLOBALS['pagesco_hook_counts'];
+	error_log( sprintf( 'hooks fired: %d calls of %d different hooks', array_sum( $counts ), count( $counts ) ) );
+} );</code></pre>
+                        <pre data-web="/" data-log><code class="language-text">http://localhost:8080/</code></pre>
+                        <div class="card card-output">
+                            <h4>Output (wp-content/debug.log; your numbers will differ)</h4>
+                            <pre><code>[25-Oct-2026 21:51:45 UTC] hooks fired: 11896 calls of 616 different hooks</code></pre>
+                        </div>
+                        <p>Thousands of hook calls for one page, and the page still renders in a fraction of a second: running a hook with no callbacks costs almost nothing. Your numbers depend on the theme, the plugins and the content, which is why they differ from these. Delete the file afterwards; <code>all</code> callbacks slow every request.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> You want every post title on the site to end with an asterisk. Which do you write?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="An action callback's return value is thrown away. Which kind of hook hands you the title and uses what you give back?">
+                                A) add_action( 'the_title', ... ) with a callback that echoes the title and an asterisk
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="the_title is a filter: WordPress passes the title in and displays whatever your callback returns, so the callback returns the title with an asterisk added.">
+                                B) add_filter( 'the_title', ... ) with a callback that returns the title and an asterisk
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Core files are replaced on every update. What does WordPress give you so you never have to edit them?">
+                                C) Edit get_the_title() in wp-includes/post-template.php
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> What does <code>wp eval-file</code> print for this file?</p>
+                        <pre data-file="quiz-order.php" data-wp><code class="language-php">&lt;?php
+add_action( 'pagesco_quiz', function () { echo 'A'; }, 20 );
+add_action( 'pagesco_quiz', function () { echo 'B'; } );
+add_action( 'pagesco_quiz', function () { echo 'C'; }, 5 );
+add_action( 'pagesco_quiz', function () { echo 'D'; } );
+do_action( 'pagesco_quiz' );</code></pre>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That is the order they were added. What does the third argument of add_action change?">
+                                A) ABCD
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Lower priorities run first, but look again at B and D: which priority do they have, and which one was added first?">
+                                B) CDBA
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="C has priority 5 and runs first. B and D both have the default 10 and run in the order they were added, then A at 20.">
+                                C) CBDA
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> A plugin has <code>add_filter( 'excerpt_length', 'pagesco_excerpt_length', 15 );</code>. Which line removes it?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="Removal needs the same hook, the same callback and the same priority it was added with, here 15.">
+                                A) remove_filter( 'excerpt_length', 'pagesco_excerpt_length', 15 );
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Without a priority, remove_filter looks at priority 10. Where was this callback added?">
+                                B) remove_filter( 'excerpt_length', 'pagesco_excerpt_length' );
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="This removes every callback on excerpt_length, including the ones core and other plugins need. Is there a more precise way?">
+                                C) remove_all_filters( 'excerpt_length' );
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> After adding <code>add_filter( 'the_title', function ( $title, $id ) { return "$title #$id"; } );</code> every page shows "There has been a critical error on this website." What is the most likely message in the log?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Nothing undefined is read here: both variables are parameters. What does PHP do when a required parameter receives no argument?">
+                                A) Warning: Undefined variable $id
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The closure is a valid callback; WordPress manages to call it. The problem is how many values it passes.">
+                                B) TypeError: call_user_func_array(): Argument #1 ($callback) must be a valid callback
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="add_filter defaults to one accepted argument, so the closure is called with only the title and PHP throws ArgumentCountError for the missing $id. Registering with 10, 2 fixes it.">
+                                C) ArgumentCountError: Too few arguments to function {closure}(), 1 passed ... and exactly 2 expected
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> Your plugin prints a "Books of the Month" box. Another developer should be able to change the number of books shown without editing your file. What do you add to your code?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="A prefixed, documented filter on the value is exactly the extension point: the other developer hooks pagesco_featured_count and returns a different number.">
+                                A) $count = apply_filters( 'pagesco_featured_count', 3 );
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="An action lets others run code at a moment, but its return value is ignored. How would they hand you a different number?">
+                                B) do_action( 'pagesco_featured_count', 3 );
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Hook names are shared by every plugin on the site. What does the course add to every name for that reason?">
+                                C) $count = apply_filters( 'count', 3 );
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Should hooks go in my theme's functions.php or in a plugin?</summary>
+                    <p>Ask what should happen when the site switches themes. Anything about <em>looks</em> (a theme's menus, its styles, its block patterns) belongs to the theme. Anything about <em>content and features</em> (the Book post type, the store notice, a REST endpoint) belongs in a plugin, because it must survive a redesign. That is why the store notice lives in a site plugin and not in the <code>pagesco</code> theme you start in Module 3.</p>
+                </details>
+                <details>
+                    <summary>Do hundreds of hooks make WordPress slow?</summary>
+                    <p>Calling a hook with nothing attached costs well under a microsecond, so the thousands of calls per page that Exercise 4 counts are not a problem. What can be slow is the work a callback does: a database query in a <code>the_title</code> filter runs for every title on the page. Keep callbacks on frequent hooks cheap, and do expensive work once (Lesson 8.2 measures this).</p>
+                </details>
+                <details>
+                    <summary>Can I use class methods instead of functions?</summary>
+                    <p>Yes, and from Module 5 on you will: <code>add_action( 'init', [ $this, 'register_post_types' ] )</code> inside a class, or <code>[ Books::class, 'register' ]</code> for a static method. The prefix problem disappears too, because the class lives in the <code>PagesCo\Books</code> namespace. The removal rule from this lesson still applies: to remove an object method someone needs the same object.</p>
+                </details>
+                <details>
+                    <summary>What is the difference between do_action( 'x', $a ) and do_action_ref_array( 'x', [ $a ] )?</summary>
+                    <p>They call the same callbacks with the same arguments; the second takes the arguments as an array, which helps when you build the list in code. <code>apply_filters_ref_array()</code> is the filter version. You will mostly read them in core rather than write them.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Block themes still print <code>&lt;body &lt;?php body_class(); ?&gt;&gt;</code> (look at line 20 of <code>wp-includes/template-canvas.php</code>), so the <code>body_class</code> filter works on every page. Add a filter to <code>pagesco-site.php</code> that adds the class <code>pagesco-site</code> to the body tag, plus <code>pagesco-thursday</code> only on Thursdays (<code>wp_date( 'l' )</code> gives the weekday in the site's time zone). Check the <code>&lt;body class="..."&gt;</code> attribute in View Source. Then think: why is filtering an array of classes safer for everyone than echoing your own <code>&lt;body&gt;</code> tag would be?</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Describe a website you use often as if it were built with hooks. Name three actions it would fire during a visit and one filter it might run on something you see. Which of them would you want to hook into if you were a developer working for that site, and what would your callback do?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>A <strong>hook</strong> is a named point where WordPress calls the functions registered for it; it is how you change WordPress without editing core</li>
+                        <li><strong>Actions</strong> (<code>add_action</code>, <code>do_action</code>) run code at a moment; <strong>filters</strong> (<code>add_filter</code>, <code>apply_filters</code>) receive a value and must <strong>return</strong> it</li>
+                        <li>The <strong>priority</strong> (default 10, lower first, ties in the order added) orders callbacks; <strong>accepted args</strong> (default 1) must match what your callback asks for</li>
+                        <li><code>remove_action</code> / <code>remove_filter</code> need the same hook, callback and priority, after the hook was added; they return <code>false</code> silently when nothing matches</li>
+                        <li>Your own hooks make code extensible: prefix them (<code>pagesco_</code>), use filters for values and actions for moments, pass context, document them</li>
+                        <li>Find hooks in the Code Reference, in the function you want to change, with <code>grep</code> in <code>wordpress/</code>, and with <code>has_filter()</code> / <code>$wp_filter</code> on the running site</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Run code at a moment</td><td><code>add_action( 'init', 'pagesco_register' );</code></td></tr>
+                            <tr><td>Change a value</td><td><code>add_filter( 'the_title', 'pagesco_title' );</code> (callback returns the value)</td></tr>
+                            <tr><td>Run before / after others</td><td>priority <code>5</code> / <code>20</code> as the third argument</td></tr>
+                            <tr><td>Receive two of the hook's values</td><td><code>add_filter( 'the_title', 'pagesco_title', 10, 2 );</code></td></tr>
+                            <tr><td>Undo someone's hook</td><td><code>remove_action( 'wp_head', 'wp_generator' );</code> (same priority)</td></tr>
+                            <tr><td>Let others change your value</td><td><code>$n = apply_filters( 'pagesco_count', 3 );</code></td></tr>
+                            <tr><td>Let others act at your moment</td><td><code>do_action( 'pagesco_before_store_notice' );</code></td></tr>
+                            <tr><td>Check what is attached</td><td><code>has_filter( 'the_content', 'wpautop' )</code> returns the priority or <code>false</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You wrote actions and filters in a must-use plugin and watched the order WordPress fires its main actions</li>
+                        <li>You controlled callback order with priorities and received extra hook values with accepted args</li>
+                        <li>You removed a core hook, and met the silent failures and fatal errors hooks produce, on purpose</li>
+                        <li>You built <code>pagesco-site.php</code>: a store notice with its own documented hooks, extended from the outside</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>In <a href="lesson_07.html"><strong>Lesson 3.1: Theme Anatomy &amp; the Template Hierarchy</strong></a> you turn from changing WordPress's behavior to changing its looks. You will take apart Twenty Twenty-Five, the theme that just printed your notice, see how block themes, classic themes and hybrids are built, and learn the template hierarchy that decides which template draws each page. Hooks come along: a theme's <code>functions.php</code> is one more place callbacks are added.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>pagesco-site.php</code> is in <code>wordpress/wp-content/mu-plugins/</code> and the notice shows on every page; the next lessons build on this site</li>
+                    <li>Delete the exercise files from <code>mu-plugins/</code> (keep <code>pagesco-site.php</code> and <code>mailpit-smtp.php</code>)</li>
+                    <li>Read <code>mailpit-smtp.php</code> from Lesson 1.2 again: you can now explain both of its hooks</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>If you only remember one thing from this lesson, remember the question "which hook, and is it an action or a filter?". Every WordPress task you meet from here on starts with it, and experienced developers look the answer up all the time; knowing how to find it matters more than knowing it. The first few times a filter eats your titles or a typo takes the site down, it feels alarming. After this lesson you know what those messages mean, and that each one is a few characters away from fixed.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_05.html" class="prev-lesson">← Previous: Core Architecture &amp; the Database</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_07.html" class="next-lesson">Next: Theme Anatomy &amp; the Template Hierarchy →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

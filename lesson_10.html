@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Child themes for block and classic WordPress themes: the Template header, how theme.json, templates, parts, patterns and functions.php are inherited and overridden, and choosing between a child theme, the Site Editor and your own theme, on WordPress 7.1 and PHP 8.5. PHP and WordPress Development Lesson 3.4.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Child Themes &amp; Customizing Existing Themes - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 3: Block Themes</a></li>
+            <li aria-current="page">Lesson 3.4: Child Themes &amp; Customizing Existing Themes</li>
+        </ul>
+    </nav>
+
+    <main id="main-content" data-state="after:lesson_09">
+        <div class="container">
+            <header>
+                <h1>🧒 Lesson 3.4: Child Themes &amp; Customizing Existing Themes</h1>
+                <p class="lead">Most client sites do not run a theme you wrote. They run Twenty Twenty-Five, or a theme they bought, and they want "just a few changes". If you edit that theme's files, the next update wipes your work. A <strong>child theme</strong> is the professional answer: a small theme that holds only your changes and borrows everything else from its parent. In this lesson you build one for Twenty Twenty-Five in the Pages &amp; Co. colors, override its <code>theme.json</code>, a template and a pattern, give it a <code>functions.php</code>, see how classic child themes differ, and then switch the shop back to its own theme.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Create and activate a child theme with the <code>Template</code> header, and explain the <code>template</code> and <code>stylesheet</code> options it sets</li>
+                        <li>Predict how a child's <code>theme.json</code>, templates, template parts, patterns and style variations combine with the parent's</li>
+                        <li>Use a child <code>functions.php</code> to enqueue the child's stylesheet, replace a pluggable parent function and remove a parent hook at the right time</li>
+                        <li>Build a classic child theme and explain how <code>get_stylesheet_directory()</code>, <code>get_template_directory()</code> and <code>locate_template()</code> choose files</li>
+                        <li>Choose between the Site Editor, a child theme, your own theme and a plugin for a requested change</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 125 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_09.html">Lesson 3.3: Patterns, Style Variations &amp; the Site Editor</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> <code>pagesco-tt5-child</code>, a child theme of Twenty Twenty-Five with the shop's palette, footer and functions, left installed while <code>pagesco</code> stays the active theme</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (nothing in this lesson needs 7.x; block child themes work the same on 6.6 and later)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 3.3; an internet connection for one demo that downloads Twenty Twenty-One</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#why" class="toc-link">Why Child Themes Exist</a></li>
+                        <li><a href="#first-child" class="toc-link">The Smallest Child Theme</a></li>
+                        <li><a href="#theme-json" class="toc-link">theme.json: Merged, Not Replaced</a></li>
+                        <li><a href="#templates" class="toc-link">Templates, Parts and Patterns</a></li>
+                        <li><a href="#functions" class="toc-link">functions.php in a Child Theme</a></li>
+                        <li><a href="#classic" class="toc-link">Classic Child Themes</a></li>
+                        <li><a href="#choosing" class="toc-link">Which Tool for Which Change?</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Finish pagesco-tt5-child</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="why" class="lesson-section">
+                <h2>🤔 Why Child Themes Exist</h2>
+                <p>In Lesson 1.1 you saw the rule "never edit core", and the same holds for themes you did not write. A theme update replaces the theme's whole folder: WordPress downloads the new version and swaps it in, with no idea that you changed <code>templates/single.html</code> last month. Your change is simply gone. A theme sold on a marketplace or listed in the WordPress.org directory is updated this way, and so is Twenty Twenty-Five.</p>
+                <p>A child theme avoids that. It is a separate theme folder that names another theme as its <strong>parent</strong>. When WordPress needs a file, it looks in the child first and falls back to the parent. You put only your changes in the child; the parent stays untouched and can be updated safely.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: tracing paper over a floor plan</h4>
+                    <p>Picture the parent theme as an architect's printed floor plan. You lay a sheet of tracing paper on top and draw only what you want different: a wall moved, a door added. Anyone looking at the stack sees the combined plan. When the architect sends a revised plan, you slide your tracing paper onto the new print, and your changes are still there. The child theme is the tracing paper: small, separate, and only meaningful on top of its parent.</p>
+                </div>
+
+                <p>"Looks in the child first" works a little differently for each kind of file. You will see each row of this table on your site in this lesson:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Parent's</th><th>With a child theme</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>style.css</code></td><td>The child's header replaces it (name, version). Whether the child's CSS is loaded is up to <code>functions.php</code></td></tr>
+                            <tr><td><code>theme.json</code></td><td><strong>Merged</strong>: the child's settings and styles are layered over the parent's</td></tr>
+                            <tr><td><code>templates/*.html</code>, <code>parts/*.html</code></td><td>A child file with the same name <strong>replaces</strong> the parent's; the rest are inherited</td></tr>
+                            <tr><td><code>patterns/*.php</code></td><td>Both are registered; a child pattern with the same <strong>slug</strong> wins</td></tr>
+                            <tr><td><code>styles/*.json</code></td><td>Inherited; a child file with the same file name replaces the parent's</td></tr>
+                            <tr><td><code>functions.php</code></td><td><strong>Both run</strong>, the child's first</td></tr>
+                            <tr><td>Classic PHP templates (<code>header.php</code>, <code>single.php</code>…)</td><td>A child file with the same name replaces the parent's</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="first-child" class="lesson-section">
+                <h2>🌱 The Smallest Child Theme</h2>
+                <p>A child theme needs one file: <code>style.css</code> with a <code>Template</code> line naming the parent's <strong>folder</strong> (not its display name). Create <code>wordpress/wp-content/themes/pagesco-tt5-child/style.css</code>:</p>
+                <pre data-file="wp-content/themes/pagesco-tt5-child/style.css"><code class="language-css">/*
+Theme Name: Pages &amp; Co. TT5 Child
+Theme URI: https://example.com/pagesco-tt5-child/
+Author: Pages &amp; Co.
+Author URI: https://example.com/
+Description: A child theme of Twenty Twenty-Five in the Pages &amp; Co. colors.
+Template: twentytwentyfive
+Requires at least: 6.7
+Tested up to: 7.1
+Requires PHP: 7.4
+Version: 1.0.0
+License: GNU General Public License v2 or later
+License URI: http://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: pagesco-tt5-child
+*/</code></pre>
+                <p>Compared with the <code>pagesco</code> header from Lesson 3.2, two lines matter. <code>Template: twentytwentyfive</code> makes it a child of Twenty Twenty-Five. <code>Text Domain</code> is the child's own folder name, for the child's own strings. <code>Requires at least: 6.7</code> matches the parent's own requirement (a child cannot run where its parent cannot). Activate it and ask WordPress what changed:</p>
+                <pre data-cli><code class="language-bash">wp theme activate pagesco-tt5-child
+wp option get template
+wp option get stylesheet
+wp theme list --fields=name,status,version</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Switched to 'Pages &amp;amp; Co. TT5 Child' theme.
+twentytwentyfive
+pagesco-tt5-child
++-------------------+----------+---------+
+| name              | status   | version |
++-------------------+----------+---------+
+| pagesco-tt5-child | active   | 1.0.0   |
+| pagesco           | inactive | 1.0.0   |
+| twentytwentyfive  | parent   | 1.5     |
+| twentytwentyfour  | inactive | 1.6     |
+| twentytwentythree | inactive | 1.7     |
++-------------------+----------+---------+</code></pre>
+                </div>
+                <p>These are the two options Lesson 3.1 pointed out. Normally both hold the same folder name; with a child theme active, <code>template</code> is the parent (where the templates and code come from) and <code>stylesheet</code> is the child (the theme whose <code>style.css</code> header names the site's theme). <code>wp theme list</code> gives the parent the status <code>parent</code>. In PHP, each option has its own directory function:</p>
+                <pre data-cli><code class="language-bash">wp eval 'echo get_template_directory(), "\n", get_stylesheet_directory(), "\n"; var_dump( is_child_theme(), wp_is_block_theme() );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>/var/www/html/wp-content/themes/twentytwentyfive
+/var/www/html/wp-content/themes/pagesco-tt5-child
+bool(true)
+bool(true)</code></pre>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Function</th><th>Returns, with a child theme active</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>get_template_directory()</code> / <code>_uri()</code></td><td>The parent's folder: path / URL</td></tr>
+                            <tr><td><code>get_stylesheet_directory()</code> / <code>_uri()</code></td><td>The child's folder</td></tr>
+                            <tr><td><code>get_stylesheet_uri()</code></td><td>The child's <code>style.css</code> URL</td></tr>
+                            <tr><td><code>get_theme_file_path( $file )</code> / <code>get_theme_file_uri()</code></td><td>The child's copy of <code>$file</code> if it exists, else the parent's (you used <code>get_theme_file_uri()</code> in Lesson 3.3's hero)</td></tr>
+                            <tr><td><code>get_parent_theme_file_path()</code> / <code>_uri()</code></td><td>Always the parent's copy</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Without a child theme the pairs return the same folder, which is why classic tutorials that mix them up seem to work until someone makes a child theme. Open <code>http://localhost:8080/</code>: it is Twenty Twenty-Five, unchanged, with your store notice at the top (Lesson 2.3's must-use plugin does not care which theme is active) and Twenty Twenty-Five's demo footer at the bottom, links to "FAQs" and "Authors" pages the shop does not have and all.</p>
+                <pre data-web="/" data-select="body" data-text><code class="language-text">http://localhost:8080/   (the visible text, shortened)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Free shipping on orders over $35. Open until 9 p.m. on Thursdays. See events
+Skip to content
+Pages &amp; Co.
+About Us
+Contact
+Events
+Sample Page
+Blog
+Hello world!
+...
+Themes
+Twenty Twenty-Five
+Designed with WordPress</code></pre>
+                </div>
+            </section>
+
+            <section id="theme-json" class="lesson-section">
+                <h2>🎨 theme.json: Merged, Not Replaced</h2>
+                <p>The shop wants Twenty Twenty-Five in its own colors. Twenty Twenty-Five names its colors by role (Lesson 3.3): <code>base</code> (page), <code>contrast</code> (text) and <code>accent-1</code> to <code>accent-6</code>, used throughout its templates and patterns. Keep the slugs and change the values. Create <code>pagesco-tt5-child/theme.json</code>:</p>
+                <pre data-file="wp-content/themes/pagesco-tt5-child/theme.json"><code class="language-json">{
+	"$schema": "https://schemas.wp.org/wp/7.1/theme.json",
+	"version": 3,
+	"settings": {
+		"color": {
+			"palette": [
+				{ "slug": "base", "name": "Paper", "color": "#fbf8f1" },
+				{ "slug": "contrast", "name": "Ink", "color": "#1f2a2e" },
+				{ "slug": "accent-1", "name": "Sage", "color": "#e3eadf" },
+				{ "slug": "accent-2", "name": "Sand", "color": "#ece3d4" },
+				{ "slug": "accent-3", "name": "Oxblood", "color": "#7a2e2e" },
+				{ "slug": "accent-4", "name": "Slate", "color": "#56636a" },
+				{ "slug": "accent-5", "name": "Cream", "color": "#f4efe3" },
+				{ "slug": "accent-6", "name": "Ink 20%", "color": "color-mix(in srgb, currentColor 20%, transparent)" }
+			]
+		}
+	},
+	"styles": {
+		"elements": {
+			"link": {
+				"color": { "text": "var:preset|color|accent-3" }
+			}
+		}
+	}
+}</code></pre>
+                <p>The child's <code>theme.json</code> is a layer between the parent's and the user's (Lesson 3.3's three layers become four: core, parent, child, user). What happens depends on the kind of value:</p>
+                <ul>
+                    <li><strong>Single values are merged key by key.</strong> The child sets only <code>styles.elements.link.color</code>; the parent's link underline, its body font (Manrope), its font sizes and everything else stay.</li>
+                    <li><strong>Preset lists are replaced as a whole.</strong> The child's <code>palette</code> replaces the parent's complete palette, so the child repeats all eight slugs, including <code>accent-6</code> with Twenty Twenty-Five's own value. Leave one out and it is gone (Common Mistakes, number 2).</li>
+                </ul>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | grep -o -- '--wp--preset--color--\(base\|contrast\|accent-[0-9]\): [^;]*'
+curl -s http://localhost:8080/ | grep -o 'a:where(:not(.wp-element-button)){[^}]*}\|body{[^}]*font-family[^;]*'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>--wp--preset--color--base: #fbf8f1
+--wp--preset--color--contrast: #1f2a2e
+--wp--preset--color--accent-1: #e3eadf
+--wp--preset--color--accent-2: #ece3d4
+--wp--preset--color--accent-3: #7a2e2e
+--wp--preset--color--accent-4: #56636a
+--wp--preset--color--accent-5: #f4efe3
+--wp--preset--color--accent-6: color-mix(in srgb, currentColor 20%, transparent)
+body{background-color: var(--wp--preset--color--base);color: var(--wp--preset--color--contrast);font-family: var(--wp--preset--font-family--manrope)
+a:where(:not(.wp-element-button)){color: var(--wp--preset--color--accent-3);}</code></pre>
+                </div>
+                <p>The shop's colors in Twenty Twenty-Five's slots, links in oxblood, and the body still in the parent's Manrope. The child also inherits the parent's style variations: <strong>Styles &gt; Browse styles</strong> still offers Evening, Noon, Dusk and the rest, because a child sees the parent's <code>styles/</code> folder (a child file with the same name would replace one, Exercise 4). The resolver counts every JSON file without <code>blockTypes</code>: Twenty Twenty-Five's 8 full variations, 8 color-only and 7 typography-only ones.</p>
+                <pre data-cli><code class="language-bash">wp eval 'echo count( WP_Theme_JSON_Resolver::get_style_variations() ), " variations, first: ", WP_Theme_JSON_Resolver::get_style_variations()[0]["title"], "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>23 variations, first: Evening</code></pre>
+                </div>
+            </section>
+
+            <section id="templates" class="lesson-section">
+                <h2>📐 Templates, Parts and Patterns</h2>
+                <p>Pages &amp; Co. does not use comments, and Twenty Twenty-Five's single post template ends with a comments section. Overriding a template is "copy, then change only what you need": copy the parent's <code>templates/single.html</code> into the child and delete the comments line. With <code>sed</code> that is one command (from the WP-CLI container; in your editor, copy the file and delete the line <code>&lt;!-- wp:pattern {"slug":"twentytwentyfive/comments"} /--&gt;</code>):</p>
+                <pre data-cli data-exit="1"><code class="language-bash">curl -s http://localhost:8080/hello-world/ | grep -c 'wp-block-comments'
+mkdir -p wp-content/themes/pagesco-tt5-child/templates
+sed '/twentytwentyfive\/comments/d' wp-content/themes/twentytwentyfive/templates/single.html &gt; wp-content/themes/pagesco-tt5-child/templates/single.html
+curl -s http://localhost:8080/hello-world/ | grep -c 'wp-block-comments'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>4
+0</code></pre>
+                </div>
+                <p>(The last <code>grep -c</code> prints 0 and exits with status 1.) Which file did WordPress use for each template? <code>get_block_templates()</code> names every template after the active theme, so it cannot tell you; core's internal <code>_get_block_template_file()</code> can (internal, so use it for checking, not in your theme's code):</p>
+                <pre data-cli><code class="language-bash">wp eval 'foreach ( array( "single", "index" ) as $slug ) { echo _get_block_template_file( "wp_template", $slug )["path"], "\n"; }'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>/var/www/html/wp-content/themes/pagesco-tt5-child/templates/single.html
+/var/www/html/wp-content/themes/twentytwentyfive/templates/index.html</code></pre>
+                </div>
+                <p><code>single</code> comes from the child, <code>index</code> from the parent. Template parts work the same way: a child <code>parts/footer.html</code> would replace the parent's. The template hierarchy from Lesson 3.1 is checked in both folders for each candidate: for a page, WordPress looks for <code>page-about.html</code> in the child, then in the parent, before it moves on to <code>page.html</code>.</p>
+                <div class="card card-warning">
+                    <h4>⚠️ An overridden template stops receiving updates</h4>
+                    <p>From now on, if a Twenty Twenty-Five update improves <code>single.html</code>, your site will not see it: your copy wins. That is the price of overriding a whole file, so override as little as possible, and when the parent updates, compare its new file with your copy (<code>diff</code> is enough). Smaller tools come first: a <code>theme.json</code> style, a pattern override, a hook.</p>
+                </div>
+
+                <h3>Overriding a pattern by slug</h3>
+                <p>Twenty Twenty-Five's footer part contains nothing but one line, <code>&lt;!-- wp:pattern {"slug":"twentytwentyfive/footer"} /--&gt;</code>; the design is in the pattern. When a child theme registers a pattern with the same slug as a parent's pattern, the child's wins (core registers the child's patterns first and skips any slug already registered). So you can replace the footer without touching the template part, which keeps the part, and everything that uses it, the parent's. You write that pattern in the project.</p>
+            </section>
+
+            <section id="functions" class="lesson-section">
+                <h2>⚙️ functions.php in a Child Theme</h2>
+                <p>First, a surprise that catches almost everyone. Add a rule to the child's <code>style.css</code> (append it below the header):</p>
+                <pre data-append="wp-content/themes/pagesco-tt5-child/style.css"><code class="language-css">/* The store notice from the pagesco-site must-use plugin (Lesson 2.3), in the shop's colors. */
+.pagesco-notice {
+	background: var(--wp--preset--color--contrast);
+	color: var(--wp--preset--color--base);
+	font-size: var(--wp--preset--font-size--small);
+	padding: 0.5rem 1rem;
+	text-align: center;
+}
+
+.pagesco-notice a {
+	color: inherit;
+}</code></pre>
+                <pre data-cli data-exit="1"><code class="language-bash">curl -s http://localhost:8080/ | grep -c 'pagesco-tt5-child/style.css'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>0</code></pre>
+                </div>
+                <p>The page never loads it. A block theme's <code>style.css</code> is a header file first; WordPress loads a theme's CSS only when <code>functions.php</code> enqueues it (Lesson 3.2's FAQ). Twenty Twenty-Five enqueues <em>its own</em> stylesheet with <code>get_parent_theme_file_uri()</code>, so the child's is ignored. Give the child a <code>functions.php</code> that enqueues it, with the parent's handle as a dependency so the child's rules come later and win ties:</p>
+                <pre data-file="wp-content/themes/pagesco-tt5-child/functions.php"><code class="language-php">&lt;?php
+/**
+ * Pages &amp; Co. TT5 Child functions and definitions.
+ *
+ * @package pagesco-tt5-child
+ */
+
+/**
+ * Loads the child theme's style.css after the parent's styles.
+ */
+function pagesco_tt5_child_enqueue_styles() {
+	wp_enqueue_style(
+		'pagesco-tt5-child-style',
+		get_stylesheet_uri(),
+		array( 'twentytwentyfive-style' ),
+		wp_get_theme()-&gt;get( 'Version' )
+	);
+}
+add_action( 'wp_enqueue_scripts', 'pagesco_tt5_child_enqueue_styles' );</code></pre>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | grep -o "&lt;link rel='stylesheet' id='pagesco-tt5-child-style-css'[^&gt;]*&gt;\|&lt;style id=\"twentytwentyfive-style-inline-css\"&gt;"</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;style id="twentytwentyfive-style-inline-css"&gt;
+&lt;link rel='stylesheet' id='pagesco-tt5-child-style-css' href='http://localhost:8080/wp-content/themes/pagesco-tt5-child/style.css?ver=1.0.0' media='all' /&gt;</code></pre>
+                </div>
+                <p>The parent's stylesheet arrives inlined in a <code>&lt;style&gt;</code> element (it is small, and WordPress inlines small stylesheets that declare their file path, as Twenty Twenty-Five does with <code>wp_style_add_data( …, 'path', … )</code>), and the child's comes after it as a normal <code>&lt;link&gt;</code>, with the child's <code>Version</code> as <code>?ver=</code> (Lesson 4.3 covers enqueueing and versions in depth). Functions in the child use the child's prefix, <code>pagesco_tt5_child_</code>, like any other code (Lesson 1.3).</p>
+                <div class="card card-success">
+                    <h4>✅ CSS in a block child theme: theme.json first</h4>
+                    <p>For a few rules, a block child theme can skip the stylesheet entirely and put them in <code>theme.json</code>'s <code>styles.css</code> string, as <code>pagesco</code> does for the notice (Lesson 3.2). Use an enqueued <code>style.css</code> when the CSS grows beyond a few lines or needs comments and structure, as here.</p>
+                </div>
+
+                <h3>Load order: the child goes first</h3>
+                <p>Both <code>functions.php</code> files run, and the order matters. List the theme files PHP has loaded:</p>
+                <pre data-cli><code class="language-bash">wp eval 'foreach ( get_included_files() as $f ) { if ( str_contains( $f, "/themes/" ) ) { echo $f, "\n"; } }'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>/var/www/html/wp-content/themes/pagesco-tt5-child/functions.php
+/var/www/html/wp-content/themes/twentytwentyfive/functions.php</code></pre>
+                </div>
+                <p>The child's <code>functions.php</code> is loaded before the parent's (<code>wp-settings.php</code> loads the stylesheet directory, then the template directory, Lesson 2.2's load order). Two consequences follow, and you will use both in the project:</p>
+                <ul>
+                    <li><strong>Pluggable functions.</strong> Twenty Twenty-Five wraps every function in <code>if ( ! function_exists( 'twentytwentyfive_post_format_setup' ) )</code> (Lesson 3.1). If the child defines a function with that name first, the parent skips its own: the child's version replaces it. Only functions written this way can be replaced; defining any other parent function in the child is a fatal "Cannot redeclare" error (Lesson 1.3).</li>
+                    <li><strong>Removing parent hooks needs good timing.</strong> When the child's file runs, the parent has not added its hooks yet, so a <code>remove_action()</code> at the top of the child's file has nothing to remove (Common Mistakes, number 3). Remove parent hooks from a callback on <code>after_setup_theme</code>, which fires after both files have loaded (Lesson 2.3's hook order).</li>
+                </ul>
+            </section>
+
+            <section id="classic" class="lesson-section">
+                <h2>🏛️ Classic Child Themes</h2>
+                <p>Many client sites run classic themes, so you need the classic version too. The idea is identical; the files are PHP templates instead of block markup. To try it you need a classic parent. Twenty Twenty-One is the last classic default theme; WP-CLI downloads it from WordPress.org (this needs an internet connection):</p>
+                <pre data-cli><code class="language-bash">wp theme install twentytwentyone</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your version number may differ)</h4>
+                    <pre><code>Installing Twenty Twenty-One (2.9)
+Downloading installation package from https://downloads.wordpress.org/theme/twentytwentyone.2.9.zip...
+Unpacking the package...
+Installing the theme...
+Theme installed successfully.
+Success: Installed 1 of 1 themes.</code></pre>
+                </div>
+                <p>A practice child for it needs the same two files. <code>style.css</code>:</p>
+                <pre data-file="wp-content/themes/pagesco-tt21-child/style.css"><code class="language-css">/*
+Theme Name: Pages &amp; Co. TT21 Child
+Template: twentytwentyone
+Version: 1.0.0
+Text Domain: pagesco-tt21-child
+*/
+
+body {
+	--global--color-primary: #7a2e2e;
+}</code></pre>
+                <p>And <code>functions.php</code>. Twenty Twenty-One enqueues its own stylesheet with <code>get_template_directory_uri()</code> (the parent), so the child enqueues its own with the parent's handle as a dependency, the same pattern as the block child:</p>
+                <pre data-file="wp-content/themes/pagesco-tt21-child/functions.php"><code class="language-php">&lt;?php
+/**
+ * Pages &amp; Co. TT21 Child: a practice classic child theme.
+ *
+ * @package pagesco-tt21-child
+ */
+
+/**
+ * Loads the child's style.css after the parent's.
+ */
+function pagesco_tt21_child_enqueue_styles() {
+	wp_enqueue_style(
+		'pagesco-tt21-child-style',
+		get_stylesheet_uri(),
+		array( 'twenty-twenty-one-style' ),
+		wp_get_theme()-&gt;get( 'Version' )
+	);
+}
+add_action( 'wp_enqueue_scripts', 'pagesco_tt21_child_enqueue_styles' );</code></pre>
+                <pre data-cli><code class="language-bash">wp theme activate pagesco-tt21-child
+curl -s http://localhost:8080/ | grep -o "&lt;link rel='stylesheet' id='\(twenty-twenty-one-style\|pagesco-tt21-child-style\)-css'[^&gt;]*&gt;" | sed 's/?ver=[0-9.]*/?ver=…/'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Switched to 'Pages &amp;amp; Co. TT21 Child' theme.
+&lt;link rel='stylesheet' id='twenty-twenty-one-style-css' href='http://localhost:8080/wp-content/themes/twentytwentyone/style.css?ver=…' media='all' /&gt;
+&lt;link rel='stylesheet' id='pagesco-tt21-child-style-css' href='http://localhost:8080/wp-content/themes/pagesco-tt21-child/style.css?ver=…' media='all' /&gt;</code></pre>
+                </div>
+                <p>Parent first, child second. (The <code>sed</code> hides the version numbers, which change with each Twenty Twenty-One release.) You may meet old tutorials that load the parent's CSS with <code>@import url("../twentytwentyone/style.css");</code> at the top of the child's <code>style.css</code>: that is outdated, because <code>@import</code> loads the files one after the other and slows the page down. Enqueue instead.</p>
+                <p>Template files are found by <code>locate_template()</code>, which checks the child's folder, then the parent's. Classic templates load their pieces through it (<code>get_header()</code>, <code>get_footer()</code>, <code>get_template_part()</code>; Lesson 4.1 uses them). Watch it switch when the child gets its own <code>footer.php</code>:</p>
+                <pre data-cli><code class="language-bash">wp eval 'echo locate_template( "footer.php" ), "\n";'
+cp wp-content/themes/twentytwentyone/footer.php wp-content/themes/pagesco-tt21-child/
+wp eval 'echo locate_template( "footer.php" ), "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>/var/www/html/wp-content/themes/twentytwentyone/footer.php
+/var/www/html/wp-content/themes/pagesco-tt21-child/footer.php</code></pre>
+                </div>
+                <p>That is the classic version of the template override you made with <code>single.html</code>, with the same warning: the copied <code>footer.php</code> no longer receives the parent's fixes. The practice is over; switch back to your block child and delete both classic themes (deleting needs the theme to be inactive):</p>
+                <pre data-cli><code class="language-bash">wp theme activate pagesco-tt5-child
+wp theme delete pagesco-tt21-child twentytwentyone</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Switched to 'Pages &amp;amp; Co. TT5 Child' theme.
+Deleted 'pagesco-tt21-child' theme.
+Deleted 'twentytwentyone' theme.
+Success: Deleted 2 of 2 themes.</code></pre>
+                </div>
+                <div class="card card-info">
+                    <h4>💡 Grandchildren do not exist</h4>
+                    <p>WordPress supports one level: a child theme cannot be the parent of another child theme. If you need to customize a child theme someone else wrote, copy it into a new theme of your own (renaming its folder, header, text domain and prefixes), or add your changes through a plugin.</p>
+                </div>
+            </section>
+
+            <section id="choosing" class="lesson-section">
+                <h2>🧭 Which Tool for Which Change?</h2>
+                <p>A child theme is one option among several. Clients describe what they want ("make the buttons red", "show the author box", "add a booking form"), not which tool to use, so learn to sort requests:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Tool</th><th>Who changes it</th><th>Where it lives</th><th>Good for</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Site Editor: Styles, templates, Additional CSS</td><td>The site owner</td><td>Database (<code>wp_global_styles</code>, <code>wp_template</code>)</td><td>Small visual changes the owner may want to change again</td></tr>
+                            <tr><td>Child theme</td><td>A developer</td><td>Files, in Git (Lesson 8.4)</td><td>Lasting design changes to a theme you did not write</td></tr>
+                            <tr><td>Your own theme (Lessons 3.2 and 3.3)</td><td>A developer</td><td>Files</td><td>When the changes outgrow the parent, or the design is truly the client's own</td></tr>
+                            <tr><td>A plugin (Module 5)</td><td>A developer</td><td>Files</td><td><strong>Features</strong>: anything that should survive a theme switch, such as post types, forms, the store notice</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The last row is the one most often gotten wrong. A child theme is still a theme: if the client switches themes in three years, everything in it disappears. That is why the store notice lives in a must-use plugin (Lesson 2.3) and why the Book post type goes into the <code>pagesco-books</code> plugin in Module 5, not into <code>functions.php</code>.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <h3>1. A Template header that names the wrong folder</h3>
+                <p>The parent's <em>name</em> is "Twenty Twenty-Five", but <code>Template</code> needs its <em>folder</em>, <code>twentytwentyfive</code>. Make a throwaway child with the wrong value:</p>
+                <pre data-file="wp-content/themes/pagesco-typo-child/style.css"><code class="language-css">/*
+Theme Name: Pages &amp; Co. Typo Child
+Template: twenty-twenty-five
+*/</code></pre>
+                <pre data-cli data-raises="Error"><code class="language-bash">wp theme list --fields=name,status
+wp theme activate pagesco-typo-child</code></pre>
+                <div class="card card-output">
+                    <h4>Error</h4>
+                    <pre><code>+-------------------+----------+
+| name              | status   |
++-------------------+----------+
+| pagesco-tt5-child | active   |
+| pagesco           | inactive |
+| twentytwentyfive  | parent   |
+| twentytwentyfour  | inactive |
+| twentytwentythree | inactive |
++-------------------+----------+
+Error: The parent theme is missing. Please install the "twenty-twenty-five" parent theme.</code></pre>
+                </div>
+                <p><strong>What it means:</strong> WordPress could not find a theme folder named <code>twenty-twenty-five</code>, so it treats the child as broken and refuses to activate it: "The parent theme is missing. Please install the "twenty-twenty-five" parent theme." Note that <code>wp theme list</code> does not show the broken theme at all; <strong>Appearance &gt; Themes</strong> lists it under <strong>Broken Themes</strong> with the same message. The same error appears if the parent really is not installed, which happens when a client uploads only the child theme. <strong>Fix:</strong> use the folder name (look in <code>wp-content/themes/</code> or at <code>wp theme list</code>'s <code>name</code> column), and install the parent first. Delete the practice folder:</p>
+                <pre data-cli><code class="language-bash">rm -r wp-content/themes/pagesco-typo-child</code></pre>
+
+                <h3>2. A partial palette in the child</h3>
+                <p>You only want new <code>base</code> and <code>contrast</code> colors, so you list just those two in the child's palette. Keep a copy of the real file and try it:</p>
+                <pre data-cli><code class="language-bash">cp wp-content/themes/pagesco-tt5-child/theme.json theme.json.bak
+sed -i '/"slug": "accent-/d; s/"color": "#1f2a2e" },/"color": "#1f2a2e" }/' wp-content/themes/pagesco-tt5-child/theme.json
+curl -s http://localhost:8080/ | grep -c -- '--wp--preset--color--accent-[0-9]: '
+curl -s http://localhost:8080/ | grep -o 'var(--wp--preset--color--accent-[0-9])' | sort | uniq -c</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>0
+      1 var(--wp--preset--color--accent-3)
+      3 var(--wp--preset--color--accent-4)</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the child's two-color palette replaced the parent's eight-color palette, so no <code>accent</code> custom property is defined any more, while the parent's styles still use them (the second command counts the uses on the home page; your link color, for one, now points at nothing). CSS ignores an undefined variable without a message, so those elements fall back to inherited or default colors, and in the editor the accent swatches vanish. Patterns that use <code>accent</code> backgrounds lose them. <strong>Fix:</strong> when you override a preset list, repeat every slug the parent uses, changing only the values. Restore the copy:</p>
+                <pre data-cli><code class="language-bash">mv theme.json.bak wp-content/themes/pagesco-tt5-child/theme.json
+curl -s http://localhost:8080/ | grep -c -- '--wp--preset--color--accent-[0-9]: '</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>1</code></pre>
+                </div>
+
+                <h3>3. Removing a parent hook too early</h3>
+                <p>The shop does not want Twenty Twenty-Five's "Checkmark" list style, which the parent registers in <code>twentytwentyfive_block_styles()</code> on <code>init</code>. You add the obvious line to the end of the child's <code>functions.php</code>, logging what <code>remove_action()</code> returns:</p>
+                <pre data-append="wp-content/themes/pagesco-tt5-child/functions.php"><code class="language-php">error_log( 'remove_action returned ' . var_export( remove_action( 'init', 'twentytwentyfive_block_styles' ), true ) );</code></pre>
+                <pre data-cli><code class="language-bash">wp eval 'var_dump( WP_Block_Styles_Registry::get_instance()-&gt;is_registered( "core/list", "checkmark-list" ) );'
+grep 'remove_action returned' wp-content/debug.log | tail -n 1</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your timestamp will differ)</h4>
+                    <pre><code>bool(true)
+[25-Oct-2026 23:00:22 UTC] remove_action returned false</code></pre>
+                </div>
+                <p><strong>What it means:</strong> <code>remove_action()</code> returned <code>false</code> because there was nothing to remove yet: the child's file runs before the parent's, which adds the hook a moment later. The checkmark style is still registered, and no error says so, only the return value you logged (Lesson 2.3: <code>remove_action()</code> must run after the <code>add_action()</code> it undoes). <strong>Fix:</strong> wrap the removal in a function hooked to <code>after_setup_theme</code>. You do that in the project, replacing <code>functions.php</code> completely.</p>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Finish pagesco-tt5-child</h2>
+                <p>The child already has the shop's palette, a <code>single.html</code> without comments and a stylesheet for the notice. Finish it: the shop's footer, a complete <code>functions.php</code>, a check of everything, and then the switch back to <code>pagesco</code>. Allow about 40 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: The shop's footer, by pattern override <span class="step-time">(10 min)</span></h3>
+                    <p>Create <code>pagesco-tt5-child/patterns/footer.php</code> with the parent footer pattern's slug, <code>twentytwentyfive/footer</code>. It uses the parent's presets (spacing <code>50</code>, font size <code>small</code>) and the child's colors, and its text uses the child's text domain:</p>
+                    <pre data-file="wp-content/themes/pagesco-tt5-child/patterns/footer.php"><code class="language-php">&lt;?php
+/**
+ * Title: Footer
+ * Slug: twentytwentyfive/footer
+ * Categories: footer
+ * Block Types: core/template-part/footer
+ * Description: The Pages &amp; Co. footer: address and contact.
+ *
+ * @package pagesco-tt5-child
+ */
+
+?&gt;
+&lt;!-- wp:group {"align":"full","style":{"spacing":{"padding":{"top":"var:preset|spacing|50","bottom":"var:preset|spacing|50"}}},"backgroundColor":"accent-1","layout":{"type":"constrained"}} --&gt;
+&lt;div class="wp-block-group alignfull has-accent-1-background-color has-background" style="padding-top:var(--wp--preset--spacing--50);padding-bottom:var(--wp--preset--spacing--50)"&gt;
+	&lt;!-- wp:site-title {"level":0} /--&gt;
+
+	&lt;!-- wp:paragraph {"fontSize":"small"} --&gt;
+	&lt;p class="has-small-font-size"&gt;&lt;?php esc_html_e( '12 Market Street · 555-0142 · Open Monday to Saturday', 'pagesco-tt5-child' ); ?&gt;&lt;/p&gt;
+	&lt;!-- /wp:paragraph --&gt;
+&lt;/div&gt;
+&lt;!-- /wp:group --&gt;</code></pre>
+                    <pre data-web="/" data-select="footer" data-text><code class="language-text">http://localhost:8080/   (the footer, as text)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Pages &amp; Co.
+12 Market Street · 555-0142 · Open Monday to Saturday</code></pre>
+                    </div>
+                    <p>The footer part still comes from the parent; only the pattern it shows is the child's. If Twenty Twenty-Five ever changes its <code>parts/footer.html</code>, your site receives that change.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: The complete functions.php <span class="step-time">(12 min)</span></h3>
+                    <p>Replace <code>functions.php</code> (this also removes the logging line from Common Mistakes). It keeps the enqueue function, replaces the parent's pluggable post-format setup (the shop's news only uses asides and quotes), and removes the checkmark style at the right moment:</p>
+                    <pre data-file="wp-content/themes/pagesco-tt5-child/functions.php"><code class="language-php">&lt;?php
+/**
+ * Pages &amp; Co. TT5 Child functions and definitions.
+ *
+ * @package pagesco-tt5-child
+ */
+
+/**
+ * Loads the child theme's style.css after the parent's styles.
+ */
+function pagesco_tt5_child_enqueue_styles() {
+	wp_enqueue_style(
+		'pagesco-tt5-child-style',
+		get_stylesheet_uri(),
+		array( 'twentytwentyfive-style' ),
+		wp_get_theme()-&gt;get( 'Version' )
+	);
+}
+add_action( 'wp_enqueue_scripts', 'pagesco_tt5_child_enqueue_styles' );
+
+/**
+ * Replaces the parent's post format support: the shop only uses asides and quotes.
+ *
+ * Twenty Twenty-Five wraps this function in function_exists(), and the child's
+ * functions.php loads first, so this definition wins.
+ */
+function twentytwentyfive_post_format_setup() {
+	add_theme_support( 'post-formats', array( 'aside', 'quote' ) );
+}
+
+/**
+ * Removes parent features the shop does not want.
+ *
+ * Runs on after_setup_theme, when the parent's functions.php has added its hooks.
+ */
+function pagesco_tt5_child_remove_parent_features() {
+	remove_action( 'init', 'twentytwentyfive_block_styles' );
+}
+add_action( 'after_setup_theme', 'pagesco_tt5_child_remove_parent_features' );</code></pre>
+                    <pre data-cli><code class="language-bash">wp eval 'print_r( get_theme_support( "post-formats" )[0] ); var_dump( WP_Block_Styles_Registry::get_instance()-&gt;is_registered( "core/list", "checkmark-list" ) );'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Array
+(
+    [0] =&gt; aside
+    [1] =&gt; quote
+)
+bool(false)</code></pre>
+                    </div>
+                    <p>The post format list shrank to two, so the editor's Post Format menu now offers only Standard, Aside and Quote; and the checkmark style is gone from the list block's Styles panel.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: Check the child theme <span class="step-time">(8 min)</span></h3>
+                    <p>One command per inheritance rule from the table at the top of the lesson:</p>
+                    <pre data-cli><code class="language-bash">cd wp-content/themes/pagesco-tt5-child &amp;&amp; find . -type f | sort &amp;&amp; cd - &gt; /dev/null
+echo "palette: $(curl -s http://localhost:8080/ | grep -o -- '--wp--preset--color--accent-3: [^;]*')"
+echo "single from: $(wp eval 'echo _get_block_template_file( "wp_template", "single" )["theme"];')"
+echo "comments on a post: $(curl -s http://localhost:8080/hello-world/ | grep -c 'wp-block-comments')"
+echo "footer: $(curl -s http://localhost:8080/ | grep -o '12 Market Street[^&lt;]*')"
+echo "child CSS: $(curl -s http://localhost:8080/ | grep -c 'pagesco-tt5-child/style.css')"
+echo "notice: $(curl -s http://localhost:8080/ | grep -c '&lt;div class="pagesco-notice"')"</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>./functions.php
+./patterns/footer.php
+./style.css
+./templates/single.html
+./theme.json
+palette: --wp--preset--color--accent-3: #7a2e2e
+single from: pagesco-tt5-child
+comments on a post: 0
+footer: 12 Market Street · 555-0142 · Open Monday to Saturday
+child CSS: 1
+notice: 1</code></pre>
+                    </div>
+                    <p>Have a look in your browser too. Twenty Twenty-Five's layout and Manrope type, in the shop's colors, with the dark notice bar and the shop's footer:</p>
+                    <figure>
+                        <img src="images/lesson_10_child.png" alt="The Hello world post in the pagesco-tt5-child theme: a dark notice bar, Twenty Twenty-Five's header and Manrope type on a cream background, oxblood links, no comments section, and a pale green footer with Pages and Co. and the shop's address." width="1085" height="1558" loading="lazy">
+                        <figcaption>A post in <code>pagesco-tt5-child</code>: the parent's design, the child's colors, footer and template.</figcaption>
+                    </figure>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 4: Back to pagesco <span class="step-time">(5 min)</span></h3>
+                    <p>The child theme was the practice; Pages &amp; Co. runs on its own theme. Switch back, leave the child installed (it is a handy reference for client work), and confirm that the front page from Lesson 3.3 is back:</p>
+                    <pre data-cli data-checkpoint><code class="language-bash">wp theme activate pagesco
+wp theme list --fields=name,status,version
+curl -s http://localhost:8080/ | grep -o '&lt;h1[^&gt;]*&gt;[^&lt;]*'
+wp post list --post_type=wp_template,wp_template_part,wp_global_styles --format=count</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Success: Switched to 'Pages &amp;amp; Co.' theme.
++-------------------+----------+---------+
+| name              | status   | version |
++-------------------+----------+---------+
+| pagesco-tt5-child | inactive | 1.0.0   |
+| pagesco           | active   | 1.0.0   |
+| twentytwentyfive  | inactive | 1.5     |
+| twentytwentyfour  | inactive | 1.6     |
+| twentytwentythree | inactive | 1.7     |
++-------------------+----------+---------+
+&lt;h1 class="wp-block-heading"&gt;Good books, good company
+0</code></pre>
+                    </div>
+                    <p>Twenty Twenty-Five is plain <code>inactive</code> again, the child stays installed, and no Site Editor copies were created along the way.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>pagesco-tt5-child/</code> holds <code>style.css</code>, <code>theme.json</code>, <code>functions.php</code>, <code>templates/single.html</code> and <code>patterns/footer.php</code></li>
+                        <li>With the child active, the site showed the shop's eight-color palette, oxblood links, the styled notice bar, the shop's footer and posts without comments</li>
+                        <li>The child's <code>functions.php</code> enqueues its stylesheet, replaces a pluggable parent function and removes a parent hook on <code>after_setup_theme</code></li>
+                        <li>Twenty Twenty-One and the practice child themes are deleted</li>
+                        <li><code>pagesco</code> is the active theme again, and the child theme is still installed</li>
+                        <li>You added a line to <code>pagesco-plan.txt</code>: "client sites on a ready-made theme: child theme"</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>The exercises use the child theme, so each one starts by activating it. Every solution switches back to <code>pagesco</code> at the end; later lessons expect it active.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Child or Parent?</h3>
+                    <p>With the child active, predict what each of these returns, then check: <code>get_theme_file_path( 'theme.json' )</code>, <code>get_theme_file_path( 'templates/index.html' )</code>, <code>get_parent_theme_file_path( 'theme.json' )</code> and <code>get_stylesheet_uri()</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>get_theme_file_path()</code> returns the child's copy if the file exists there, else the parent's. The child has a <code>theme.json</code> but no <code>templates/index.html</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">wp theme activate pagesco-tt5-child
+wp eval 'echo get_theme_file_path( "theme.json" ), "\n", get_theme_file_path( "templates/index.html" ), "\n", get_parent_theme_file_path( "theme.json" ), "\n", get_stylesheet_uri(), "\n";'
+wp theme activate pagesco</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Success: Switched to 'Pages &amp;amp; Co. TT5 Child' theme.
+/var/www/html/wp-content/themes/pagesco-tt5-child/theme.json
+/var/www/html/wp-content/themes/twentytwentyfive/templates/index.html
+/var/www/html/wp-content/themes/twentytwentyfive/theme.json
+http://localhost:8080/wp-content/themes/pagesco-tt5-child/style.css
+Success: Switched to 'Pages &amp;amp; Co.' theme.</code></pre>
+                        </div>
+                        <p>This lookup is why Lesson 3.3's hero used <code>get_theme_file_uri()</code>: a child theme of <code>pagesco</code> could replace the image just by having its own <code>assets/images/book-image.webp</code>.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: A Template the Parent Does Not Have</h3>
+                    <p>Child themes can add templates, not only replace them. Give the child a template for the About page only, using the hierarchy from Lesson 3.1: copy the parent's <code>page.html</code> and add a paragraph "Independent since the first page." right after the header part. Check that /about/ shows it and /contact/ does not, then remove it.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The most specific page template by slug is <code>page-about.html</code>. Twenty Twenty-Five's <code>page.html</code> starts with <code>&lt;!-- wp:template-part {"slug":"header"} /--&gt;</code>; <code>sed</code> can add lines after it with the <code>a\</code> command or a substitution.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli data-exit="1"><code class="language-bash">wp theme activate pagesco-tt5-child
+sed 's|&lt;!-- wp:template-part {"slug":"header"} /--&gt;|&amp;\n\n&lt;!-- wp:paragraph --&gt;\n&lt;p&gt;Independent since the first page.&lt;/p&gt;\n&lt;!-- /wp:paragraph --&gt;|' wp-content/themes/twentytwentyfive/templates/page.html &gt; wp-content/themes/pagesco-tt5-child/templates/page-about.html
+curl -s http://localhost:8080/about/ | grep -c 'Independent since the first page.'
+curl -s http://localhost:8080/contact/ | grep -c 'Independent since the first page.'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Success: Switched to 'Pages &amp;amp; Co. TT5 Child' theme.
+1
+0</code></pre>
+                        </div>
+                        <p>The About page found <code>page-about.html</code> in the child before it reached <code>page.html</code> in the parent. Remove it and switch back:</p>
+                        <pre data-cli><code class="language-bash">rm wp-content/themes/pagesco-tt5-child/templates/page-about.html
+wp theme activate pagesco</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Success: Switched to 'Pages &amp;amp; Co.' theme.</code></pre>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: Which Tool? (No Code)</h3>
+                    <p>A client on Twenty Twenty-Five asks for five changes. For each, choose the Site Editor, a child theme, or a plugin, and say why: (a) a different shade of yellow for buttons, which they might change again in spring; (b) an "Opening hours" box on every product page that must survive a future redesign; (c) the post template without the "Written by" line, permanently, for all posts; (d) a booking form for author readings; (e) an extra 1 px border on all images, versioned with the rest of the developer's work.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Ask two questions for each: who should be able to change it later, and should it survive a theme switch?</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>(a) Site Editor, Styles: a visual choice the owner wants to keep changing. (b) Plugin (or a synced pattern if it is pure content): it must survive a redesign, so it cannot live in the theme. (c) Child theme: copy <code>single.html</code> and remove the <code>twentytwentyfive/hidden-written-by</code> pattern line, a lasting design change. (d) Plugin: a feature with data, forms and security (Module 5). (e) Child theme: a <code>styles.blocks</code> rule in its <code>theme.json</code> (or its stylesheet), kept in Git. Reasonable people may answer (a) or (e) differently; what matters is that you can say who owns the change.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 4: Override a Parent Style Variation (Stretch)</h3>
+                    <p>Twenty Twenty-Five's <code>styles/01-evening.json</code> is one of the variations your child inherits. Make the child's own version of it, titled "Evening at Pages &amp; Co." and using the parent file's settings, then check how many variations the child now offers and what the first one is called. Is the count what you expected? Remove the file afterwards.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>A child file with the same file name (<code>styles/01-evening.json</code>) replaces the parent's. Start from a copy of the parent file and change its <code>"title"</code> with <code>sed</code>. List titles with <code>WP_Theme_JSON_Resolver::get_style_variations()</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">wp theme activate pagesco-tt5-child
+mkdir -p wp-content/themes/pagesco-tt5-child/styles
+sed 's/"title": "Evening"/"title": "Evening at Pages \&amp; Co."/' wp-content/themes/twentytwentyfive/styles/01-evening.json &gt; wp-content/themes/pagesco-tt5-child/styles/01-evening.json
+wp eval '$v = WP_Theme_JSON_Resolver::get_style_variations(); echo count( $v ), " variations, first: ", $v[0]["title"], "\n";'
+rm -r wp-content/themes/pagesco-tt5-child/styles
+wp theme activate pagesco</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Success: Switched to 'Pages &amp;amp; Co. TT5 Child' theme.
+22 variations, first: Evening at Pages &amp; Co.
+Success: Switched to 'Pages &amp;amp; Co.' theme.</code></pre>
+                        </div>
+                        <p>The first entry is now yours, but the count dropped from 23 to 22. WordPress compares <em>file names only</em>, ignoring folders, and Twenty Twenty-Five has two files called <code>01-evening.json</code>: the full variation in <code>styles/</code> and the color-only one in <code>styles/colors/</code>. Your child file replaced both. Reading core's code (here <code>WP_Theme_JSON_Resolver::get_style_variations()</code>) is how you find surprises like this; when you override a parent's variation, use the same subfolder and check the list afterwards.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> A child theme of Twenty Twenty-Five is active. Which value does <code>wp option get template</code> print?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That one is in the stylesheet option. Which option points at the theme the templates and code come from?">
+                                A) The child's folder name
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="template holds the parent's folder (twentytwentyfive); stylesheet holds the child's. Without a child theme both are the same.">
+                                B) twentytwentyfive
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Options store folder names, not display names. What did the Template header need?">
+                                C) Twenty Twenty-Five
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> The child's <code>theme.json</code> sets only <code>styles.elements.link.color</code>. What happens to the parent's body font?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="Single values in theme.json are merged key by key, so everything the child does not set keeps the parent's value. Only preset lists such as the palette are replaced as a whole.">
+                                A) It stays: the child's file is merged over the parent's
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Did the body lose Manrope when you added the child's theme.json?">
+                                B) It falls back to the browser default, because the child's theme.json replaces the parent's
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Both files are used, in layers. Which kind of value was replaced as a whole?">
+                                C) The child's theme.json is ignored as long as the parent has one
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> This line is at the top level of a child theme's <code>functions.php</code>. What does it return?</p>
+                        <pre data-norun><code class="language-php">remove_action( 'wp_enqueue_scripts', 'twentytwentyfive_enqueue_styles' );</code></pre>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Which functions.php file runs first, and had the parent added the action yet?">
+                                A) true, and the parent's stylesheet is no longer loaded
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="remove_action() does not raise errors for a missing callback; it tells you through its return value.">
+                                B) A fatal error, because the function does not exist yet
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The child's functions.php runs before the parent's, so the action has not been added yet and there is nothing to remove. Do it from a callback on after_setup_theme.">
+                                C) false, and the parent's stylesheet is still loaded
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> You want a different footer on a Twenty Twenty-Five child theme and keep as much of the parent as possible. What is the smallest override?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That works, but you then own the part's markup forever. What does the parent's footer part actually contain?">
+                                A) Copy parts/footer.html into the child and rewrite it
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The parent's footer part only references the pattern twentytwentyfive/footer, and a child pattern with the same slug wins, so the part itself stays the parent's.">
+                                B) A child pattern with the slug twentytwentyfive/footer
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Never edit a theme you did not write. Where would that change go at the next update?">
+                                C) Edit the parent's patterns/footer.php
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> A client wants a "Book a reading" form, and their site runs a child theme you built. Where should the form go?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Think three years ahead: the client switches themes. What happens to everything in the child?">
+                                A) In the child theme's functions.php, since the child already exists
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The Site Editor is for design the owner controls. Where do features with data and security belong?">
+                                B) In a template created in the Site Editor
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="A form is a feature with data and security needs; it must survive a theme switch, so it belongs in a plugin (Module 5).">
+                                C) In a plugin
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Should I make a child theme of my own theme, pagesco?</summary>
+                    <p>No. A child theme protects your changes from someone else's updates. You control <code>pagesco</code>, so you change it directly and keep it in Git. A child of your theme makes sense only if you sell or share the parent and one client needs a variation of it.</p>
+                </details>
+                <details>
+                    <summary>What happens to Site Editor changes when I switch to a child theme?</summary>
+                    <p>They stay behind. Site Editor copies and global styles are stored per theme (the templates are named <code>twentytwentyfive//single</code>, the styles post <code>wp-global-styles-twentytwentyfive</code>), so a child starts clean. If the owner customized the parent in the Site Editor first, export those changes (Lesson 3.3) and move them into the child's files.</p>
+                </details>
+                <details>
+                    <summary>Can I use the Create Block Theme plugin to make a child theme?</summary>
+                    <p>Yes: it can create a child of the active theme, including your Site Editor changes. It is a good starting point; the files it writes are the same kinds you wrote by hand in this lesson, so you can read and maintain them.</p>
+                </details>
+                <details>
+                    <summary>Is a child theme slower?</summary>
+                    <p>Barely: WordPress checks one more folder for each file and runs one more <code>functions.php</code>. An extra stylesheet is one more request, which is another reason to keep small CSS in <code>theme.json</code>. Lesson 8.2 measures what really costs time.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Twenty Twenty-Five's single post template includes the pattern <code>twentytwentyfive/hidden-written-by</code> ("Written by … in …"). Without copying <code>single.html</code> again, change that line on every post to "Posted by … in the … section" by overriding only the pattern in your child theme. Open the parent's <code>patterns/hidden-written-by.php</code> first: it uses its own text domain and <code>esc_html_e()</code>; which text domain should your copy use, and why?</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Imagine a client on Twenty Twenty-Five whose previous developer edited the theme's files directly. The next update is waiting. Write the steps you would take, in order, to move their changes into a child theme without losing anything. Which of today's commands (<code>diff</code>, <code>_get_block_template_file()</code>, <code>wp theme list</code>) would you use, and where?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>A child theme is a <code>style.css</code> with <code>Template: parent-folder</code>; the <code>template</code> option holds the parent, <code>stylesheet</code> the child</li>
+                        <li>The child's <code>theme.json</code> is merged over the parent's, but preset lists such as the palette are replaced whole</li>
+                        <li>Child templates, parts and classic PHP templates replace the parent's files of the same name; child patterns replace parent patterns with the same slug</li>
+                        <li>Both <code>functions.php</code> files run, the child's first: pluggable parent functions can be replaced, and parent hooks are removed on <code>after_setup_theme</code></li>
+                        <li>The child's <code>style.css</code> is loaded only if <code>functions.php</code> enqueues it</li>
+                        <li>Features belong in plugins; a child theme disappears with a theme switch</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Make a child theme</td><td><code>Template: twentytwentyfive</code> in the child's <code>style.css</code></td></tr>
+                            <tr><td>Load the child's CSS</td><td><code>wp_enqueue_style( 'pagesco-tt5-child-style', get_stylesheet_uri(), array( 'twentytwentyfive-style' ) )</code></td></tr>
+                            <tr><td>A file from the child, else the parent</td><td><code>get_theme_file_path( $file )</code> / <code>get_theme_file_uri( $file )</code></td></tr>
+                            <tr><td>Always the parent's file</td><td><code>get_parent_theme_file_path( $file )</code></td></tr>
+                            <tr><td>Replace a parent template</td><td>same file name in the child's <code>templates/</code></td></tr>
+                            <tr><td>Replace a parent pattern</td><td>same <code>Slug:</code> in the child's <code>patterns/</code></td></tr>
+                            <tr><td>Remove a parent hook</td><td><code>remove_action()</code> inside a callback on <code>after_setup_theme</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You built <code>pagesco-tt5-child</code>: Twenty Twenty-Five in the shop's colors, with its own footer, single template and functions</li>
+                        <li>You saw each inheritance rule on a real site and broke three of them on purpose</li>
+                        <li>You built a classic child theme and watched <code>locate_template()</code> choose the child's file</li>
+                        <li>You can decide whether a change belongs in the Site Editor, a child theme, your own theme or a plugin</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>Module 3 is complete: you can build, extend and customize block themes. In <a href="lesson_11.html"><strong>Lesson 4.1: The Loop &amp; Template Tags</strong></a> you step into the classic theme world you glimpsed with Twenty Twenty-One: you build <code>pagesco-classic</code>, a classic theme with PHP templates, and learn the Loop and the template tags that power most existing WordPress sites, and that still run underneath every Query Loop block.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>pagesco</code> is the active theme and <code>pagesco-tt5-child</code> is installed but inactive</li>
+                    <li>Check that Twenty Twenty-One is deleted (<code>wp theme list</code>); Lesson 4.1 builds its own classic theme</li>
+                    <li>Look at the source of any WordPress site you use and find its theme folder name in a <code>/wp-content/themes/…</code> URL; is it a child theme?</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Four lessons ago a theme was a mystery folder. Now you can write one from scratch, give it patterns and variations, and customize someone else's without fear of the next update. That last skill is the one clients pay for most often, because almost every site you inherit runs a theme you did not write. Be patient with the "who loads first" rules; you will look them up a few more times, and that is exactly how professionals learn them.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_09.html" class="prev-lesson">← Previous: Patterns, Style Variations &amp; the Site Editor</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_11.html" class="next-lesson">Next: The Loop &amp; Template Tags →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Your first WordPress plugin: the plugin header, a folder layout that grows, the PagesCo\Books namespace with Composer autoloading, and activation, deactivation and uninstall, building the pagesco-books plugin on WordPress 7.1 and PHP 8.5. PHP and WordPress Development Lesson 5.1.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Your First Plugin - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 5: Plugin Development</a></li>
+            <li aria-current="page">Lesson 5.1: Your First Plugin</li>
+        </ul>
+    </nav>
+
+
+    <main id="main-content" data-state="after:lesson_13">
+        <div class="container">
+            <header>
+                <h1>🔌 Lesson 5.1: Your First Plugin</h1>
+                <p class="lead">Themes decide how Pages &amp; Co. looks; everything the shop <em>does</em> belongs in a plugin, so it survives the next redesign. In this lesson you create <code>pagesco-books</code>, the plugin that the rest of the course grows into a bookstore: books and genres, settings, events, blocks, REST endpoints. Because so much will be added to it, you start with the part most tutorials skip: a structure that stays tidy at fifteen features, with a namespace, Composer autoloading and a clear rule for where new code goes.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Write a plugin header WordPress understands, including the version requirements it checks on activation</li>
+                        <li>Organize a plugin as a short main file plus namespaced classes in <code>src/</code>, loaded by Composer's PSR-4 autoloader</li>
+                        <li>Start features from one main object on <code>plugins_loaded</code>, and add a new feature by writing one class and listing it</li>
+                        <li>Use activation and deactivation hooks and <code>uninstall.php</code> for the right jobs, and say what each must never do</li>
+                        <li>Recognize the typical first-plugin failures: direct file access, a missing autoloader, a class the autoloader cannot find, a hook registered too late</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 135 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_13.html">Lesson 4.3: functions.php: Supports, Assets, Menus &amp; Widgets</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> the <code>pagesco-books</code> plugin skeleton (namespace <code>PagesCo\Books</code>, Composer autoload, a "Bookseller" role on activation, cleanup on uninstall) with its first feature, the store-notice additions moved out of <code>pagesco-site.php</code></li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (the plugin declares WordPress 6.8 and PHP 8.2 as its minimums)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 4.3, with <code>pagesco</code> active; Docker for the <code>composer:2</code> image (Lesson 1.3)</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#what-is-a-plugin" class="toc-link">What a Plugin Is</a></li>
+                        <li><a href="#header" class="toc-link">The Main File and Its Header</a></li>
+                        <li><a href="#structure" class="toc-link">A Structure That Grows: Namespaces and Composer</a></li>
+                        <li><a href="#lifecycle" class="toc-link">Activation, Deactivation and Uninstall</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: The First Feature Moves In</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="what-is-a-plugin" class="lesson-section">
+                <h2>🔌 What a Plugin Is</h2>
+                <p>A plugin is PHP that WordPress loads on every request while it is active, from a folder (or a single file) in <code>wp-content/plugins/</code>. You already know two relatives: a must-use plugin is loaded always, with no way to switch it off in the admin (Lesson 2.3), and a theme's <code>functions.php</code> is loaded only while that theme is active (Lesson 4.3). A normal plugin sits in between: the site owner activates and deactivates it, WordPress runs code once at those moments, and it can clean up after itself when it is deleted. The smallest real example ships with WordPress. Look at the top of Hello Dolly from the WP-CLI container:</p>
+                <pre data-cli><code class="language-bash">sed -n '1,20p' wp-content/plugins/hello.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;?php
+/**
+ * @package Hello_Dolly
+ * @version 1.7.2
+ */
+/*
+Plugin Name: Hello Dolly
+Plugin URI: http://wordpress.org/plugins/hello-dolly/
+Description: This is not just a plugin, it symbolizes the hope and enthusiasm of an entire generation summed up in two words sung most famously by Louis Armstrong: Hello, Dolly. When activated you will randomly see a lyric from &lt;cite&gt;Hello, Dolly&lt;/cite&gt; in the upper right of your admin screen on every page.
+Author: Matt Mullenweg
+Version: 1.7.2
+Author URI: http://ma.tt/
+Text Domain: hello-dolly
+*/
+
+// Don't load directly.
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}</code></pre>
+                </div>
+                <p>Two things make it a plugin. The comment block is the <strong>plugin header</strong>: WordPress reads those <code>Name: value</code> lines (without running the file) to list the plugin on the Plugins screen; <code>Plugin Name</code> is the only required one. And the first code is a guard: <code>ABSPATH</code> is defined by <code>wp-load.php</code>, so if somebody requests the file directly from a browser, it stops before doing anything. The rest of Hello Dolly is two functions and two hooks, the same toolkit you have used since Lesson 2.3.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: the shop's departments</h4>
+                    <p>Think of <code>pagesco-books</code> as the back office of the shop, and of each feature (the notice additions, the book catalog, the events calendar, the settings page) as a department with its own room. The main file is the front door with the shop's name on it: it unlocks, switches on the lights and hands a list of departments to the manager, the <code>Plugin</code> object, who opens each one in the morning (<code>plugins_loaded</code>). A new department means a new room and one new line on the manager's list, never knocking through the walls of the existing ones.</p>
+                </div>
+
+                <p>The layout you build in this lesson, and that later lessons add to:</p>
+                <pre><code class="language-text">wp-content/plugins/pagesco-books/
+  pagesco-books.php      main file: header, guard, constants, autoloader, hooks; nothing else
+  composer.json          the package and its PSR-4 rule: PagesCo\Books\ is in src/
+  vendor/                written by Composer (autoload.php + vendor/composer/)
+  uninstall.php          removes the plugin's data when it is deleted
+  src/
+    Plugin.php           PagesCo\Books\Plugin: starts every feature on plugins_loaded
+    Feature.php          PagesCo\Books\Feature: the interface every feature implements
+    Activator.php        PagesCo\Books\Activator: activation and deactivation
+    StoreNotice.php      PagesCo\Books\StoreNotice: the first feature (the project)</code></pre>
+            </section>
+
+            <section id="header" class="lesson-section">
+                <h2>📄 The Main File and Its Header</h2>
+                <p>A plugin in a folder needs a main file with the same name as the folder: <code>pagesco-books/pagesco-books.php</code>. That pair, <code>pagesco-books/pagesco-books.php</code>, is how WordPress identifies the plugin in the <code>active_plugins</code> option (Lesson 2.2). Create <code>wordpress/wp-content/plugins/pagesco-books/pagesco-books.php</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/pagesco-books.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name:       Pages &amp; Co. Books
+ * Plugin URI:        https://example.com/pagesco-books/
+ * Description:       The bookstore features of the Pages &amp; Co. website: books, genres, events and the shop's blocks.
+ * Version:           1.0.0
+ * Requires at least: 6.8
+ * Requires PHP:      8.2
+ * Author:            Pages &amp; Co.
+ * Author URI:        https://example.com/
+ * License:           GPL-2.0-or-later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain:       pagesco-books
+ *
+ * @package PagesCo\Books
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+define( 'PAGESCO_BOOKS_VERSION', '1.0.0' );
+define( 'PAGESCO_BOOKS_FILE', __FILE__ );
+define( 'PAGESCO_BOOKS_DIR', plugin_dir_path( __FILE__ ) );</code></pre>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Header</th><th>What WordPress does with it</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>Plugin Name</code></td><td>Required: the name on the Plugins screen</td></tr>
+                            <tr><td><code>Description</code>, <code>Author</code>, <code>Plugin URI</code>, <code>Author URI</code></td><td>Shown on the Plugins screen</td></tr>
+                            <tr><td><code>Version</code></td><td>Shown, and compared with the directory for updates; also your asset and upgrade version</td></tr>
+                            <tr><td><code>Requires at least</code>, <code>Requires PHP</code></td><td><strong>Checked on activation</strong>: WordPress refuses to activate on an older WordPress or PHP (Exercise 1)</td></tr>
+                            <tr><td><code>License</code>, <code>License URI</code></td><td>Plugins are GPL-compatible, like WordPress; required in the directory</td></tr>
+                            <tr><td><code>Text Domain</code> (and <code>Domain Path</code>)</td><td>The text domain of the plugin's strings: the folder name. WordPress 6.8+ also uses it to find the plugin's own translation files (the version note in Lesson 4.3)</td></tr>
+                            <tr><td><code>Requires Plugins</code></td><td>Slugs of plugins this one depends on (WordPress 6.5+); not needed here</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p><code>Requires PHP: 8.2</code> is the line Lesson 1.3 promised: above it, the plugin may use typed properties, <code>match</code>, nullsafe calls and the rest of modern PHP, even though core sticks to PHP 7.4 syntax. <code>Requires at least: 6.8</code> matches what <code>@wordpress/create-block</code> will need for the blocks in Module 6. Below the header come the guard and three constants, the only global names this plugin defines, prefixed <code>PAGESCO_BOOKS_</code>: the version, the main file's path (functions such as <code>plugins_url()</code> and the activation hooks need it) and the plugin's folder with a trailing slash, from <code>plugin_dir_path()</code>. Ask WordPress what it sees:</p>
+                <pre data-cli><code class="language-bash">wp plugin list --fields=name,status,version
+wp plugin get pagesco-books --fields=name,title,version,status</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+---------------+----------+---------+
+| name          | status   | version |
++---------------+----------+---------+
+| akismet       | inactive | 5.7.2   |
+| hello         | inactive | 1.7.2   |
+| pagesco-books | inactive | 1.0.0   |
+| mailpit-smtp  | must-use |         |
+| pagesco-site  | must-use | 1.0.0   |
++---------------+----------+---------+
++---------+-------------------+
+| Field   | Value             |
++---------+-------------------+
+| name    | pagesco-books     |
+| title   | Pages &amp; Co. Books |
+| version | 1.0.0             |
+| status  | inactive          |
++---------+-------------------+</code></pre>
+                </div>
+                <p>The plugin is installed and inactive. WordPress read the header (note the title with a plain <code>&amp;</code>) without running any of the code. Leave it inactive for now; it has nothing to do yet.</p>
+            </section>
+
+            <section id="structure" class="lesson-section">
+                <h2>🗂️ A Structure That Grows: Namespaces and Composer</h2>
+                <p>Lesson 1.3 gave every global name a prefix. That works for a handful of functions; for a plugin with dozens of classes, PHP has a better tool, the one you used in PHP Foundations: a <strong>namespace</strong>. Every class of the plugin lives in <code>PagesCo\Books</code>, so its short names (<code>Plugin</code>, <code>Activator</code>, later <code>BookPostType</code>) cannot collide with anybody else's, and the namespace is the prefix. Hook names, options and other things WordPress stores globally still get the <code>pagesco_books_</code> prefix, because a namespace does not reach into the database.</p>
+                <p>The second tool is <strong>autoloading</strong>: instead of a <code>require</code> line per class, the plugin tells PHP "classes in <code>PagesCo\Books</code> live in <code>src/</code>", and PHP loads each file the first time its class is used. The PSR-4 rule turns a class name into a path by replacing the namespace prefix with the folder and the backslashes with slashes, so the class name and the file name must match exactly, case included:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Class</th><th>File (PSR-4: <code>PagesCo\Books\</code> = <code>src/</code>)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>PagesCo\Books\Plugin</code></td><td><code>src/Plugin.php</code></td></tr>
+                            <tr><td><code>PagesCo\Books\StoreNotice</code></td><td><code>src/StoreNotice.php</code></td></tr>
+                            <tr><td><code>PagesCo\Books\Admin\SettingsPage</code> (a later lesson)</td><td><code>src/Admin/SettingsPage.php</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>These file names follow PSR-4, not the <code>class-pagesco-book-card.php</code> style from Lesson 1.3: core's style is for WordPress's own non-namespaced classes, and PHPCS can be told to accept PSR-4 names in <code>src/</code> (Lesson 8.1). Composer writes the autoloader for you. Create <code>wordpress/wp-content/plugins/pagesco-books/composer.json</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/composer.json"><code class="language-json">{
+	"name": "pagesco/pagesco-books",
+	"description": "The bookstore features of the Pages &amp; Co. website.",
+	"type": "wordpress-plugin",
+	"license": "GPL-2.0-or-later",
+	"require": {
+		"php": "&gt;=8.2"
+	},
+	"autoload": {
+		"psr-4": {
+			"PagesCo\\Books\\": "src/"
+		}
+	}
+}</code></pre>
+                <p>The plugin needs no packages, only the autoloader, so the command is <code>composer dump-autoload</code>. Run it in the <code>composer:2</code> container from Lesson 1.3, in the plugin's folder. From your project folder (on Windows PowerShell, leave out <code>--user</code> and write <code>${PWD}</code>, as in Lesson 1.3):</p>
+                <pre data-norun><code class="language-bash">docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD/wordpress:/var/www/html" -w /var/www/html/wp-content/plugins/pagesco-books composer:2 composer dump-autoload</code></pre>
+                <pre data-composer="wp-content/plugins/pagesco-books"><code class="language-bash">composer dump-autoload</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Composer could not detect the root package (pagesco/pagesco-books) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version
+...
+Generated autoload files</code></pre>
+                </div>
+                <p>The first line is a harmless note (a plugin's <code>composer.json</code> usually has no version, so Composer assumes 1.0.0); depending on your setup Composer may also warn that it cannot write its cache, which is harmless too. The <code>...</code> stands for those lines. Composer wrote <code>vendor/autoload.php</code> and a few files in <code>vendor/composer/</code>, among them <code>platform_check.php</code>, which stops with a clear message if the plugin ever runs on a PHP older than the <code>"php": "&gt;=8.2"</code> you required. You run <code>dump-autoload</code> again only when the <code>autoload</code> section of <code>composer.json</code> changes; new class files in <code>src/</code> are found without it, as you will see in the project.</p>
+
+                <h3>The feature contract and the main object</h3>
+                <p>Every feature will be a class with one public entry point, <code>register()</code>, that adds its hooks, and nothing that happens before it is called. An <strong>interface</strong> writes that rule down so PHP enforces it. Create <code>src/Feature.php</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/Feature.php"><code class="language-php">&lt;?php
+/**
+ * The contract every feature of the plugin follows.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books;
+
+/**
+ * A feature adds its hooks in register(), and does nothing before that.
+ */
+interface Feature {
+
+	/**
+	 * Adds the feature's actions and filters.
+	 */
+	public function register(): void;
+}</code></pre>
+                <p>The main object, <code>src/Plugin.php</code>, keeps the list of feature classes, starts each one, and remembers it, so that other code can reach a running feature (to remove one of its hooks, the rule from Lesson 2.3: you need the same object). Its list is empty for now:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/Plugin.php"><code class="language-php">&lt;?php
+/**
+ * The plugin's main object.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books;
+
+/**
+ * Starts the plugin's features and keeps them reachable.
+ */
+final class Plugin {
+
+	/**
+	 * The one instance, created on first use.
+	 *
+	 * @var Plugin|null
+	 */
+	private static ?Plugin $instance = null;
+
+	/**
+	 * The running features, keyed by class name.
+	 *
+	 * @var array&lt;class-string, Feature&gt;
+	 */
+	private array $features = array();
+
+	/**
+	 * Returns the plugin's one instance.
+	 */
+	public static function instance(): Plugin {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+
+		return self::$instance;
+	}
+
+	/**
+	 * Creates every feature and lets it add its hooks. Runs on plugins_loaded.
+	 */
+	public function boot(): void {
+		/**
+		 * Filters the feature classes the plugin starts.
+		 *
+		 * @since 1.0.0
+		 *
+		 * @param string[] $classes Fully qualified class names of Feature implementations.
+		 */
+		$classes = apply_filters( 'pagesco_books_features', $this-&gt;feature_classes() );
+
+		foreach ( $classes as $class ) {
+			$feature = new $class();
+			$feature-&gt;register();
+			$this-&gt;features[ $class ] = $feature;
+		}
+	}
+
+	/**
+	 * Returns a running feature, for example to remove one of its hooks.
+	 *
+	 * @param string $class Fully qualified class name.
+	 */
+	public function feature( string $class ): ?Feature {
+		return $this-&gt;features[ $class ] ?? null;
+	}
+
+	/**
+	 * The plugin's features. Add a new feature class here.
+	 *
+	 * @return string[]
+	 */
+	private function feature_classes(): array {
+		return array(
+			// One feature class per line, for example StoreNotice::class.
+		);
+	}
+}</code></pre>
+                <ul>
+                    <li><code>instance()</code> creates the object once and returns that same object every time after, so <code>Plugin::instance()</code> is the plugin's handle anywhere in PHP.</li>
+                    <li><code>boot()</code> runs the list through a filter of its own, <code>pagesco_books_features</code> (a custom hook, Lesson 2.3), then creates each feature and calls <code>register()</code>. <code>new $class()</code> is where the autoloader loads the file.</li>
+                    <li>The types (<code>?Plugin</code>, <code>array</code>, <code>: void</code>) are fine here because the plugin requires PHP 8.2 and these methods are called by your own code. Hook callbacks that WordPress or other plugins call, such as a filter's <code>$text</code>, stay untyped, the advice from Lesson 1.3: another callback may hand you something unexpected.</li>
+                </ul>
+                <p>Now finish the main file. Add these lines to the end of <code>pagesco-books.php</code>: load the autoloader, then hand <code>boot()</code> to <code>plugins_loaded</code>, the action that fires once every plugin is loaded (the table in Lesson 2.3), so a feature may rely on another plugin's functions:</p>
+                <pre data-append="wp-content/plugins/pagesco-books/pagesco-books.php"><code class="language-php">require PAGESCO_BOOKS_DIR . 'vendor/autoload.php';
+
+add_action( 'plugins_loaded', array( PagesCo\Books\Plugin::instance(), 'boot' ) );</code></pre>
+                <p>The main file is not namespaced, so it writes the full class name, <code>PagesCo\Books\Plugin</code>. Activate the plugin and check that the autoloader found the class and that <code>boot()</code> is hooked:</p>
+                <pre data-cli><code class="language-bash">wp plugin activate pagesco-books
+wp eval 'var_dump( has_action( "plugins_loaded", array( PagesCo\Books\Plugin::instance(), "boot" ) ), class_exists( "PagesCo\Books\Plugin", false ) );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Plugin 'pagesco-books' activated.
+Success: Activated 1 of 1 plugins.
+int(10)
+bool(true)</code></pre>
+                </div>
+                <p>Hooked at priority 10, and the class is loaded (<code>false</code> as the second argument of <code>class_exists()</code> means "do not autoload just for this question"). The plugin is running, with no features yet.</p>
+            </section>
+
+            <section id="lifecycle" class="lesson-section">
+                <h2>🔄 Activation, Deactivation and Uninstall</h2>
+                <p>Most plugin code runs on every request. Three moments are different, and each has a job:</p>
+
+                <div class="mermaid">
+graph TD
+    A["files in wp-content/plugins"] --> B["activate: activation hook, once"]
+    B --> C["every request: main file, then plugins_loaded"]
+    C --> D["Plugin::boot() registers each feature"]
+    D --> E["deactivate: deactivation hook, data kept"]
+    E --> F["delete: uninstall.php removes the data"]
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Moment</th><th>Registered with</th><th>Its job</th><th>Never</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Activation</td><td><code>register_activation_hook( __FILE__, $callback )</code></td><td>One-time setup: roles, default options, database tables (5.5), rewrite rules for post types (5.2)</td><td>Print output, or do work every request needs</td></tr>
+                            <tr><td>Deactivation</td><td><code>register_deactivation_hook( __FILE__, $callback )</code></td><td>Undo what is temporary: scheduled events (7.3), rewrite rules</td><td>Delete the owner's data: deactivating is a pause</td></tr>
+                            <tr><td>Uninstall</td><td>an <code>uninstall.php</code> file</td><td>Remove everything the plugin stored: options, roles, tables</td><td>Run without checking <code>WP_UNINSTALL_PLUGIN</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Lesson 2.1's FAQ suggested the first job: a <strong>Bookseller</strong> role for shop staff. Roles are stored in the database (the <code>wp_user_roles</code> option), so they are created once, on activation, not on every request. Create <code>src/Activator.php</code>. The new role starts with exactly the capabilities of the Author role; later lessons can give it more:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/Activator.php"><code class="language-php">&lt;?php
+/**
+ * What happens when the plugin is activated or deactivated.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books;
+
+/**
+ * Activation and deactivation callbacks (uninstall.php cleans up for good).
+ */
+final class Activator {
+
+	/**
+	 * Runs once, when an administrator activates the plugin.
+	 */
+	public static function activate(): void {
+		$author = get_role( 'author' );
+
+		add_role(
+			'pagesco_bookseller',
+			'Bookseller',
+			$author ? $author-&gt;capabilities : array( 'read' =&gt; true )
+		);
+	}
+
+	/**
+	 * Runs once, when the plugin is deactivated. Keeps all data.
+	 */
+	public static function deactivate(): void {
+		// Nothing to undo yet: later lessons flush rewrite rules and clear scheduled events here.
+	}
+}</code></pre>
+                <p>Register both callbacks at the end of the main file. They must be registered while the file loads, at the top level, because WordPress fires the activation hook during the activation request itself (Common Mistakes, number 3):</p>
+                <pre data-append="wp-content/plugins/pagesco-books/pagesco-books.php"><code class="language-php">register_activation_hook( __FILE__, array( PagesCo\Books\Activator::class, 'activate' ) );
+register_deactivation_hook( __FILE__, array( PagesCo\Books\Activator::class, 'deactivate' ) );</code></pre>
+                <p>And the cleanup, <code>uninstall.php</code> in the plugin's folder. WordPress runs this file when an administrator deletes the plugin, and defines <code>WP_UNINSTALL_PLUGIN</code> first; the guard makes sure nothing else can run it:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/uninstall.php"><code class="language-php">&lt;?php
+/**
+ * Removes the plugin's data when an administrator deletes the plugin.
+ *
+ * @package PagesCo\Books
+ */
+
+defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
+
+remove_role( 'pagesco_bookseller' );</code></pre>
+                <p>The plugin is already active, so the activation hook has not run yet. Deactivate and activate again, and follow the role through the life cycle. <code>wp plugin uninstall --skip-delete</code> runs the uninstall procedure without deleting the files, which is how you test <code>uninstall.php</code> without losing your work:</p>
+                <pre data-cli><code class="language-bash">wp plugin deactivate pagesco-books
+wp plugin activate pagesco-books
+wp role list --fields=name,role
+wp plugin deactivate pagesco-books
+wp role list --field=role | grep -c pagesco_bookseller
+wp plugin uninstall pagesco-books --skip-delete
+wp role list --field=role | grep -c pagesco_bookseller
+wp plugin activate pagesco-books</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Plugin 'pagesco-books' deactivated.
+Success: Deactivated 1 of 1 plugins.
+Plugin 'pagesco-books' activated.
+Success: Activated 1 of 1 plugins.
++---------------+--------------------+
+| name          | role               |
++---------------+--------------------+
+| Administrator | administrator      |
+| Editor        | editor             |
+| Author        | author             |
+| Contributor   | contributor        |
+| Subscriber    | subscriber         |
+| Bookseller    | pagesco_bookseller |
++---------------+--------------------+
+Plugin 'pagesco-books' deactivated.
+Success: Deactivated 1 of 1 plugins.
+1
+Ran uninstall procedure for 'pagesco-books' plugin without deleting.
+Success: Uninstalled 1 of 1 plugins.
+0
+Plugin 'pagesco-books' activated.
+Success: Activated 1 of 1 plugins.</code></pre>
+                </div>
+                <p>Activation added "Bookseller". Deactivation kept it (one match): a site owner who deactivates a plugin for a minute to debug something must not lose anything. Uninstall removed it (zero matches; <code>grep -c</code> still printed the count). The last command activated the plugin again, which created the role again. On a live site, uninstall happens when someone clicks <strong>Delete</strong> on the Plugins screen, and then the files go too.</p>
+                <div class="card card-info">
+                    <h4>🧩 Version note: plugins and load_plugin_textdomain()</h4>
+                    <p>Old plugins call <code>load_plugin_textdomain( 'my-plugin', false, … )</code> on <code>init</code> so WordPress finds the translations in their <code>languages/</code> folder. Since WordPress 6.8, <code>wp-settings.php</code> registers each active plugin's <code>Text Domain</code> and <code>Domain Path</code> itself (the same change you met for themes in Lesson 4.3), and translations from WordPress.org never needed the call. <code>pagesco-books</code> requires 6.8, so it leaves the call out; a plugin that supports 6.7 or older and ships its own translations still needs it. Either way, never translate strings at the top level of the main file: WordPress 6.7+ reports "Translation loading for the <code>pagesco-books</code> domain was triggered too early" when a translation exists. Lesson 8.3 builds the translation files.</p>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <p>Each mistake breaks the plugin on purpose and repairs it right after, so <code>pagesco-books</code> ends as it started.</p>
+
+                <h3>1. No guard against direct access</h3>
+                <p>Every PHP file in <code>wp-content/</code> can be requested by URL. Comment out the guard line in the main file for a moment and request the file directly, as an attacker's scanner would:</p>
+                <pre data-cli><code class="language-bash">sed -i "s#^defined( 'ABSPATH' ) || exit;#// &amp;#" wp-content/plugins/pagesco-books/pagesco-books.php
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/wp-content/plugins/pagesco-books/pagesco-books.php
+sed -i "s#^// defined#defined#" wp-content/plugins/pagesco-books/pagesco-books.php
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/wp-content/plugins/pagesco-books/pagesco-books.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>500
+200</code></pre>
+                </div>
+                <p><strong>What it means:</strong> without the guard the file runs on its own, without WordPress, and dies on the first WordPress function: a 500 error, and in the server log (<code>docker compose logs wordpress</code>, Lesson 1.2) the line <code>PHP Fatal error:  Uncaught Error: Call to undefined function plugin_dir_path() in /var/www/html/wp-content/plugins/pagesco-books/pagesco-books.php:22</code>. On a host that displays errors, every visitor sees that message, with your server's file paths. Worse, a file that <em>does</em> something at the top level (deletes data, sends mail) would do it for anyone who knows the URL. With the guard back, the request ends quietly with 200 and an empty page. <strong>Fix:</strong> <code>defined( 'ABSPATH' ) || exit;</code> at the top of every PHP file that can run on its own: the main file, <code>uninstall.php</code> (its own constant) and any file with top-level code. Files in <code>src/</code> only declare a class, so a direct request does nothing there.</p>
+
+                <h3>2. Activating without the autoloader</h3>
+                <p>You copy the plugin to another site (or check it out from Git, Lesson 8.4) and forget to run Composer, so <code>vendor/</code> is missing. Simulate it by renaming the folder:</p>
+                <pre data-cli data-raises="Warning,Fatal error"><code class="language-bash">wp plugin deactivate pagesco-books
+mv wp-content/plugins/pagesco-books/vendor wp-content/plugins/pagesco-books/vendor-off
+wp plugin activate pagesco-books</code></pre>
+                <div class="card card-output">
+                    <h4>Error</h4>
+                    <pre><code>Plugin 'pagesco-books' deactivated.
+Success: Deactivated 1 of 1 plugins.
+Warning: require(/var/www/html/wp-content/plugins/pagesco-books/vendor/autoload.php): Failed to open stream: No such file or directory in /var/www/html/wp-content/plugins/pagesco-books/pagesco-books.php on line 24
+Fatal error: Uncaught Error: Failed opening required '/var/www/html/wp-content/plugins/pagesco-books/vendor/autoload.php' (include_path='.:/usr/local/lib/php') in /var/www/html/wp-content/plugins/pagesco-books/pagesco-books.php:24
+Stack trace:
+#0 /var/www/html/wp-admin/includes/plugin.php(2388): include_once()
+#1 /var/www/html/wp-admin/includes/plugin.php(679): plugin_sandbox_scrape('pagesco-books/p...')
+#2 phar:///usr/local/bin/wp/vendor/wp-cli/extension-command/src/Plugin_Command.php(386): activate_plugin('pagesco-books/p...', '', false)
+...
+#15 {main}
+  thrown in /var/www/html/wp-content/plugins/pagesco-books/pagesco-books.php on line 24</code></pre>
+                </div>
+                <p>(The <code>...</code> stands for WP-CLI's own stack frames.) <strong>What it means:</strong> <code>require</code> found no <code>vendor/autoload.php</code>: a Warning, then a Fatal error. The second stack frame is the useful one: <code>plugin_sandbox_scrape()</code>. WordPress includes a plugin's main file in a sandbox before it activates it, and because the file failed, it did not activate it; in the admin you would read "Plugin could not be activated because it triggered a <strong>fatal error</strong>." The site itself never broke. Put the folder back and activate:</p>
+                <pre data-cli><code class="language-bash">mv wp-content/plugins/pagesco-books/vendor-off wp-content/plugins/pagesco-books/vendor
+wp plugin activate pagesco-books</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Plugin 'pagesco-books' activated.
+Success: Activated 1 of 1 plugins.</code></pre>
+                </div>
+                <p><strong>Fix:</strong> run <code>composer dump-autoload</code> (or <code>composer install</code> once there are packages) wherever the plugin is installed, or ship <code>vendor/</code> with it. Lesson 8.4 makes that part of the deployment.</p>
+
+                <h3>3. Registering the activation hook too late</h3>
+                <p>A tidy-minded developer moves everything into a <code>plugins_loaded</code> callback, the activation hook included. Try it with a one-file plugin, <code>wordpress/wp-content/plugins/pagesco-late-hook.php</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-late-hook.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Late Hook Demo
+ */
+
+add_action(
+	'plugins_loaded',
+	function () {
+		register_activation_hook( __FILE__, 'pagesco_late_hook_activate' );
+	}
+);
+
+/**
+ * Should run once, on activation.
+ */
+function pagesco_late_hook_activate() {
+	update_option( 'pagesco_late_hook', 'activated' );
+}</code></pre>
+                <pre data-cli data-raises="Error"><code class="language-bash">wp plugin activate pagesco-late-hook
+wp option get pagesco_late_hook</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Plugin 'pagesco-late-hook' activated.
+Success: Activated 1 of 1 plugins.
+Error: Could not get 'pagesco_late_hook' option. Does it exist?</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the plugin activated, and the activation callback never ran: no option, no warning. On the activation request <code>plugins_loaded</code> has already fired before WordPress includes the new plugin's file, so the closure that would register the hook is never called. <strong>Fix:</strong> call <code>register_activation_hook()</code> and <code>register_deactivation_hook()</code> at the top level of the main file, with <code>__FILE__</code>, as <code>pagesco-books.php</code> does. Remove the demo:</p>
+                <pre data-cli><code class="language-bash">wp plugin deactivate pagesco-late-hook
+wp plugin delete pagesco-late-hook</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Plugin 'pagesco-late-hook' deactivated.
+Success: Deactivated 1 of 1 plugins.
+Deleted 'pagesco-late-hook' plugin.
+Success: Deleted 1 of 1 plugins.</code></pre>
+                </div>
+
+                <h3>4. A file name that does not match the class</h3>
+                <p>This one waits for the project's first feature, so it is the project's last step. Read on.</p>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: The First Feature Moves In</h2>
+                <p>Since Lesson 2.3, two callbacks in <code>mu-plugins/pagesco-site.php</code> have been waiting for a better home: the Thursday hours and the "See events" link, code that "moves into the <code>pagesco-books</code> plugin in Module 5". The notice bar itself stays in the must-use plugin (it is site furniture that must always be there); the shop's additions to it become the plugin's first feature. Allow about 30 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: Write the feature and list it <span class="step-time">(10 min)</span></h3>
+                    <p>Create <code>src/StoreNotice.php</code>. It implements <code>Feature</code>, and its <code>register()</code> attaches two methods to the notice's own hooks, at the same priorities as the old functions. The strings now belong to the plugin's text domain:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/StoreNotice.php"><code class="language-php">&lt;?php
+/**
+ * The shop's additions to the store notice from the pagesco-site must-use plugin.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books;
+
+/**
+ * Adds the late-opening hours and an events link to the store notice.
+ */
+final class StoreNotice implements Feature {
+
+	/**
+	 * Hooks into the notice's own filter and action (Lesson 2.3).
+	 */
+	public function register(): void {
+		add_filter( 'pagesco_store_notice', array( $this, 'add_late_opening' ), 20 );
+		add_action( 'pagesco_store_notice_end', array( $this, 'print_events_link' ) );
+	}
+
+	/**
+	 * Adds the late-opening hours to the notice text.
+	 *
+	 * @param string $text The notice text so far.
+	 * @return string
+	 */
+	public function add_late_opening( $text ) {
+		return $text . ' ' . __( 'Open until 9 p.m. on Thursdays.', 'pagesco-books' );
+	}
+
+	/**
+	 * Prints a link to the events page inside the notice bar.
+	 */
+	public function print_events_link(): void {
+		printf(
+			' &lt;a href="%s"&gt;%s&lt;/a&gt;',
+			esc_url( home_url( '/events/' ) ),
+			esc_html__( 'See events', 'pagesco-books' )
+		);
+	}
+}</code></pre>
+                    <p>Then put the class on the list in <code>Plugin::feature_classes()</code>: replace the comment line inside <code>return array( … );</code> with <code>StoreNotice::class,</code> in your editor (the method then reads exactly like the final file in the handoff), or with <code>sed</code>. Inside the namespace, <code>StoreNotice::class</code> is the string <code>"PagesCo\Books\StoreNotice"</code>. Then look at the notice bar:</p>
+                    <pre data-cli><code class="language-bash">sed -i 's|// One feature class per line, for example StoreNotice::class.|StoreNotice::class,|' wp-content/plugins/pagesco-books/src/Plugin.php
+grep -n -A 3 "return array(" wp-content/plugins/pagesco-books/src/Plugin.php
+curl -s http://localhost:8080/ | grep -o '&lt;div class="pagesco-notice"&gt;.*&lt;/div&gt;'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>75:		return array(
+76-			StoreNotice::class,
+77-		);
+78-	}
+&lt;div class="pagesco-notice"&gt;Free shipping on orders over $35. Open until 9 p.m. on Thursdays. Open until 9 p.m. on Thursdays. &lt;a href="http://localhost:8080/events/"&gt;See events&lt;/a&gt; &lt;a href="http://localhost:8080/events/"&gt;See events&lt;/a&gt;&lt;/div&gt;</code></pre>
+                    </div>
+                    <p>Everything twice: the old functions in the must-use plugin and the new feature both ran. That is good news, because it proves the feature works and that you did not have to run Composer again for the new class: PSR-4 found <code>src/StoreNotice.php</code> by its name.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: Trim the must-use plugin <span class="step-time">(8 min)</span></h3>
+                    <p>Replace <code>wordpress/wp-content/mu-plugins/pagesco-site.php</code> with this version: the notice and its three hooks, the generator removal, and a new version number. The two functions <code>pagesco_notice_late_opening()</code> and <code>pagesco_notice_events_link()</code> are gone:</p>
+                    <pre data-file="wp-content/mu-plugins/pagesco-site.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Pages &amp; Co. Site
+ * Description: Site-wide features of the Pages &amp; Co. bookstore: the store notice bar.
+ * Version:     1.1.0
+ * Author:      Pages &amp; Co.
+ */
+
+/**
+ * Prints the store notice at the top of every front-end page.
+ */
+function pagesco_render_store_notice() {
+	/**
+	 * Filters the text of the store notice.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param string $text Plain text; it is escaped when printed. Return '' to hide the notice.
+	 */
+	$text = apply_filters( 'pagesco_store_notice', 'Free shipping on orders over $35.' );
+
+	if ( '' === $text ) {
+		return;
+	}
+
+	/**
+	 * Fires before the store notice bar is printed.
+	 *
+	 * @since 1.0.0
+	 */
+	do_action( 'pagesco_before_store_notice' );
+
+	echo '&lt;div class="pagesco-notice"&gt;' . esc_html( $text );
+
+	/**
+	 * Fires inside the store notice bar, after the text.
+	 *
+	 * @since 1.0.0
+	 */
+	do_action( 'pagesco_store_notice_end' );
+
+	echo '&lt;/div&gt;';
+}
+add_action( 'wp_body_open', 'pagesco_render_store_notice' );
+
+remove_action( 'wp_head', 'wp_generator' );</code></pre>
+                    <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | grep -o '&lt;div class="pagesco-notice"&gt;.*&lt;/div&gt;'
+wp plugin deactivate pagesco-books
+curl -s http://localhost:8080/ | grep -o '&lt;div class="pagesco-notice"&gt;.*&lt;/div&gt;'
+wp plugin activate pagesco-books</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;div class="pagesco-notice"&gt;Free shipping on orders over $35. Open until 9 p.m. on Thursdays. &lt;a href="http://localhost:8080/events/"&gt;See events&lt;/a&gt;&lt;/div&gt;
+Plugin 'pagesco-books' deactivated.
+Success: Deactivated 1 of 1 plugins.
+&lt;div class="pagesco-notice"&gt;Free shipping on orders over $35.&lt;/div&gt;
+Plugin 'pagesco-books' activated.
+Success: Activated 1 of 1 plugins.</code></pre>
+                    </div>
+                    <p>Once, exactly as since Lesson 2.3, and now the split is visible: with <code>pagesco-books</code> deactivated, the must-use plugin still prints the bar with its basic text; the shop's extras come and go with the plugin. That is the plugin/must-use division in one picture.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: The case of the missing class <span class="step-time">(5 min)</span></h3>
+                    <p>Common Mistake number 4, on purpose. Rename the feature's file with a lowercase <code>n</code> (as might happen when a file is created on a laptop and deployed to a Linux server) and load a page:</p>
+                    <pre data-cli data-raises="Fatal error"><code class="language-bash">mv wp-content/plugins/pagesco-books/src/StoreNotice.php wp-content/plugins/pagesco-books/src/Storenotice.php
+curl -s http://localhost:8080/ | head -n 6</code></pre>
+                    <div class="card card-output">
+                        <h4>Error</h4>
+                        <pre><code>Fatal error: Uncaught Error: Class "PagesCo\Books\StoreNotice" not found in /var/www/html/wp-content/plugins/pagesco-books/src/Plugin.php:54
+Stack trace:
+#0 /var/www/html/wp-includes/class-wp-hook.php(353): PagesCo\Books\Plugin-&gt;boot('')
+#1 /var/www/html/wp-includes/class-wp-hook.php(377): WP_Hook-&gt;apply_filters(NULL, Array)
+#2 /var/www/html/wp-includes/plugin.php(523): WP_Hook-&gt;do_action(Array)</code></pre>
+                    </div>
+                    <p><strong>What it means:</strong> <code>boot()</code>, called from <code>plugins_loaded</code> in <code>wp-settings.php</code>, asked for <code>PagesCo\Books\StoreNotice</code>; the autoloader looked for exactly <code>src/StoreNotice.php</code> and found nothing, because Linux file names are case-sensitive. On a case-insensitive file system, the default on macOS and Windows, the same code works, which is how this bug reaches servers. The whole site is down, since the error happens on every request. (With <code>WP_DEBUG</code> off, visitors would see "There has been a critical error on this website" and the admin would get a recovery-mode email, which Mailpit would catch.) <strong>Fix:</strong> the file name is the class name, letter for letter:</p>
+                    <pre data-cli><code class="language-bash">mv wp-content/plugins/pagesco-books/src/Storenotice.php wp-content/plugins/pagesco-books/src/StoreNotice.php
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>200</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 4: Check the finished skeleton <span class="step-time">(7 min)</span></h3>
+                    <p>List the plugin's own files (not <code>vendor/</code>), and check the role, the features and the notice in one go:</p>
+                    <pre data-cli data-checkpoint><code class="language-bash">find wp-content/plugins/pagesco-books -path '*/vendor' -prune -o -type f -print | sort
+wp plugin list --name=pagesco-books --fields=name,status,version
+wp role list --field=role | grep pagesco
+wp eval 'var_dump( PagesCo\Books\Plugin::instance()-&gt;feature( PagesCo\Books\StoreNotice::class ) instanceof PagesCo\Books\Feature );'
+curl -s http://localhost:8080/ | grep -c 'Open until 9 p.m. on Thursdays.'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>wp-content/plugins/pagesco-books/composer.json
+wp-content/plugins/pagesco-books/pagesco-books.php
+wp-content/plugins/pagesco-books/src/Activator.php
+wp-content/plugins/pagesco-books/src/Feature.php
+wp-content/plugins/pagesco-books/src/Plugin.php
+wp-content/plugins/pagesco-books/src/StoreNotice.php
+wp-content/plugins/pagesco-books/uninstall.php
++---------------+--------+---------+
+| name          | status | version |
++---------------+--------+---------+
+| pagesco-books | active | 1.0.0   |
++---------------+--------+---------+
+pagesco_bookseller
+bool(true)
+1</code></pre>
+                    </div>
+                    <p>Seven files of your own plus Composer's <code>vendor/</code>, the plugin active at 1.0.0, the Bookseller role, a running <code>StoreNotice</code> feature reachable through <code>Plugin::instance()-&gt;feature()</code>, and the Thursday hours once on the page. Open <code>pagesco-plan.txt</code> and add the rule you will follow from now on: "New feature = one class in <code>src/</code> implementing <code>Feature</code> + one line in <code>Plugin::feature_classes()</code>; data it stores is removed in <code>uninstall.php</code>."</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>pagesco-books</code> is active, with a header that requires WordPress 6.8 and PHP 8.2, the <code>ABSPATH</code> guard and the three <code>PAGESCO_BOOKS_</code> constants</li>
+                        <li><code>composer.json</code> maps <code>PagesCo\Books\</code> to <code>src/</code>, and <code>vendor/autoload.php</code> exists</li>
+                        <li><code>src/</code> holds <code>Plugin.php</code>, <code>Feature.php</code>, <code>Activator.php</code> and <code>StoreNotice.php</code>, each class in a file of exactly its name</li>
+                        <li>Activation creates the Bookseller role, deactivation keeps it, <code>uninstall.php</code> removes it</li>
+                        <li><code>mu-plugins/pagesco-site.php</code> (version 1.1.0) no longer has the two notice callbacks; the notice reads exactly as before, once</li>
+                        <li>The <code>pagesco-late-hook</code> demo plugin is deleted</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Every exercise undoes itself, so the plugin ends exactly as the project left it. Try each one before you open the solution.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: When the Server Is Too Old</h3>
+                    <p>What does a site owner see when the server's PHP is older than <code>Requires PHP</code>? You cannot downgrade PHP for a test, but you can raise the requirement: deactivate the plugin, set <code>Requires PHP: 9.0</code> in the header, try to activate it, then put <code>8.2</code> back and activate it again.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>sed -i 's/Requires PHP:      8.2/Requires PHP:      9.0/'</code> on the main file (mind the spaces that align the header). The activation fails, so the command exits with an error.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli data-raises="Warning,Error"><code class="language-bash">wp plugin deactivate pagesco-books
+sed -i 's/Requires PHP:      8.2/Requires PHP:      9.0/' wp-content/plugins/pagesco-books/pagesco-books.php
+wp plugin activate pagesco-books</code></pre>
+                        <div class="card card-output">
+                            <h4>Output (your PHP version number may differ)</h4>
+                            <pre><code>Plugin 'pagesco-books' deactivated.
+Success: Deactivated 1 of 1 plugins.
+Warning: Failed to activate plugin. Current PHP version (8.5.12) does not meet minimum requirements for Pages &amp;amp; Co. Books. The plugin requires PHP 9.0..
+Error: No plugins activated.</code></pre>
+                        </div>
+                        <pre data-cli><code class="language-bash">sed -i 's/Requires PHP:      9.0/Requires PHP:      8.2/' wp-content/plugins/pagesco-books/pagesco-books.php
+wp plugin activate pagesco-books</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Plugin 'pagesco-books' activated.
+Success: Activated 1 of 1 plugins.</code></pre>
+                        </div>
+                        <p>WordPress compared the header with the running PHP (8.5) and refused, with a message the owner can act on, before running a line of your code. Without the header, PHP 8.2 syntax on an old server would have been a fatal error instead. (The admin shows the same check as "This plugin does not work with your version of PHP" on the Plugins screen.)</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Add a Feature the Plugin's Way</h3>
+                    <p>Lesson 2.3's bonus challenge added a <code>pagesco-site</code> class to the <code>&lt;body&gt;</code> tag. Do it as a <code>pagesco-books</code> feature: a class <code>BodyClasses</code> that implements <code>Feature</code> and filters <code>body_class</code>, listed in <code>Plugin::feature_classes()</code>. Check the home page's body tag, then remove the feature again (file and list line).</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Copy the shape of <code>StoreNotice</code>. The filter receives an array of class names and must return it. The list line goes after <code>StoreNotice::class,</code>; <code>sed -i '/StoreNotice::class,/a\			BodyClasses::class,'</code> adds it with the same tabs.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/plugins/pagesco-books/src/BodyClasses.php"><code class="language-php">&lt;?php
+/**
+ * Body classes for the shop's pages.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books;
+
+/**
+ * Adds the pagesco-site class to the body of every front-end page.
+ */
+final class BodyClasses implements Feature {
+
+	/**
+	 * Hooks into body_class.
+	 */
+	public function register(): void {
+		add_filter( 'body_class', array( $this, 'add_site_class' ) );
+	}
+
+	/**
+	 * Adds the class.
+	 *
+	 * @param string[] $classes The body classes so far.
+	 * @return string[]
+	 */
+	public function add_site_class( $classes ) {
+		$classes[] = 'pagesco-site';
+		return $classes;
+	}
+}</code></pre>
+                        <pre data-cli><code class="language-bash">sed -i '/StoreNotice::class,/a\			BodyClasses::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+curl -s http://localhost:8080/ | grep -o '&lt;body class="[^"]*"'
+sed -i '/BodyClasses::class,/d' wp-content/plugins/pagesco-books/src/Plugin.php
+rm wp-content/plugins/pagesco-books/src/BodyClasses.php
+curl -s http://localhost:8080/ | grep -o '&lt;body class="[^"]*"'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>&lt;body class="home blog wp-embed-responsive wp-theme-pagesco pagesco-site"
+&lt;body class="home blog wp-embed-responsive wp-theme-pagesco"</code></pre>
+                        </div>
+                        <p>One new file and one list line added a feature; deleting both removed it without touching anything else. That is the whole point of the structure: features do not know about each other.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: Switch a Feature Off From Outside</h3>
+                    <p>Another developer on the project wants the notice bar without the shop's extras for a while, without editing <code>pagesco-books</code>. Use the plugin's own filter <code>pagesco_books_features</code> in a must-use plugin, <code>exercise-no-notice-extras.php</code>. Check the notice, then delete the file.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The filter receives the list of class names. <code>array_diff()</code> removes one. The must-use plugin loads before <code>pagesco-books</code>, but that does not matter: the filter is applied later, on <code>plugins_loaded</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/mu-plugins/exercise-no-notice-extras.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Exercise: No Notice Extras
+ */
+
+/**
+ * Removes the StoreNotice feature from the plugin's list.
+ *
+ * @param string[] $classes Feature class names.
+ * @return string[]
+ */
+function pagesco_without_notice_extras( $classes ) {
+	return array_diff( $classes, array( PagesCo\Books\StoreNotice::class ) );
+}
+add_filter( 'pagesco_books_features', 'pagesco_without_notice_extras' );</code></pre>
+                        <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | grep -o '&lt;div class="pagesco-notice"&gt;.*&lt;/div&gt;'
+rm wp-content/mu-plugins/exercise-no-notice-extras.php
+curl -s http://localhost:8080/ | grep -o '&lt;div class="pagesco-notice"&gt;.*&lt;/div&gt;'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>&lt;div class="pagesco-notice"&gt;Free shipping on orders over $35.&lt;/div&gt;
+&lt;div class="pagesco-notice"&gt;Free shipping on orders over $35. Open until 9 p.m. on Thursdays. &lt;a href="http://localhost:8080/events/"&gt;See events&lt;/a&gt;&lt;/div&gt;</code></pre>
+                        </div>
+                        <p>The feature was never created, so its hooks were never added. Removing a single hook of a running feature works too, because <code>Plugin::instance()-&gt;feature( StoreNotice::class )</code> hands out the very object that added it (Lesson 2.3's third rule of removing).</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 4: What Uninstall Does to a Bookseller (Stretch)</h3>
+                    <p>Create a user <code>sam</code> (Sam Rivera, sam@example.com) with the Bookseller role. Run the uninstall procedure without deleting the files, then ask WordPress for Sam's roles and whether Sam may still <code>edit_posts</code>. Explain the result, then put everything back: activate the plugin and delete Sam.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>wp user create sam sam@example.com --role=pagesco_bookseller --display_name="Sam Rivera" --porcelain</code> prints only the new ID. <code>wp user get sam --field=roles</code> reads the stored role; <code>user_can( get_user_by( 'login', 'sam' ), 'edit_posts' )</code> asks about a capability.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">wp user create sam sam@example.com --role=pagesco_bookseller --display_name="Sam Rivera" --porcelain
+wp plugin uninstall pagesco-books --deactivate --skip-delete
+wp user get sam --field=roles
+wp user meta get sam wp_capabilities --format=json
+wp eval 'var_dump( user_can( get_user_by( "login", "sam" ), "edit_posts" ) );'
+wp plugin activate pagesco-books
+wp eval 'var_dump( user_can( get_user_by( "login", "sam" ), "edit_posts" ) );'
+wp user delete sam --yes</code></pre>
+                        <div class="card card-output">
+                            <h4>Output (your user ID may differ)</h4>
+                            <pre><code>4
+Deactivating 'pagesco-books'...
+Plugin 'pagesco-books' deactivated.
+Ran uninstall procedure for 'pagesco-books' plugin without deleting.
+Success: Uninstalled 1 of 1 plugins.
+
+{"pagesco_bookseller":true}
+bool(false)
+Plugin 'pagesco-books' activated.
+Success: Activated 1 of 1 plugins.
+bool(true)
+Success: Removed user 4 from http://localhost:8080.</code></pre>
+                        </div>
+                        <p>After the uninstall, <code>roles</code> prints an empty line: <code>WP_User</code> only reports roles that still exist. Sam's <code>wp_capabilities</code> user meta (Lesson 2.1) still says <code>pagesco_bookseller</code>, because uninstall did not touch user meta, but the role's definition is gone, so it grants nothing and Sam can no longer write posts. Activating the plugin recreated the role and Sam's rights came back. A careful <code>uninstall.php</code> for a live shop would move such users to another role first, for example with <code>get_users( array( 'role' =&gt; 'pagesco_bookseller' ) )</code> and <code>$user-&gt;set_role( 'author' )</code>. Decisions like that are why uninstall code deserves as much thought as activation code.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> Which line must a plugin's main file have for WordPress to list it on the Plugins screen?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The guard protects against direct requests. Does WordPress need it to recognize a plugin?">
+                                A) defined( 'ABSPATH' ) || exit;
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Version is shown when present, but optional. Which header is the only required one?">
+                                B) A Version line in the header comment
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="WordPress reads the header comment without running the file, and Plugin Name is the one required field; everything else is optional, though the requirement lines are strongly recommended.">
+                                C) A Plugin Name line in the header comment
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> When does the callback passed to <code>register_activation_hook()</code> run?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="It runs once, during the request that activates the plugin, which is why one-time setup such as add_role belongs there and per-request code does not.">
+                                A) Once, during the request that activates the plugin
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Then roles would be added on every page view. What makes activation special?">
+                                B) On every request while the plugin is active
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Installing only copies files; nothing runs then. Which moment did the role demo use?">
+                                C) When the plugin's files are uploaded
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> With the PSR-4 rule <code>"PagesCo\\Books\\": "src/"</code>, where must the class <code>PagesCo\Books\Rest\BooksController</code> live?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That is core's naming style for non-namespaced classes. How does PSR-4 turn a class name into a path?">
+                                A) src/class-books-controller.php
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="PSR-4 replaces the prefix PagesCo\Books\ with src/, turns the remaining backslashes into slashes and adds .php, with the exact same letters and case.">
+                                B) src/Rest/BooksController.php
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The sub-namespace Rest is part of the path. Where did it go?">
+                                C) src/BooksController.php
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> The plugin stores a settings option. Where should the code that deletes it go?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="An owner who deactivates for a minute would lose their settings. Is deactivation the end of a plugin's life?">
+                                A) In the deactivation callback
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That would delete it on every request. Which file does WordPress run when the plugin is deleted?">
+                                B) At the top of the main file
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="uninstall.php runs only when the plugin is deleted, guarded by WP_UNINSTALL_PLUGIN. Deactivation is a pause and must keep the data.">
+                                C) In uninstall.php
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> You add <code>src/BookPostType.php</code> with the class <code>PagesCo\Books\BookPostType</code> and list it in <code>feature_classes()</code>. What else must you do before it works?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="Nothing: the PSR-4 autoloader finds new classes by name. composer dump-autoload is only needed when the autoload section of composer.json changes, as the project showed with StoreNotice.">
+                                A) Nothing; the autoloader finds the new class by its name
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="In the project you added StoreNotice.php without running Composer. Did it load?">
+                                B) Run composer dump-autoload again
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Activation is for one-time setup. Does loading a class need it?">
+                                C) Deactivate and activate the plugin
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Is Composer worth it for a plugin with no dependencies?</summary>
+                    <p>For one or two files, a <code>require</code> line is fine. <code>pagesco-books</code> will have a dozen classes by Module 7, plus tests in Lesson 8.1 that need the same autoloader, and every <code>require</code> you do not write is one you cannot forget. The cost is one command and a <code>vendor/</code> folder. If the plugin later needs a library from Packagist, the setup is already there; for plugins distributed to many sites, tools such as Strauss or PHP-Scoper rename bundled libraries so two plugins cannot load clashing versions of the same one.</p>
+                </details>
+                <details>
+                    <summary>Why a static instance() instead of a global variable?</summary>
+                    <p>Both give other code a way to reach the plugin's object. A global (<code>$GLOBALS['pagesco_books']</code>) can be overwritten by any code by accident; <code>Plugin::instance()</code> can only ever return the one object, and its name lives in your namespace. Some developers prefer to avoid single instances altogether and pass objects around (dependency injection). The course keeps one small, predictable entry point, because hooks need a way to find the object that added them.</p>
+                </details>
+                <details>
+                    <summary>Should vendor/ go into Git?</summary>
+                    <p>Usually not: you commit <code>composer.json</code> (and <code>composer.lock</code> once there are packages) and run Composer when building or deploying, so the repository holds only your code. A site plugin that is deployed by copying files, or a plugin submitted to the directory, must include <code>vendor/</code> in the files that reach the server. Lesson 8.4 sets this up for Pages &amp; Co.</p>
+                </details>
+                <details>
+                    <summary>Why is the store notice itself still a must-use plugin?</summary>
+                    <p>Because nobody should be able to switch it off by accident, and it has no settings or data: it is site furniture. The shop-specific extras became a feature of <code>pagesco-books</code>, where they can be turned off or replaced with the plugin. Many agencies use exactly this split: a small must-use plugin for what must always run, and a normal plugin for the client's features.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Add a "Features" link to the plugin's row on the Plugins screen that lists, in a tooltip (<code>title</code> attribute), the class names of the running features. Use the <code>plugin_row_meta</code> filter (its second argument is the plugin's basename, compare it with <code>plugin_basename( PAGESCO_BOOKS_FILE )</code>), and get the class names from the <code>Plugin</code> object: you will need a small public method that returns the keys of <code>$features</code>. Escape the attribute with <code>esc_attr()</code>. Where would such a method be useful later, for example in a Site Health check?</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Open <code>pagesco-plan.txt</code> from Lesson 1.1 again and read the feature list you marked "content", "theme" or "plugin" before you knew any of this. Which items would you mark differently now, and why? Then write the next three features you expect <code>pagesco-books</code> to get, each as a class name in <code>PagesCo\Books</code> with one sentence about the hooks it will use. Compare them with the Module 5 to 7 lessons as you go.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>A plugin is a folder in <code>wp-content/plugins/</code> with a main file of the same name whose header comment has at least <code>Plugin Name</code>; <code>Requires at least</code> and <code>Requires PHP</code> are checked on activation</li>
+                        <li>Guard every file that can run on its own with <code>defined( 'ABSPATH' ) || exit;</code></li>
+                        <li>Namespace the plugin's classes (<code>PagesCo\Books</code>) and let Composer's PSR-4 autoloader load them from <code>src/</code>; file names match class names exactly, case included</li>
+                        <li>Keep the main file short: header, guard, constants, autoloader, life-cycle hooks, and <code>boot()</code> on <code>plugins_loaded</code></li>
+                        <li>Each feature is a class implementing <code>Feature</code>; adding one means one file and one line in <code>Plugin::feature_classes()</code></li>
+                        <li>Activation sets up once (roles, defaults), deactivation pauses and keeps data, <code>uninstall.php</code> removes data; register the hooks at the top level of the main file</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Stop direct requests</td><td><code>defined( 'ABSPATH' ) || exit;</code></td></tr>
+                            <tr><td>The plugin's folder path</td><td><code>plugin_dir_path( __FILE__ )</code> (in a constant)</td></tr>
+                            <tr><td>Autoload <code>PagesCo\Books\…</code></td><td><code>"autoload": { "psr-4": { "PagesCo\\Books\\": "src/" } }</code>, <code>composer dump-autoload</code>, <code>require … 'vendor/autoload.php';</code></td></tr>
+                            <tr><td>Start the features</td><td><code>add_action( 'plugins_loaded', array( PagesCo\Books\Plugin::instance(), 'boot' ) );</code></td></tr>
+                            <tr><td>One-time setup</td><td><code>register_activation_hook( __FILE__, array( PagesCo\Books\Activator::class, 'activate' ) );</code></td></tr>
+                            <tr><td>A role</td><td><code>add_role( 'pagesco_bookseller', 'Bookseller', $caps );</code> / <code>remove_role()</code></td></tr>
+                            <tr><td>Cleanup on delete</td><td><code>uninstall.php</code> starting with <code>defined( 'WP_UNINSTALL_PLUGIN' ) || exit;</code></td></tr>
+                            <tr><td>Test uninstall safely</td><td><code>wp plugin uninstall pagesco-books --deactivate --skip-delete</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You created <code>pagesco-books</code>: a header WordPress checks, a namespaced, autoloaded structure and a main object that starts features</li>
+                        <li>You gave it a life cycle: a Bookseller role on activation, kept on deactivation, removed by <code>uninstall.php</code></li>
+                        <li>You moved the store-notice extras from the must-use plugin into the plugin's first feature, keeping a promise from Lesson 2.3</li>
+                        <li>You broke the plugin four ways on purpose (direct access, missing autoloader, late hook, wrong file name) and fixed each one</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>The skeleton is ready for real features. In <a href="lesson_15.html"><strong>Lesson 5.2: Custom Post Types, Taxonomies &amp; Meta</strong></a> the shop's catalog moves in: a <code>book</code> post type, a <code>genre</code> taxonomy and book meta such as author, price and pages, each a feature class in <code>src/</code>, plus the eleven books from the MySQL course seeded with WP-CLI. The activation hook gets its second job then, because new post types need their permalinks set up.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>pagesco-books</code> is active, <code>src/</code> holds exactly the four classes, and the notice shows the Thursday hours once</li>
+                    <li>Check that no exercise files are left (<code>src/BodyClasses.php</code>, <code>mu-plugins/exercise-no-notice-extras.php</code>) and that the user <code>sam</code> is deleted</li>
+                    <li>Skim the "Plugin Basics" chapter of the official Plugin Handbook (developer.wordpress.org/plugins) and compare its advice with what you built</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>This was a lesson about structure more than features, and structure can feel like ceremony when the only feature is two lines of notice text. It pays off quietly: in the coming lessons you will add a post type, a settings page, a database table, blocks and REST routes, and each will be one new class in a predictable place instead of another hundred lines in one file. Professional plugin code mostly looks like this, a short entry point and small classes with one job each, and you now know your way around it.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_13.html" class="prev-lesson">← Previous: functions.php: Supports, Assets, Menus &amp; Widgets</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_15.html" class="next-lesson">Next: Custom Post Types, Taxonomies &amp; Meta →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

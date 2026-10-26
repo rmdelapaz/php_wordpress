@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Classic WordPress theme development: the Loop, template tags and their the_/get_ pairs, template parts with get_template_part(), and conditional tags, building the pagesco-classic theme on WordPress 7.1 and PHP 8.5. PHP and WordPress Development Lesson 4.1.">
+    <meta name="author" content="Ray de la Paz">
+    <title>The Loop &amp; Template Tags - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 4: Classic &amp; Hybrid Theme Development</a></li>
+            <li aria-current="page">Lesson 4.1: The Loop &amp; Template Tags</li>
+        </ul>
+    </nav>
+
+    <main id="main-content" data-state="after:lesson_10">
+        <div class="container">
+            <header>
+                <h1>🔁 Lesson 4.1: The Loop &amp; Template Tags</h1>
+                <p class="lead">Module 3 built Pages &amp; Co. the modern way, from blocks. Now you step into the world most existing WordPress sites still live in: classic themes, where every template is a PHP file. At the heart of each one is a few lines of code called the Loop, plus a family of small functions, the template tags, that print a post's title, date, author and content. You will build <code>pagesco-classic</code>, the shop's classic theme, from a single file to a set of templates and template parts, and finish by giving it a <code>theme.json</code>, which makes it a hybrid.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Explain what the Loop does with the main query, step by step, and write it correctly with <code>have_posts()</code> and <code>the_post()</code></li>
+                        <li>Use template tags and their <code>the_</code> / <code>get_</code> pairs, and choose between printing and returning (and escaping) a value</li>
+                        <li>Split a classic theme into <code>header.php</code>, <code>footer.php</code> and template parts with <code>get_template_part()</code>, including passing arguments</li>
+                        <li>Use conditional tags such as <code>is_home()</code>, <code>is_singular()</code> and <code>is_search()</code>, and say when they work and when they are called too early</li>
+                        <li>Build <code>pagesco-classic</code> with <code>index.php</code>, <code>singular.php</code> and <code>404.php</code>, and turn it into a hybrid theme with <code>theme.json</code></li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 125 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_10.html">Lesson 3.4: Child Themes &amp; Customizing Existing Themes</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> <code>pagesco-classic</code>, a classic theme for Pages &amp; Co. with templates, template parts and a <code>theme.json</code>, active for the rest of Module 4</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (nothing here needs 7.x; passing arguments to <code>get_template_part()</code> needs WordPress 5.5 or later)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 3.4, with <code>pagesco</code> active and <code>pagesco-site.php</code> in <code>mu-plugins/</code></li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#the-loop" class="toc-link">The Loop</a></li>
+                        <li><a href="#template-tags" class="toc-link">Template Tags</a></li>
+                        <li><a href="#template-parts" class="toc-link">Template Parts</a></li>
+                        <li><a href="#conditional-tags" class="toc-link">Conditional Tags</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Finish pagesco-classic</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="the-loop" class="lesson-section">
+                <h2>🔁 The Loop</h2>
+                <p>Before WordPress loads a single template, it has already done the hard part. In Lesson 3.1 you watched <code>template-loader.php</code> choose a template; just before that, WordPress turned the URL into a database query and ran it. That query is the <strong>main query</strong>, and its results wait in the global <code>$wp_query</code> object (Lesson 1.3 named it): one post for <code>/hello-world/</code>, the three News posts for <code>/category/news/</code>, every match for <code>/?s=dune</code>. A classic template does not fetch posts. It only walks through the list WordPress already found, and that walk is <strong>the Loop</strong>.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: the reading list at the till</h4>
+                    <p>A customer hands the bookseller a list of books they ordered. The bookseller does not search the shop again; the list is done. They go down it one line at a time: "is there another book on the list?" (<code>have_posts()</code>), "take the next one off the pile and put it on the counter" (<code>the_post()</code>), then read out its title, author and price (template tags), and start again. When the list is empty, they stop. If they forget to take the next book off the pile, they read out the same title forever.</p>
+                </div>
+
+                <div class="mermaid">
+graph TD
+    A["GET /category/news/"] --> B["main query: 3 posts"]
+    B --> C["template: index.php"]
+    C --> D{"have_posts()?"}
+    D -->|"yes"| E["the_post(): next post"]
+    E --> F["template tags"]
+    F --> D
+    D -->|"no"| G["rest of the page"]
+                </div>
+
+                <h3>A classic theme in two files</h3>
+                <p>You met a throwaway classic theme in Lesson 3.1. This time you build one to keep. Create the folder <code>wordpress/wp-content/themes/pagesco-classic/</code> and its header, <code>style.css</code>. It follows the rules from Lesson 3.2: the text domain matches the folder, and so does the function prefix you will use, <code>pagesco_classic_</code>:</p>
+                <pre data-file="wp-content/themes/pagesco-classic/style.css"><code class="language-css">/*
+Theme Name: Pages &amp; Co. Classic
+Theme URI: https://example.com/pagesco-classic/
+Author: Pages &amp; Co.
+Author URI: https://example.com/
+Description: A classic PHP theme for the Pages &amp; Co. bookstore, built in Module 4.
+Requires at least: 6.6
+Tested up to: 7.1
+Requires PHP: 7.4
+Version: 1.0.0
+License: GNU General Public License v2 or later
+License URI: http://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: pagesco-classic
+*/</code></pre>
+                <p>Then the one template every theme must have, <code>index.php</code>. A classic template prints the whole document, so it calls <code>wp_head()</code>, <code>wp_body_open()</code> and <code>wp_footer()</code> itself (Lesson 3.1's third Common Mistake, and the reason your store notice from Lesson 2.3 will appear). The <code>&lt;title&gt;</code> comes from <code>wp_get_document_title()</code> for now; Lesson 4.3 hands that job to WordPress with a theme support. The Loop is the <code>if</code> / <code>while</code> block in the middle:</p>
+                <pre data-file="wp-content/themes/pagesco-classic/index.php"><code class="language-php">&lt;?php
+/**
+ * The main template file. For now it does everything itself.
+ *
+ * @package pagesco-classic
+ */
+
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html &lt;?php language_attributes(); ?&gt;&gt;
+&lt;head&gt;
+	&lt;meta charset="&lt;?php bloginfo( 'charset' ); ?&gt;"&gt;
+	&lt;title&gt;&lt;?php echo esc_html( wp_get_document_title() ); ?&gt;&lt;/title&gt;
+	&lt;?php wp_head(); ?&gt;
+&lt;/head&gt;
+&lt;body &lt;?php body_class(); ?&gt;&gt;
+&lt;?php wp_body_open(); ?&gt;
+&lt;main&gt;
+	&lt;?php
+	if ( have_posts() ) {
+		while ( have_posts() ) {
+			the_post();
+			the_title( '&lt;h2&gt;', '&lt;/h2&gt;' );
+		}
+	} else {
+		echo '&lt;p&gt;Nothing here yet.&lt;/p&gt;';
+	}
+	?&gt;
+&lt;/main&gt;
+&lt;?php wp_footer(); ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+                <p>Activate it, check what kind of theme WordPress thinks it is, and list the headings it prints on the home page:</p>
+                <pre data-cli><code class="language-bash">wp theme activate pagesco-classic
+wp eval 'var_dump( wp_is_block_theme(), wp_theme_has_theme_json() );'
+curl -s http://localhost:8080/ | grep -o '&lt;h2&gt;[^&lt;]*&lt;/h2&gt;'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Switched to 'Pages &amp;amp; Co. Classic' theme.
+bool(false)
+bool(false)
+&lt;h2&gt;Hello world!&lt;/h2&gt;
+&lt;h2&gt;Book club: Dune&lt;/h2&gt;
+&lt;h2&gt;Staff picks for the season&lt;/h2&gt;
+&lt;h2&gt;Welcome to the new Pages &amp;#038; Co. website&lt;/h2&gt;</code></pre>
+                </div>
+                <p>A classic theme (<code>false</code>, <code>false</code>), and four headings: the four published posts, newest first, the same list Lesson 3.2's Query Loop showed. (<code>&amp;#038;</code> is the ampersand in "Pages &amp; Co.": <code>the_title()</code> runs the title through WordPress's display filters, which write it as an HTML entity. The browser shows a plain <code>&amp;</code>.) Now the important part: the <em>same</em> file draws every other list too, because the Loop just walks whatever the main query found:</p>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/category/news/ | grep -o '&lt;h2&gt;[^&lt;]*&lt;/h2&gt;'
+curl -s "http://localhost:8080/?s=dune" | grep -o '&lt;h2&gt;[^&lt;]*&lt;/h2&gt;'
+curl -s http://localhost:8080/about/ | grep -o '&lt;h2&gt;[^&lt;]*&lt;/h2&gt;'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;h2&gt;Book club: Dune&lt;/h2&gt;
+&lt;h2&gt;Staff picks for the season&lt;/h2&gt;
+&lt;h2&gt;Welcome to the new Pages &amp;#038; Co. website&lt;/h2&gt;
+&lt;h2&gt;Book club: Dune&lt;/h2&gt;
+&lt;h2&gt;Staff picks for the season&lt;/h2&gt;
+&lt;h2&gt;About Us&lt;/h2&gt;</code></pre>
+                </div>
+                <p>Three News posts for the category, two search results for "dune" ("Staff picks" mentions <em>Dune</em> in its list), and for <code>/about/</code> a Loop of exactly one item: the page itself. On a single post or page, the main query holds one post, and classic templates still run the Loop over it. That is why you will see <code>while ( have_posts() )</code> even in templates that only ever show one post.</p>
+
+                <h3>What the four functions do</h3>
+                <p>The Loop functions are thin wrappers around the main query. They live in <code>wp-includes/query.php</code>, and each one hands the work to the matching method of the <code>WP_Query</code> class in <code>wp-includes/class-wp-query.php</code>:</p>
+                <pre data-cli><code class="language-bash">grep -n "^function have_posts\|^function the_post\|^function rewind_posts\|^function in_the_loop" wp-includes/query.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>961:function have_posts() {
+984:function in_the_loop() {
+1001:function rewind_posts() {
+1018:function the_post() {</code></pre>
+                </div>
+                <ul>
+                    <li><code>have_posts()</code> is <code>$wp_query-&gt;have_posts()</code>: true while there is a next post. When the list runs out it fires the <code>loop_end</code> action and rewinds, so a second Loop on the same page starts from the top.</li>
+                    <li><code>the_post()</code> moves to the next post and calls <code>setup_postdata()</code>, which sets the global <code>$post</code> (Lesson 1.3) and a few helpers such as the author. Every template tag reads that global. The first call also fires <code>loop_start</code>.</li>
+                    <li><code>in_the_loop()</code> tells code (and blocks, as you will see in Lesson 4.2) whether the Loop is running right now; <code>rewind_posts()</code> starts the list again.</li>
+                </ul>
+
+                <div class="card card-warning">
+                    <h4>⚠️ No the_post(), no end</h4>
+                    <p><code>while ( have_posts() ) { the_title(); }</code> never ends: without <code>the_post()</code> the list never moves on, so <code>have_posts()</code> stays true and the same title is printed again and again until PHP's time limit stops the request (30 seconds in the course container, <code>max_execution_time</code>). If a page of your classic theme hangs and then fails, look for a Loop without <code>the_post()</code> first.</p>
+                </div>
+            </section>
+
+            <section id="template-tags" class="lesson-section">
+                <h2>🏷️ Template Tags</h2>
+                <p><code>the_title()</code> is a <strong>template tag</strong>: a function that prints something about the current post. WordPress has dozens of them, and they come in pairs. A function starting with <code>the_</code> <em>prints</em> the value, ready for HTML; its partner starting with <code>get_</code> (or <code>get_the_</code>) <em>returns</em> it, so you can store it, test it or pass it somewhere else. Replace the Loop's body in <code>index.php</code> with a small article per post:</p>
+                <pre data-file="wp-content/themes/pagesco-classic/index.php"><code class="language-php">&lt;?php
+/**
+ * The main template file. For now it does everything itself.
+ *
+ * @package pagesco-classic
+ */
+
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html &lt;?php language_attributes(); ?&gt;&gt;
+&lt;head&gt;
+	&lt;meta charset="&lt;?php bloginfo( 'charset' ); ?&gt;"&gt;
+	&lt;title&gt;&lt;?php echo esc_html( wp_get_document_title() ); ?&gt;&lt;/title&gt;
+	&lt;?php wp_head(); ?&gt;
+&lt;/head&gt;
+&lt;body &lt;?php body_class(); ?&gt;&gt;
+&lt;?php wp_body_open(); ?&gt;
+&lt;main&gt;
+	&lt;?php
+	if ( have_posts() ) {
+		while ( have_posts() ) {
+			the_post();
+			?&gt;
+			&lt;article id="post-&lt;?php the_ID(); ?&gt;" &lt;?php post_class(); ?&gt;&gt;
+				&lt;h2&gt;&lt;a href="&lt;?php the_permalink(); ?&gt;"&gt;&lt;?php the_title(); ?&gt;&lt;/a&gt;&lt;/h2&gt;
+				&lt;p&gt;&lt;?php echo esc_html( get_the_date() ); ?&gt; by &lt;?php the_author(); ?&gt;&lt;/p&gt;
+				&lt;?php the_excerpt(); ?&gt;
+			&lt;/article&gt;
+			&lt;?php
+		}
+	} else {
+		echo '&lt;p&gt;Nothing here yet.&lt;/p&gt;';
+	}
+	?&gt;
+&lt;/main&gt;
+&lt;?php wp_footer(); ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+                <pre data-web="/" data-select="#post-16"><code class="language-text">http://localhost:8080/   (View Source, the article for "Staff picks")</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;article id="post-16" class="post-16 post type-post status-publish format-standard hentry category-news"&gt;
+				&lt;h2&gt;&lt;a href="http://localhost:8080/staff-picks/"&gt;Staff picks for the season&lt;/a&gt;&lt;/h2&gt;
+				&lt;p&gt;September 15, 2026 by Devon Park&lt;/p&gt;
+				&lt;p&gt;Three books we keep pressing into customers&amp;#8217; hands this season: It was a pleasure to burn. Ray Bradbury, Fahrenheit 451&lt;/p&gt;
+			&lt;/article&gt;</code></pre>
+                </div>
+                <p>One line at a time: <code>the_ID()</code> printed 16. <code>post_class()</code> printed a whole <code>class="…"</code> attribute describing the post (its ID, post type, status, format and category), the classic counterpart of the classes block themes add; stylesheets and plugins rely on them, so always include it. <code>the_permalink()</code> printed the URL, <code>the_title()</code> the title, <code>get_the_date()</code> returned the date in the format from Settings &gt; General, which <code>esc_html()</code> escaped before <code>echo</code>, <code>the_author()</code> printed the author's display name, and <code>the_excerpt()</code> built a short summary from the content, because the post has no hand-written excerpt: up to 55 words of text, markup removed, wrapped in a paragraph. Notice what is missing: the list of three books. The excerpt is built only from blocks that <code>excerpt_remove_blocks()</code> (<code>wp-includes/blocks.php</code>) counts as text, and a list whose items are <code>core/list-item</code> blocks is skipped. When a summary matters, write the excerpt by hand in the editor's Excerpt panel.</p>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Prints (<code>the_</code>)</th><th>Returns (<code>get_</code>)</th><th>What</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>the_ID()</code></td><td><code>get_the_ID()</code></td><td>Post ID</td></tr>
+                            <tr><td><code>the_title( $before, $after )</code></td><td><code>get_the_title( $post )</code></td><td>Title, with display filters</td></tr>
+                            <tr><td><code>the_title_attribute()</code></td><td><code>the_title_attribute( array( 'echo' =&gt; false ) )</code></td><td>Title escaped for an HTML attribute</td></tr>
+                            <tr><td><code>the_permalink()</code></td><td><code>get_permalink( $post )</code></td><td>URL of the post</td></tr>
+                            <tr><td><code>the_content()</code></td><td><code>get_the_content()</code> (raw!)</td><td>Content; only <code>the_content()</code> renders blocks (Common Mistakes)</td></tr>
+                            <tr><td><code>the_excerpt()</code></td><td><code>get_the_excerpt( $post )</code></td><td>Excerpt, or a summary built from the content</td></tr>
+                            <tr><td><code>the_date()</code> / <code>the_time()</code></td><td><code>get_the_date( $format, $post )</code> / <code>get_the_time()</code></td><td>Publish date and time</td></tr>
+                            <tr><td><code>the_author()</code></td><td><code>get_the_author()</code></td><td>Author's display name</td></tr>
+                            <tr><td><code>the_category( ', ' )</code></td><td><code>get_the_category_list( ', ' )</code></td><td>Linked category names</td></tr>
+                            <tr><td><code>post_class()</code></td><td><code>get_post_class()</code></td><td>CSS classes (array when returned)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Most <code>get_</code> functions also accept a post (an ID or a <code>WP_Post</code>), so they work outside the Loop too. With WP-CLI there is no main query and no Loop, but this works:</p>
+                <pre data-cli><code class="language-bash">wp eval 'echo get_the_title( 16 ), "\n", get_permalink( 16 ), "\n", get_the_date( "Y-m-d", 16 ), "\n", get_the_category_list( ", ", "", 16 ), "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Staff picks for the season
+http://localhost:8080/staff-picks/
+2026-09-15
+&lt;a href="http://localhost:8080/category/news/" rel="category tag"&gt;News&lt;/a&gt;</code></pre>
+                </div>
+
+                <div class="card card-danger">
+                    <h4>🛑 Printing is not the same as escaping</h4>
+                    <p>The <code>the_</code> tags print values WordPress has prepared for HTML: <code>the_permalink()</code> runs <code>esc_url()</code>, <code>the_content()</code> runs the content filters (Lesson 2.3's Exercise 3 listed them), <code>the_title()</code> runs the title filters. What they prepare is HTML <em>text</em>, not an attribute value. When you put a value into an attribute, or print something you got from a <code>get_</code> function, escape it yourself for that spot, the rule from Lesson 1.3: <code>esc_attr( get_the_title() )</code> or <code>the_title_attribute()</code> in <code>title="…"</code>, <code>esc_url( get_permalink() )</code> in <code>href</code>, <code>esc_html( get_the_date() )</code> as you just did.</p>
+                </div>
+                <p>One tag has a surprise in it. <code>the_date()</code> prints the date only for the <em>first</em> post of each day: its source in <code>wp-includes/general-template.php</code> checks <code>is_new_day()</code> and prints nothing for the second post published on the same day. That made sense for old blog layouts with a date heading per day; for a list where every post shows its date, use <code>get_the_date()</code> (or <code>the_time( get_option( 'date_format' ) )</code>), as this theme does.</p>
+            </section>
+
+            <section id="template-parts" class="lesson-section">
+                <h2>🧩 Template Parts</h2>
+                <p>Every template needs the same head, header and footer. Copying them into <code>index.php</code>, <code>singular.php</code> and <code>404.php</code> would mean three places to fix every change. Classic themes split the page into pieces and load them with a few functions:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Function</th><th>Loads (child theme first, then parent; Lesson 3.4)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>get_header()</code> / <code>get_header( 'shop' )</code></td><td><code>header.php</code> / <code>header-shop.php</code></td></tr>
+                            <tr><td><code>get_footer()</code>, <code>get_sidebar()</code></td><td><code>footer.php</code>, <code>sidebar.php</code></td></tr>
+                            <tr><td><code>get_template_part( 'template-parts/content' )</code></td><td><code>template-parts/content.php</code></td></tr>
+                            <tr><td><code>get_template_part( 'template-parts/content', 'none' )</code></td><td><code>template-parts/content-none.php</code>, else <code>template-parts/content.php</code></td></tr>
+                            <tr><td><code>get_template_part( $slug, $name, $args )</code></td><td>the same, with <code>$args</code> available inside the part as <code>$args</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>All of them go through <code>locate_template()</code> (<code>wp-includes/template.php</code>), the function you watched switch from parent to child in Lesson 3.4, so a child theme of <code>pagesco-classic</code> could replace any part. Note that you pass the path <em>without</em> <code>.php</code>; Common Mistakes shows what happens otherwise. Create the header part, <code>header.php</code>. It is the top of the old <code>index.php</code>, plus a viewport meta tag and a site header that links the shop's name to the home page:</p>
+                <pre data-file="wp-content/themes/pagesco-classic/header.php"><code class="language-php">&lt;?php
+/**
+ * The header: the document head and the top of every page.
+ *
+ * @package pagesco-classic
+ */
+
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html &lt;?php language_attributes(); ?&gt;&gt;
+&lt;head&gt;
+	&lt;meta charset="&lt;?php bloginfo( 'charset' ); ?&gt;"&gt;
+	&lt;meta name="viewport" content="width=device-width, initial-scale=1"&gt;
+	&lt;title&gt;&lt;?php echo esc_html( wp_get_document_title() ); ?&gt;&lt;/title&gt;
+	&lt;?php wp_head(); ?&gt;
+&lt;/head&gt;
+&lt;body &lt;?php body_class(); ?&gt;&gt;
+&lt;?php wp_body_open(); ?&gt;
+&lt;header class="site-header"&gt;
+	&lt;p class="site-title"&gt;&lt;a href="&lt;?php echo esc_url( home_url( '/' ) ); ?&gt;"&gt;&lt;?php bloginfo( 'name' ); ?&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;/header&gt;
+&lt;main id="main" class="site-main"&gt;</code></pre>
+                <p>It ends with an open <code>&lt;main&gt;</code>; <code>footer.php</code> closes it, prints the shop's address with a translatable string (Lesson 1.3) and calls <code>wp_footer()</code>:</p>
+                <pre data-file="wp-content/themes/pagesco-classic/footer.php"><code class="language-php">&lt;?php
+/**
+ * The footer: the end of the main content and the bottom of every page.
+ *
+ * @package pagesco-classic
+ */
+
+?&gt;
+&lt;/main&gt;
+&lt;footer class="site-footer"&gt;
+	&lt;p&gt;&lt;?php esc_html_e( 'Pages &amp; Co. · 12 Market Street · 555-0142', 'pagesco-classic' ); ?&gt;&lt;/p&gt;
+&lt;/footer&gt;
+&lt;?php wp_footer(); ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+                <p>Next, the article itself becomes a part, <code>template-parts/content.php</code>, so every list in the theme (the blog home, archives, search, and the front page you build in Lesson 4.2) shows posts the same way. Three changes from the version in <code>index.php</code>: the "by" line is now one translatable sentence with placeholders, a machine-readable <code>&lt;time datetime&gt;</code> wraps the date, and the date and author only appear for posts (search results can include pages). The heading level comes from <code>$args</code>, defaulting to 2, so a page that lists posts under an <code>&lt;h2&gt;</code> section heading can ask for <code>&lt;h3&gt;</code>:</p>
+                <pre data-file="wp-content/themes/pagesco-classic/template-parts/content.php"><code class="language-php">&lt;?php
+/**
+ * One post in a list: title, date and author, excerpt.
+ *
+ * @package pagesco-classic
+ */
+
+$pagesco_classic_level = isset( $args['heading_level'] ) ? absint( $args['heading_level'] ) : 2;
+?&gt;
+&lt;article id="post-&lt;?php the_ID(); ?&gt;" &lt;?php post_class(); ?&gt;&gt;
+	&lt;?php the_title( '&lt;h' . $pagesco_classic_level . ' class="entry-title"&gt;&lt;a href="' . esc_url( get_permalink() ) . '"&gt;', '&lt;/a&gt;&lt;/h' . $pagesco_classic_level . '&gt;' ); ?&gt;
+	&lt;?php if ( 'post' === get_post_type() ) : ?&gt;
+		&lt;p class="entry-meta"&gt;
+			&lt;?php
+			printf(
+				/* translators: 1: publish date, 2: author name. */
+				esc_html__( '%1$s by %2$s', 'pagesco-classic' ),
+				'&lt;time datetime="' . esc_attr( get_the_date( 'c' ) ) . '"&gt;' . esc_html( get_the_date() ) . '&lt;/time&gt;',
+				esc_html( get_the_author() )
+			);
+			?&gt;
+		&lt;/p&gt;
+	&lt;?php endif; ?&gt;
+	&lt;div class="entry-summary"&gt;
+		&lt;?php the_excerpt(); ?&gt;
+	&lt;/div&gt;
+&lt;/article&gt;</code></pre>
+                <p><code>$args</code> is whatever array the template passed as the third argument of <code>get_template_part()</code>, or an empty array; <code>absint()</code> (Lesson 1.3) makes sure only a number ends up in the tag name. The variable gets the theme's prefix because a template part shares its variables with nothing else, but WordPress coding standards treat it like a global (Lesson 3.3's patterns did the same). And a part for empty lists, <code>template-parts/content-none.php</code>, which says something more helpful on a search with no results:</p>
+                <pre data-file="wp-content/themes/pagesco-classic/template-parts/content-none.php"><code class="language-php">&lt;?php
+/**
+ * Shown when a list has no posts.
+ *
+ * @package pagesco-classic
+ */
+
+?&gt;
+&lt;section class="no-results"&gt;
+	&lt;?php if ( is_search() ) : ?&gt;
+		&lt;p&gt;&lt;?php esc_html_e( 'No books or posts matched your search. Try another word.', 'pagesco-classic' ); ?&gt;&lt;/p&gt;
+		&lt;?php get_search_form(); ?&gt;
+	&lt;?php else : ?&gt;
+		&lt;p&gt;&lt;?php esc_html_e( 'Nothing here yet.', 'pagesco-classic' ); ?&gt;&lt;/p&gt;
+	&lt;?php endif; ?&gt;
+&lt;/section&gt;</code></pre>
+                <p>Now <code>index.php</code> shrinks to what is special about lists: a page heading, the Loop, and the parts. The heading uses conditional tags, the topic of the next section:</p>
+                <pre data-file="wp-content/themes/pagesco-classic/index.php"><code class="language-php">&lt;?php
+/**
+ * The main template: the blog home, archives and search results.
+ *
+ * @package pagesco-classic
+ */
+
+get_header();
+?&gt;
+&lt;header class="page-header"&gt;
+	&lt;?php if ( is_home() ) : ?&gt;
+		&lt;h1&gt;&lt;?php esc_html_e( 'News from the shop', 'pagesco-classic' ); ?&gt;&lt;/h1&gt;
+	&lt;?php elseif ( is_search() ) : ?&gt;
+		&lt;h1&gt;&lt;?php /* translators: %s: the search terms. */ printf( esc_html__( 'Search results for: %s', 'pagesco-classic' ), esc_html( get_search_query( false ) ) ); ?&gt;&lt;/h1&gt;
+	&lt;?php else : ?&gt;
+		&lt;?php the_archive_title( '&lt;h1&gt;', '&lt;/h1&gt;' ); ?&gt;
+		&lt;?php the_archive_description( '&lt;div class="archive-description"&gt;', '&lt;/div&gt;' ); ?&gt;
+	&lt;?php endif; ?&gt;
+&lt;/header&gt;
+
+&lt;?php
+if ( have_posts() ) {
+	while ( have_posts() ) {
+		the_post();
+		get_template_part( 'template-parts/content' );
+	}
+} else {
+	get_template_part( 'template-parts/content', 'none' );
+}
+
+get_footer();</code></pre>
+                <pre data-web="/" data-select="#post-16"><code class="language-text">http://localhost:8080/   (View Source, the article for "Staff picks")</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;article id="post-16" class="post-16 post type-post status-publish format-standard hentry category-news"&gt;
+	&lt;h2 class="entry-title"&gt;&lt;a href="http://localhost:8080/staff-picks/"&gt;Staff picks for the season&lt;/a&gt;&lt;/h2&gt;			&lt;p class="entry-meta"&gt;
+			&lt;time datetime="2026-09-15T10:00:00+00:00"&gt;September 15, 2026&lt;/time&gt; by Devon Park		&lt;/p&gt;
+		&lt;div class="entry-summary"&gt;
+		&lt;p&gt;Three books we keep pressing into customers&amp;#8217; hands this season: It was a pleasure to burn. Ray Bradbury, Fahrenheit 451&lt;/p&gt;
+	&lt;/div&gt;
+&lt;/article&gt;</code></pre>
+                </div>
+                <p>The same post, now from the part: a linked <code>h2</code> with a class, the date in a <code>&lt;time&gt;</code> element and the author's name in one sentence. (The blank space and the odd indentation are where the PHP tags were; browsers ignore it.) The theme folder now looks like a real classic theme:</p>
+                <pre data-cli><code class="language-bash">find wp-content/themes/pagesco-classic -type f | sort</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>wp-content/themes/pagesco-classic/footer.php
+wp-content/themes/pagesco-classic/header.php
+wp-content/themes/pagesco-classic/index.php
+wp-content/themes/pagesco-classic/style.css
+wp-content/themes/pagesco-classic/template-parts/content-none.php
+wp-content/themes/pagesco-classic/template-parts/content.php</code></pre>
+                </div>
+            </section>
+
+            <section id="conditional-tags" class="lesson-section">
+                <h2>❓ Conditional Tags</h2>
+                <p><code>index.php</code> asked <code>is_home()</code> and <code>is_search()</code> to choose its heading. Those are <strong>conditional tags</strong>: functions that answer yes or no about the current request. You have seen their names before, in Lesson 3.1, as the questions <code>template-loader.php</code> asks to pick a template. A theme asks the same questions to vary a template, and plugins ask them to decide whether to do something on this page.</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Tag</th><th>True when the request is…</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>is_front_page()</code></td><td>the site's front page, whatever it shows (Lesson 3.1)</td></tr>
+                            <tr><td><code>is_home()</code></td><td>the list of latest posts, wherever it lives</td></tr>
+                            <tr><td><code>is_singular()</code> / <code>is_singular( 'post' )</code></td><td>one post, page or other post type / one of that type</td></tr>
+                            <tr><td><code>is_single()</code>, <code>is_page( 'about' )</code></td><td>a single post (not a page) / that page (slug, ID or title)</td></tr>
+                            <tr><td><code>is_archive()</code>, <code>is_category( 'news' )</code>, <code>is_author()</code>, <code>is_date()</code></td><td>any archive / that category / an author / a date archive</td></tr>
+                            <tr><td><code>is_search()</code>, <code>is_404()</code>, <code>is_paged()</code></td><td>search results / not found / page 2 or later of a list (Lesson 4.2)</td></tr>
+                            <tr><td><code>has_category()</code>, <code>has_excerpt()</code>, <code>in_the_loop()</code></td><td>about the current post or the Loop rather than the request</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>They all read the main query (<code>is_home()</code> is <code>$wp_query-&gt;is_home()</code>), so they only know the answer after WordPress has run it. A small must-use plugin can show you their answers for a few URLs. It asks on <code>template_redirect</code>, the action from Lesson 2.3 that fires after the query and before the template. Create <code>wordpress/wp-content/mu-plugins/pagesco-conditions.php</code>:</p>
+                <pre data-file="wp-content/mu-plugins/pagesco-conditions.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Pages &amp; Co. Conditions
+ * Description: Lesson 4.1 tool: logs which conditional tags are true on each front-end request.
+ */
+
+/**
+ * Writes the request path and the conditional tags that are true to debug.log.
+ */
+function pagesco_log_conditions() {
+	$tags = array( 'is_front_page', 'is_home', 'is_singular', 'is_single', 'is_page', 'is_archive', 'is_category', 'is_author', 'is_search', 'is_404' );
+	$true = array_filter( $tags, 'call_user_func' );
+
+	$path = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
+
+	error_log( $path . ' -&gt; ' . implode( ', ', $true ) );
+}
+add_action( 'template_redirect', 'pagesco_log_conditions' );</code></pre>
+                <p><code>array_filter()</code> calls <code>call_user_func()</code> with each function name and keeps the ones that return true. The request path comes from <code>$_SERVER</code>, so it is unslashed and sanitized before it is logged (Lesson 1.3). Request seven URLs from the WP-CLI container and read the log:</p>
+                <pre data-cli data-log><code class="language-bash">for url in / /book-club-dune/ /about/ /category/news/ /author/maria/ "/?s=dune" /nothing-here/; do curl -s -o /dev/null "http://localhost:8080$url"; done</code></pre>
+                <div class="card card-output">
+                    <h4>Output (wp-content/debug.log; your timestamps will differ)</h4>
+                    <pre><code>[25-Oct-2026 23:23:17 UTC] / -&gt; is_front_page, is_home
+[25-Oct-2026 23:23:17 UTC] /book-club-dune/ -&gt; is_singular, is_single
+[25-Oct-2026 23:23:17 UTC] /about/ -&gt; is_singular, is_page
+[25-Oct-2026 23:23:17 UTC] /category/news/ -&gt; is_archive, is_category
+[25-Oct-2026 23:23:17 UTC] /author/maria/ -&gt; is_archive, is_author
+[25-Oct-2026 23:23:17 UTC] /?s=dune -&gt; is_search
+[25-Oct-2026 23:23:17 UTC] /nothing-here/ -&gt; is_404</code></pre>
+                </div>
+                <p>The home page is both <code>is_front_page()</code> and <code>is_home()</code>, because Settings &gt; Reading shows the latest posts there. A post is <code>is_singular()</code> and <code>is_single()</code>, a page <code>is_singular()</code> and <code>is_page()</code>: use <code>is_singular()</code> when you mean "one item of any type", as <code>singular.php</code> will. Archives are always <code>is_archive()</code> plus the specific kind; search and 404 stand alone. In <code>index.php</code> these answers pick the heading:</p>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | grep -o '&lt;h1&gt;.*&lt;/h1&gt;'
+curl -s http://localhost:8080/category/news/ | grep -o '&lt;h1&gt;.*&lt;/h1&gt;'
+curl -s "http://localhost:8080/?s=dune" | grep -o '&lt;h1&gt;.*&lt;/h1&gt;'
+rm wp-content/mu-plugins/pagesco-conditions.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;h1&gt;News from the shop&lt;/h1&gt;
+&lt;h1&gt;Category: &lt;span&gt;News&lt;/span&gt;&lt;/h1&gt;
+&lt;h1&gt;Search results for: dune&lt;/h1&gt;</code></pre>
+                </div>
+                <p><code>the_archive_title()</code> produced "Category: News" (with the term name in a <code>&lt;span&gt;</code> you could style); it knows every archive type, so one call covers category, tag, author and date archives. The last command deleted the logging tool again.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <p>For the first three, use a scratch template that the hierarchy picks for one URL only. From Lesson 3.1 you know <code>category-news.php</code> beats <code>index.php</code> for <code>/category/news/</code>, so every other page stays untouched while you experiment. You delete it at the end.</p>
+
+                <h3>1. Concatenating a tag that prints</h3>
+                <pre data-file="wp-content/themes/pagesco-classic/category-news.php" data-web="/category/news/" data-select="main"><code class="language-php">&lt;?php
+get_header();
+
+while ( have_posts() ) {
+	the_post();
+	echo '&lt;h2 class="mistake"&gt;' . the_title() . '&lt;/h2&gt;';
+}
+
+get_footer();</code></pre>
+                <div class="card card-output">
+                    <h4>Output (View Source)</h4>
+                    <pre><code>&lt;main id="main" class="site-main"&gt;
+Book club: Dune&lt;h2 class="mistake"&gt;&lt;/h2&gt;Staff picks for the season&lt;h2 class="mistake"&gt;&lt;/h2&gt;Welcome to the new Pages &amp;#038; Co. website&lt;h2 class="mistake"&gt;&lt;/h2&gt;&lt;/main&gt;</code></pre>
+                </div>
+                <p><strong>What it means:</strong> each title sits <em>before</em> an empty heading. PHP evaluates the whole expression on the right of <code>echo</code> first; while doing that it calls <code>the_title()</code>, which prints the title immediately and returns nothing (<code>null</code>), so the string that <code>echo</code> finally prints is <code>&lt;h2 class="mistake"&gt;&lt;/h2&gt;</code>. No error, just broken markup. <strong>Fix:</strong> inside a string, use the returning version, <code>echo '&lt;h2&gt;' . esc_html( get_the_title() ) . '&lt;/h2&gt;';</code>, or let the tag wrap itself: <code>the_title( '&lt;h2&gt;', '&lt;/h2&gt;' );</code>.</p>
+
+                <h3>2. get_the_content() for display</h3>
+                <pre data-file="wp-content/themes/pagesco-classic/category-news.php" data-web="/category/news/" data-select="div.mistake"><code class="language-php">&lt;?php
+get_header();
+
+while ( have_posts() ) {
+	the_post();
+	echo '&lt;div class="mistake"&gt;' . get_the_content() . '&lt;/div&gt;';
+}
+
+get_footer();</code></pre>
+                <div class="card card-output">
+                    <h4>Output (the first post's content, View Source)</h4>
+                    <pre><code>&lt;div class="mistake"&gt;&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;Our Thursday book club starts with &lt;em&gt;Dune&lt;/em&gt;. Join us at 7 p.m. in the reading corner; the first coffee is on us.&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;
+&lt;/div&gt;</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the block comments from Lesson 2.1 are in the page. <code>get_the_content()</code> returns <code>post_content</code> as it is stored; only <code>the_content()</code> runs the <code>the_content</code> filters, and those are what render blocks (<code>do_blocks</code>), expand shortcodes, turn image tags responsive and so on. The comments are invisible in the browser, so this often goes unnoticed until a dynamic block, a synced pattern or a shortcode prints nothing. <strong>Fix:</strong> <code>the_content();</code>, or when you need the HTML in a variable, <code>apply_filters( 'the_content', get_the_content() )</code>.</p>
+
+                <h3>3. A file extension in get_template_part()</h3>
+                <pre data-file="wp-content/themes/pagesco-classic/category-news.php" data-web="/category/news/" data-select="main"><code class="language-php">&lt;?php
+get_header();
+
+while ( have_posts() ) {
+	the_post();
+	$pagesco_classic_found = get_template_part( 'template-parts/content.php' );
+}
+var_dump( $pagesco_classic_found );
+
+get_footer();</code></pre>
+                <div class="card card-output">
+                    <h4>Output (View Source)</h4>
+                    <pre><code>&lt;main id="main" class="site-main"&gt;
+bool(false)
+&lt;/main&gt;</code></pre>
+                </div>
+                <p><strong>What it means:</strong> an empty page with no error. <code>get_template_part()</code> adds <code>.php</code> itself, so it looked for <code>template-parts/content.php.php</code>, found nothing, and returned <code>false</code>, the only sign that anything went wrong. A typo in the slug has the same silent result. <strong>Fix:</strong> pass the path without the extension, <code>get_template_part( 'template-parts/content' )</code>. When a part seems to print nothing, <code>var_dump()</code> what <code>get_template_part()</code> returns: <code>false</code> means "file not found" (a found part returns <code>null</code>). Delete the scratch template:</p>
+                <pre data-cli><code class="language-bash">rm wp-content/themes/pagesco-classic/category-news.php</code></pre>
+
+                <h3>4. Asking a conditional tag too early</h3>
+                <p>Someone wants a message in the footer of the blog home only, and writes this must-use plugin:</p>
+                <pre data-file="wp-content/mu-plugins/mistake-early.php" data-norun><code class="language-php">&lt;?php
+if ( is_home() ) {
+	add_action( 'wp_footer', 'pagesco_news_footer_message' );
+}
+
+function pagesco_news_footer_message() {
+	echo '&lt;p&gt;Read all our news!&lt;/p&gt;';
+}</code></pre>
+                <pre data-cli data-raises="doing_it_wrong"><code class="language-bash">curl -s http://localhost:8080/ | head -n 3</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Notice: Function is_home was called &lt;strong&gt;incorrectly&lt;/strong&gt;. Conditional query tags do not work before the query is run. Before then, they always return false. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 3.1.0.) in /var/www/html/wp-includes/functions.php on line 6260
+&lt;!DOCTYPE html&gt;</code></pre>
+                </div>
+                <p><strong>What it means:</strong> must-use plugins load long before the main query runs (Lesson 2.2's load order), so <code>is_home()</code> cannot know the answer. It returns <code>false</code>, the message never appears, and with <code>WP_DEBUG</code> on WordPress says so: "Conditional query tags do not work before the query is run. Before then, they always return false." <strong>Fix:</strong> ask inside a callback on a hook that runs after the query, such as <code>template_redirect</code> or <code>wp</code>, or check inside the <code>wp_footer</code> callback itself, as the conditions tool did. Delete the file:</p>
+                <pre data-cli><code class="language-bash">rm wp-content/mu-plugins/mistake-early.php</code></pre>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Finish pagesco-classic</h2>
+                <p>The theme can already list posts. In this project you give it a template for single posts and pages, a "not found" page, and a <code>theme.json</code> that brings in the shop's colors and fonts, then check every kind of URL from your template map (Lesson 3.1). <code>pagesco-classic</code> stays active for the rest of Module 4. Allow about 40 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: One template for posts and pages <span class="step-time">(12 min)</span></h3>
+                    <p>In the hierarchy, posts and pages both fall through to <code>singular</code> before <code>index</code>, so one <code>singular.php</code> can draw both, using <code>is_singular( 'post' )</code> for the parts only posts have: the date and author, the categories, and links to the previous and next post. Create <code>wordpress/wp-content/themes/pagesco-classic/singular.php</code>:</p>
+                    <pre data-file="wp-content/themes/pagesco-classic/singular.php"><code class="language-php">&lt;?php
+/**
+ * A single post or page.
+ *
+ * @package pagesco-classic
+ */
+
+get_header();
+
+while ( have_posts() ) {
+	the_post();
+	?&gt;
+	&lt;article id="post-&lt;?php the_ID(); ?&gt;" &lt;?php post_class(); ?&gt;&gt;
+		&lt;?php the_title( '&lt;h1 class="entry-title"&gt;', '&lt;/h1&gt;' ); ?&gt;
+		&lt;?php if ( is_singular( 'post' ) ) : ?&gt;
+			&lt;p class="entry-meta"&gt;
+				&lt;?php
+				printf(
+					/* translators: 1: publish date, 2: author name. */
+					esc_html__( '%1$s by %2$s', 'pagesco-classic' ),
+					'&lt;time datetime="' . esc_attr( get_the_date( 'c' ) ) . '"&gt;' . esc_html( get_the_date() ) . '&lt;/time&gt;',
+					esc_html( get_the_author() )
+				);
+				?&gt;
+			&lt;/p&gt;
+		&lt;?php endif; ?&gt;
+		&lt;div class="entry-content"&gt;
+			&lt;?php the_content(); ?&gt;
+		&lt;/div&gt;
+		&lt;?php if ( is_singular( 'post' ) &amp;&amp; has_category() ) : ?&gt;
+			&lt;p class="entry-terms"&gt;&lt;?php esc_html_e( 'Filed under:', 'pagesco-classic' ); ?&gt; &lt;?php the_category( ', ' ); ?&gt;&lt;/p&gt;
+		&lt;?php endif; ?&gt;
+	&lt;/article&gt;
+	&lt;?php
+	if ( is_singular( 'post' ) ) {
+		the_post_navigation();
+	}
+}
+
+get_footer();</code></pre>
+                    <p><code>the_content()</code> renders the blocks, <code>the_category( ', ' )</code> prints linked categories, and <code>the_post_navigation()</code> prints a complete, accessible navigation block to the neighboring posts by date. Look at the Book club post:</p>
+                    <pre data-web="/book-club-dune/" data-select="main"><code class="language-text">http://localhost:8080/book-club-dune/   (View Source, the main element)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;main id="main" class="site-main"&gt;
+	&lt;article id="post-17" class="post-17 post type-post status-publish format-standard hentry category-news"&gt;
+		&lt;h1 class="entry-title"&gt;Book club: Dune&lt;/h1&gt;					&lt;p class="entry-meta"&gt;
+				&lt;time datetime="2026-10-01T10:00:00+00:00"&gt;October 1, 2026&lt;/time&gt; by Maria Lopez			&lt;/p&gt;
+				&lt;div class="entry-content"&gt;
+
+&lt;p class="wp-block-paragraph"&gt;Our Thursday book club starts with &lt;em&gt;Dune&lt;/em&gt;. Join us at 7 p.m. in the reading corner; the first coffee is on us.&lt;/p&gt;
+
+		&lt;/div&gt;
+					&lt;p class="entry-terms"&gt;Filed under: &lt;a href="http://localhost:8080/category/news/" rel="category tag"&gt;News&lt;/a&gt;&lt;/p&gt;
+			&lt;/article&gt;
+
+	&lt;nav class="navigation post-navigation" aria-label="Posts"&gt;
+		&lt;h2 class="screen-reader-text"&gt;Post navigation&lt;/h2&gt;
+		&lt;div class="nav-links"&gt;&lt;div class="nav-previous"&gt;&lt;a href="http://localhost:8080/staff-picks/" rel="prev"&gt;Staff picks for the season&lt;/a&gt;&lt;/div&gt;&lt;div class="nav-next"&gt;&lt;a href="http://localhost:8080/hello-world/" rel="next"&gt;Hello world!&lt;/a&gt;&lt;/div&gt;&lt;/div&gt;
+	&lt;/nav&gt;&lt;/main&gt;</code></pre>
+                    </div>
+                    <p>The paragraph block rendered as HTML (with the <code>wp-block-paragraph</code> class from Lesson 3.1), "Filed under: News" linked to the category, and the post navigation: the previous post by date is Staff picks, the next is Hello world!, the newest. The About page uses the same file without any post-only parts, and its synced "Opening hours" pattern from Lesson 3.3 renders because <code>the_content()</code> runs the blocks:</p>
+                    <pre data-web="/about/" data-select="main" data-text><code class="language-text">http://localhost:8080/about/   (the visible text of the main element)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>About Us
+Pages &amp; Co. is an independent bookstore with a big reading corner, a small café and staff who love to talk about books.
+Opening hours
+Monday to Wednesday, Friday: 9 a.m. to 6 p.m.
+Thursday: 9 a.m. to 9 p.m.
+Saturday: 10 a.m. to 6 p.m.
+Questions about an order? See our Contact page.</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: The "not found" page <span class="step-time">(6 min)</span></h3>
+                    <p>Without a <code>404.php</code>, a missing URL falls through to <code>index.php</code>, which would print "Category:"-style headings that make no sense. Create <code>404.php</code> with the same wording as the block theme's 404 template from Lesson 3.2:</p>
+                    <pre data-file="wp-content/themes/pagesco-classic/404.php"><code class="language-php">&lt;?php
+/**
+ * The "not found" page.
+ *
+ * @package pagesco-classic
+ */
+
+get_header();
+?&gt;
+&lt;h1&gt;&lt;?php esc_html_e( 'This page is not on our shelves', 'pagesco-classic' ); ?&gt;&lt;/h1&gt;
+&lt;p&gt;&lt;?php esc_html_e( 'The page you asked for does not exist, or it has moved. Try a search:', 'pagesco-classic' ); ?&gt;&lt;/p&gt;
+&lt;?php
+get_search_form();
+
+get_footer();</code></pre>
+                    <pre data-web="/nothing-here/" data-headers="" data-select="main" data-text><code class="language-text">http://localhost:8080/nothing-here/</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>HTTP/1.1 404 Not Found
+
+This page is not on our shelves
+The page you asked for does not exist, or it has moved. Try a search:
+Search for:</code></pre>
+                    </div>
+                    <p>WordPress sent the 404 status itself, before the template ran; the template only chooses what the page says. <code>get_search_form()</code> printed the search form (its labels show up in the text). In a classic theme it uses older markup until the theme declares HTML5 support, one of the theme supports in Lesson 4.3.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: Make it hybrid with theme.json <span class="step-time">(10 min)</span></h3>
+                    <p>The blocks inside your posts and pages use the shop's presets: Lesson 3.3's section styles and patterns ask for classes like <code>has-small-font-size</code> and colors like <code>sage</code>. In a classic theme those presets do not exist yet. A <code>theme.json</code> adds them, and it also lets you set the base colors and fonts without writing CSS. This one repeats the core of <code>pagesco</code>'s file from Lesson 3.2 (palette, font families and sizes, layout widths, page colors and fonts). Create <code>wordpress/wp-content/themes/pagesco-classic/theme.json</code>:</p>
+                    <pre data-file="wp-content/themes/pagesco-classic/theme.json"><code class="language-json">{
+	"$schema": "https://schemas.wp.org/wp/7.1/theme.json",
+	"version": 3,
+	"settings": {
+		"color": {
+			"defaultPalette": false,
+			"palette": [
+				{ "slug": "paper", "name": "Paper", "color": "#fbf8f1" },
+				{ "slug": "ink", "name": "Ink", "color": "#1f2a2e" },
+				{ "slug": "oxblood", "name": "Oxblood", "color": "#7a2e2e" },
+				{ "slug": "sage", "name": "Sage", "color": "#e3eadf" },
+				{ "slug": "slate", "name": "Slate", "color": "#56636a" }
+			]
+		},
+		"layout": {
+			"contentSize": "680px",
+			"wideSize": "1180px"
+		},
+		"typography": {
+			"defaultFontSizes": false,
+			"fontFamilies": [
+				{ "slug": "serif", "name": "Serif", "fontFamily": "Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif" },
+				{ "slug": "sans", "name": "Sans", "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" }
+			],
+			"fontSizes": [
+				{ "slug": "small", "name": "Small", "size": "0.9rem" },
+				{ "slug": "medium", "name": "Medium", "size": "1.125rem" },
+				{ "slug": "large", "name": "Large", "size": "1.75rem" }
+			]
+		}
+	},
+	"styles": {
+		"color": {
+			"background": "var:preset|color|paper",
+			"text": "var:preset|color|ink"
+		},
+		"typography": {
+			"fontFamily": "var:preset|font-family|serif",
+			"fontSize": "var:preset|font-size|medium",
+			"lineHeight": "1.6"
+		},
+		"elements": {
+			"link": { "color": { "text": "var:preset|color|oxblood" } },
+			"heading": { "typography": { "fontFamily": "var:preset|font-family|sans" } }
+		}
+	}
+}</code></pre>
+                    <pre data-cli><code class="language-bash">wp eval 'var_dump( wp_is_block_theme(), wp_theme_has_theme_json() );'
+curl -s http://localhost:8080/ | grep -o -- '--wp--preset--color--oxblood: [^;]*\|body{[^}]*}'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>bool(false)
+bool(true)
+--wp--preset--color--oxblood: #7a2e2e
+body{background-color: var(--wp--preset--color--paper);color: var(--wp--preset--color--ink);font-family: var(--wp--preset--font-family--serif);font-size: var(--wp--preset--font-size--medium);line-height: 1.6;padding-top: 0px;padding-right: 0px;padding-bottom: 0px;padding-left: 0px;}</code></pre>
+                    </div>
+                    <p><code>false, true</code>: a hybrid, exactly as Lesson 3.1's quiz described. WordPress now prints the shop's presets and a <code>body</code> rule with the paper background, ink text and serif font in the same global styles it prints for block themes, and the block editor's color and font size pickers offer the shop's choices instead of the defaults.</p>
+                    <div class="card card-info">
+                        <h4>💡 What a hybrid does not get: styles.css</h4>
+                        <p>This file has no <code>styles.css</code> string, the place where <code>pagesco</code> keeps the notice bar's rules. That is on purpose: WordPress prints that custom CSS for block themes only. The check is in <code>wp_enqueue_global_styles()</code> in <code>wp-includes/script-loader.php</code>; this finds the comment above the line that adds the custom CSS, and the <code>if</code> around it:</p>
+                        <pre data-cli><code class="language-bash">grep -n "Add the global styles custom CSS" -B 30 wp-includes/script-loader.php | grep "is_block_theme )"
+grep -n "Add the global styles custom CSS" wp-includes/script-loader.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>2615-	if ( $is_block_theme ) {
+2644:		// Add the global styles custom CSS at the end.</code></pre>
+                        </div>
+                        <p>A classic theme loads its CSS from files it enqueues in <code>functions.php</code>, which is the next lesson but one: in Lesson 4.3 <code>pagesco-classic</code> enqueues its <code>style.css</code> and the notice bar gets its dark band back. Until then the bar is plain text at the top of each page.</p>
+                    </div>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 4: Check every kind of page <span class="step-time">(8 min)</span></h3>
+                    <p>Run through the URLs of your template map from Lesson 3.1. For each one, print the HTTP status, how many notice bars it has (exactly one: the theme calls <code>wp_body_open()</code>), and its <code>&lt;h1&gt;</code> without tags:</p>
+                    <pre data-cli data-checkpoint><code class="language-bash">for url in / /hello-world/ /about/ /category/news/ /author/maria/ /2026/09/ "/?s=dune" /nothing-here/; do
+  page=$(curl -s "http://localhost:8080$url")
+  code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:8080$url")
+  notice=$(printf '%s' "$page" | grep -c '&lt;div class="pagesco-notice"')
+  h1=$(printf '%s' "$page" | grep -o '&lt;h1[^&gt;]*&gt;.*&lt;/h1&gt;' | sed 's/&lt;[^&gt;]*&gt;//g')
+  printf '%-15s %s  notice: %s  %s\n' "$url" "$code" "$notice" "$h1"
+done</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>/               200  notice: 1  News from the shop
+/hello-world/   200  notice: 1  Hello world!
+/about/         200  notice: 1  About Us
+/category/news/ 200  notice: 1  Category: News
+/author/maria/  200  notice: 1  Author: Maria Lopez
+/2026/09/       200  notice: 1  Month: September 2026
+/?s=dune        200  notice: 1  Search results for: dune
+/nothing-here/  404  notice: 1  This page is not on our shelves</code></pre>
+                    </div>
+                    <p>Eight kinds of page, three templates (<code>index.php</code>, <code>singular.php</code>, <code>404.php</code>) and three parts. The block theme needed six templates for the same map because a block template cannot ask a conditional tag; a classic template can, so <code>index.php</code> covers the blog home, all archives and search on its own. Add a line to the template map in <code>pagesco-plan.txt</code>: "pagesco-classic: index (home, archives, search), singular (posts, pages), 404".</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>pagesco-classic</code> is the active theme and has <code>style.css</code>, <code>theme.json</code>, <code>header.php</code>, <code>footer.php</code>, <code>index.php</code>, <code>singular.php</code>, <code>404.php</code> and two parts in <code>template-parts/</code></li>
+                        <li>Every Loop calls <code>the_post()</code>; every list item comes from <code>template-parts/content.php</code></li>
+                        <li>Posts show their date, author, categories and previous/next links; pages show only their title and content</li>
+                        <li><code>/nothing-here/</code> answers 404 with the "not on our shelves" page and a search form</li>
+                        <li><code>wp_theme_has_theme_json()</code> is true and the pages use the shop's paper background and fonts</li>
+                        <li>Every page has exactly one store notice; the scratch <code>category-news.php</code> and both test must-use plugins are deleted</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Each exercise adds something to the theme and removes it again, so <code>pagesco-classic</code> ends as the project left it. Try each one before you open the solution.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Predict the Conditional Tags</h3>
+                    <p>Write down which conditional tags are true for <code>/contact/</code>, <code>/author/devon/</code>, <code>/2026/09/</code> and <code>/?s=club</code>. Then bring back the conditions tool from this lesson, add <code>is_date</code> to its list, and check.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>A date archive is an archive. The tool's list is the <code>$tags</code> array; add <code>'is_date'</code> to it. Delete the tool when you are done.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/mu-plugins/pagesco-conditions.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Pages &amp; Co. Conditions
+ * Description: Lesson 4.1 tool: logs which conditional tags are true on each front-end request.
+ */
+
+/**
+ * Writes the request path and the conditional tags that are true to debug.log.
+ */
+function pagesco_log_conditions() {
+	$tags = array( 'is_front_page', 'is_home', 'is_singular', 'is_single', 'is_page', 'is_archive', 'is_category', 'is_author', 'is_date', 'is_search', 'is_404' );
+	$true = array_filter( $tags, 'call_user_func' );
+
+	$path = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
+
+	error_log( $path . ' -&gt; ' . implode( ', ', $true ) );
+}
+add_action( 'template_redirect', 'pagesco_log_conditions' );</code></pre>
+                        <pre data-cli data-log><code class="language-bash">for url in /contact/ /author/devon/ /2026/09/ "/?s=club"; do curl -s -o /dev/null "http://localhost:8080$url"; done
+rm wp-content/mu-plugins/pagesco-conditions.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output (wp-content/debug.log; your timestamps will differ)</h4>
+                            <pre><code>[25-Oct-2026 23:23:20 UTC] /contact/ -&gt; is_singular, is_page
+[25-Oct-2026 23:23:20 UTC] /author/devon/ -&gt; is_archive, is_author
+[25-Oct-2026 23:23:20 UTC] /2026/09/ -&gt; is_archive, is_date
+[25-Oct-2026 23:23:20 UTC] /?s=club -&gt; is_search</code></pre>
+                        </div>
+                        <p>Contact is a page; Devon's archive and September 2026 are archives of their kind. A search is never an archive, which is also why the hierarchy sends it to <code>search</code> and then <code>index</code>, never <code>archive</code>.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: A Template for One Page</h3>
+                    <p>The shop wants the About page, and only the About page, to start with the line "Independent since the first page." under its title. Do it with the classic template hierarchy, without touching <code>singular.php</code>'s logic: copy <code>singular.php</code> to the most specific file name for that page and add the line. Check <code>/about/</code> and <code>/contact/</code>, then delete the file.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The page chain from Lesson 3.1 starts with <code>page-{slug}</code>. In the copy, add a paragraph right after the <code>the_title()</code> line, for example with <code>sed</code>'s <code>a\</code> command or in your editor.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli data-exit="1"><code class="language-bash">sed "/the_title( '&lt;h1/a\\
+		&lt;p class=\"page-tagline\"&gt;&lt;?php esc_html_e( 'Independent since the first page.', 'pagesco-classic' ); ?&gt;&lt;/p&gt;" wp-content/themes/pagesco-classic/singular.php &gt; wp-content/themes/pagesco-classic/page-about.php
+curl -s http://localhost:8080/about/ | grep -c 'Independent since the first page.'
+curl -s http://localhost:8080/contact/ | grep -c 'Independent since the first page.'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>1
+0</code></pre>
+                        </div>
+                        <p><code>page-about.php</code> wins for the About page; Contact still falls through to <code>singular.php</code>. (The <code>is_singular( 'post' )</code> checks in the copy are now dead code; a real page template would drop them.) Remove it:</p>
+                        <pre data-cli><code class="language-bash">rm wp-content/themes/pagesco-classic/page-about.php</code></pre>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: How Many in This Category?</h3>
+                    <p>Write a <code>category.php</code> that shows the category name as the heading, then a line such as "3 posts in News" (use <code>_n()</code> so "1 post" is singular), then the usual list from the content part. The number of posts the main query found is in <code>$wp_query-&gt;found_posts</code>. Check <code>/category/news/</code> and <code>/category/uncategorized/</code>, then delete the file.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>single_cat_title( '', false )</code> returns the category name. <code>global $wp_query;</code> gives you the main query object. <code>_n( '%s post in %s', '%s posts in %s', $count, 'pagesco-classic' )</code> picks the form; numbered placeholders <code>%1$s</code> and <code>%2$s</code> let translators reorder them.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/themes/pagesco-classic/category.php"><code class="language-php">&lt;?php
+/**
+ * Category archives, with the number of posts (Lesson 4.1, Exercise 3).
+ *
+ * @package pagesco-classic
+ */
+
+global $wp_query;
+
+get_header();
+
+$pagesco_classic_count = (int) $wp_query-&gt;found_posts;
+?&gt;
+&lt;header class="page-header"&gt;
+	&lt;h1&gt;&lt;?php single_cat_title(); ?&gt;&lt;/h1&gt;
+	&lt;p class="category-count"&gt;
+		&lt;?php
+		printf(
+			/* translators: 1: number of posts, 2: category name. */
+			esc_html( _n( '%1$s post in %2$s', '%1$s posts in %2$s', $pagesco_classic_count, 'pagesco-classic' ) ),
+			esc_html( number_format_i18n( $pagesco_classic_count ) ),
+			esc_html( single_cat_title( '', false ) )
+		);
+		?&gt;
+	&lt;/p&gt;
+&lt;/header&gt;
+
+&lt;?php
+while ( have_posts() ) {
+	the_post();
+	get_template_part( 'template-parts/content' );
+}
+
+get_footer();</code></pre>
+                        <pre data-web="/category/news/" data-select="header.page-header" data-text><code class="language-text">http://localhost:8080/category/news/</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>News
+3 posts in News</code></pre>
+                        </div>
+                        <pre data-web="/category/uncategorized/" data-select="p.category-count" data-text><code class="language-text">http://localhost:8080/category/uncategorized/</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>1 post in Uncategorized</code></pre>
+                        </div>
+                        <pre data-cli><code class="language-bash">rm wp-content/themes/pagesco-classic/category.php</code></pre>
+                        <p><code>found_posts</code> is the total for the whole query, not the number on this page; with ten posts per page they are the same here, but on a long archive they differ. Lesson 4.2 uses it, with <code>max_num_pages</code>, for pagination.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 4: Two Passes over the Results (Stretch)</h3>
+                    <p>On search results, the shop wants a one-line summary at the top ("Found: Book club: Dune, Staff picks for the season") and then the normal list. Write a <code>search.php</code> that loops over the main query twice. Check <code>/?s=dune</code>, then delete the file.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The first Loop collects titles with <code>get_the_title()</code> into an array; <code>implode( ', ', … )</code> joins them. Call <code>rewind_posts()</code> before the second Loop, to be explicit (the first Loop's last <code>have_posts()</code> also rewinds).</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/themes/pagesco-classic/search.php"><code class="language-php">&lt;?php
+/**
+ * Search results with a summary line (Lesson 4.1, Exercise 4).
+ *
+ * @package pagesco-classic
+ */
+
+get_header();
+
+$pagesco_classic_titles = array();
+while ( have_posts() ) {
+	the_post();
+	$pagesco_classic_titles[] = get_the_title();
+}
+?&gt;
+&lt;h1&gt;&lt;?php /* translators: %s: the search terms. */ printf( esc_html__( 'Search results for: %s', 'pagesco-classic' ), esc_html( get_search_query( false ) ) ); ?&gt;&lt;/h1&gt;
+&lt;p class="search-summary"&gt;&lt;?php /* translators: %s: list of post titles. */ printf( esc_html__( 'Found: %s', 'pagesco-classic' ), esc_html( implode( ', ', $pagesco_classic_titles ) ) ); ?&gt;&lt;/p&gt;
+&lt;?php
+rewind_posts();
+
+while ( have_posts() ) {
+	the_post();
+	get_template_part( 'template-parts/content' );
+}
+
+get_footer();</code></pre>
+                        <pre data-cli><code class="language-bash">curl -s "http://localhost:8080/?s=dune" | grep -o '&lt;p class="search-summary"&gt;[^&lt;]*\|&lt;h2 class="entry-title"&gt;&lt;a [^&gt;]*&gt;[^&lt;]*'
+rm wp-content/themes/pagesco-classic/search.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>&lt;p class="search-summary"&gt;Found: Book club: Dune, Staff picks for the season
+&lt;h2 class="entry-title"&gt;&lt;a href="http://localhost:8080/book-club-dune/"&gt;Book club: Dune
+&lt;h2 class="entry-title"&gt;&lt;a href="http://localhost:8080/staff-picks/"&gt;Staff picks for the season</code></pre>
+                        </div>
+                        <p>Both passes walked the same two posts; the database was queried once. <code>get_the_title()</code> came back escaped for HTML text and went into <code>esc_html()</code> again, which does not double-encode (Lesson 1.3). Lesson 4.2 takes this further: Loops over <em>other</em> queries, on the same page as the main one.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> In the Loop, for a post titled "Dune", what does <code>echo '&lt;p&gt;' . the_title() . '&lt;/p&gt;';</code> print?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="the_title prints right away and returns nothing. When does it run, compared with the echo?">
+                                A) &lt;p&gt;Dune&lt;/p&gt;
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The title does appear somewhere. Which happens first, the call inside the expression or the echo of the finished string?">
+                                B) &lt;p&gt;&lt;/p&gt; only
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="PHP evaluates the expression first: the_title prints Dune and returns null, then echo prints the empty paragraph. Inside a string use get_the_title with esc_html.">
+                                C) Dune&lt;p&gt;&lt;/p&gt;
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> You need the post title inside an attribute: <code>&lt;a title="…"&gt;</code>. What do you write?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="the_title_attribute prints the title escaped for an attribute; esc_attr( get_the_title() ) is the returning equivalent. the_title prepares HTML text, not attribute values.">
+                                A) the_title_attribute(), or esc_attr( get_the_title() )
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="the_title prepares the title as HTML text. Is that the same as safe inside a quoted attribute?">
+                                B) the_title(), because template tags are already escaped
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="A get_ value is yours to escape. Which escaping function is made for attributes?">
+                                C) echo get_the_title();
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> A classic theme has <code>index.php</code>, <code>singular.php</code> and <code>archive.php</code>. Which file draws the search results at <code>/?s=dune</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Is a search an archive? Look at the conditional tags Exercise 1 logged for a search.">
+                                A) archive.php
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The search chain is search, then index. A search is not an archive, so archive.php is never a candidate and index.php draws it.">
+                                B) index.php
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="singular is for one post or page. How many results can a search have?">
+                                C) singular.php
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> A must-use plugin has <code>if ( is_front_page() ) { … }</code> at the top level of its file. What happens on the home page?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="When are must-use plugins loaded, compared with the main query?">
+                                A) The code runs, because the home page is the front page
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Calling a conditional tag too early is not fatal. What does it return, and what does WordPress log?">
+                                B) A fatal error, because the function does not exist yet
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The main query has not run when must-use plugins load, so conditional tags return false, and with WP_DEBUG on WordPress reports that they were called incorrectly. Ask on template_redirect instead.">
+                                C) It returns false, and WordPress notices that it was called incorrectly
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> Which file does <code>get_template_part( 'template-parts/content', 'none' )</code> load first, if it exists?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="The name is joined to the slug with a hyphen: template-parts/content-none.php, looked up in the child theme and then the parent. Only if it is missing does WordPress fall back to template-parts/content.php.">
+                                A) template-parts/content-none.php
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That is the fallback. What does the second argument add to the file name?">
+                                B) template-parts/content.php
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The slug includes the folder. Where does WordPress look for the file?">
+                                C) none.php in the theme's root folder
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Does the_post() query the database for each post?</summary>
+                    <p>No. The main query fetched all the posts for the page in one go before the template ran, and the first call to <code>the_post()</code> also loads their authors into the cache at once (you can read that in <code>WP_Query::the_post()</code>). The Loop itself only moves a pointer through an array. What can cost a query per post is code you add inside it, such as fetching something for each post that is not cached; Lesson 8.2 measures that.</p>
+                </details>
+                <details>
+                    <summary>Why do some themes write endwhile; and endif; instead of braces?</summary>
+                    <p>That is PHP's alternative syntax (<code>while ( have_posts() ) : the_post(); … endwhile;</code>), common in templates because a lone <code>endwhile;</code> between blocks of HTML is easier to match than a <code>}</code>. Both work the same; this course uses braces in PHP-heavy code and the colon form around HTML (<code>if ( … ) : ?&gt; … &lt;?php endif;</code>), as in <code>index.php</code>'s heading.</p>
+                </details>
+                <details>
+                    <summary>What does the Query Loop block have to do with this?</summary>
+                    <p>Everything. When a block theme's Query Loop is set to "inherit" the query, as in <code>pagesco</code>'s templates, its Post Template block walks the very same <code>$wp_query</code> you looped over today; otherwise it builds a <code>new WP_Query</code> from its settings. You can read both branches in <code>wp-includes/blocks/post-template.php</code>. Lesson 4.2 writes those custom queries by hand, and Module 6's dynamic blocks use them in PHP.</p>
+                </details>
+                <details>
+                    <summary>Should I make a new classic theme for a client today?</summary>
+                    <p>Usually not: for a new site, a block theme gives the owner the Site Editor and you less PHP to maintain. You will still read and extend classic themes constantly, because most existing sites use them, and the Loop and template tags are also how plugins and dynamic blocks print posts. This module is about being fluent in both.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Open <code>get_template_part()</code> in <code>wp-includes/general-template.php</code> (line 167 on WordPress 7.1). Before it looks for a file it fires an action whose name contains the slug. Find it, then write a must-use plugin that logs a line every time <code>template-parts/content</code> is requested, and count the lines for the home page. What would a plugin use that action for, given that it cannot change which file is loaded?</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> You have now built the same site twice, as <code>pagesco</code> (blocks) and <code>pagesco-classic</code> (PHP). Pick one page, the search results for example, and describe how each theme produces it: which file, which "loop", where the heading comes from. Which version would you rather hand to a shop owner, and which would you rather debug at midnight? Why?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>WordPress runs the <strong>main query</strong> before any template; the <strong>Loop</strong> (<code>while ( have_posts() ) { the_post(); … }</code>) walks its results, one post at a time, even on single posts</li>
+                        <li><code>the_post()</code> sets the global <code>$post</code> that every template tag reads; without it the Loop never ends</li>
+                        <li><strong>Template tags</strong> come in pairs: <code>the_</code> prints HTML-ready text, <code>get_</code> returns the value for you to escape for its context (<code>esc_attr</code>, <code>esc_url</code>, <code>esc_html</code>)</li>
+                        <li><code>get_the_content()</code> is raw block markup; <code>the_content()</code> renders it. <code>the_date()</code> prints once per day; <code>get_the_date()</code> every time</li>
+                        <li><code>get_header()</code>, <code>get_footer()</code> and <code>get_template_part( $slug, $name, $args )</code> load parts through <code>locate_template()</code>, child theme first; no <code>.php</code> in the slug</li>
+                        <li><strong>Conditional tags</strong> read the main query, so they work in templates and in hooks from <code>template_redirect</code> on, and return <code>false</code> with a notice before that</li>
+                        <li>A classic theme with a <code>theme.json</code> is a <strong>hybrid</strong>: presets and global styles, but no <code>styles.css</code> custom CSS</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Show the posts WordPress found</td><td><code>if ( have_posts() ) { while ( have_posts() ) { the_post(); … } }</code></td></tr>
+                            <tr><td>A linked title</td><td><code>the_title( '&lt;h2&gt;&lt;a href="' . esc_url( get_permalink() ) . '"&gt;', '&lt;/a&gt;&lt;/h2&gt;' );</code></td></tr>
+                            <tr><td>The content, blocks rendered</td><td><code>the_content();</code></td></tr>
+                            <tr><td>The date of every post</td><td><code>echo esc_html( get_the_date() );</code></td></tr>
+                            <tr><td>The post's classes</td><td><code>&lt;article &lt;?php post_class(); ?&gt;&gt;</code></td></tr>
+                            <tr><td>A reusable piece with options</td><td><code>get_template_part( 'template-parts/content', null, array( 'heading_level' =&gt; 3 ) );</code></td></tr>
+                            <tr><td>Different output per kind of page</td><td><code>is_home()</code>, <code>is_singular( 'post' )</code>, <code>is_search()</code>, <code>is_archive()</code></td></tr>
+                            <tr><td>Archive heading for any archive</td><td><code>the_archive_title( '&lt;h1&gt;', '&lt;/h1&gt;' );</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You built <code>pagesco-classic</code>: three templates, a header, a footer and two template parts that draw every page of the shop</li>
+                        <li>You took the Loop apart and read the functions behind it in core</li>
+                        <li>You used template tags in both forms, escaped what needed escaping, and met four silent or noisy mistakes on purpose</li>
+                        <li>You watched conditional tags answer for seven kinds of URL and turned the theme into a hybrid with <code>theme.json</code></li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>So far every Loop has walked the main query, the list WordPress chose from the URL. In <a href="lesson_12.html"><strong>Lesson 4.2: Custom Queries</strong></a> you ask for your own lists with <code>WP_Query</code>: a front page for <code>pagesco-classic</code> with several Loops on one page, the right way to change the main query with <code>pre_get_posts</code>, pagination that does not end in a 404, and the <code>wp_reset_postdata()</code> call that keeps template tags pointing at the right post.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>pagesco-classic</code> is active (<code>wp theme list</code>) and that its folder holds only the files from the checklist</li>
+                    <li>Check that <code>mu-plugins/</code> holds only <code>mailpit-smtp.php</code> and <code>pagesco-site.php</code></li>
+                    <li>Open a few pages in your browser: plain, but in the shop's colors and fonts, with the notice text at the top. The styling comes in Lesson 4.3</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>The Loop is a dozen lines, yet it is the part of WordPress that confuses people the longest, because so much happens out of sight: the query before it, the global it fills, the filters behind each tag. You did not just copy it today; you watched the main query change from URL to URL and read the functions behind <code>have_posts()</code>. The next time a classic theme shows the wrong post or nothing at all, you know where to look, and that is most of what "experienced" means.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_10.html" class="prev-lesson">← Previous: Child Themes &amp; Customizing Existing Themes</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_12.html" class="next-lesson">Next: Custom Queries →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

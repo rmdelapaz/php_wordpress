@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Security in WordPress: sanitize input, escape output, verify nonces, check capabilities and use $wpdb->prepare, by hardening the Pages & Co. book meta box and adding a safe stock-toggle action on WordPress 7.1 and PHP 8.5. PHP and WordPress Development Lesson 5.3.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Security in WordPress - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 5: Plugin Development</a></li>
+            <li aria-current="page">Lesson 5.3: Security in WordPress</li>
+        </ul>
+    </nav>
+
+
+    <main id="main-content" data-state="after:lesson_15">
+        <div class="container">
+            <header>
+                <h1>🔐 Lesson 5.3: Security in WordPress</h1>
+                <p class="lead">Last lesson you gave Pages &amp; Co. a form that writes to the database and an API that anyone can read. That is exactly where a WordPress site is attacked. Security in WordPress is not a library you add; it is four habits you apply everywhere data crosses a boundary: sanitize what comes in, escape what goes out, prove a request is genuine with a nonce, and check the user is allowed with a capability, plus <code>$wpdb-&gt;prepare()</code> whenever you write SQL by hand. In this lesson you harden the real book meta box you wrote, add a "Mark sold out" action the safe way, and watch each defense turn a working attack into a dead end, on this very site.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Sanitize input on the way in and escape output on the way out, choosing the right function for each context</li>
+                        <li>Protect every state change with a nonce and a <code>current_user_can()</code> capability check</li>
+                        <li>Write safe database queries with <code>$wpdb-&gt;prepare()</code> and explain how SQL injection works</li>
+                        <li>Name the common WordPress vulnerabilities (XSS, CSRF, SQL injection, broken access control) and the defense against each</li>
+                        <li>Harden a real save handler and an admin action in the <code>pagesco-books</code> plugin</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 130 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_15.html">Lesson 5.2: Custom Post Types, Taxonomies &amp; Meta</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> a hardened <code>BookMetaBox</code> save path and a nonce-protected, capability-checked "Mark sold out" row action in <code>pagesco-books</code></li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (the escaping, nonce and capability APIs are stable and unchanged in 7.x)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 5.2, with the eleven-book catalog and <code>pagesco-books</code> active</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#mindset" class="toc-link">The Security Mindset</a></li>
+                        <li><a href="#escape" class="toc-link">Escape Late: Stopping XSS</a></li>
+                        <li><a href="#sanitize" class="toc-link">Sanitize and Validate Input</a></li>
+                        <li><a href="#nonces" class="toc-link">Nonces and Capabilities</a></li>
+                        <li><a href="#sql" class="toc-link">Safe SQL with $wpdb-&gt;prepare()</a></li>
+                        <li><a href="#vulns" class="toc-link">The Common Vulnerabilities</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Harden the Plugin</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="mindset" class="lesson-section">
+                <h2>🛡️ The Security Mindset</h2>
+                <p>Every value that enters WordPress from outside, a form field, a URL parameter, a REST body, a cookie, is <strong>untrusted</strong>: it might be a typo, or it might be crafted to break your page or steal a session. The whole of WordPress security follows one data flow, the one Lesson 1.3 drew: <strong>sanitize early</strong> (clean a value the moment you receive it), store it, then <strong>escape late</strong> (make it safe for its destination the moment you print it). Between those two gates sit two questions about every change: is this request genuine (a nonce), and is this user allowed (a capability)?</p>
+
+                <div class="mermaid">
+graph TD
+    A["request: form, URL, REST"] --> B["is it genuine? check the nonce"]
+    B --> C["is the user allowed? current_user_can()"]
+    C --> D["sanitize the values"]
+    D --> E["store in the database"]
+    E --> F["escape for output: esc_html, esc_attr, esc_url"]
+    F --> G["safe HTML in the page"]
+                </div>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: the shop's back door</h4>
+                    <p>Think of your plugin's write handlers as the shop's back door, where deliveries come in. A nonce is checking the delivery has the token you handed the courier this morning, so it is not a stranger with a forged clipboard. The capability check is making sure the person signing for it works here. Sanitizing is unwrapping and inspecting the goods before they go on the shelf. Escaping is how you display a customer's name in the window: you print it as text, never as a sign someone else wrote for you. Skip any one step and the shop is exposed in a different way.</p>
+                </div>
+                <p>You already met every tool once: escaping and sanitizing in Lesson 1.3, nonces and <code>current_user_can()</code> in Lesson 2.3 and 2.1, <code>$wpdb-&gt;prepare()</code> in Lesson 2.2. This lesson puts them to work together on real code, and shows what each one prevents.</p>
+            </section>
+
+            <section id="escape" class="lesson-section">
+                <h2>🧹 Escape Late: Stopping XSS</h2>
+                <p><strong>Cross-site scripting</strong> (XSS) is when a value someone else controls is printed into your page as HTML, so their markup, often a <code>&lt;script&gt;</code>, runs in your visitor's browser with your site's privileges. The defense is to escape every dynamic value for the context it lands in, at the moment of output. The author of a book comes from a form, so it is never to be trusted. Set Dune's author to a string full of HTML, then see how the Books column (your <code>BookColumns</code> from Lesson 5.2) prints it:</p>
+                <pre data-cli><code class="language-bash">wp post meta update 30 pagesco_author 'Herbert &amp; Sons &lt;script&gt;alert(1)&lt;/script&gt;'
+wp eval 'ob_start(); do_action( "manage_book_posts_custom_column", "pagesco_author", 30 ); echo ob_get_clean(), "\n";'
+wp post meta update 30 pagesco_author 'Frank Herbert'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Updated custom field 'pagesco_author'.
+Herbert &amp;amp; Sons &amp;lt;script&amp;gt;alert(1)&amp;lt;/script&amp;gt;
+Success: Updated custom field 'pagesco_author'.</code></pre>
+                </div>
+                <p>The angle brackets and ampersand came back as <code>&amp;lt;</code>, <code>&amp;gt;</code> and <code>&amp;amp;</code>: HTML entities, text the browser shows but does not run. That is <code>esc_html()</code> doing its job in the column's <code>print_column()</code> method. The last command puts the real author back.</p>
+
+                <div class="card card-danger">
+                    <h4>🛑 The anti-example: the same column without escaping</h4>
+                    <p>Had the column printed the value raw, the stored <code>&lt;script&gt;</code> would run for every editor who opened the Books list, a <em>stored</em> XSS that persists in the database:</p>
+                    <pre data-norun><code class="language-php">// NEVER do this: the author is printed as HTML, so a stored &lt;script&gt; executes.
+echo get_post_meta( $post_id, 'pagesco_author', true );
+
+// Always escape for the context. Here the value becomes text:
+echo esc_html( get_post_meta( $post_id, 'pagesco_author', true ) );</code></pre>
+                </div>
+                <p>The context decides the function. Lesson 1.3's family: <code>esc_html()</code> for text, <code>esc_attr()</code> for an HTML attribute value (the meta box uses it on every <code>value="…"</code>), <code>esc_url()</code> for an <code>href</code> or <code>src</code>, and <code>wp_kses_post()</code> when you must allow the same HTML a post may contain. The rule has no exceptions: escape at the point of output, even for data you sanitized on the way in, because you cannot always tell where a value has been.</p>
+            </section>
+
+            <section id="sanitize" class="lesson-section">
+                <h2>🧼 Sanitize and Validate Input</h2>
+                <p>Escaping protects output; <strong>sanitizing</strong> protects what you store. The two are not the same: sanitizing removes what does not belong (tags, control characters), and <strong>validating</strong> rejects what is the wrong shape (a price of "lots", a date of "soon"). The meta box save from Lesson 5.2 already sanitizes each field; here you will see those functions at work and add the two guards it still needs. Watch the sanitizers clean deliberately bad input:</p>
+                <pre data-cli><code class="language-bash">wp eval '$in = array( "price" => "-5.50", "pages" => "412 pages", "author" => "O\x27Brien &lt;b&gt;Press&lt;/b&gt;" );
+echo "price:  ", max( 0, (float) $in["price"] ), "\n";
+echo "pages:  ", absint( $in["pages"] ), "\n";
+echo "author: ", sanitize_text_field( $in["author"] ), "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>price:  0
+pages:  412
+author: O'Brien Press</code></pre>
+                </div>
+                <p>A negative price becomes <code>0</code>, "412 pages" becomes the integer <code>412</code>, and <code>sanitize_text_field()</code> strips the tags and trims the author to a clean line. Those are the rules a hardened save applies to every field before it touches the database.</p>
+
+                <div class="card card-warning">
+                    <h4>⚠️ What the Lesson 5.2 save still needs</h4>
+                    <p>Two gaps remain in that first save. First, <code>save_post</code> fires on autosaves and revisions too; without a guard, an autosave with no form data would wipe the fields. The fix is <code>wp_is_post_autosave()</code> and <code>wp_is_post_revision()</code>. Second, the date field was only run through <code>sanitize_text_field()</code>, which happily stores "soon"; a real date needs <em>validating</em> against the <code>Y-m-d</code> format, not just cleaning. You will add both in the project, replacing the save method with a hardened version.</p>
+                </div>
+                <p>One subtlety you already use: WordPress adds slashes to request data (Lesson 1.3's magic-quotes demo), so the save calls <code>wp_unslash()</code> before sanitizing. Sanitize, validate, <em>then</em> store; never store raw request data and hope to clean it later.</p>
+            </section>
+
+            <section id="nonces" class="lesson-section">
+                <h2>🎫 Nonces and Capabilities</h2>
+                <p>Sanitizing and escaping handle the <em>content</em> of a request. Two more checks handle the <em>request itself</em>. A <strong>nonce</strong> (number used once) is a token WordPress ties to a user, an action and a few hours; your form prints it and your handler verifies it, which proves the request came from a page your site served to this user, not from a forged link on another site. That attack is <strong>cross-site request forgery</strong> (CSRF): a page elsewhere quietly makes the logged-in victim's browser fire a request at your site. A <strong>capability</strong> check (<code>current_user_can()</code>, Lesson 2.1) then asks whether this user is even allowed to do it. You need both: a nonce without a capability lets any logged-in user act; a capability without a nonce can be triggered by forgery.</p>
+                <p>See the nonce round trip on its own, the two functions a form and a handler use:</p>
+                <pre data-cli><code class="language-bash">wp eval 'wp_set_current_user( 2 );
+$token = wp_create_nonce( "pagesco_books_save_details" );
+echo "verify good token: ", var_export( (bool) wp_verify_nonce( $token, "pagesco_books_save_details" ), true ), "\n";
+echo "verify bad token:  ", var_export( (bool) wp_verify_nonce( "deadbeef", "pagesco_books_save_details" ), true ), "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>verify good token: true
+verify bad token:  false</code></pre>
+                </div>
+                <p>A token made for that action verifies; a made-up one does not. In a form you never call these by hand: <code>wp_nonce_field( 'action', 'name' )</code> prints the hidden field (the meta box already does), and in a handler <code>check_admin_referer( 'action' )</code> verifies it and stops the request with a 403 if it is missing or stale. The "Mark sold out" action you build in the project uses exactly that, together with <code>current_user_can( 'edit_post', $id )</code>, so only an allowed user acting from a genuine link can flip a book's stock.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Where WordPress checks for you, and where it does not</h4>
+                    <p>The block editor and the REST API check nonces and capabilities for you: last lesson, Devon (an author) was refused when he tried to edit Maria's book through REST, because the <code>book</code> type maps to the standard post capabilities. But the moment you write your own form handler, admin action or AJAX endpoint, those checks are <em>your</em> job. WordPress will not add them; it only gives you the functions.</p>
+                </div>
+            </section>
+
+            <section id="sql" class="lesson-section">
+                <h2>🗄️ Safe SQL with $wpdb-&gt;prepare()</h2>
+                <p>Core APIs such as <code>WP_Query</code> and <code>get_post_meta()</code> build safe SQL for you, and you should prefer them. When you must write SQL by hand (Lesson 2.2, and the custom table in Lesson 5.5), any value you drop into the string is a door for <strong>SQL injection</strong>: a crafted value that ends your intended query and starts the attacker's. The defense is <code>$wpdb-&gt;prepare()</code>, which puts values in through typed placeholders, <code>%s</code> for strings, <code>%d</code> for integers, <code>%f</code> for floats, <code>%i</code> for identifiers, and quotes and escapes each one.</p>
+
+                <div class="card card-danger">
+                    <h4>🛑 The anti-example: a value concatenated into SQL</h4>
+                    <p>Imagine a shop report that looks up books by an author taken from the URL. Built like this, a value such as <code>' OR 1=1 -- </code> changes what the query returns, and worse is possible:</p>
+                    <pre data-norun><code class="language-php">// NEVER do this: $author goes straight into the SQL string.
+$author  = $_GET['author'];
+$results = $wpdb-&gt;get_results(
+    "SELECT post_id FROM {$wpdb-&gt;postmeta}
+     WHERE meta_key = 'pagesco_author' AND meta_value = '" . $author . "'"
+);</code></pre>
+                </div>
+                <p>The safe version passes the value as a placeholder. Run it against the catalog, a real report of Frank Herbert's books under $20, and look at the SQL <code>prepare()</code> produced:</p>
+                <pre data-cli><code class="language-bash">wp eval 'global $wpdb;
+$author    = "Frank Herbert";
+$max_price = 20;
+$sql = $wpdb-&gt;prepare(
+    "SELECT p.post_title, pm_price.meta_value AS price
+     FROM {$wpdb-&gt;posts} p
+     INNER JOIN {$wpdb-&gt;postmeta} pm_author ON pm_author.post_id = p.ID AND pm_author.meta_key = \"pagesco_author\"
+     INNER JOIN {$wpdb-&gt;postmeta} pm_price  ON pm_price.post_id  = p.ID AND pm_price.meta_key  = \"pagesco_price\"
+     WHERE p.post_type = %s AND pm_author.meta_value = %s AND pm_price.meta_value + 0 &lt;= %d",
+    "book",
+    $author,
+    $max_price
+);
+echo $sql, "\n---\n";
+foreach ( $wpdb-&gt;get_results( $sql ) as $row ) { echo $row-&gt;post_title, " $", $row-&gt;price, "\n"; }'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>SELECT p.post_title, pm_price.meta_value AS price
+     FROM wp_posts p
+     INNER JOIN wp_postmeta pm_author ON pm_author.post_id = p.ID AND pm_author.meta_key = "pagesco_author"
+     INNER JOIN wp_postmeta pm_price  ON pm_price.post_id  = p.ID AND pm_price.meta_key  = "pagesco_price"
+     WHERE p.post_type = 'book' AND pm_author.meta_value = 'Frank Herbert' AND pm_price.meta_value + 0 &lt;= 20
+---
+Dune $14.99</code></pre>
+                </div>
+                <p><code>prepare()</code> quoted <code>'Frank Herbert'</code> and inserted <code>20</code> as a number; a value with a stray quote would have been escaped, not treated as SQL. The query returns Dune. One rule covers it: no variable ever goes directly into a query string; it goes through a placeholder in <code>prepare()</code>.</p>
+            </section>
+
+            <section id="vulns" class="lesson-section">
+                <h2>📋 The Common Vulnerabilities</h2>
+                <p>The same handful of weaknesses account for most compromised WordPress plugins. Each maps to a defense you have now used:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Vulnerability</th><th>What happens</th><th>Defense</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Cross-site scripting (XSS)</td><td>Attacker HTML runs in a visitor's browser</td><td>Escape on output: <code>esc_html()</code>, <code>esc_attr()</code>, <code>esc_url()</code>, <code>wp_kses_post()</code></td></tr>
+                            <tr><td>Cross-site request forgery (CSRF)</td><td>A forged request rides a logged-in user's session</td><td>Nonces: <code>wp_nonce_field()</code> + <code>check_admin_referer()</code> / <code>wp_verify_nonce()</code></td></tr>
+                            <tr><td>SQL injection</td><td>A crafted value rewrites your query</td><td><code>$wpdb-&gt;prepare()</code>, or a core API that does it for you</td></tr>
+                            <tr><td>Broken access control</td><td>A user does something their role should forbid</td><td><code>current_user_can()</code> on every state change; <code>permission_callback</code> on REST routes (Module 7)</td></tr>
+                            <tr><td>Unsanitized input</td><td>Bad or malicious data is stored</td><td>Sanitize and validate on input: <code>sanitize_text_field()</code>, <code>absint()</code>, type checks</td></tr>
+                            <tr><td>Exposed secrets</td><td>Keys in code leak through the repo or a direct request</td><td>Keep secrets in <code>wp-config.php</code> / environment; guard files with <code>ABSPATH</code> (Lesson 5.1)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Notice that none of these needs a security plugin: they are habits in your own code. A firewall or a scanner (Module 8 mentions them) is a backstop, not a substitute for escaping and checking.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <h3>1. Escaping for the wrong context</h3>
+                <p>Escaping is not one function; the destination decides. Running a URL through <code>esc_html()</code> mangles it, while a value meant as text needs <code>esc_html()</code>, not <code>esc_url()</code>. See the mismatch:</p>
+                <pre data-cli><code class="language-bash">wp eval '$url = home_url( "/books/?genre=sci-fi&amp;sort=price" );
+echo "esc_url:  ", esc_url( $url ), "\n";
+echo "esc_html: ", esc_html( $url ), "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>esc_url:  http://localhost:8080/books/?genre=sci-fi&amp;#038;sort=price
+esc_html: http://localhost:8080/books/?genre=sci-fi&amp;amp;sort=price</code></pre>
+                </div>
+                <p><strong>What it means:</strong> <code>esc_url()</code> keeps a usable link (encoding the <code>&amp;</code> as <code>&amp;#038;</code> for an attribute); <code>esc_html()</code> turns the same string into display text, which breaks it as an <code>href</code>. <strong>Fix:</strong> match the function to the context, <code>esc_url()</code> in an <code>href</code> or <code>src</code>, <code>esc_attr()</code> in any other attribute, <code>esc_html()</code> in text.</p>
+
+                <h3>2. A nonce but no capability check</h3>
+                <p>A common half-measure: the handler verifies the nonce and stops there. But a nonce only proves the request is genuine for <em>this</em> user; it says nothing about whether the user is allowed. A logged-in subscriber visiting your form page gets a valid nonce too. Confirm that a capability is a separate question:</p>
+                <pre data-cli><code class="language-bash">wp eval 'wp_set_current_user( 2 );
+echo "editor edit Dune (30):   ", var_export( current_user_can( "edit_post", 30 ), true ), "\n";
+wp_set_current_user( 3 );
+echo "author edit Dune (30):   ", var_export( current_user_can( "edit_post", 30 ), true ), "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>editor edit Dune (30):   true
+author edit Dune (30):   false</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the editor Maria may edit Dune; the author Devon may not (it is not his, and authors cannot edit others' posts). A nonce check would have passed for both. <strong>Fix:</strong> always pair the nonce with <code>current_user_can()</code> for the specific object, as the hardened save and the stock action do.</p>
+
+                <h3>3. Trusting that an insert checks permissions</h3>
+                <p>Functions like <code>wp_insert_post()</code> and <code>update_post_meta()</code> do <em>not</em> check capabilities (Lesson 2.1's FAQ warned of this): they assume you already did. A handler that writes without a prior check is broken access control, even with no visible error:</p>
+                <pre data-cli><code class="language-bash">wp eval 'wp_set_current_user( 3 );
+$id = wp_insert_post( array( "post_type" => "book", "post_title" => "Snuck in", "post_status" => "publish" ) );
+echo "created book as author Devon: ", ( $id ? "ID $id" : "failed" ), "\n";
+wp_delete_post( $id, true );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>created book as author Devon: ID 41</code></pre>
+                </div>
+                <p><strong>What it means:</strong> <code>wp_insert_post()</code> created a book even though we set the current user to an author, because the function trusts the caller. The last line deletes it again. <strong>Fix:</strong> gate every write behind <code>current_user_can()</code> yourself; the database functions will not do it for you.</p>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Harden the Plugin</h2>
+                <p>Now apply all of it to <code>pagesco-books</code>: replace the meta box save with a hardened version, and add a "Mark sold out / Mark in stock" action to the Books list the safe way, with a nonce and a capability check. Allow about 30 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: Harden the meta box save <span class="step-time">(10 min)</span></h3>
+                    <p>Replace <code>wordpress/wp-content/plugins/pagesco-books/src/Admin/BookMetaBox.php</code> with this version. The <code>render()</code> method is unchanged (it already escaped every value with <code>esc_attr()</code>); the new <code>save()</code> adds the autosave and revision guards, validates the date with a small helper, and clamps the price:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/Admin/BookMetaBox.php"><code class="language-php">&lt;?php
+/**
+ * The "Book details" box on the book editing screen (hardened in Lesson 5.3).
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books\Admin;
+
+use PagesCo\Books\BookPostType;
+use PagesCo\Books\Feature;
+
+/**
+ * Shows the book meta as a form under the editor and saves it safely with the book.
+ */
+final class BookMetaBox implements Feature {
+
+	/**
+	 * The fields this box edits, so render and save stay in step.
+	 */
+	private const TEXT_FIELDS = array( 'pagesco_author', 'pagesco_isbn' );
+
+	/**
+	 * Hooks the box into the book screen and the save into save_post_book.
+	 */
+	public function register(): void {
+		add_action( 'add_meta_boxes_' . BookPostType::NAME, array( $this, 'add' ) );
+		add_action( 'save_post_' . BookPostType::NAME, array( $this, 'save' ), 10, 2 );
+	}
+
+	/**
+	 * Adds the box to the book editing screen.
+	 */
+	public function add(): void {
+		add_meta_box(
+			'pagesco-book-details',
+			__( 'Book details', 'pagesco-books' ),
+			array( $this, 'render' ),
+			BookPostType::NAME,
+			'normal',
+			'high'
+		);
+	}
+
+	/**
+	 * Prints the form fields, filled with the saved values and escaped for the attribute context.
+	 *
+	 * @param \WP_Post $post The book being edited.
+	 */
+	public function render( $post ): void {
+		wp_nonce_field( 'pagesco_books_save_details', 'pagesco_books_details_nonce' );
+
+		$author    = get_post_meta( $post-&gt;ID, 'pagesco_author', true );
+		$price     = get_post_meta( $post-&gt;ID, 'pagesco_price', true );
+		$pages     = get_post_meta( $post-&gt;ID, 'pagesco_pages', true );
+		$published = get_post_meta( $post-&gt;ID, 'pagesco_published', true );
+		$isbn      = get_post_meta( $post-&gt;ID, 'pagesco_isbn', true );
+		$in_stock  = get_post_meta( $post-&gt;ID, 'pagesco_in_stock', true );
+		?&gt;
+		&lt;p&gt;
+			&lt;label for="pagesco-author"&gt;&lt;?php esc_html_e( 'Author', 'pagesco-books' ); ?&gt;&lt;/label&gt;&lt;br&gt;
+			&lt;input type="text" id="pagesco-author" name="pagesco_author" class="widefat" value="&lt;?php echo esc_attr( $author ); ?&gt;"&gt;
+		&lt;/p&gt;
+		&lt;p&gt;
+			&lt;label for="pagesco-price"&gt;&lt;?php esc_html_e( 'Price (USD)', 'pagesco-books' ); ?&gt;&lt;/label&gt;&lt;br&gt;
+			&lt;input type="number" id="pagesco-price" name="pagesco_price" min="0" step="0.01" value="&lt;?php echo esc_attr( $price ); ?&gt;"&gt;
+		&lt;/p&gt;
+		&lt;p&gt;
+			&lt;label for="pagesco-pages"&gt;&lt;?php esc_html_e( 'Pages', 'pagesco-books' ); ?&gt;&lt;/label&gt;&lt;br&gt;
+			&lt;input type="number" id="pagesco-pages" name="pagesco_pages" min="1" step="1" value="&lt;?php echo esc_attr( $pages ); ?&gt;"&gt;
+		&lt;/p&gt;
+		&lt;p&gt;
+			&lt;label for="pagesco-published"&gt;&lt;?php esc_html_e( 'First published', 'pagesco-books' ); ?&gt;&lt;/label&gt;&lt;br&gt;
+			&lt;input type="date" id="pagesco-published" name="pagesco_published" value="&lt;?php echo esc_attr( $published ); ?&gt;"&gt;
+		&lt;/p&gt;
+		&lt;p&gt;
+			&lt;label for="pagesco-isbn"&gt;&lt;?php esc_html_e( 'ISBN', 'pagesco-books' ); ?&gt;&lt;/label&gt;&lt;br&gt;
+			&lt;input type="text" id="pagesco-isbn" name="pagesco_isbn" value="&lt;?php echo esc_attr( $isbn ); ?&gt;"&gt;
+		&lt;/p&gt;
+		&lt;p&gt;
+			&lt;label&gt;
+				&lt;input type="checkbox" name="pagesco_in_stock" value="1" &lt;?php checked( (bool) $in_stock ); ?&gt;&gt;
+				&lt;?php esc_html_e( 'In stock', 'pagesco-books' ); ?&gt;
+			&lt;/label&gt;
+		&lt;/p&gt;
+		&lt;?php
+	}
+
+	/**
+	 * Saves the fields when the book is saved from this form.
+	 *
+	 * @param int      $post_id The book's ID.
+	 * @param \WP_Post $post    The book.
+	 */
+	public function save( $post_id, $post ): void {
+		// 1. Is this a real submission of our form, not an autosave or a bulk edit?
+		if ( ! isset( $_POST['pagesco_books_details_nonce'] ) ) {
+			return;
+		}
+		if ( wp_is_post_autosave( $post_id ) || wp_is_post_revision( $post_id ) ) {
+			return;
+		}
+
+		// 2. Did it carry our valid nonce?
+		if ( ! wp_verify_nonce( sanitize_key( wp_unslash( $_POST['pagesco_books_details_nonce'] ) ), 'pagesco_books_save_details' ) ) {
+			return;
+		}
+
+		// 3. May this user edit this book?
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
+
+		// 4. Sanitize and validate every field before it is stored.
+		$in = wp_unslash( $_POST );
+
+		update_post_meta( $post_id, 'pagesco_author', sanitize_text_field( $in['pagesco_author'] ?? '' ) );
+		update_post_meta( $post_id, 'pagesco_isbn', sanitize_text_field( $in['pagesco_isbn'] ?? '' ) );
+		update_post_meta( $post_id, 'pagesco_price', max( 0, (float) ( $in['pagesco_price'] ?? 0 ) ) );
+		update_post_meta( $post_id, 'pagesco_pages', absint( $in['pagesco_pages'] ?? 0 ) );
+		update_post_meta( $post_id, 'pagesco_published', self::valid_date( $in['pagesco_published'] ?? '' ) );
+		update_post_meta( $post_id, 'pagesco_in_stock', isset( $in['pagesco_in_stock'] ) );
+	}
+
+	/**
+	 * Returns the value only if it is a real Y-m-d date, otherwise an empty string.
+	 *
+	 * @param string $value The submitted value.
+	 * @return string
+	 */
+	private static function valid_date( $value ): string {
+		$value = sanitize_text_field( $value );
+		$date  = \DateTime::createFromFormat( 'Y-m-d', $value );
+
+		return ( $date &amp;&amp; $date-&gt;format( 'Y-m-d' ) === $value ) ? $value : '';
+	}
+}</code></pre>
+                    <p>The save now runs only for a genuine form submission (not an autosave), by an allowed user, with every value sanitized and the date validated. Confirm the file is valid and the box is still registered on the book screen:</p>
+                    <pre data-cli><code class="language-bash">php -l wp-content/plugins/pagesco-books/src/Admin/BookMetaBox.php
+wp eval '$GLOBALS["current_screen"] = WP_Screen::get( "book" );
+do_action( "add_meta_boxes_book", get_post( 30 ) );
+echo isset( $GLOBALS["wp_meta_boxes"]["book"]["normal"]["high"]["pagesco-book-details"] ) ? "Book details box registered\n" : "missing\n";'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>No syntax errors detected in wp-content/plugins/pagesco-books/src/Admin/BookMetaBox.php
+Book details box registered</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: Add a safe "Mark sold out" action <span class="step-time">(12 min)</span></h3>
+                    <p>Create <code>src/Admin/StockAction.php</code>. It adds a link to each book's row that flips its stock, and handles the click at <code>admin-post.php</code>. Every defense from this lesson is in it: the link is built with <code>wp_nonce_url()</code>, only shown to users who may edit that book; the handler verifies the nonce with <code>check_admin_referer()</code>, checks the capability, then redirects with <code>wp_safe_redirect()</code>:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/Admin/StockAction.php"><code class="language-php">&lt;?php
+/**
+ * A "Mark sold out" / "Mark in stock" link for each book on the Books screen.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books\Admin;
+
+use PagesCo\Books\BookPostType;
+use PagesCo\Books\Feature;
+
+/**
+ * Adds the row action and handles the request it sends to admin-post.php.
+ */
+final class StockAction implements Feature {
+
+	/**
+	 * The admin-post.php action name, also the start of the nonce action.
+	 */
+	private const ACTION = 'pagesco_books_toggle_stock';
+
+	/**
+	 * Hooks the link into the list and the handler into admin-post.php.
+	 */
+	public function register(): void {
+		add_filter( 'post_row_actions', array( $this, 'add_link' ), 10, 2 );
+		add_action( 'admin_post_' . self::ACTION, array( $this, 'handle' ) );
+	}
+
+	/**
+	 * Adds the link to rows of books the current user may edit.
+	 *
+	 * @param string[] $actions Row action links.
+	 * @param \WP_Post $post    The post in this row.
+	 * @return string[]
+	 */
+	public function add_link( $actions, $post ) {
+		if ( BookPostType::NAME !== $post-&gt;post_type || ! current_user_can( 'edit_post', $post-&gt;ID ) ) {
+			return $actions;
+		}
+
+		$url = add_query_arg(
+			array(
+				'action' =&gt; self::ACTION,
+				'book'   =&gt; $post-&gt;ID,
+			),
+			admin_url( 'admin-post.php' )
+		);
+		$url = wp_nonce_url( $url, self::ACTION . '_' . $post-&gt;ID );
+
+		$label = get_post_meta( $post-&gt;ID, 'pagesco_in_stock', true )
+			? __( 'Mark sold out', 'pagesco-books' )
+			: __( 'Mark in stock', 'pagesco-books' );
+
+		$actions['pagesco_stock'] = sprintf( '&lt;a href="%s"&gt;%s&lt;/a&gt;', esc_url( $url ), esc_html( $label ) );
+		return $actions;
+	}
+
+	/**
+	 * Flips the book's stock flag, then goes back to the Books screen.
+	 */
+	public function handle(): void {
+		$book_id = isset( $_GET['book'] ) ? absint( $_GET['book'] ) : 0;
+
+		check_admin_referer( self::ACTION . '_' . $book_id );
+
+		if ( BookPostType::NAME !== get_post_type( $book_id ) || ! current_user_can( 'edit_post', $book_id ) ) {
+			wp_die( esc_html__( 'Sorry, you are not allowed to change this book.', 'pagesco-books' ), 403 );
+		}
+
+		$in_stock = (bool) get_post_meta( $book_id, 'pagesco_in_stock', true );
+		update_post_meta( $book_id, 'pagesco_in_stock', ! $in_stock );
+
+		wp_safe_redirect( admin_url( 'edit.php?post_type=' . BookPostType::NAME ) );
+		exit;
+	}
+}</code></pre>
+                    <p>List the feature, then confirm the link appears for an editor and is absent for an author who does not own the book:</p>
+                    <pre data-cli><code class="language-bash">sed -i '/Admin\\BookColumns::class,/a\			Admin\\StockAction::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+wp eval 'wp_set_current_user( 2 );
+$a = apply_filters( "post_row_actions", array(), get_post( 30 ) );
+echo "editor sees stock action: ", isset( $a["pagesco_stock"] ) ? "yes\n" : "no\n";
+wp_set_current_user( 3 );
+$a = apply_filters( "post_row_actions", array(), get_post( 30 ) );
+echo "author sees stock action: ", isset( $a["pagesco_stock"] ) ? "yes\n" : "no\n";'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>editor sees stock action: yes
+author sees stock action: no</code></pre>
+                    </div>
+                    <p>The editor gets the link; the author, who cannot edit Dune, does not. That is the capability check deciding what even appears.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: Watch the nonce stop a forged request <span class="step-time">(8 min)</span></h3>
+                    <p>The handler runs at <code>admin-post.php?action=pagesco_books_toggle_stock</code>. A genuine click carries the nonce the link added. A request <em>without</em> the token, the shape a forged link from another site would have, is refused before any stock changes. Send one as the logged-in editor and read the response:</p>
+                    <pre data-web="/wp-admin/admin-post.php?action=pagesco_books_toggle_stock&amp;book=30" data-login="admin" data-select=".wp-die-message" data-headers=""><code class="language-text">GET http://localhost:8080/wp-admin/admin-post.php?action=pagesco_books_toggle_stock&amp;book=30</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>HTTP/1.1 403 Forbidden
+
+&lt;div class="wp-die-message"&gt;The link you followed has expired.&lt;/div&gt;</code></pre>
+                    </div>
+                    <p>A <code>403</code> and "The link you followed has expired", WordPress's message when <code>check_admin_referer()</code> finds no valid nonce. The book's stock did not change. A real click from the Books screen carries the token in the link, so it succeeds; a forged request from elsewhere cannot guess it, so it fails. Confirm Dune is untouched:</p>
+                    <pre data-cli data-checkpoint><code class="language-bash">wp post meta get 30 pagesco_in_stock
+wp eval 'echo PagesCo\Books\Plugin::instance()->feature( PagesCo\Books\Admin\StockAction::class ) instanceof PagesCo\Books\Feature ? "StockAction running\n" : "not running\n";'
+find wp-content/plugins/pagesco-books/src -type f | sort</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>1
+StockAction running
+wp-content/plugins/pagesco-books/src/Activator.php
+wp-content/plugins/pagesco-books/src/Admin/BookColumns.php
+wp-content/plugins/pagesco-books/src/Admin/BookMetaBox.php
+wp-content/plugins/pagesco-books/src/Admin/StockAction.php
+wp-content/plugins/pagesco-books/src/BookMeta.php
+wp-content/plugins/pagesco-books/src/BookPostType.php
+wp-content/plugins/pagesco-books/src/Feature.php
+wp-content/plugins/pagesco-books/src/GenreTaxonomy.php
+wp-content/plugins/pagesco-books/src/Plugin.php
+wp-content/plugins/pagesco-books/src/StoreNotice.php</code></pre>
+                    </div>
+                    <p>Dune is still in stock (<code>1</code>), the <code>StockAction</code> feature is running, and the plugin now has the two new files. Open <code>http://localhost:8080/wp-admin/edit.php?post_type=book</code> in your browser and hover a book to see the "Mark sold out" link; clicking it (a genuine, nonced request) really does flip the stock.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>BookMetaBox::save()</code> checks the nonce, guards against autosaves and revisions, checks <code>current_user_can( 'edit_post', … )</code>, and sanitizes and validates every field</li>
+                        <li><code>Admin\StockAction</code> is listed in <code>Plugin::feature_classes()</code> and running</li>
+                        <li>The "Mark sold out" link shows only for users who may edit the book</li>
+                        <li>A request to the handler without a valid nonce is refused with a 403</li>
+                        <li>The catalog is unchanged: eleven books, Dune in stock, author "Frank Herbert"</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Each exercise leaves the plugin as the project did. Try before opening the solution.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Prove the Date Validator</h3>
+                    <p>The hardened save validates the publication date against <code>Y-m-d</code>. Write a quick check that a real date passes and a wrong-shaped one is rejected, using the same <code>DateTime::createFromFormat()</code> test the save's helper uses.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>A value is valid when <code>DateTime::createFromFormat( 'Y-m-d', $v )</code> returns an object whose <code>format( 'Y-m-d' )</code> equals <code>$v</code> again. Try <code>1965-08-01</code> and <code>soon</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">wp eval 'function demo_valid( $v ) {
+	$d = DateTime::createFromFormat( "Y-m-d", $v );
+	return ( $d && $d->format( "Y-m-d" ) === $v ) ? "valid" : "rejected";
+}
+echo "1965-08-01: ", demo_valid( "1965-08-01" ), "\n";
+echo "soon:       ", demo_valid( "soon" ), "\n";
+echo "1965-13-99: ", demo_valid( "1965-13-99" ), "\n";'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>1965-08-01: valid
+soon:       rejected
+1965-13-99: rejected</code></pre>
+                        </div>
+                        <p>A real date passes; "soon" and an impossible date are rejected. Validating the shape, not just sanitizing the characters, is what keeps nonsense out of a field other code will trust to be a date.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Escape for a JavaScript Context</h3>
+                    <p>You need to drop a book's title into an inline script, say a small analytics call. Neither <code>esc_html()</code> nor <code>esc_attr()</code> is right there. Find the function for a JavaScript string context and show it quoting a title that contains an apostrophe.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>esc_js()</code> escapes a value for use inside a quoted JavaScript string. Try it on <code>The Hobbit (O'Reilly ed.)</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">wp eval 'echo esc_js( "The Hobbit (O\x27Reilly ed.)" ), "\n";'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>The Hobbit (O\'Reilly ed.)</code></pre>
+                        </div>
+                        <p><code>esc_js()</code> backslash-escaped the apostrophe so it cannot end the JavaScript string early. For larger data passed to scripts, <code>wp_json_encode()</code> (with <code>wp_add_inline_script()</code>) is the modern choice; <code>esc_js()</code> suits a single inline value.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: A Prepared Search With a Placeholder</h3>
+                    <p>Write a prepared query that counts how many books cost less than a given price, with the price as a <code>%f</code> placeholder. Run it for $10.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Join <code>wp_postmeta</code> on <code>pagesco_price</code>, and compare <code>meta_value + 0 &lt; %f</code>. Use <code>$wpdb-&gt;get_var()</code> with <code>COUNT(*)</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">wp eval 'global $wpdb;
+$limit = 10.0;
+$count = $wpdb-&gt;get_var( $wpdb-&gt;prepare(
+	"SELECT COUNT(*) FROM {$wpdb-&gt;postmeta} WHERE meta_key = %s AND meta_value + 0 &lt; %f",
+	"pagesco_price",
+	$limit
+) );
+echo "books under \$10: ", $count, "\n";'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>books under $10: 6</code></pre>
+                        </div>
+                        <p>The price went in as a <code>%f</code> placeholder, so even a value typed by a user could not break out into SQL. Core would do this for you through a <code>meta_query</code>; when you hand-write SQL, <code>prepare()</code> is not optional.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 4: Capability-gate a Bulk Change (Stretch)</h3>
+                    <p>Write a throwaway script that marks every book out of stock, but only if the current user may edit it, skipping the rest. Run it as the editor Maria, show the counts, then put all the books back in stock. This is the shape a safe bulk action takes.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Loop the books with <code>get_posts()</code>; for each, check <code>current_user_can( 'edit_post', $id )</code> before <code>update_post_meta()</code>. Count changed vs skipped. Restore with a second loop setting <code>pagesco_in_stock</code> to <code>1</code> (or to each book's seeded value; all eleven were in stock except two).</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">wp eval 'wp_set_current_user( 2 );
+$changed = 0; $skipped = 0;
+foreach ( get_posts( array( "post_type" => "book", "numberposts" => -1 ) ) as $b ) {
+	if ( current_user_can( "edit_post", $b->ID ) ) { update_post_meta( $b->ID, "pagesco_in_stock", false ); $changed++; }
+	else { $skipped++; }
+}
+echo "changed: $changed, skipped: $skipped\n";'
+wp eval 'foreach ( get_posts( array( "post_type" => "book", "numberposts" => -1 ) ) as $b ) {
+	$sold_out = in_array( $b->post_title, array( "The Great Gatsby", "The Catcher in the Rye" ), true );
+	update_post_meta( $b->ID, "pagesco_in_stock", ! $sold_out );
+}'
+wp post meta get 30 pagesco_in_stock</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>changed: 11, skipped: 0
+1</code></pre>
+                        </div>
+                        <p>Maria may edit all eleven, so none were skipped; as an author only her own would change. The restore loop puts the catalog back exactly (Gatsby and Catcher out of stock, the rest in), so Dune reads <code>1</code> again. A real bulk action adds a nonce on top of this capability loop.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> When should you escape a dynamic value?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Cleaning on input is sanitizing, a separate step; escaping is about the destination.">
+                                A) Once, when you first receive it
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Escape late: at the point of output, with the function for that context (esc_html, esc_attr, esc_url), because you cannot be sure where a stored value has been.">
+                                B) At the point of output, for its context
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Escaping before storage would corrupt the stored value and still not match the output context.">
+                                C) Just before saving it to the database
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> A custom form handler verifies the nonce but does no capability check. What is still wrong?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="A valid nonce only proves the request came from this user's genuine page; any logged-in user, whatever their role, gets one. The capability check decides whether they are allowed to act.">
+                                A) Any logged-in user, regardless of role, can perform the action
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The nonce is exactly what stops cross-site forgery; that part is handled.">
+                                B) The form is open to cross-site request forgery
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="A nonce is not about SQL; prepare() handles injection.">
+                                C) The query is open to SQL injection
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> Which turns a user-supplied value into a safe part of a hand-written SQL query?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="esc_sql escapes a string but does not add quoting or type-check; prepare is the whole-query tool.">
+                                A) esc_html( $value )
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="sanitize_text_field cleans input for storage, not for SQL safety.">
+                                B) sanitize_text_field( $value )
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The prepare() method inserts each value through a typed placeholder (%s, %d, %f, %i), quoting and escaping it so it cannot break out of the query.">
+                                C) $wpdb-&gt;prepare( $sql, $value )
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> Why does <code>BookMetaBox::save()</code> call <code>wp_is_post_autosave()</code> before saving?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Autosaves do not improve performance here; the concern is the data.">
+                                A) To make saving faster
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="save_post fires on autosaves and revisions, which carry no meta-box fields; without the guard an autosave would overwrite the saved values with empty ones.">
+                                B) An autosave carries no form fields and would wipe the saved values
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The nonce, not the autosave check, is what proves the request is genuine.">
+                                C) It replaces the need for a nonce
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> Does <code>wp_insert_post()</code> check whether the current user may create the post?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="It does not; last lesson an author created a book through it in a script.">
+                                A) Yes, it refuses if the user lacks the capability
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="It behaves the same under WP-CLI and the web; neither adds a capability check.">
+                                B) Only when called over the web, not in WP-CLI
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="No. wp_insert_post() and update_post_meta() trust the caller; you must call current_user_can() yourself before writing. The REST API and block editor add that check, but your own handlers must too.">
+                                C) No; you must check the capability yourself before calling it
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Do I still need nonces and capability checks if I use the REST API or the block editor?</summary>
+                    <p>For core's own endpoints and the editor, those checks are built in: the editor sends an <code>X-WP-Nonce</code> header and the API enforces the post-type capabilities, which is why Devon was refused last lesson. But any route <em>you</em> register needs a <code>permission_callback</code> (Module 7 makes this a rule), and any form, admin action or AJAX handler you write needs its own nonce and capability check. The checks are automatic only for the paths WordPress controls.</p>
+                </details>
+                <details>
+                    <summary>What is the difference between sanitizing and validating?</summary>
+                    <p>Sanitizing <em>changes</em> a value to make it safe or well-formed, <code>sanitize_text_field()</code> strips tags, <code>absint()</code> forces a non-negative integer. Validating <em>judges</em> a value and accepts or rejects it, is this a real <code>Y-m-d</code> date, is this one of the allowed options. Use both: validate when a value must have a particular shape (reject if not), sanitize when you can safely clean it. The hardened save does both, validating the date and sanitizing the text.</p>
+                </details>
+                <details>
+                    <summary>Is <code>esc_html()</code> enough, or should I use <code>wp_kses()</code>?</summary>
+                    <p><code>esc_html()</code> turns everything into text, which is what you want for a name, a price or a title. Use <code>wp_kses_post()</code> or <code>wp_kses()</code> only when the value is <em>meant</em> to contain HTML and you want to allow a safe subset, for example a description that may hold <code>&lt;strong&gt;</code> and links. <code>wp_kses()</code> lets you pass the exact tags and attributes allowed; it is heavier, so reserve it for genuine rich text, not for a field that should be plain.</p>
+                </details>
+                <details>
+                    <summary>Should the plugin store secrets like an API key?</summary>
+                    <p>Never in the code or the repository. A key belongs in <code>wp-config.php</code> or an environment variable, read at runtime; Module 7's external-API lesson and Module 8's deployment lesson show the pattern. And every PHP file that could run on its own still needs the <code>ABSPATH</code> guard from Lesson 5.1, so a direct request cannot execute it outside WordPress.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Add a second row action, "Duplicate", that copies a book as a new draft. It must be at least as careful as <code>StockAction</code>: a nonce tied to the book ID, a <code>current_user_can( 'edit_post', $id )</code> check, and a capability to <em>create</em> a new book (<code>current_user_can( get_post_type_object( 'book' )->cap->create_posts )</code>). Copy the title, content and the registered meta keys with <code>BookMeta::fields()</code>, set the status to <code>draft</code>, and redirect to the new book's editor. Which of the two capability checks matters more here, and why?</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Pick one handler you have written in this course so far, the meta box save, the stock action, or even the store notice from Lesson 2.3, and trace a single untrusted value through it: where does it enter, where is it checked (nonce, capability), where is it sanitized, and where is it escaped on the way out? Note any gap you find. Then write the one security habit from this lesson you are most likely to forget, and how you will remember it (a checklist in <code>pagesco-plan.txt</code>, a PHPCS rule in Lesson 8.1, a code-review note).</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Sanitize input early, escape output late; they are different jobs with different functions</li>
+                        <li>Escape for the context: <code>esc_html()</code> for text, <code>esc_attr()</code> for attributes, <code>esc_url()</code> for links, <code>wp_kses_post()</code> for allowed HTML</li>
+                        <li>Every state change needs both a nonce (<code>wp_nonce_field()</code> + <code>check_admin_referer()</code>) and a capability check (<code>current_user_can()</code>)</li>
+                        <li>Guard <code>save_post</code> handlers against autosaves and revisions, and validate values that must have a shape, not just sanitize them</li>
+                        <li>Never concatenate a value into SQL: use <code>$wpdb-&gt;prepare()</code> with <code>%s</code>, <code>%d</code>, <code>%f</code>, <code>%i</code>, or a core API</li>
+                        <li>Database functions like <code>wp_insert_post()</code> do not check capabilities; that is your job</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Safe text output</td><td><code>echo esc_html( $value );</code></td></tr>
+                            <tr><td>Safe attribute / URL output</td><td><code>esc_attr( $value )</code> / <code>esc_url( $value )</code></td></tr>
+                            <tr><td>A form token</td><td><code>wp_nonce_field( 'action', 'name' )</code> then <code>check_admin_referer( 'action' )</code></td></tr>
+                            <tr><td>An allowed-user gate</td><td><code>if ( ! current_user_can( 'edit_post', $id ) ) { return; }</code></td></tr>
+                            <tr><td>Skip autosaves in save_post</td><td><code>if ( wp_is_post_autosave( $id ) || wp_is_post_revision( $id ) ) { return; }</code></td></tr>
+                            <tr><td>A safe hand-written query</td><td><code>$wpdb-&gt;get_results( $wpdb-&gt;prepare( $sql, $value ) )</code></td></tr>
+                            <tr><td>Clean / shaped input</td><td><code>sanitize_text_field()</code>, <code>absint()</code>, a format check</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You hardened the real book meta box save: nonce, autosave guard, capability check, and per-field sanitizing and validating</li>
+                        <li>You added a "Mark sold out" action protected by a nonce and a capability check, built with <code>admin-post.php</code></li>
+                        <li>You saw each defense work: escaping neutralized stored HTML, a tokenless request got a 403, a capability check hid an action and refused a write</li>
+                        <li>You wrote a safe <code>$wpdb-&gt;prepare()</code> query and named the common vulnerabilities and their fixes</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>The plugin's data and its writes are now safe. Next it needs a home in the admin for the shop's own options. In <a href="lesson_17.html"><strong>Lesson 5.4: Admin Pages, Settings API &amp; Options</strong></a> you add a settings page under Settings with the WordPress Settings API, which brings its own built-in nonce and sanitization, the same habits you practiced here, wrapped in a standard framework, and store the shop's preferences in a single <code>pagesco_books_settings</code> option.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>pagesco-books</code> lists seven features, including <code>Admin\StockAction</code></li>
+                    <li>Confirm the meta box still saves from the book editor and the Books list shows the "Mark sold out" link</li>
+                    <li>Re-read your own handlers with the four habits in mind: sanitize, escape, nonce, capability</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Security can feel like a long list of ways to get it wrong, but today you saw it is really four habits you now apply by reflex: clean what comes in, escape what goes out, check the token, check the user. Every attack in this lesson met a one-line defense you already know how to write. Keep applying them everywhere data crosses a boundary, and you will write plugins that stay safe long after the clever exploits have moved on. That is what separates a hobby plugin from a professional one.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_15.html" class="prev-lesson">← Previous: Custom Post Types, Taxonomies &amp; Meta</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_17.html" class="next-lesson">Next: Admin Pages, Settings API &amp; Options →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

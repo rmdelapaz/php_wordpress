@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="WordPress for developers: what WordPress 7.1 is, WordPress.org vs WordPress.com, how one request travels through the core files, where your code lives, how PHP and MySQL skills carry over, and the Pages &amp; Co. project you will build. PHP and WordPress Development Lesson 1.1.">
+    <meta name="author" content="Ray de la Paz">
+    <title>WordPress for Developers - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 1: Getting Started</a></li>
+            <li aria-current="page">Lesson 1.1: WordPress for Developers</li>
+        </ul>
+    </nav>
+
+    <main id="main-content" data-state="fresh">
+        <div class="container">
+            <header>
+                <h1>🧭 Lesson 1.1: WordPress for Developers</h1>
+                <p class="lead">You can write PHP, and you can design and query a MySQL database. That puts you one step away from one of the most in-demand skills in web development: building for WordPress, the PHP application that runs a huge share of the web. This lesson is your map. You will see what WordPress is when you look at it as a developer rather than as a site owner, follow one request through its core files, learn where your own code is allowed to live, and meet Pages &amp; Co., the bookstore website you will build from an empty theme to a deployed site over this course.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Describe WordPress 7.1 as a developer sees it: a PHP and MySQL application with themes, plugins, blocks and APIs as extension points</li>
+                        <li>Explain the difference between WordPress.org (the software) and WordPress.com (a hosting service), and pick the right one for a project</li>
+                        <li>Trace a front-end request from <code>index.php</code> to the finished HTML, naming the core files on the way</li>
+                        <li>Say where your code belongs (themes, plugins, must-use plugins in <code>wp-content/</code>) and why you never edit core files</li>
+                        <li>Map what you know from PHP Foundations and MySQL Foundations to the way WordPress does the same jobs</li>
+                        <li>Describe the Pages &amp; Co. project and plan how you will work through this course</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 100 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="https://rays-php.netlify.app/" target="_blank" rel="noopener">PHP Foundations</a> and <a href="https://rays-mysql.netlify.app/" target="_blank" rel="noopener">MySQL Foundations</a> (or equivalent experience)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> a first look at WordPress in your browser and the Pages &amp; Co. site plan you will build from in every module</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (WordPress 7.1 itself runs on PHP 7.4 and newer)</li>
+                    <li><span class="meta-label">🧱 Site</span> nothing to install yet: WordPress Playground in a browser tab; your own development site comes in Lesson 1.2</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#what-is-wordpress" class="toc-link">What WordPress Is, for a Developer</a></li>
+                        <li><a href="#org-vs-com" class="toc-link">WordPress.org vs WordPress.com</a></li>
+                        <li><a href="#request" class="toc-link">One Request, Start to Finish</a></li>
+                        <li><a href="#your-code" class="toc-link">Where Your Code Lives</a></li>
+                        <li><a href="#bridge" class="toc-link">From PHP and MySQL Foundations to WordPress</a></li>
+                        <li><a href="#pagesco" class="toc-link">The Pages &amp; Co. Project</a></li>
+                        <li><a href="#how-to-learn" class="toc-link">How to Learn in This Course</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Meet WordPress and Plan Pages &amp; Co.</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="what-is-wordpress" class="lesson-section">
+                <h2>🌍 What WordPress Is, for a Developer</h2>
+                <p>A site owner sees WordPress as a dashboard where you write posts, upload photos and pick a theme. A developer sees something else: <strong>a PHP application that stores its content in a MySQL database and builds every page on request</strong>, the same kind of program you wrote in PHP Foundations, only much bigger and with twenty years of design decisions behind it. It is free, open-source software under the GPL license, built by a worldwide community of contributors, and it runs everything from personal blogs to news sites, university sites and online stores. Surveys such as W3Techs have measured it running more than four in ten of all websites for years, which is why WordPress skills show up in so many job listings and freelance requests.</p>
+                <p>What makes WordPress a <em>platform</em> rather than just a program is that it was designed to be extended without being edited. Almost everything a professional WordPress developer does falls into one of these extension points, and each has its own module in this course:</p>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Extension point</th><th>What it does</th><th>Where you learn it</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><strong>Hooks</strong></td><td>Named moments where core calls your functions (actions) or lets you change a value (filters)</td><td>Lesson 2.3, then everywhere</td></tr>
+                            <tr><td><strong>Themes</strong></td><td>Decide how the site looks: templates, styles, layouts. Modern ones are <em>block themes</em> configured with <code>theme.json</code></td><td>Modules 3 and 4</td></tr>
+                            <tr><td><strong>Plugins</strong></td><td>Add features: content types, settings pages, shortcodes, integrations</td><td>Module 5</td></tr>
+                            <tr><td><strong>Blocks</strong></td><td>The building pieces of the editor and of block themes, written in JavaScript (React) with PHP on the server</td><td>Module 6</td></tr>
+                            <tr><td><strong>APIs</strong></td><td>The REST API, WP-Cron, the HTTP API and more, so WordPress can talk to apps and other services</td><td>Module 7</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>WordPress in 7.1: what is new since the tutorials you may have seen</h3>
+                <p>WordPress keeps its old APIs working for a very long time, so a tutorial from years ago often still "works". It may just not be how anyone would build the thing today. These are the milestones that change how a developer works, with the version that brought each one:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Version</th><th>What arrived</th><th>What it means for you</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>3.0</td><td>Custom post types and taxonomies</td><td>WordPress became a general content system, not only a blog (Lesson 5.2: the <code>book</code> post type)</td></tr>
+                            <tr><td>4.7</td><td>The REST API in core</td><td>Every site has a JSON API at <code>/wp-json/</code> (Module 7)</td></tr>
+                            <tr><td>5.0</td><td>The block editor (project name "Gutenberg")</td><td>Content is stored as blocks; you write blocks in JavaScript (Module 6)</td></tr>
+                            <tr><td>5.8 and 5.9</td><td><code>theme.json</code>, block themes and the Site Editor</td><td>Whole sites, header to footer, are built from blocks (Module 3)</td></tr>
+                            <tr><td>6.5</td><td>The Interactivity API and Block Bindings</td><td>Interactive blocks without your own framework, blocks that show post meta (Lessons 6.3 and 6.4)</td></tr>
+                            <tr><td>6.9</td><td>The Abilities API</td><td>Plugins describe what they can do in a way other software, including AI tools, can discover (Lesson 7.3)</td></tr>
+                            <tr><td>7.0</td><td>A redesigned admin, an AI client library and the Connectors settings screen</td><td>The admin screens in this course look the way 7.x draws them (Lesson 9.2 covers AI in core)</td></tr>
+                            <tr><td>7.1</td><td>The Icons API, more Block Bindings targets, pings off on non-production sites</td><td>The version this course is built and tested on: 7.1.3</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Classic themes, PHP templates and the Loop are not gone. Most client sites you will be paid to work on were built that way, and the dynamic blocks you write in Module 6 use the same queries. That is why the course teaches both: block themes first because new sites start there, classic and hybrid themes right after.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: a building with rooms you may rent</h4>
+                    <p>Think of WordPress core as an apartment building. The owner (the WordPress project) maintains the structure, the wiring and the plumbing, and renovates it a few times a year. You are a tenant. You can paint and furnish your rooms as you like (themes), plug appliances into the sockets the building provides (plugins and hooks), and even add a doorbell that rings in the lobby (the REST API). What you never do is knock down a wall in the building itself: the next renovation would put it back, and your changes would be gone. Every rule in this course about where code goes comes from this picture.</p>
+                </div>
+            </section>
+
+            <section id="org-vs-com" class="lesson-section">
+                <h2>🏢 WordPress.org vs WordPress.com</h2>
+                <p>The two names cause more confusion for newcomers than anything else, so get it straight once:</p>
+                <ul>
+                    <li><strong>WordPress.org</strong> is the home of the open-source software: the download, the documentation (the <a href="https://developer.wordpress.org/" target="_blank" rel="noopener">developer handbooks and Code Reference</a>), the free plugin and theme directories, the support forums and the community that builds WordPress. When people say "self-hosted WordPress" they mean this software, installed on a server you control.</li>
+                    <li><strong>WordPress.com</strong> is a commercial hosting service run by Automattic, a company co-founded by WordPress co-founder Matt Mullenweg. It runs the same software for you. Its plans differ in what you are allowed to change: the lower ones do not let you upload your own plugins or themes; the higher ones do.</li>
+                </ul>
+                <p>A useful comparison: WordPress.org is like the Android operating system, open for any manufacturer to use; WordPress.com is one company's phone that ships with it. Plenty of other companies host WordPress too, from cheap shared hosting to managed WordPress hosts that handle updates, caching and backups for you (Lesson 8.4 compares them).</p>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Question</th><th>Self-hosted (WordPress.org software)</th><th>WordPress.com</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Can I install my own theme and plugin?</td><td>Always</td><td>Only on plans that allow it</td></tr>
+                            <tr><td>Can I edit files, run WP-CLI, read the database?</td><td>Yes (on most hosts)</td><td>Limited, depends on the plan</td></tr>
+                            <tr><td>Who updates, backs up and secures it?</td><td>You or your host</td><td>WordPress.com</td></tr>
+                            <tr><td>What this course uses</td><td>Yes: your own local site from Lesson 1.2</td><td>No</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-success">
+                    <h4>✅ Rule of thumb for client work</h4>
+                    <p>If a project needs custom code, which is every project in this course, you need an environment where you can install your own theme and plugin. Before you quote a job, ask where the site is hosted and on which plan: "we are on WordPress.com" may mean "you cannot install a plugin until we upgrade".</p>
+                </div>
+            </section>
+
+            <section id="request" class="lesson-section">
+                <h2>🔄 One Request, Start to Finish</h2>
+                <p>In PHP Foundations you wrote pages where one PHP file handled one URL. WordPress works differently: almost every front-end URL, <code>/</code>, <code>/hello-world/</code>, <code>/books/dune/</code>, is handled by the <strong>same</strong> file, <code>index.php</code> in the WordPress root. The web server sends every request that does not match a real file to it (that is what "pretty permalinks" set up, Lesson 1.2). From there WordPress loads itself, works out what you asked for from the URL, and picks a template to draw it with.</p>
+
+                <div class="mermaid">
+graph TD
+    A["Browser asks for /hello-world/"] --> B["index.php"]
+    B --> C["wp-blog-header.php"]
+    C --> D["wp-load.php finds wp-config.php"]
+    D --> E["wp-settings.php: core, plugins, theme"]
+    E --> F["action: init"]
+    F --> G["wp(): parse the URL, run the main query"]
+    G --> H["template-loader.php picks a template"]
+    H --> I["HTML sent to the browser"]
+                </div>
+
+                <p>You do not have to take the diagram on trust: the files are short and readable. These outputs come from the course's development site, the one you set up in the next lesson; once you have it, you can run the same commands yourself. The first two lines of real code in <code>index.php</code> and the heart of <code>wp-blog-header.php</code>:</p>
+                <pre data-cli><code class="language-bash">grep -n "WP_USE_THEMES\|require" index.php
+grep -n "require\|wp();" wp-blog-header.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>14:define( 'WP_USE_THEMES', true );
+17:require __DIR__ . '/wp-blog-header.php';
+13:	require_once __DIR__ . '/wp-load.php';
+16:	wp();
+19:	require_once ABSPATH . WPINC . '/template-loader.php';</code></pre>
+                </div>
+                <p>That is the whole front door. <code>index.php</code> sets one constant (<code>WP_USE_THEMES</code>, "draw this request with the theme") and hands over to <code>wp-blog-header.php</code>, which does three things in order:</p>
+                <ol>
+                    <li><strong>Load WordPress</strong> (<code>wp-load.php</code>). It finds <code>wp-config.php</code>, your site's settings (database name and password, debug switches), and that file ends by loading <code>wp-settings.php</code>, which loads the core library, connects to the database, loads must-use plugins, active plugins and the active theme, and fires actions such as <code>plugins_loaded</code> and <code>init</code> along the way. By the end, everything your code registered is known.</li>
+                    <li><strong>Work out the request</strong> (<code>wp()</code>). WordPress matches the URL against its rewrite rules, turns it into query variables ("the post with the slug <code>hello-world</code>") and runs the <strong>main query</strong> against the database. This is the step that replaced the router you might have written yourself.</li>
+                    <li><strong>Draw the page</strong> (<code>template-loader.php</code>). From what the query found (one post, a page, an archive, a 404), WordPress picks the most specific template the theme has, using the <strong>template hierarchy</strong> (Lesson 3.1), and runs it. The theme's markup, the blocks and the content come together into HTML.</li>
+                </ol>
+                <p>You can see the end of the trip from the outside. From the WP-CLI container (Lesson 1.2), <code>curl</code> asks the site for a page just as a browser would; this prints the page's <code>&lt;title&gt;</code>:</p>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/hello-world/ | grep -o '&lt;title&gt;.*&lt;/title&gt;'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;title&gt;Hello world! &amp;#8211; Pages &amp;amp; Co.&lt;/title&gt;</code></pre>
+                </div>
+                <p>"Hello world!" is the post the URL asked for, found by the main query; "Pages &amp; Co." is the site title stored in the database (as <code>&amp;amp;</code>, the HTML way of writing an ampersand, a detail Lesson 1.2 comes back to). The <code>&amp;#8211;</code> between them is an en dash written as an HTML entity, WordPress's default separator, which your browser tab shows as a plain dash. None of it is written in any file. This is the same request/response cycle as PHP Foundations Lesson 1.1, with WordPress doing the routing, the database work and the templating for you, and with hooks along the whole path where your code can join in.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Why this matters before you write any code</h4>
+                    <p>Most WordPress bugs are timing bugs: code that runs before the thing it needs exists. "Is the user known yet?" "Has the theme loaded?" "Has the main query run?" If you keep this sequence in mind (load, then query, then template), most of those questions answer themselves. Lesson 2.2 walks through <code>wp-settings.php</code> in detail, and Lesson 2.3 hangs your first code on its hooks.</p>
+                </div>
+            </section>
+
+            <section id="your-code" class="lesson-section">
+                <h2>🗂️ Where Your Code Lives</h2>
+                <p>Here is the WordPress root of the course site, the folder that <code>index.php</code> lives in:</p>
+                <pre data-cli><code class="language-bash">ls</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>index.php             wp-activate.php       wp-comments-post.php  wp-config.php         wp-includes           wp-login.php          wp-signup.php
+license.txt           wp-admin              wp-config-docker.php  wp-content            wp-links-opml.php     wp-mail.php           wp-trackback.php
+readme.html           wp-blog-header.php    wp-config-sample.php  wp-cron.php           wp-load.php           wp-settings.php       xmlrpc.php</code></pre>
+                </div>
+                <p>Almost all of it belongs to WordPress core: the <code>wp-*.php</code> files in the root, <code>wp-admin/</code> (the dashboard) and <code>wp-includes/</code> (the library: more than a thousand PHP files of functions and classes). Two exceptions matter to you. <code>wp-config.php</code> is your site's configuration, and <code>wp-config-docker.php</code> is the template the official Docker image builds it from (the next lesson explains). And <code>wp-content/</code> is the one folder that belongs to <em>you</em>:</p>
+                <pre data-cli><code class="language-bash">ls wp-content wp-content/themes wp-content/plugins</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>wp-content:
+index.php   mu-plugins  plugins     themes      uploads
+
+wp-content/plugins:
+akismet    hello.php  index.php
+
+wp-content/themes:
+index.php          twentytwentyfive   twentytwentyfour   twentytwentythree</code></pre>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Folder</th><th>What goes there</th><th>In this course</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>wp-content/themes/</code></td><td>One folder per theme. Twenty Twenty-Five is the default theme of WordPress 7.1; Twenty Twenty-Four and Twenty Twenty-Three ship too</td><td>Your block theme <code>pagesco</code> (Lesson 3.2)</td></tr>
+                            <tr><td><code>wp-content/plugins/</code></td><td>One folder (or file) per plugin. A fresh install has Akismet and Hello Dolly, both inactive</td><td>Your plugin <code>pagesco-books</code> (Lesson 5.1)</td></tr>
+                            <tr><td><code>wp-content/mu-plugins/</code></td><td>"Must-use" plugins: every PHP file here runs on every request, no activation</td><td><code>mailpit-smtp.php</code> (Lesson 1.2), <code>pagesco-site.php</code> (Lesson 2.3)</td></tr>
+                            <tr><td><code>wp-content/uploads/</code></td><td>Media files, by year and month</td><td>Book covers</td></tr>
+                            <tr><td><code>wp-content/debug.log</code></td><td>PHP errors and your <code>error_log()</code> lines, when logging is on</td><td>Your first stop when something breaks (Lesson 1.2)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Everything else WordPress knows lives in the database: posts, pages and books in <code>wp_posts</code>, their extra fields in <code>wp_postmeta</code>, settings in <code>wp_options</code>, users in <code>wp_users</code>. Your MySQL skills apply directly, and Lesson 2.2 takes you on a tour of the tables with SQL.</p>
+
+                <div class="card card-danger">
+                    <h4>🛑 Never edit core files</h4>
+                    <p>Changing a file in <code>wp-admin/</code>, <code>wp-includes/</code> or the root "to make it work" is the classic beginner fix, and it always comes back to bite. Every WordPress update replaces those files, so your change silently disappears, and a security update may be applied automatically in the middle of the night. A modified core file is also exactly what security scanners look for when a site has been hacked. If you need WordPress to behave differently, there is a hook, a theme or a plugin for it. Common Mistakes 1 shows how WordPress itself notices an edited core file.</p>
+                </div>
+            </section>
+
+            <section id="bridge" class="lesson-section">
+                <h2>🌉 From PHP and MySQL Foundations to WordPress</h2>
+                <p>You are not starting over. Everything you learned is still true inside WordPress; WordPress just has its own, older, established ways of doing many of the same jobs, and on a WordPress project you use those so that your code fits in with core and every other plugin. This table is the cheat sheet for the whole course:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You did this in the Foundations courses</th><th>WordPress does it with</th><th>Lesson</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>One PHP file per page, or your own router</td><td>Rewrite rules, the main query and the template hierarchy</td><td>2.2, 3.1</td></tr>
+                            <tr><td>Calling your own functions in order</td><td>Hooks: core calls your functions at the right moment</td><td>2.3</td></tr>
+                            <tr><td><code>htmlspecialchars()</code> on output</td><td><code>esc_html()</code>, <code>esc_attr()</code>, <code>esc_url()</code>, <code>wp_kses_post()</code></td><td>1.3, 5.3</td></tr>
+                            <tr><td><code>filter_input()</code> and validation</td><td><code>sanitize_text_field()</code>, <code>absint()</code> and friends, plus nonces against forged requests</td><td>1.3, 5.3</td></tr>
+                            <tr><td>PDO with prepared statements</td><td><code>WP_Query</code> and the content APIs first; <code>$wpdb-&gt;prepare()</code> when you need raw SQL</td><td>4.2, 5.5</td></tr>
+                            <tr><td><code>CREATE TABLE</code> for every kind of data</td><td>Custom post types, taxonomies and meta in the existing tables; a custom table only when it is really needed</td><td>5.2, 5.5</td></tr>
+                            <tr><td>Sessions and a login form</td><td>Users, roles and capabilities: <code>current_user_can()</code></td><td>2.1, 5.3</td></tr>
+                            <tr><td>Your own JSON endpoint</td><td>The REST API: <code>register_rest_route()</code></td><td>7.2</td></tr>
+                            <tr><td>Namespaces, classes, Composer</td><td>The same, inside your plugin (core itself is mostly procedural functions)</td><td>1.3, 5.1</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Some of WordPress will look old-fashioned to you after PHP Foundations: global functions instead of classes, a few global variables, arrays of arguments where you would expect typed parameters. That is the price of keeping millions of sites working through every update, and Lesson 1.3 explains the conventions so you can read core comfortably and write modern code that still fits in.</p>
+
+                <div class="card card-info">
+                    <h4>💡 What changes most: you write less of the program</h4>
+                    <p>In your own PHP apps you wrote the main program and called libraries. In WordPress, core is the main program and calls <em>you</em>. Developers call this "inversion of control", and it takes a few lessons to feel natural. If you catch yourself asking "where do I put the code that runs first?", the WordPress answer is almost always "in a function, attached to the right hook".</p>
+                </div>
+            </section>
+
+            <section id="pagesco" class="lesson-section">
+                <h2>📚 The Pages &amp; Co. Project</h2>
+                <p>Pages &amp; Co. is the independent bookstore you have met before: in MySQL Foundations you designed its <code>bookstore</code> database (the eleven classics from <em>Dune</em> to <em>Animal Farm</em>), and in PHP Foundations you wrote its <code>pagesco/bookstore</code> library and a small CRUD app. Now the store wants a real website its staff can update themselves, and that is a WordPress job. You will build it piece by piece, the way a professional would, and every lesson's project adds to the same site:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Module</th><th>What Pages &amp; Co. gets</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>1 Getting Started</td><td>A local development site (<code>http://localhost:8080</code>) with WP-CLI, debugging and email catching</td></tr>
+                            <tr><td>2 WordPress Inside Out</td><td>Staff accounts, the About, Contact and Events pages, and a site plugin with a store notice built on hooks</td></tr>
+                            <tr><td>3 Block Themes</td><td>The custom block theme <code>pagesco</code>: <code>theme.json</code>, templates, patterns, a style variation</td></tr>
+                            <tr><td>4 Classic &amp; Hybrid Themes</td><td>A classic theme <code>pagesco-classic</code>, to practice the Loop, custom queries and <code>functions.php</code></td></tr>
+                            <tr><td>5 Plugin Development</td><td>The plugin <code>pagesco-books</code>: a Book post type, Genres, book details, a settings page, events in a custom table</td></tr>
+                            <tr><td>6 Block Development</td><td>Custom blocks: a book card, a dynamic book list, an interactive genre filter</td></tr>
+                            <tr><td>7 APIs &amp; Integration</td><td>REST endpoints under <code>pagesco/v1</code>, a scheduled daily task, cached external data</td></tr>
+                            <tr><td>8 Professional Workflow</td><td>Tests, performance checks, translations, accessibility, and a deployment</td></tr>
+                            <tr><td>9 Final Project</td><td>The whole site, tested and launched</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The site follows one naming plan the whole way, so nothing collides with core or other plugins: the theme is <code>pagesco</code>, the plugin is <code>pagesco-books</code>, functions start with <code>pagesco_</code>, classes live in the <code>PagesCo\Books</code> namespace. You will see why that matters in Lesson 2.3 when two functions with the same name take a site down.</p>
+            </section>
+
+            <section id="how-to-learn" class="lesson-section">
+                <h2>🧠 How to Learn in This Course</h2>
+                <p>This is a hands-on course. Each lesson teaches an idea, shows it working, breaks it on purpose, and then has you build part of Pages &amp; Co. with it. A few habits will make it go much more smoothly.</p>
+                <h3>Type the examples, and trust the outputs</h3>
+                <p>Every command and every piece of code in this course was run on a real WordPress 7.1.3 site on PHP 8.5, and the <strong>Output</strong> card under it shows what it really printed. If your output differs, that difference is information: a typo, a missed step, a file in the wrong folder. Cards labeled "your ... will differ" show things that change on every run, such as dates and security tokens. Type the examples rather than pasting them, at least the short ones: your fingers learn the function names faster than your eyes do. Copy buttons are there for the long ones.</p>
+                <h3>Read the errors on purpose</h3>
+                <p>Every lesson has a <strong>Common Mistakes</strong> section where you make real mistakes deliberately and read what WordPress says. A developer who can read "Fatal error: Uncaught ArgumentCountError" calmly fixes it in a minute; one who panics takes an afternoon. The messages in this course are the real ones, so you will recognize them when they show up in your own work.</p>
+                <h3>Use the official documentation</h3>
+                <p>Nobody memorizes WordPress. Professionals look things up all day, mostly in two places at <a href="https://developer.wordpress.org/" target="_blank" rel="noopener">developer.wordpress.org</a>: the <strong>Code Reference</strong> (every core function, class and hook with its source) and the <strong>handbooks</strong> (Theme, Plugin, Block Editor, REST API). When a lesson introduces a function, open its Code Reference page once; you will get faster at it every time. Be careful with older blog posts and videos: check which WordPress version they were written for, because much of what you find is from before blocks.</p>
+                <h3>Keep a learning journal</h3>
+                <p>At the end of every lesson there is a short journal prompt. Writing down what clicked and what did not is one of the most reliable ways to make knowledge stick, and your journal becomes the place you look up "how did I fix that last time?". A notebook or a plain text file is enough. Start it today with the first entry at the end of this lesson.</p>
+
+                <div class="card card-success">
+                    <h4>✅ Growth mindset: add the word "yet"</h4>
+                    <p>WordPress is big, and at some point in this course you will think "I don't get hooks" or "blocks are too much". Add one word: "I don't get hooks <em>yet</em>." Every WordPress developer you will ever work with felt lost in core at first; the difference between them and someone who gave up is only that they kept going. Plateaus are normal, mistakes are feedback, and this course is a marathon you run one lesson at a time.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h4>⏱️ Plan your time</h4>
+                    <p>Each lesson shows an honest time at the top: reading, typing every example, the project, the exercises, the quiz and the journal. Most lessons take between one and a half and two and a half hours. Two shorter sessions work better than one long one, and stopping in the middle of a project is fine: your site keeps its state until you come back.</p>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <p>You do not have a site of your own until the next lesson, so here you watch these mistakes on the course site. Come back and repeat them on yours once Lesson 1.2 is done: each takes a minute.</p>
+
+                <h3>1. "Fixing" something by editing a core file</h3>
+                <p>Suppose a tutorial tells you to add a line to <code>wp-includes/functions.php</code>. This makes a backup in <code>wp-content/</code>, appends a harmless comment to that core file, and asks WP-CLI to compare every core file with the official checksums from WordPress.org:</p>
+                <pre data-cli data-raises="Warning,Error"><code class="language-bash">cp wp-includes/functions.php wp-content/functions.php.bak
+echo '// my quick fix' &gt;&gt; wp-includes/functions.php
+wp core verify-checksums</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Warning: File doesn't verify against checksum: wp-includes/functions.php
+Warning: File should not exist: wp-config-docker.php
+Error: WordPress installation doesn't verify against checksums.</code></pre>
+                </div>
+                <p><strong>What it means:</strong> WordPress knows exactly what every core file should contain, and the edited one fails the check (the other warning, about <code>wp-config-docker.php</code>, is the Docker image's extra file, expected on a Docker site). Updates replace a modified file without asking, and security plugins report it as a possible hack. <strong>Fix:</strong> put the change in a plugin or theme, attached to a hook, and leave core alone. Restore the file and check again:</p>
+                <pre data-cli data-raises="Warning"><code class="language-bash">mv wp-content/functions.php.bak wp-includes/functions.php
+wp core verify-checksums</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Warning: File should not exist: wp-config-docker.php
+Success: WordPress installation verifies against checksums.</code></pre>
+                </div>
+
+                <h3>2. Copying code from an old tutorial</h3>
+                <p>A tutorial from years ago gets the current user with <code>get_currentuserinfo()</code>. The function still exists, so the code "works", but WordPress tells you it should not be used:</p>
+                <pre data-cli data-raises="Deprecated"><code class="language-bash">wp eval 'get_currentuserinfo();'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Deprecated: Function get_currentuserinfo is &lt;strong&gt;deprecated&lt;/strong&gt; since version 4.5.0! Use wp_get_current_user() instead. in /var/www/html/wp-includes/functions.php on line 6260</code></pre>
+                </div>
+                <p><strong>What it means:</strong> deprecated functions are kept so old sites keep running, but they may be removed one day, and the replacement is usually better. The message names the version that deprecated it (4.5.0, many years ago) and the replacement. The <code>&lt;strong&gt;</code> tags are there because WordPress formats the message for a web page. You only see messages like this with debugging turned on, which is one reason your development site will always have it on (Lesson 1.2). <strong>Fix:</strong> use <code>wp_get_current_user()</code>, and check the date and the WordPress version of any tutorial before you copy from it.</p>
+
+                <h3>3. Customizing a theme you did not write</h3>
+                <p>It is tempting to add a few lines to <code>wp-content/themes/twentytwentyfive/functions.php</code> or to tweak one of its templates. Twenty Twenty-Five is updated through the dashboard like a plugin, and an update replaces the whole <code>twentytwentyfive/</code> folder: your lines are gone, without a warning. The same goes for any theme or plugin from the WordPress.org directory or a marketplace. <strong>Fix:</strong> site features go in your own plugin (Module 5), design changes go in your own theme or a child theme of the one you want to change (Lesson 3.4). Ask "who updates this folder?" before you edit any file in <code>wp-content/</code>: if the answer is not "me", do not edit it.</p>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Meet WordPress and Plan Pages &amp; Co.</h2>
+                <p>Before you install anything, take WordPress for a test drive and write down what you are going to build. You will use <strong>WordPress Playground</strong>, a complete WordPress that runs inside your browser tab (PHP compiled to WebAssembly, with an in-browser database). Nothing is installed, and the site disappears when you close the tab unless you choose to save it. Allow about 40 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: Start a WordPress in your browser <span class="step-time">(5 min)</span></h3>
+                    <p>Open this address in a current desktop browser. After a few seconds you are looking at a fresh WordPress site, logged in as an administrator:</p>
+                    <pre data-norun><code class="language-text">https://playground.wordpress.net/</code></pre>
+                    <p>Use Playground's settings panel to check which WordPress and PHP versions it is running, and pick WordPress 7.1 if it offers a choice. (Playground's default PHP version can be older than 8.5; for looking around that makes no difference.) Click through the dashboard: Posts, Pages, Appearance, Plugins, Settings. Note what is in the left-hand menu; Lesson 2.1 explains each part from a developer's point of view.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: Look at content the way WordPress stores it <span class="step-time">(10 min)</span></h3>
+                    <p>Go to Pages and add a new page titled "About Us". Add a heading "Our Story" and a paragraph "Pages &amp; Co. has sold books on Main Street since the day it opened." Then open the editor's options menu (the ⋮ button at the top right) and choose <strong>Code editor</strong>. You are looking at what WordPress saves in the database for this page:</p>
+                    <pre data-norun><code class="language-html">&lt;!-- wp:heading --&gt;
+&lt;h2 class="wp-block-heading"&gt;Our Story&lt;/h2&gt;
+&lt;!-- /wp:heading --&gt;
+
+&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;Pages &amp;amp; Co. has sold books on Main Street since the day it opened.&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;</code></pre>
+                    <p>Plain HTML, wrapped in HTML comments that name each block. That is the whole trick of the block editor: the comments let the editor rebuild the blocks, and the HTML between them is what visitors get. Switch back to the Visual editor, publish the page and view it. Write in your journal one thing that surprised you about this markup; Lesson 2.1 goes deeper.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: Write the Pages &amp; Co. site map <span class="step-time">(10 min)</span></h3>
+                    <p>Create a folder for your course work, for example <code>wordpress-course</code> in your home folder, and in it a plain text file <code>pagesco-plan.txt</code>. List the pages and the addresses the finished store will have. Start from this and add at least three of your own (a staff picks page? a gift card page?):</p>
+                    <pre data-norun><code class="language-text">Pages &amp; Co. site map
+/                      home: featured books, store notice, upcoming events
+/about/                About Us
+/contact/              Contact
+/events/               upcoming readings and book clubs
+/books/                all books
+/books/dune/           one book: author, price, pages, in stock
+/genre/fiction/        books in one genre</code></pre>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 4: Decide where each feature lives <span class="step-time">(15 min)</span></h3>
+                    <p>Under the site map, write a feature list with three columns: the feature, whether it is <strong>content</strong> (entered by staff in the dashboard), <strong>theme</strong> (how things look) or <strong>plugin</strong> (what the site can do), and why. Use the test from this lesson: "What should happen if Pages &amp; Co. switches to a different design next year?" Anything that must survive a redesign is not theme work. Do at least eight features, including: the store's colors and fonts, the Book type with price and page count, the About Us text, the list of genres, the events listing, the layout of a single book page, the store notice bar, a JSON feed of books for a partner app.</p>
+                    <p>There is no single right answer for every line, and that is the point: you will compare your plan with what the course builds and see where your thinking changed. Keep the file; the journal prompt in Lesson 5.1 asks you to look at it again.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li>You started WordPress Playground and found which WordPress and PHP versions it runs</li>
+                        <li>You created a page and read its block markup in the Code editor</li>
+                        <li><code>pagesco-plan.txt</code> has a site map with at least ten addresses</li>
+                        <li>It has a feature list of at least eight features, each marked content, theme or plugin, with a reason</li>
+                        <li>Your learning journal exists and has its first entry (see the end of this lesson)</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>These are thinking exercises: pen and paper (or your plan file) is enough. Try each one before you open the solution.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Theme, Plugin or Content?</h3>
+                    <p>For each item, decide where it belongs: <strong>theme</strong>, <strong>plugin</strong> or <strong>content</strong>. (a) A "Staff Pick" badge setting that marks some books. (b) The header layout with the logo on the left. (c) The text of the store's return policy. (d) An email to staff whenever a new event is added. (e) The font used for book titles. (f) Google Analytics tracking code that the store wants on every page whatever the design.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Ask of each one: should it survive a redesign? Is it something staff type in, or something a developer builds?</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>(a) <strong>Plugin</strong>: it is data about books, and books must survive a new theme (it would be book meta, Lesson 5.2). (b) <strong>Theme</strong>: pure layout. (c) <strong>Content</strong>: staff write it in a page. (d) <strong>Plugin</strong>: behavior, unrelated to design. (e) <strong>Theme</strong>: <code>theme.json</code> typography (Lesson 3.2). (f) <strong>Plugin</strong> (or a must-use plugin): it is required "whatever the design", the exact test. Putting tracking code in a theme is a common reason it vanishes after a redesign.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Follow <code>/books/dune/</code></h3>
+                    <p>A visitor opens <code>http://localhost:8080/books/dune/</code> on the finished Pages &amp; Co. site. List, in order, the core files and steps WordPress goes through, from the first file that runs to the HTML. Where along the way does your <code>pagesco-books</code> plugin get the chance to say "there is a post type called <code>book</code>"? Why must that happen before the main query?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Use the diagram in "One Request, Start to Finish". Plugins are loaded inside one of those files, and <code>init</code> fires before <code>wp()</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p><code>index.php</code> → <code>wp-blog-header.php</code> → <code>wp-load.php</code> → <code>wp-config.php</code> → <code>wp-settings.php</code> (core, must-use plugins, plugins including <code>pagesco-books</code>, the theme, then the <code>init</code> action) → <code>wp()</code> matches the URL to the rewrite rule for books and runs the main query for the book with the slug <code>dune</code> → <code>template-loader.php</code> picks the theme's template for a single book → HTML. The plugin registers the post type on <code>init</code> (Lesson 5.2). It must happen before the main query because the rewrite rule for <code>/books/…</code> and the post type itself only exist once they are registered; if they were registered later, <code>wp()</code> would not recognize the URL and the visitor would get a 404.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: Choose the Hosting</h3>
+                    <p>Three people ask for your advice. (a) A retired teacher wants a simple blog about birds, no budget for a developer, and never wants to think about updates. (b) Pages &amp; Co. needs its custom theme, its own plugin with a Book post type, and a REST endpoint for a partner app. (c) A small agency wants staging sites for every client, WP-CLI over SSH and Git-based deploys. Which kind of hosting fits each, and what question would you ask before saying yes to (b) if the store is already on WordPress.com?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Who needs custom code, and who needs someone else to do the maintenance?</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>(a) WordPress.com (or another fully managed host) on a basic plan: no custom code, maintenance done for her. (b) Self-hosted WordPress on a host that allows custom themes and plugins, typically a managed WordPress host or a VPS; this course's choice. (c) A managed WordPress host or a VPS with staging, SSH and WP-CLI (Lesson 8.4). For (b) on WordPress.com, ask: "Which plan are you on, and does it allow uploading your own plugins and themes?" If not, the store must upgrade or move before you can deliver.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 4: Read the Front Door Yourself (Stretch)</h3>
+                    <p>The WordPress source code is public. Open the official read-only mirror of the core files at <a href="https://github.com/WordPress/WordPress" target="_blank" rel="noopener">github.com/WordPress/WordPress</a> (or, after Lesson 1.2, the <code>wordpress/</code> folder of your own project) and read <code>wp-blog-header.php</code> and the end of <code>wp-config-sample.php</code>. Answer: (1) Why does <code>wp-blog-header.php</code> check <code>$wp_did_header</code>? (2) What is the last line of real code in <code>wp-config-sample.php</code>, and what does that tell you about where your own settings must go in <code>wp-config.php</code>? (3) After Lesson 1.2, find the line where the function <code>wp()</code> is defined.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>For (3), <code>grep -n "^function wp(" wp-includes/functions.php</code> from the WP-CLI container. Functions are defined in <code>wp-includes/</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>(1) So the file only does its work once, even if it is included twice; with <code>require_once</code> plus the flag, a second include does nothing. (2) <code>require_once ABSPATH . 'wp-settings.php';</code>, right under the comment "That's all, stop editing!". Anything you define in <code>wp-config.php</code> must come <em>above</em> that line, because by the time <code>wp-settings.php</code> runs, WordPress has already read your constants. (3) On the course site:</p>
+                        <pre data-cli><code class="language-bash">grep -n "^function wp(" wp-includes/functions.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>1349:function wp( $query_vars = '' ) {</code></pre>
+                        </div>
+                        <p>The one-line call <code>wp();</code> in <code>wp-blog-header.php</code> leads here, to the function that sets off the whole query process. Reading core is often just that: following one function into the next.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> Pages &amp; Co. needs a "Staff Pick" checkbox on every book. Where should the code for it go?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That file is replaced on every update. What does WordPress give you so that you never need to touch it?">
+                                A) In wp-includes/post.php, next to the other post functions
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="It is a feature of the store's data, so it belongs in the store's own plugin, in wp-content/plugins/, where it survives core updates and theme changes.">
+                                B) In the pagesco-books plugin in wp-content/plugins/
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Would the checkbox and its data survive if the store switched to a new design next year?">
+                                C) In the functions.php of the active theme
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> A client says "our site is on WordPress.com" and asks you to install a custom plugin. What is the right first step?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="WordPress.com is a hosting service. Does every plan let you upload code?">
+                                A) Upload the plugin: every WordPress site can install any plugin
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Custom plugins are possible on WordPress.com, on the right plan. Is rebuilding the only way?">
+                                B) Tell them custom code is impossible on WordPress.com and the site must be rebuilt
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Whether you can install your own plugins on WordPress.com depends on the plan. Find out first; the answer may be an upgrade or a move to another host.">
+                                C) Ask which plan they are on, because only some plans allow your own plugins
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> In which order does a front-end request reach these files?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="index.php hands over to wp-blog-header.php, whose wp-load.php finds wp-config.php, which ends by loading wp-settings.php; only then do wp() and the template loader run.">
+                                A) index.php, wp-blog-header.php, wp-config.php, wp-settings.php, template-loader.php
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The template can only be chosen once WordPress knows what was asked for. What has to be loaded before any of that?">
+                                B) index.php, template-loader.php, wp-config.php, wp-settings.php, wp-blog-header.php
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Look at the last line of wp-config-sample.php: which file does the configuration load?">
+                                C) wp-settings.php, wp-config.php, index.php, wp-blog-header.php, template-loader.php
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> Code from a tutorial prints <code>Deprecated: Function get_currentuserinfo is deprecated since version 4.5.0! Use wp_get_current_user() instead.</code> What should you do?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The notice is a warning about the future. What happens to your code when the function is finally removed?">
+                                A) Nothing: the code still works, so the message can be ignored
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Hiding a message does not change the code that caused it. What does the message itself suggest?">
+                                B) Turn off debugging so the message goes away
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The message names the replacement. Switch to wp_get_current_user(), and treat the tutorial with care: it was written for a much older WordPress.">
+                                C) Replace the call with wp_get_current_user() and check how old the tutorial is
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> In PHP Foundations your code called functions in the order you chose. What is the biggest change in WordPress?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Your PHP is the same language here, with the same classes and namespaces. What changes is who is in charge of the order.">
+                                A) WordPress does not allow classes, so everything must be a function
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Core runs the program and calls your functions at the moments you registered them for with hooks. This inversion of control is what Lesson 2.3 builds on.">
+                                B) WordPress core runs the main program and calls your code through hooks
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="WordPress uses MySQL too, and you can still query it. What does WordPress do for you that your own program used to do?">
+                                C) WordPress stores content in files instead of a database
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Do I need to know JavaScript and React for this course?</summary>
+                    <p>For Modules 1 to 5, no: it is PHP, SQL, HTML and some CSS. Module 6 (custom blocks) uses modern JavaScript and a little React, and the lessons explain what you need as they go; if you have written JavaScript before, you will be fine. The build tooling (Node 24, <code>@wordpress/scripts</code>) is set up step by step in Lesson 6.1.</p>
+                </details>
+                <details>
+                    <summary>Is WordPress still worth learning with so many newer platforms around?</summary>
+                    <p>Yes, for a practical reason: the sheer number of existing WordPress sites means a steady demand for people who can maintain, extend and rebuild them, and new sites keep being built on it because clients can edit their own content. WordPress has also kept moving: block themes, the REST API, the Interactivity API and AI building blocks in 7.x. The skills transfer too: PHP, SQL, React, REST and good security habits are useful well beyond WordPress.</p>
+                </details>
+                <details>
+                    <summary>What about page builders like Elementor or Divi?</summary>
+                    <p>They are plugins that replace much of the editor and theme with their own drag-and-drop system, and you will meet them on client sites. This course teaches the core platform underneath: blocks, themes and plugins written in code. That is what lets you extend any site, page builder or not, and what page-builder add-ons are themselves built with.</p>
+                </details>
+                <details>
+                    <summary>My computer is old. Can I still do the course?</summary>
+                    <p>Lesson 1.2 runs WordPress in Docker, which works best with 8 GB of memory or more and a few gigabytes of free disk space. If that is a struggle, the lesson also shows <code>wp-env</code> and WordPress Playground, and many lessons can be followed in Playground with some limits. Lesson 1.2's FAQ has details.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Pick a website you admire and find out whether it runs WordPress, without any special tools. Open its View Source and look for clues: paths containing <code>/wp-content/</code> or <code>/wp-includes/</code>, a <code>&lt;meta name="generator"&gt;</code> tag, a <code>&lt;link rel="https://api.w.org/"&gt;</code> tag pointing at <code>/wp-json/</code>. Then try its address followed by <code>/wp-json/</code>. Write down which clues you found and which theme folder name appears in the paths. (Lesson 2.3 shows how to remove the generator tag from your own site, and why hiding it is not real security.)</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>This is the first entry in the learning journal you will keep through the whole course (a notebook or a plain text file works fine). After every lesson, take five minutes to jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Start your journal with two questions. <em>Why do you want to learn WordPress development?</em> (A job, freelance clients, your own project, maintaining a site someone handed you?) And <em>what do you hope to build</em> by the end of this course, besides Pages &amp; Co.? Describe it in a few sentences: who it is for, two or three features it needs, and which of them you think will be theme work and which plugin work. You will reread this entry at the end of the course and see how far you have come.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>For a developer, WordPress is a <strong>PHP application on MySQL</strong> that you extend through hooks, themes, plugins, blocks and APIs, never by editing core</li>
+                        <li><strong>WordPress.org</strong> is the open-source software and its community; <strong>WordPress.com</strong> is one hosting service, where custom code depends on the plan</li>
+                        <li>Every front-end request goes <code>index.php</code> → <code>wp-blog-header.php</code> → <code>wp-load.php</code> / <code>wp-config.php</code> → <code>wp-settings.php</code> → <code>wp()</code> (the main query) → <code>template-loader.php</code> → HTML</li>
+                        <li>Your code lives in <code>wp-content/</code>: themes for looks, plugins for features, must-use plugins for site-wide code; everything else WordPress knows is in the database</li>
+                        <li>Your PHP and MySQL skills carry over; WordPress adds its own conventions: hooks, escaping functions, <code>WP_Query</code>, capabilities</li>
+                        <li>WordPress 7.1 is block-first (block themes, <code>theme.json</code>, the Interactivity API) while classic APIs stay supported and widely used</li>
+                    </ul>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You took WordPress apart on paper: its extension points, its milestones and its request lifecycle</li>
+                        <li>You ran a WordPress site in your browser and read the block markup it stores</li>
+                        <li>You wrote the Pages &amp; Co. site plan and decided where each feature belongs</li>
+                        <li>You started the learning journal you will keep for the whole course</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>In <a href="lesson_02.html"><strong>Lesson 1.2: Your Local Development Environment</strong></a> you set up the real thing: a Pages &amp; Co. development site at <code>http://localhost:8080</code> running WordPress 7.1 on PHP 8.5 and MySQL 9.7 in Docker, with WP-CLI to control it from the command line, debugging and a log file to catch every error, and Mailpit to catch every email. It is the site every later lesson builds on, so that lesson takes its time.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Check that your computer can run Docker: Windows 10/11 (64-bit) with WSL 2, a recent macOS, or a 64-bit Linux; 8 GB of memory or more is comfortable</li>
+                    <li>Make sure you can open a terminal (Terminal on macOS, Ubuntu for WSL on Windows, your usual shell on Linux) and that you have administrator rights to install software</li>
+                    <li>Install Visual Studio Code if you do not have it yet; Lesson 1.2 adds its PHP support</li>
+                    <li>Keep <code>pagesco-plan.txt</code> and your journal where you will find them again</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>You already have the hard parts: you know how a server builds a page, how to write PHP, how to model and query data. WordPress is a large codebase written by thousands of people, and nobody understands all of it; good WordPress developers simply know where to look and are not afraid to read core. That is exactly the habit this course builds, one lesson at a time. Welcome to the project. By the end of it, Pages &amp; Co. will be a real, deployed website, and you will have built every piece of it.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_02.html" class="next-lesson">Next: Your Local Development Environment →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

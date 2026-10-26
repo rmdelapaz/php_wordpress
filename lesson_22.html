@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="The Interactivity API on WordPress 7.1: server-rendered directives, wp_interactivity_state and derived state, a script module store with state, context and actions, withSyncEvent, progressive enhancement, building the Pages &amp; Co. Book Filter. PHP and WordPress Development Lesson 6.4.">
+    <meta name="author" content="Ray de la Paz">
+    <title>The Interactivity API - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 6: Block Development</a></li>
+            <li aria-current="page">Lesson 6.4: The Interactivity API</li>
+        </ul>
+    </nav>
+    <main id="main-content" data-state="after:lesson_21">
+        <div class="container">
+            <header>
+                <h1>⚡ Lesson 6.4: The Interactivity API</h1>
+                <p class="lead">A customer on the Pages &amp; Co. site wants the fantasy books, then the dystopian ones, then everything again. With what you have built so far, each choice is a new page load. Today the shop gets a catalog that filters instantly in the browser, and you get WordPress's own answer to front-end interactivity: the server renders the finished HTML with a few <code>data-wp-*</code> attributes, and a small store of state and actions, written in a JavaScript module, takes over in the browser. No hand-written DOM code, no React on the front end, and the page works before (and without) the JavaScript.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Explain how the Interactivity API splits the work: server-rendered HTML with directives, then hydration by a store in a script module</li>
+                        <li>Scaffold an interactive block into the plugin, and build its <code>viewScriptModule</code> with <code>--experimental-modules</code></li>
+                        <li>Set state and per-element context in PHP with <code>wp_interactivity_state()</code> and <code>wp_interactivity_data_wp_context()</code>, including derived state the server can compute</li>
+                        <li>Write a store with <code>store()</code>, state getters, <code>getContext()</code> and actions, and connect it with <code>data-wp-on</code>, <code>bind</code>, <code>class</code> and <code>text</code></li>
+                        <li>Build interactive features that stay accessible and keep working without JavaScript</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 140 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_21.html">Lesson 6.3: Dynamic Blocks &amp; Block Bindings</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> the <code>pagesco/book-filter</code> block: the whole catalog with genre links that filter instantly, keep the address in step, and work without JavaScript, on a new "Find a Book" page</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (derived state computed on the server needs 6.6+, <code>withSyncEvent()</code> 6.8+; the plugin requires 6.8)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 6.3, with Node 24; a browser with its developer tools (<kbd>F12</kbd>)</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#why" class="toc-link">Interactivity, the WordPress Way</a></li>
+                        <li><a href="#scaffold" class="toc-link">Scaffolding an Interactive Block</a></li>
+                        <li><a href="#server" class="toc-link">The Server Side: State, Context, Directives</a></li>
+                        <li><a href="#store" class="toc-link">The Browser Side: the Store</a></li>
+                        <li><a href="#enhancement" class="toc-link">Without JavaScript, and for Everyone</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: A Find a Book Page</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="why" class="lesson-section">
+                <h2>🎭 Interactivity, the WordPress Way</h2>
+                <p>Lesson 6.3's Book List can show one genre, chosen by an editor. Letting <em>visitors</em> choose needs JavaScript on the front end, and there are three classic ways to add it: hand-written JavaScript in a <code>viewScript</code> that finds elements and toggles them (fine for one button, a tangle for a catalog); a React app on the front end (a big download, and the page is empty until it runs); or the <strong>Interactivity API</strong>, WordPress's standard since 6.5, which core's own Navigation, Image lightbox, Search and Query pagination blocks use.</p>
+                <p>Its idea fits what you already know. <code>render.php</code> keeps rendering the real HTML on the server, so visitors and search engines get a complete page. Into that HTML you write <strong>directives</strong>, attributes such as <code>data-wp-on--click="actions.selectGenre"</code> or <code>data-wp-bind--hidden="!state.isVisible"</code>, which <em>declare</em> how the element depends on data. The data, the <strong>state</strong>, starts in PHP and is sent to the browser as JSON. In the browser, a <strong>store</strong> in a script module holds the same state plus the <strong>actions</strong> that change it, and the Interactivity runtime (<code>@wordpress/interactivity</code>, about the size of a small image) keeps every directive in step whenever state changes. You never write <code>querySelector</code> or <code>classList.toggle</code>.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: the stage and the lighting desk</h4>
+                    <p>The server builds the stage: every book is on it, every genre link, finished and visible. Directives are cables from each light on the stage to a fader on the lighting desk ("this book is lit while <code>isVisible</code> is true"). The store is the desk: move the <code>genre</code> fader, and every light wired to it changes at once. You only ever touch the faders; the cables do the rest.</p>
+                </div>
+
+                <div class="mermaid">
+graph TD
+    A["render.php: HTML, directives, wp_interactivity_state"] -->|"server processes directives"| B["finished HTML and state JSON"]
+    B -->|"browser loads view.js module"| C["store: state, getters, actions"]
+    C -->|"hydration"| D["directives wired to state"]
+    D -->|"click: actions.selectGenre"| E["state.genre changes"]
+    E -->|"runtime updates"| D
+                </div>
+
+                <p>Two consequences make the API different from a front-end framework. First, the <em>server</em> evaluates directives too: when it renders <code>data-wp-bind--hidden="!state.isVisible"</code>, WordPress computes the value in PHP and writes <code>hidden</code> into the HTML, so the page is correct before any JavaScript runs. Second, all the JavaScript is shared: one runtime for every interactive block on the page, loaded as a native ES module.</p>
+            </section>
+
+            <section id="scaffold" class="lesson-section">
+                <h2>🏗️ Scaffolding an Interactive Block</h2>
+                <p>Interactive blocks have their own create-block template, a separate npm package. It works with <code>--no-plugin</code> like the others. In the plugin's folder:</p>
+                <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npx @wordpress/create-block@latest book-filter --no-plugin --template @wordpress/create-block-interactive-template --target-dir=src/blocks/book-filter --namespace=pagesco --textdomain=pagesco-books</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>...
+
+Creating a "block.json" file.
+
+...
+
+Code is Poetry</code></pre>
+                </div>
+                <p>The first <code>...</code> includes "Downloading template files"; the others name your folder. What it wrote, and the parts of <code>block.json</code> that make it interactive:</p>
+                <pre data-cli><code class="language-bash">cd wp-content/plugins/pagesco-books/src/blocks/book-filter
+ls
+grep -E '"(interactivity|viewScriptModule)"' block.json
+cat view.js</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>README.md    block.json   edit.js      editor.scss  index.js     render.php   style.scss   view.js
+		"interactivity": true
+	"viewScriptModule": "file:./view.js"
+import { store, getContext } from '@wordpress/interactivity';
+
+const { state } = store( 'pagesco', {
+	state: {
+		get themeText() {
+			return state.isDark ? state.darkText : state.lightText;
+		}
+	},
+	actions: {
+		toggleOpen() {
+			const context = getContext();
+			context.isOpen = ! context.isOpen;
+		},
+		toggleTheme() {
+			state.isDark = ! state.isDark;
+		}
+	},
+	callbacks: {
+		logIsOpen: () =&gt; {
+			const { isOpen } = getContext();
+			// Log the value of `isOpen` each time it changes.
+			console.log( `Is open: ${ isOpen }` );
+		},
+	},
+} );</code></pre>
+                </div>
+                <ul>
+                    <li><code>"supports": { "interactivity": true }</code> tells WordPress the block's markup contains directives, so the server processes them when it renders the block.</li>
+                    <li><code>"viewScriptModule": "file:./view.js"</code> is the front-end code, loaded as a <strong>script module</strong> (<code>&lt;script type="module"&gt;</code>) only on pages that contain the block. Script modules are WordPress's (6.5+) way of loading native JavaScript modules, with an import map that points <code>@wordpress/interactivity</code> at core's copy.</li>
+                    <li><code>view.js</code> calls <code>store( 'pagesco', { state, actions, callbacks } )</code>. The first argument is the store's <strong>namespace</strong>; the scaffold used the block namespace, but a store namespace should be unique to the feature, so yours will be <code>pagesco/book-filter</code>.</li>
+                </ul>
+                <p>The scaffold's demo (a dark-mode toggle and an open/close paragraph) is worth a read and then it goes, together with <code>README.md</code> and <code>editor.scss</code>, which the shop's block does not need:</p>
+                <pre data-cli><code class="language-bash">cd wp-content/plugins/pagesco-books/src/blocks/book-filter
+rm README.md editor.scss</code></pre>
+
+                <h3>Building script modules</h3>
+                <p>One more switch, once per plugin. <code>wp-scripts build</code> builds classic scripts by default and silently skips <code>viewScriptModule</code> files; the option <code>--experimental-modules</code> adds a second build for modules (Common Mistake 1 shows the silent version). Replace <code>package.json</code> in <code>pagesco-books</code>, adding the option to both scripts:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/package.json"><code class="language-json">{
+	"name": "pagesco-books",
+	"version": "1.0.0",
+	"private": true,
+	"description": "The blocks of the Pages &amp; Co. Books plugin.",
+	"license": "GPL-2.0-or-later",
+	"scripts": {
+		"build": "wp-scripts build --webpack-src-dir=src/blocks --output-path=build/blocks --blocks-manifest --experimental-modules",
+		"start": "wp-scripts start --webpack-src-dir=src/blocks --output-path=build/blocks --blocks-manifest --experimental-modules"
+	},
+	"devDependencies": {
+		"@wordpress/scripts": "^37.0.0"
+	}
+}</code></pre>
+                <p>"Experimental" refers to the build option's name, which has stayed while module support matured; core's own interactive blocks, and create-block's interactive template, rely on it. No other block changes: the Book Card and the Book List build exactly as before.</p>
+            </section>
+
+            <section id="server" class="lesson-section">
+                <h2>🖥️ The Server Side: State, Context, Directives</h2>
+                <p>The Book Filter shows the whole catalog with a row of genre links on top and a sentence "Showing 2 of 11 books". It has no attributes: it is the same on every page. Replace <code>src/blocks/book-filter/block.json</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-filter/block.json"><code class="language-json">{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "pagesco/book-filter",
+	"version": "0.1.0",
+	"title": "Book Filter",
+	"category": "widgets",
+	"icon": "filter",
+	"description": "The whole catalog, with genre buttons that filter it instantly.",
+	"keywords": [ "books", "genres", "catalog" ],
+	"textdomain": "pagesco-books",
+	"supports": {
+		"html": false,
+		"interactivity": true,
+		"color": {
+			"background": true,
+			"text": true,
+			"link": true
+		},
+		"spacing": {
+			"margin": true,
+			"padding": true
+		}
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css",
+	"render": "file:./render.php",
+	"viewScriptModule": "file:./view.js"
+}</code></pre>
+                <p>The design decision comes before any code: <strong>what is the state?</strong> Only one thing changes when a customer clicks, the selected genre, so the state is one string, <code>genre</code>, empty for "All books". Everything else is derived from it: whether a book is visible, whether a link is the current one, how many books show. Each book and each link also needs to know something about itself (its genres, its slug); that is <strong>context</strong>, data attached to an element and visible to the directives inside it. Replace <code>src/blocks/book-filter/render.php</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-filter/render.php"><code class="language-php">&lt;?php
+/**
+ * Renders the Book Filter: genre links and the whole catalog, with Interactivity API directives.
+ *
+ * The server prints the finished HTML (filtered already if the URL says ?genre=…), and the
+ * view.js store takes over in the browser. $attributes, $content and $block as in Lesson 6.3.
+ *
+ * @package PagesCo\Books
+ */
+
+use PagesCo\Books\BookPostType;
+use PagesCo\Books\GenreTaxonomy;
+use PagesCo\Books\Shortcodes\BookShortcode;
+
+$books = get_posts(
+	array(
+		'post_type'      =&gt; BookPostType::NAME,
+		'post_status'    =&gt; 'publish',
+		'posts_per_page' =&gt; 100,
+		'orderby'        =&gt; 'title',
+		'order'          =&gt; 'ASC',
+	)
+);
+$genres = get_terms(
+	array(
+		'taxonomy'   =&gt; GenreTaxonomy::NAME,
+		'hide_empty' =&gt; true,
+	)
+);
+$genres = is_array( $genres ) ? $genres : array();
+
+// Each book's genre slugs, in the same order as $books.
+$book_genres = array();
+foreach ( $books as $book ) {
+	$terms         = get_the_terms( $book, GenreTaxonomy::NAME );
+	$book_genres[] = is_array( $terms ) ? wp_list_pluck( $terms, 'slug' ) : array();
+}
+
+// A genre in the address (?genre=fantasy) is the starting filter, so the links work without JavaScript.
+$selected = isset( $_GET['genre'] ) ? sanitize_key( wp_unslash( $_GET['genre'] ) ) : '';
+if ( ! in_array( $selected, wp_list_pluck( $genres, 'slug' ), true ) ) {
+	$selected = '';
+}
+
+wp_interactivity_state(
+	'pagesco/book-filter',
+	array(
+		'genre'        =&gt; $selected,
+		'bookGenres'   =&gt; $book_genres,
+		// Derived state: the server runs these closures while it processes the directives.
+		'isVisible'    =&gt; function () {
+			$state   = wp_interactivity_state();
+			$context = wp_interactivity_get_context();
+			return '' === $state['genre'] || in_array( $state['genre'], $context['genres'], true );
+		},
+		'isSelected'   =&gt; function () {
+			$state   = wp_interactivity_state();
+			$context = wp_interactivity_get_context();
+			return $state['genre'] === $context['slug'];
+		},
+		'visibleCount' =&gt; function () {
+			$state = wp_interactivity_state();
+			$count = 0;
+			foreach ( $state['bookGenres'] as $slugs ) {
+				if ( '' === $state['genre'] || in_array( $state['genre'], $slugs, true ) ) {
+					++$count;
+				}
+			}
+			return $count;
+		},
+	)
+);
+
+$card  = new BookShortcode();
+$links = array_merge(
+	array( '' =&gt; __( 'All books', 'pagesco-books' ) ),
+	wp_list_pluck( $genres, 'name', 'slug' )
+);
+?&gt;
+&lt;div &lt;?php echo get_block_wrapper_attributes(); ?&gt; data-wp-interactive="pagesco/book-filter"&gt;
+	&lt;nav class="wp-block-pagesco-book-filter__genres" aria-label="&lt;?php esc_attr_e( 'Filter by genre', 'pagesco-books' ); ?&gt;"&gt;
+		&lt;?php foreach ( $links as $slug =&gt; $name ) : ?&gt;
+			&lt;a
+				href="&lt;?php echo esc_url( '' === $slug ? remove_query_arg( 'genre' ) : add_query_arg( 'genre', $slug ) ); ?&gt;"
+				&lt;?php echo wp_interactivity_data_wp_context( array( 'slug' =&gt; (string) $slug ) ); ?&gt;
+				data-wp-on--click="actions.selectGenre"
+				data-wp-bind--aria-current="state.isSelected"
+				data-wp-class--is-selected="state.isSelected"
+			&gt;&lt;?php echo esc_html( $name ); ?&gt;&lt;/a&gt;
+		&lt;?php endforeach; ?&gt;
+	&lt;/nav&gt;
+
+	&lt;p class="wp-block-pagesco-book-filter__count" aria-live="polite"&gt;
+		&lt;?php
+		printf(
+			/* translators: 1: number of books shown, 2: number of books in the catalog. */
+			esc_html__( 'Showing %1$s of %2$s books', 'pagesco-books' ),
+			'&lt;span data-wp-text="state.visibleCount"&gt;&lt;/span&gt;',
+			esc_html( number_format_i18n( count( $books ) ) )
+		);
+		?&gt;
+	&lt;/p&gt;
+
+	&lt;ul class="wp-block-pagesco-book-filter__books"&gt;
+		&lt;?php foreach ( $books as $index =&gt; $book ) : ?&gt;
+			&lt;li
+				&lt;?php echo wp_interactivity_data_wp_context( array( 'genres' =&gt; $book_genres[ $index ] ) ); ?&gt;
+				data-wp-bind--hidden="!state.isVisible"
+			&gt;&lt;?php echo wp_kses_post( $card-&gt;render( array( 'id' =&gt; $book-&gt;ID ) ) ); ?&gt;&lt;/li&gt;
+		&lt;?php endforeach; ?&gt;
+	&lt;/ul&gt;
+&lt;/div&gt;</code></pre>
+                <p>From the top:</p>
+                <ul>
+                    <li><strong>The data.</strong> All published books in title order, the genres that have books, and each book's genre slugs. <code>get_the_terms()</code> reads from the term cache that <code>get_posts()</code> filled, so the loop runs no extra queries.</li>
+                    <li><strong>The starting genre comes from the address.</strong> <code>?genre=fantasy</code> is user input: <code>wp_unslash()</code>, <code>sanitize_key()</code>, and then a check against the real slugs (Lesson 5.3: validate against what is allowed). Anything else means "All books".</li>
+                    <li><strong><code>wp_interactivity_state( 'pagesco/book-filter', array( … ) )</code></strong> sets the store's initial state on the server. Plain values (<code>genre</code>, <code>bookGenres</code>) are sent to the browser as JSON. <strong>Closures</strong> are derived state: while WordPress processes the directives it calls them, and inside them <code>wp_interactivity_state()</code> (without arguments) and <code>wp_interactivity_get_context()</code> return the current namespace's state and the context of the element being processed. Their results go into the HTML, not into the JSON.</li>
+                    <li><strong><code>data-wp-interactive="pagesco/book-filter"</code></strong> on the wrapper names the store; every directive inside refers to it.</li>
+                    <li><strong><code>wp_interactivity_data_wp_context( $array )</code></strong> prints a <code>data-wp-context</code> attribute with the array as JSON, quoted and escaped correctly. Each link gets <code>{"slug":"fantasy"}</code>, each list item <code>{"genres":[…]}</code>.</li>
+                    <li><strong>The directives.</strong> <code>data-wp-on--click</code> runs an action; <code>data-wp-bind--aria-current</code> and <code>data-wp-bind--hidden</code> set an attribute from a value (<code>!</code> negates); <code>data-wp-class--is-selected</code> adds or removes a class; <code>data-wp-text</code> sets an element's text. The links are real links (<code>add_query_arg()</code>, <code>esc_url()</code>), the count sentence is translated in PHP with the numbers as placeholders, and every book line is Lesson 5.5's formatter again, escaped where printed.</li>
+                </ul>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Directive</th><th>Does</th><th>Processed on the server too</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>data-wp-interactive</code></td><td>names the store for this element and its children</td><td>yes</td></tr>
+                            <tr><td><code>data-wp-context</code></td><td>attaches local data, merged with parents' context</td><td>yes</td></tr>
+                            <tr><td><code>data-wp-bind--attr</code></td><td>sets or removes an attribute</td><td>yes</td></tr>
+                            <tr><td><code>data-wp-class--name</code></td><td>adds or removes a class</td><td>yes</td></tr>
+                            <tr><td><code>data-wp-style--prop</code></td><td>sets a CSS property</td><td>yes</td></tr>
+                            <tr><td><code>data-wp-text</code></td><td>sets the text content</td><td>yes</td></tr>
+                            <tr><td><code>data-wp-each</code></td><td>repeats a <code>&lt;template&gt;</code> for each item of a list</td><td>yes</td></tr>
+                            <tr><td><code>data-wp-on--event</code>, <code>data-wp-on-async--event</code></td><td>runs an action on a DOM event (<code>on-async</code> for actions that need nothing from the event right away)</td><td>no (browser only)</td></tr>
+                            <tr><td><code>data-wp-watch</code>, <code>data-wp-init</code>, <code>data-wp-run</code></td><td>run a callback when its state changes, once on start, or on every render</td><td>no</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The styles, then <code>index.js</code> and an <code>edit.js</code> that previews the block with Lesson 6.3's <code>ServerSideRender</code> (a filter is for visitors; the editor only needs to show where it is). Replace <code>src/blocks/book-filter/style.scss</code>, <code>src/blocks/book-filter/index.js</code> and <code>src/blocks/book-filter/edit.js</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-filter/style.scss"><code class="language-css">.wp-block-pagesco-book-filter__genres {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.wp-block-pagesco-book-filter__genres a {
+	padding: 0.25rem 0.75rem;
+	border: 1px solid currentColor;
+	border-radius: 999px;
+	text-decoration: none;
+}
+
+.wp-block-pagesco-book-filter__genres a.is-selected {
+	outline: 2px solid currentColor;
+	font-weight: 700;
+}
+
+.wp-block-pagesco-book-filter__books {
+	list-style: none;
+	padding-left: 0;
+}
+
+.wp-block-pagesco-book-filter__books li {
+	padding: 0.5rem 0;
+	border-bottom: 1px solid currentColor;
+}</code></pre>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-filter/index.js"><code class="language-js">import { registerBlockType } from '@wordpress/blocks';
+import './style.scss';
+import Edit from './edit';
+import metadata from './block.json';
+
+registerBlockType( metadata.name, {
+	edit: Edit,
+} );</code></pre>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-filter/edit.js"><code class="language-js">import { useBlockProps } from '@wordpress/block-editor';
+import ServerSideRender from '@wordpress/server-side-render';
+
+export default function Edit() {
+	// A preview from render.php; the filter itself works on the front end.
+	return (
+		&lt;div { ...useBlockProps() }&gt;
+			&lt;ServerSideRender
+				block="pagesco/book-filter"
+				skipBlockSupportAttributes
+			/&gt;
+		&lt;/div&gt;
+	);
+}</code></pre>
+                <p>Build (the scaffold's <code>view.js</code> is still there; the next section replaces it) and put the block on a test page:</p>
+                <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null
+ls build/blocks/book-filter</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>block.json
+index.asset.php
+index.js
+render.php
+style-index-rtl.css
+style-index.css
+view.asset.php
+view.js</code></pre>
+                </div>
+                <pre data-content="page:filter-test" data-title="Filter test"><code class="language-html">&lt;!-- wp:pagesco/book-filter /--&gt;</code></pre>
+                <p>Now ask for the fantasy books, with <code>curl</code>, which runs no JavaScript at all. The count, the Fantasy link, and how many list items the server already hid:</p>
+                <pre data-cli><code class="language-bash">curl -s 'http://localhost:8080/filter-test/?genre=fantasy' &gt; filter.html
+grep -o 'Showing &lt;span data-wp-text="state.visibleCount"&gt;[0-9]*&lt;/span&gt; of [0-9]* books' filter.html
+grep -o '&lt;a aria-current="true" class="is-selected"' filter.html
+grep -c '&lt;li hidden' filter.html</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Showing &lt;span data-wp-text="state.visibleCount"&gt;2&lt;/span&gt; of 11 books
+&lt;a aria-current="true" class="is-selected"
+9</code></pre>
+                </div>
+                <p>The server ran the directives: it filled <code>data-wp-text</code> with <code>2</code>, added <code>aria-current="true"</code> and the class to the Fantasy link (and <code>aria-current="false"</code> to the others: <code>aria-</code> attributes get the words), and wrote <code>hidden</code> on the nine books that are not fantasy. A visitor gets the filtered page from the server. And the state JSON that travels with it:</p>
+                <pre data-cli><code class="language-bash">grep -A 1 'id="wp-script-module-data-@wordpress/interactivity"' filter.html
+rm filter.html</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;script id="wp-script-module-data-@wordpress/interactivity" type="application/json"&gt;
+{"state":{"pagesco/book-filter":{"genre":"fantasy","bookGenres":[["classic","dystopian","fiction"],["classic","fiction"],["dystopian","fiction","science-fiction"],["fiction","science-fiction"],["dystopian","fiction","science-fiction"],["fantasy","fiction"],["classic","fiction"],["classic","fiction"],["classic","fiction"],["fantasy","fiction"],["classic","fiction"]],"isVisible":{},"isSelected":{},"visibleCount":{}}},"derivedStateClosures":{"pagesco/book-filter":["state.isSelected","state.visibleCount","state.isVisible"]}}</code></pre>
+                </div>
+                <p><code>genre</code> and <code>bookGenres</code> are there as values. The closures cannot travel (PHP code means nothing to a browser), so they arrive as empty objects, and <code>derivedStateClosures</code> lists them: it tells the runtime "these are derived on the server; the store must provide its own getters", which is the next section's job.</p>
+            </section>
+
+            <section id="store" class="lesson-section">
+                <h2>🧠 The Browser Side: the Store</h2>
+                <p>Replace <code>src/blocks/book-filter/view.js</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-filter/view.js"><code class="language-js">import { store, getContext, withSyncEvent } from '@wordpress/interactivity';
+
+const { state } = store( 'pagesco/book-filter', {
+	state: {
+		// The same derived state as the closures in render.php, for the browser.
+		get isVisible() {
+			const { genres } = getContext();
+			return state.genre === '' || genres.includes( state.genre );
+		},
+		get isSelected() {
+			return getContext().slug === state.genre;
+		},
+		get visibleCount() {
+			return state.bookGenres.filter(
+				( genres ) =&gt; state.genre === '' || genres.includes( state.genre )
+			).length;
+		},
+	},
+	actions: {
+		// withSyncEvent: this action needs the event right away, to stop the link.
+		selectGenre: withSyncEvent( ( event ) =&gt; {
+			event.preventDefault();
+			state.genre = getContext().slug;
+
+			// Keep the address in step, so a reload or a shared link shows the same list.
+			const url = new URL( window.location.href );
+			if ( state.genre ) {
+				url.searchParams.set( 'genre', state.genre );
+			} else {
+				url.searchParams.delete( 'genre' );
+			}
+			window.history.replaceState( null, '', url );
+		} ),
+	},
+} );</code></pre>
+                <ul>
+                    <li><strong><code>store( namespace, definition )</code></strong> registers, or extends, the store whose namespace the HTML names. The runtime merges the server's state JSON into <code>state</code>, so <code>state.genre</code> and <code>state.bookGenres</code> already hold the server's values when the page starts. <code>store()</code> returns the store, and <code>const { state } = …</code> keeps a reference for the getters and actions.</li>
+                    <li><strong>Getters are derived state</strong>, the JavaScript twins of the PHP closures, and must compute the same answers, or the page would change on hydration. <code>getContext()</code> returns the context of the element the directive is on: the book's <code>genres</code> for <code>isVisible</code>, the link's <code>slug</code> for <code>isSelected</code>. The runtime tracks what each getter reads, so when <code>state.genre</code> changes it recomputes exactly the directives that depend on it.</li>
+                    <li><strong>Actions</strong> change state. <code>selectGenre</code> sets <code>state.genre</code>, and that one assignment is all it takes: eleven <code>hidden</code> attributes, six links and the count update themselves.</li>
+                    <li><strong><code>withSyncEvent()</code></strong>. The runtime normally runs actions a moment later, so long tasks do not block the page (better for the Interaction to Next Paint score, Lesson 8.2). An action that must use the event <em>synchronously</em> (here <code>event.preventDefault()</code>, so the link is not followed) says so with <code>withSyncEvent()</code>. Common Mistake 2 shows what happens without it.</li>
+                    <li><strong><code>history.replaceState()</code></strong> puts <code>?genre=…</code> into the address without a page load, so a reload or a shared link shows the same list, rendered by the server.</li>
+                </ul>
+                <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null
+cat build/blocks/book-filter/view.asset.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your version hash will differ)</h4>
+                    <pre><code>&lt;?php return array(
+	'dependencies' =&gt; array(
+		'@wordpress/interactivity'
+	),
+	'version' =&gt; '2de75b133a97932c8a8c',
+	'type' =&gt; 'module'
+);</code></pre>
+                </div>
+                <p>Compare it with Lesson 6.1's <code>index.asset.php</code>: the dependency is a module ID, <code>@wordpress/interactivity</code>, not a script handle, and <code>'type' =&gt; 'module'</code> marks the file as a module. The page now loads it, only because the block is on it:</p>
+                <pre data-cli data-exit="1"><code class="language-bash">curl -s http://localhost:8080/filter-test/ | grep -o 'id="pagesco-book-filter-view-script-module-js-module"'
+curl -s http://localhost:8080/filter-test/ | grep -o '"@wordpress/interactivity":"[^"?]*'
+curl -s http://localhost:8080/about/ | grep -c 'pagesco-book-filter-view-script-module'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>id="pagesco-book-filter-view-script-module-js-module"
+"@wordpress/interactivity":"http://localhost:8080/wp-includes/js/dist/script-modules/interactivity/index.js
+0</code></pre>
+                </div>
+                <p>A <code>&lt;script type="module"&gt;</code> with the ID WordPress derived from the block name, an import map entry that resolves <code>@wordpress/interactivity</code> to core's file, and nothing on the About page.</p>
+
+                <h3>In the browser</h3>
+                <p>Open <code>http://localhost:8080/filter-test/</code>, click <strong>Fantasy</strong>, then <strong>Science Fiction</strong>, then <strong>All books</strong>, with the developer tools' Console open. The list changes instantly, the address bar follows, and the Console stays empty. To check this in a real browser for this lesson, the clicks were scripted with Playwright (Chromium) on a WordPress 7.1 site built by this lesson, on the project's Find a Book page, which holds the same block; after each step the script read the count, the visible books, the link with <code>aria-current="true"</code> and the address, and at the end it counted the page loads and the Console messages:</p>
+                <pre><code class="language-text">Loaded                   Showing 11 of 11 books current: All books        address: /find-a-book/
+                         visible: all 11
+Clicked Fantasy          Showing 2 of 11 books  current: Fantasy          address: /find-a-book/?genre=fantasy
+                         visible: Lord of the Rings, The Hobbit
+Clicked Science Fiction  Showing 3 of 11 books  current: Science Fiction  address: /find-a-book/?genre=science-fiction
+                         visible: Brave New World, Dune, Fahrenheit 451
+Clicked All books        Showing 11 of 11 books current: All books        address: /find-a-book/
+                         visible: all 11
+Page loads: 1
+Console: (empty)</code></pre>
+                <p>The last line is the point of the whole lesson: three filters, one page load. The <code>?genre=</code> addresses are shareable, and when someone opens one, the server renders that filter directly.</p>
+                <figure>
+                    <img src="images/lesson_22_filter.png" alt="The Find a Book page of the Pages and Co. site: the heading, an introduction sentence, a row of rounded genre links with Fantasy outlined and bold, the sentence Showing 2 of 11 books, and two books, Lord of the Rings and The Hobbit, each with author, price and stock." width="1000" height="453" loading="lazy">
+                    <figcaption>The Book Filter with Fantasy selected: two of eleven books visible, the rest only hidden.</figcaption>
+                </figure>
+            </section>
+
+            <section id="enhancement" class="lesson-section">
+                <h2>♿ Without JavaScript, and for Everyone</h2>
+                <p>The genre choices are links to <code>?genre=…</code> addresses, and the server can render every one of them. So the filter also works when the module fails to load, a browser extension blocks it, or the visitor clicks before it arrives: the link is followed, and the server sends the filtered page. The same Playwright script with JavaScript switched off, clicking Fantasy:</p>
+                <pre><code class="language-text">Loaded                   Showing 11 of 11 books current: All books        address: /find-a-book/
+                         visible: all 11
+Clicked Fantasy          Showing 2 of 11 books  current: Fantasy          address: /find-a-book/?genre=fantasy
+                         visible: Lord of the Rings, The Hobbit
+Page loads: 2
+Console: (empty)</code></pre>
+                <p>Same result, one page load more. This is <strong>progressive enhancement</strong>: the HTML works on its own, and JavaScript makes it faster. It came almost for free because the state starts in PHP and the derived values have PHP closures, so the server and the browser agree on every directive.</p>
+                <div class="card card-success">
+                    <h4>✅ Accessible by construction</h4>
+                    <ul>
+                        <li>Real links in a <code>&lt;nav&gt;</code> with an <code>aria-label</code>: keyboard users tab to them and press <kbd>Enter</kbd>; screen readers announce "Filter by genre, navigation".</li>
+                        <li><code>aria-current="true"</code> on the selected link tells assistive technology which filter is active; the bold outline shows it visually, not by color alone.</li>
+                        <li>The count paragraph has <code>aria-live="polite"</code>, so a screen reader announces "Showing 2 of 11 books" after a click, the feedback a sighted user gets from the shorter list.</li>
+                        <li>Hidden books use the <code>hidden</code> attribute, which removes them from the page and from the accessibility tree, not just from view.</li>
+                    </ul>
+                </div>
+                <div class="card card-info">
+                    <h4>🧩 Version note: withSyncEvent() and its warning</h4>
+                    <p><code>withSyncEvent()</code> arrived in WordPress 6.8, together with the change that runs actions asynchronously. Since then, an action that calls <code>event.preventDefault()</code> without it still works, but the runtime logs a deprecation warning that, word for word in 7.1, says it "will stop working in WordPress 7.0". It has not stopped in 7.1; do not wait for it to. On 6.5 to 6.7 sites, <code>withSyncEvent</code> does not exist and the import fails; the plugin's minimum of 6.8 rules those out.</p>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <h3>1. Building without --experimental-modules</h3>
+                <p>Every tutorial's <code>package.json</code> that predates interactive blocks has the plain build script. Take the option out again (keeping a copy) and build:</p>
+                <pre data-cli><code class="language-bash">cd wp-content/plugins/pagesco-books
+cp package.json package.json.bak
+sed -i 's/ --experimental-modules//' package.json
+grep '"build"' package.json</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>		"build": "wp-scripts build --webpack-src-dir=src/blocks --output-path=build/blocks --blocks-manifest",</code></pre>
+                </div>
+                <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build 2&gt;&amp;1 | tail -n 1
+ls build/blocks/book-filter</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your timing will differ)</h4>
+                    <pre><code>webpack 5.112.2 compiled successfully in 646 ms
+block.json
+index.asset.php
+index.js
+render.php
+style-index-rtl.css
+style-index.css</code></pre>
+                </div>
+                <pre data-cli data-exit="1"><code class="language-bash">curl -s http://localhost:8080/filter-test/ | grep -c 'pagesco-book-filter-view-script-module'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>0</code></pre>
+                </div>
+                <p><strong>What it means:</strong> "compiled successfully", and no <code>view.js</code> or <code>view.asset.php</code> in the build. <code>block.json</code> still names <code>file:./view.js</code>, but the file is missing, so WordPress registers no module and the page has no script for the block: no warning in the build, in PHP or in the browser. The page even looks right, because the server rendered it; only clicking reveals it (every click is a full page load). <strong>Fix:</strong> <code>--experimental-modules</code> in both scripts, and after a build, check that <code>view.js</code> is in <code>build/</code>. Restore and rebuild:</p>
+                <pre data-cli><code class="language-bash">mv wp-content/plugins/pagesco-books/package.json.bak wp-content/plugins/pagesco-books/package.json</code></pre>
+                <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null
+ls build/blocks/book-filter | grep view</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>view.asset.php
+view.js</code></pre>
+                </div>
+
+                <h3>2. preventDefault() without withSyncEvent()</h3>
+                <p>Written the natural way, as a plain method, the action looks like this:</p>
+                <pre><code class="language-js">selectGenre( event ) {
+	event.preventDefault();
+	state.genre = getContext().slug;
+	// …
+},</code></pre>
+                <p>Built that way, the filter works, and the browser's Console says (recorded with Playwright in Chromium on WordPress 7.1, after one click):</p>
+                <pre><code class="language-text">Loaded                   Showing 11 of 11 books current: All books        address: /find-a-book/
+                         visible: all 11
+Clicked Fantasy          Showing 2 of 11 books  current: Fantasy          address: /find-a-book/?genre=fantasy
+                         visible: Lord of the Rings, The Hobbit
+Page loads: 1
+Console: [warning] Using the synchronous event.preventDefault() function in a store action without wrapping it in withSyncEvent() is deprecated and will stop working in WordPress 7.0. Please wrap the store action in withSyncEvent().</code></pre>
+                <p><strong>What it means:</strong> since 6.8 the runtime may run actions after the browser has finished handling the event, and by then <code>preventDefault()</code> would be too late: the link would be followed. For now it detects the call and handles the event synchronously anyway, with this deprecation warning. <strong>Fix:</strong> wrap every action that uses <code>event.preventDefault()</code>, <code>stopPropagation()</code> or <code>currentTarget</code> in <code>withSyncEvent()</code>; actions that do not touch the event need nothing.</p>
+
+                <h3>3. A store namespace that does not match</h3>
+                <p>The HTML says <code>data-wp-interactive="pagesco/book-filter"</code>; a typo in <code>view.js</code> registers <code>store( 'pagesco/bookfilter', … )</code>. The build is fine, the page loads without a message in the Console, and clicking Fantasy… shows the two fantasy books. Recorded with Playwright, with a marker in <code>window</code> to detect page loads:</p>
+                <pre><code class="language-text">After clicking Fantasy:  Showing 2 of 11 books
+Address:                /find-a-book/?genre=fantasy
+window.__marker:        gone (the page was reloaded)
+Console:                (empty)</code></pre>
+                <p><strong>What it means:</strong> no store answers to <code>pagesco/book-filter</code>, so none of the directives is wired up and the click simply follows the link; the server renders the filtered page, which is correct, just slow. Progressive enhancement hides the bug, which is good for visitors and bad for you. <strong>Fix:</strong> one constant spelling of the namespace in <code>render.php</code> and <code>view.js</code>; when testing an interactive block, watch whether the page <em>reloads</em> (the browser's tab spinner, or the Network panel's Doc filter), not only whether the result is right.</p>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: A Find a Book Page</h2>
+                <p>The Book Filter gets its own page in the shop, which the header menu picks up by itself. Allow about 30 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: Create the page <span class="step-time">(10 min)</span></h3>
+                    <p>Add a page "Find a Book" with a short introduction and the Book Filter (in the editor: a paragraph, then type <code>/book filter</code>). The Code editor shows:</p>
+                    <pre data-content="page:find-a-book" data-title="Find a Book"><code class="language-html">&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;Pick a genre to see what is on our shelves. Prices and stock are always up to date.&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;
+
+&lt;!-- wp:pagesco/book-filter /--&gt;</code></pre>
+                    <pre data-web="/find-a-book/?genre=dystopian" data-select=".wp-block-pagesco-book-filter__count" data-text><code class="language-text">http://localhost:8080/find-a-book/?genre=dystopian   (the count, as text)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Showing 3 of 11 books</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: Test it like a customer <span class="step-time">(10 min)</span></h3>
+                    <p>In the browser, with the Console open: click through all five genres and back to All books (instant, no reload, no Console messages); reload on <code>?genre=classic</code> (the server shows six classics, Classic outlined); press <kbd>Tab</kbd> to reach the links and <kbd>Enter</kbd> to choose one; then disable JavaScript in the developer tools' settings and click a genre (the page reloads, filtered). The scripted run of this step in Chromium, for comparison:</p>
+                    <pre><code class="language-text">Loaded                   Showing 11 of 11 books current: All books        address: /find-a-book/
+                         visible: all 11
+Clicked Classic          Showing 6 of 11 books  current: Classic          address: /find-a-book/?genre=classic
+                         visible: 1984, Animal Farm, Pride and Prejudice, The Catcher in the Rye, The Great Gatsby, To Kill a Mockingbird
+Clicked Dystopian        Showing 3 of 11 books  current: Dystopian        address: /find-a-book/?genre=dystopian
+                         visible: 1984, Brave New World, Fahrenheit 451
+Clicked Fantasy          Showing 2 of 11 books  current: Fantasy          address: /find-a-book/?genre=fantasy
+                         visible: Lord of the Rings, The Hobbit
+Clicked Fiction          Showing 11 of 11 books current: Fiction          address: /find-a-book/?genre=fiction
+                         visible: all 11
+Clicked Science Fiction  Showing 3 of 11 books  current: Science Fiction  address: /find-a-book/?genre=science-fiction
+                         visible: Brave New World, Dune, Fahrenheit 451
+Clicked All books        Showing 11 of 11 books current: All books        address: /find-a-book/
+                         visible: all 11
+Opened ?genre=classic    Showing 6 of 11 books  current: Classic          address: /find-a-book/?genre=classic
+                         visible: 1984, Animal Farm, Pride and Prejudice, The Catcher in the Rye, The Great Gatsby, To Kill a Mockingbird
+Enter on Dystopian       Showing 3 of 11 books  current: Dystopian        address: /find-a-book/?genre=dystopian
+                         visible: 1984, Brave New World, Fahrenheit 451
+Page loads: 2
+Console: (empty)</code></pre>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: Clean up and check <span class="step-time">(10 min)</span></h3>
+                    <p>Delete the Filter test page, then check the menu, the block's files, the build script and the features (no new PHP feature this time: the block needed none):</p>
+                    <pre data-cli data-checkpoint><code class="language-bash">wp post delete $(wp post list --post_type=page --name=filter-test --field=ID) --force &gt; /dev/null
+curl -s http://localhost:8080/ | grep -o '&gt;Find a Book&lt;'
+ls wp-content/plugins/pagesco-books/src/blocks wp-content/plugins/pagesco-books/src/blocks/book-filter
+grep -c 'experimental-modules' wp-content/plugins/pagesco-books/package.json
+grep -c "::class," wp-content/plugins/pagesco-books/src/Plugin.php</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&gt;Find a Book&lt;
+wp-content/plugins/pagesco-books/src/blocks:
+book-card    book-filter  book-list
+
+wp-content/plugins/pagesco-books/src/blocks/book-filter:
+block.json  edit.js     index.js    render.php  style.scss  view.js
+2
+14</code></pre>
+                    </div>
+                    <p>In <code>pagesco-plan.txt</code>, under "Blocks", note: "Book Filter (interactive, 6.4): store pagesco/book-filter, state genre (from ?genre=), derived isVisible/isSelected/visibleCount in PHP closures + JS getters; page Find a Book. Build needs --experimental-modules."</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>package.json</code> builds with <code>--experimental-modules</code>, and <code>build/blocks/book-filter/</code> contains <code>view.js</code> and <code>view.asset.php</code></li>
+                        <li><code>render.php</code> sets the state with <code>wp_interactivity_state()</code>, including three closures, and validates <code>?genre=</code></li>
+                        <li><code>view.js</code> registers the <code>pagesco/book-filter</code> store with the same three getters and a <code>withSyncEvent()</code> action</li>
+                        <li>The Find a Book page filters instantly, keeps the address in step, and shows the right books when opened with <code>?genre=</code></li>
+                        <li>With JavaScript off, the genre links still filter; the Console shows no messages with it on</li>
+                        <li>The Filter test page is deleted</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Each exercise leaves the site as the project did. Try each one before you open the solution.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Every Filter from the Server</h3>
+                    <p>Using only <code>curl</code>, print the count sentence the server renders for each genre, for a genre that does not exist (<code>romance</code>), and for a hostile value (<code>%3Cscript%3E</code>, an encoded <code>&lt;script&gt;</code>).</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>A shell <code>for</code> loop over the slugs, and <code>grep -o</code> for the number inside <code>data-wp-text="state.visibleCount"</code>. What should <code>render.php</code> do with a slug it does not know?</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">for genre in classic dystopian fantasy fiction science-fiction romance %3Cscript%3E; do
+	printf '%s: ' "$genre"
+	curl -s "http://localhost:8080/find-a-book/?genre=$genre" | grep -o 'visibleCount"&gt;[0-9]*' | grep -o '[0-9]*$'
+done</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>classic: 6
+dystopian: 3
+fantasy: 2
+fiction: 11
+science-fiction: 3
+romance: 11
+%3Cscript%3E: 11</code></pre>
+                        </div>
+                        <p>Every real genre is filtered by the server; <code>romance</code> and the script fall back to all eleven books, because <code>render.php</code> accepts only slugs that exist. Nothing from the address reaches the page unchecked.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Look Inside the Server's State</h3>
+                    <p>Render the block in PHP with <code>do_blocks()</code>, then print what <code>wp_interactivity_state( 'pagesco/book-filter' )</code> holds afterwards, writing <code>closure</code> for derived values.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>wp_interactivity_state()</code> with a namespace and no array returns that namespace's state. A value is derived if it is an <code>instanceof Closure</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="filter-state.php" data-wp><code class="language-php">&lt;?php
+echo do_blocks( '&lt;!-- wp:pagesco/book-filter /--&gt;' ) ? "rendered\n" : "empty\n";
+
+$state = wp_interactivity_state( 'pagesco/book-filter' );
+foreach ( $state as $key =&gt; $value ) {
+	echo $key, ': ', $value instanceof Closure ? 'closure' : wp_json_encode( $value ), "\n";
+}</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>rendered
+genre: ""
+bookGenres: [["classic","dystopian","fiction"],["classic","fiction"],["dystopian","fiction","science-fiction"],["fiction","science-fiction"],["dystopian","fiction","science-fiction"],["fantasy","fiction"],["classic","fiction"],["classic","fiction"],["classic","fiction"],["fantasy","fiction"],["classic","fiction"]]
+isVisible: closure
+isSelected: closure
+visibleCount: closure</code></pre>
+                        </div>
+                        <p>The state is a per-request registry: rendering the block filled it, and WordPress prints it as JSON in the page footer. Two Book Filters on one page would share this one state, which is what you want here (both would follow the same genre) and something to keep in mind for blocks that must be independent: per-instance data belongs in context. Remove the script: <code>rm filter-state.php</code>.</p>
+                        <pre data-cli><code class="language-bash">rm filter-state.php</code></pre>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: A Heading That Follows the Filter (Stretch)</h3>
+                    <p>Add an <code>&lt;h2&gt;</code> at the top of the block that reads "All books", or the selected genre's name, and changes with the filter. Give the state a <code>genreNames</code> map and a derived <code>selectedName</code>, on both sides. Check the server's output for <code>?genre=science-fiction</code>, then (optionally) click in the browser, and undo.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>array_merge( array( '' =&gt; __( 'All books', 'pagesco-books' ) ), wp_list_pluck( $genres, 'name', 'slug' ) )</code> builds the map. The heading needs only <code>data-wp-text="state.selectedName"</code>; the getter in <code>view.js</code> is one line.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">cd wp-content/plugins/pagesco-books/src/blocks/book-filter
+cp render.php render.php.bak
+cp view.js view.js.bak
+sed -i "s|^\t\t'genre'        =&gt; \$selected,|&amp;\n\t\t'genreNames'   =&gt; array_merge( array( '' =&gt; __( 'All books', 'pagesco-books' ) ), wp_list_pluck( \$genres, 'name', 'slug' ) ),\n\t\t'selectedName' =&gt; function () {\n\t\t\t\$state = wp_interactivity_state();\n\t\t\treturn \$state['genreNames'][ \$state['genre'] ] ?? '';\n\t\t},|" render.php
+sed -i 's|data-wp-interactive="pagesco/book-filter"&gt;|&amp;\n\t&lt;h2 class="wp-block-pagesco-book-filter__title" data-wp-text="state.selectedName"&gt;&lt;/h2&gt;|' render.php
+sed -i 's|^\t\tget isSelected() {|\t\tget selectedName() {\n\t\t\treturn state.genreNames[ state.genre ];\n\t\t},\n&amp;|' view.js
+grep -n -A 2 'get selectedName' view.js</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>10:		get selectedName() {
+11-			return state.genreNames[ state.genre ];
+12-		},</code></pre>
+                        </div>
+                        <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null</code></pre>
+                        <pre data-web="/find-a-book/?genre=science-fiction" data-select=".wp-block-pagesco-book-filter__title"><code class="language-text">http://localhost:8080/find-a-book/?genre=science-fiction   (View Source: the heading)</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>&lt;h2 class="wp-block-pagesco-book-filter__title" data-wp-text="state.selectedName"&gt;Science Fiction&lt;/h2&gt;</code></pre>
+                        </div>
+                        <p>The server filled the heading through the closure; in the browser the getter keeps it in step. A map in state is the usual way to give JavaScript translated strings from PHP: the module has no translation functions of its own here, so PHP translates and the state carries the result. Undo:</p>
+                        <pre data-cli><code class="language-bash">cd wp-content/plugins/pagesco-books/src/blocks/book-filter
+mv render.php.bak render.php
+mv view.js.bak view.js</code></pre>
+                        <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null</code></pre>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> What does <code>--experimental-modules</code> change in <code>npm run build</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="It adds a module build, so viewScriptModule files such as view.js are built with a view.asset.php of type module; without it they are skipped silently.">
+                                A) It also builds viewScriptModule files as script modules
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The Interactivity runtime is core's; your build only refers to it. What was missing from build/ in Common Mistake 1?">
+                                B) It bundles @wordpress/interactivity into view.js
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The editor script is built either way. Which file did the plain build leave out?">
+                                C) It turns the editor script into a module
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> A visitor opens <code>/find-a-book/?genre=fantasy</code>. What is in the HTML the server sends?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The server processes the directives too. What did curl, which runs no JavaScript, show for the list items?">
+                                A) All eleven books visible; view.js hides nine after it loads
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="render.php always prints all books. How does it keep nine of them out of sight?">
+                                B) Only the two fantasy books
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="render.php prints every book, and the server evaluates data-wp-bind--hidden through the isVisible closure, so the nine others arrive with the hidden attribute.">
+                                C) All eleven books, nine of them with the hidden attribute
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> Which directive keeps "Showing 2 of 11 books" up to date?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="bind sets attributes. The number is the text of a span.">
+                                A) data-wp-bind--text="state.visibleCount"
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="data-wp-text sets the element's text content from a value, on the server and in the browser; here the span holds state.visibleCount.">
+                                B) data-wp-text="state.visibleCount" on the span
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="watch runs a callback for side effects. Which directive sets an element's text?">
+                                C) data-wp-watch="state.visibleCount"
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> Why does <code>render.php</code> give <code>isVisible</code> a PHP closure when <code>view.js</code> has a getter for it?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="The server evaluates directives while rendering; with the closure it can compute isVisible per book, so the HTML is already filtered and nothing changes when the page hydrates.">
+                                A) So the server can evaluate the directives and send correct HTML before any JavaScript runs
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Closures cannot be serialized to JSON; they arrive as empty objects. What does the server do with them instead?">
+                                B) So the browser receives the function in the state JSON
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The getter is required either way. Who evaluates directives before the browser does?">
+                                C) It replaces the getter, which can then be removed
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> <code>view.js</code> registers <code>store( 'pagesco/bookfilter', … )</code> by mistake. A visitor clicks Fantasy. What happens?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Did Common Mistake 3 show any message? The runtime finds no store for the HTML's namespace.">
+                                A) An error appears in the Console and nothing happens
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Without a store, no action runs. What does a click on a real link do then?">
+                                B) The list filters instantly, as intended
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="No store is wired to the directives, so the click follows the link and the server renders the filtered page: correct, but a full page load each time, with no message.">
+                                C) The link is followed and the server renders the fantasy books, with a page load
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>When should I use the Interactivity API instead of a plain viewScript?</summary>
+                    <p>Use it whenever the front end has state that several elements depend on (a filter, tabs, a cart count, a "show more"), and especially when the server should render the starting state. A one-off script (a copy button, an analytics call) can stay a classic <code>viewScript</code>. A full application with its own routing is a job for a framework, often headless (Lesson 9.2). The Interactivity API sits in the large middle, where most WordPress sites live.</p>
+                </details>
+                <details>
+                    <summary>All eleven books are in the HTML. What about a catalog of 5,000?</summary>
+                    <p>Then filtering in the browser is the wrong design: the page would be huge. The next step is to fetch books on demand from the REST API in an <code>async</code> action (or with generator actions, <code>function*</code>, which the runtime supports for awaiting), render a page of results at a time, and keep the address in step as here. Module 7 builds the <code>pagesco/v1/books</code> endpoint such a filter would call; core's Query block does a version of this with the Interactivity router, which replaces a region of the page with the server's HTML for the next address.</p>
+                </details>
+                <details>
+                    <summary>Can two interactive blocks talk to each other?</summary>
+                    <p>Yes, through state: any block whose HTML uses <code>data-wp-interactive="pagesco/book-filter"</code> shares this store. A separate "genre menu" block in the sidebar could set <code>state.genre</code>, and the list would follow. Stores can also read other stores with <code>store( 'other/namespace' )</code>. Keep namespaces specific, so blocks only share on purpose.</p>
+                </details>
+                <details>
+                    <summary>Why not show the filter working in the editor?</summary>
+                    <p>View modules do not run in the editor, by design: the editor is for arranging content, and a click there should select the block, not filter it. <code>ServerSideRender</code> shows the starting state, which is enough to place it. If editors should choose a starting genre per page, that would become an attribute, passed into the state by <code>render.php</code>.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Add a "Hide sold-out books" checkbox. It is a second piece of state (<code>hideSoldOut</code>, from <code>?in-stock=1</code>), each book's context gains <code>inStock</code>, and <code>isVisible</code> and <code>visibleCount</code> consider both, in PHP and in JavaScript. Bind the checkbox's <code>checked</code> with <code>data-wp-bind--checked</code> and handle <code>data-wp-on--change</code>. Does that action need <code>withSyncEvent()</code>? What should the address look like, and what does the page do without JavaScript, where a checkbox is not a link? (A small <code>&lt;form method="get"&gt;</code> with a submit button inside a <code>&lt;noscript&gt;</code> is one answer.)</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> For the Book Filter, write three short lists: the state, the derived state, and the context, and say for each item why it belongs in that list. Then pick an interactive feature you have seen on another site (an accordion, a "load more" button, a size picker) and design it the same way: what is the one piece of state, what is derived, what does each element need to know about itself, and how would it work without JavaScript?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>The Interactivity API renders on the server and hydrates in the browser: directives in the HTML, state from PHP, a store in a script module</li>
+                        <li>Interactive blocks declare <code>"supports": { "interactivity": true }</code> and a <code>viewScriptModule</code>; <code>wp-scripts</code> builds modules only with <code>--experimental-modules</code></li>
+                        <li><code>wp_interactivity_state()</code> sets the starting state; closures in it are derived state the server evaluates, mirrored by getters in <code>view.js</code></li>
+                        <li><code>wp_interactivity_data_wp_context()</code> attaches per-element context; <code>getContext()</code> reads it in getters and actions</li>
+                        <li>Actions change state and the runtime updates every directive; actions that use the event synchronously need <code>withSyncEvent()</code></li>
+                        <li>Real links, server-rendered state and validated input make the feature work without JavaScript and for assistive technology</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>A new interactive block</td><td><code>npx @wordpress/create-block@latest &lt;slug&gt; --no-plugin --template @wordpress/create-block-interactive-template --target-dir=src/blocks/&lt;slug&gt; --namespace=pagesco --textdomain=pagesco-books</code></td></tr>
+                            <tr><td>Build modules</td><td><code>wp-scripts build … --experimental-modules</code></td></tr>
+                            <tr><td>Starting state (PHP)</td><td><code>wp_interactivity_state( 'ns', array( 'genre' =&gt; $selected, 'isVisible' =&gt; function () { … } ) );</code></td></tr>
+                            <tr><td>Per-element data</td><td><code>&lt;?php echo wp_interactivity_data_wp_context( array( 'slug' =&gt; $slug ) ); ?&gt;</code></td></tr>
+                            <tr><td>Wire the HTML</td><td><code>data-wp-interactive="ns"</code>, <code>data-wp-on--click</code>, <code>data-wp-bind--hidden="!state.isVisible"</code>, <code>data-wp-class--is-selected</code>, <code>data-wp-text</code></td></tr>
+                            <tr><td>The store (JS)</td><td><code>const { state } = store( 'ns', { state: { get isVisible() { … } }, actions: { selectGenre: withSyncEvent( ( event ) =&gt; { … } ) } } );</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You built the shop's first interactive block, with the same <code>render.php</code> skills as Lesson 6.3 and a store of under forty lines</li>
+                        <li>You designed state, derived state and context, and made the server and the browser agree on all of it</li>
+                        <li>You kept the filter working without JavaScript, accessible, and shareable by address</li>
+                        <li>You gave the shop a Find a Book page</li>
+                        <li>You finished Module 6: a static block, a dynamic block, bindings and an interactive block, all in one plugin</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>Every block so far gets its data from PHP while the page is rendered. Module 7 opens the other door: in <a href="lesson_23.html"><strong>Lesson 7.1: Using the REST API</strong></a> you read and write the shop's data over HTTP, from the command line and from JavaScript with <code>apiFetch</code>. You have met the REST API in passing already (the editor's <code>/wp/v2/genres</code> request and the <code>block-renderer</code> route in Lesson 6.3, <code>/wp/v2/books</code> from Lesson 5.2), and you will see how authentication works, including application passwords. Lesson 7.2 then builds <code>pagesco/v1</code> endpoints of the shop's own, the kind a Book Filter for 5,000 books would call.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Open the Find a Book page, try two genres and a reload, and check that the Console is quiet</li>
+                    <li>Make sure the Filter test page is gone and <code>npm run build</code> has run on your final files</li>
+                    <li>Open <code>http://localhost:8080/wp-json/wp/v2/books</code> in your browser and skim the JSON: Lesson 7.1 starts there</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Four lessons ago you had never built a block. Now your plugin has a static one, a dynamic one, a binding source and an interactive one, and you can explain where each one's data lives and who renders it. Front-end interactivity is where many PHP developers stop and hand over to someone else; you just built it the way WordPress core does, server first. If the store still feels unfamiliar, reread its forty lines once more tomorrow: they will look shorter.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_21.html" class="prev-lesson">← Previous: Dynamic Blocks &amp; Block Bindings</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_23.html" class="next-lesson">Next: Using the REST API →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

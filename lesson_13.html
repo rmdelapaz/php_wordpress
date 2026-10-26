@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A classic theme's functions.php: theme supports, enqueueing styles and scripts with versions, navigation menus, widget areas, accessibility and translation, finishing pagesco-classic and giving the pagesco block theme its first functions.php, on WordPress 7.1 and PHP 8.5. PHP and WordPress Development Lesson 4.3.">
+    <meta name="author" content="Ray de la Paz">
+    <title>functions.php: Supports, Assets, Menus &amp; Widgets - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 4: Classic &amp; Hybrid Theme Development</a></li>
+            <li aria-current="page">Lesson 4.3: functions.php: Supports, Assets, Menus &amp; Widgets</li>
+        </ul>
+    </nav>
+
+
+    <main id="main-content" data-state="after:lesson_12">
+        <div class="container">
+            <header>
+                <h1>🧰 Lesson 4.3: functions.php: Supports, Assets, Menus &amp; Widgets</h1>
+                <p class="lead"><code>pagesco-classic</code> can already find and show every kind of content, but it still writes its own <code>&lt;title&gt;</code>, prints an old-style search form, has no stylesheet, no menu and nothing in its footer but an address. All of that is the job of one file, <code>functions.php</code>: the place where a classic theme tells WordPress which features it supports, which CSS and JavaScript it needs, and where menus and widgets may go. In this lesson you finish the classic theme, make it accessible and translatable, and then hand the site back to <code>pagesco</code>, which gets its own first <code>functions.php</code>.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Explain when <code>functions.php</code> runs and choose the right hook for theme setup, widgets and assets</li>
+                        <li>Declare theme supports such as <code>title-tag</code> and <code>html5</code> with <code>add_theme_support()</code>, and say which ones block themes get automatically</li>
+                        <li>Enqueue a stylesheet and a deferred script with <code>wp_enqueue_style()</code> and <code>wp_enqueue_script()</code>, with dependencies and a version that busts browser caches</li>
+                        <li>Register a menu location and a widget area, print them with <code>wp_nav_menu()</code> and <code>dynamic_sidebar()</code>, and fill them from WP-CLI</li>
+                        <li>Add the accessibility and translation basics every theme needs: a skip link, screen-reader text, labelled navigation and strings WordPress can translate</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 140 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_12.html">Lesson 4.2: Custom Queries</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> the finished <code>pagesco-classic</code> (supports, stylesheet, menu script, primary menu, footer widget area, skip link, translations) and <code>pagesco</code>'s first <code>functions.php</code> with a "Pages &amp; Co." pattern category</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (script loading strategies need 6.3+; automatic loading of a theme's <code>languages/</code> folder needs 6.8+)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 4.2, with <code>pagesco-classic</code> active</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#functions-php" class="toc-link">What functions.php Is For</a></li>
+                        <li><a href="#theme-supports" class="toc-link">Theme Supports</a></li>
+                        <li><a href="#assets" class="toc-link">Enqueueing Styles and Scripts</a></li>
+                        <li><a href="#menus" class="toc-link">Navigation Menus</a></li>
+                        <li><a href="#widgets" class="toc-link">Widget Areas</a></li>
+                        <li><a href="#a11y-i18n" class="toc-link">Accessibility and Translation</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Finish the Classic Theme, Then Back to pagesco</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="functions-php" class="lesson-section">
+                <h2>🧰 What functions.php Is For</h2>
+                <p>You have met <code>functions.php</code> twice: Twenty Twenty-Five's in Lesson 3.1, and the one you started for <code>pagesco-classic</code> in Lesson 4.2 with a single <code>pre_get_posts</code> callback. It is not a template. WordPress never prints it; it <em>includes</em> it on every request while the theme is active, right after the plugins are loaded (the <code>wp-settings.php</code> tour in Lesson 2.2). That includes the admin, AJAX and REST requests, and WP-CLI:</p>
+                <pre data-cli><code class="language-bash">wp eval 'var_dump( function_exists( "pagesco_classic_adjust_main_query" ), did_action( "after_setup_theme" ) );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>bool(true)
+int(1)</code></pre>
+                </div>
+                <p>Your function exists even in a WP-CLI command, and <code>after_setup_theme</code> has fired once. Two consequences follow. First, code at the top level of <code>functions.php</code> runs everywhere, so almost everything in it belongs in a callback on the right hook. Second, it only runs while the theme is active, which is why features that must survive a redesign (the store notice, the Book post type) go into plugins, the decision table from Lesson 3.4.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: the shop's fit-out instructions</h4>
+                    <p>If the templates are the floor plans of the shop (Lesson 3.2), <code>functions.php</code> is the sheet of instructions the theme hands the building manager when it moves in: "we need the shop sign handled by you" (theme supports), "please deliver these crates of paint and these tools" (stylesheets and scripts), "there will be a directory board here and a notice board there" (a menu location and a widget area). The manager, WordPress, does the actual work at the right moment of each day. The instructions only describe what the theme needs; they never paint the walls themselves.</p>
+                </div>
+
+                <p>Each kind of instruction has its moment in the request. These are the hooks a theme uses, in the order they fire:</p>
+
+                <div class="mermaid">
+graph TD
+    A["plugins are loaded"] --> B["theme functions.php is included"]
+    B --> C["after_setup_theme: supports, menu locations"]
+    C --> D["init, with widgets_init at priority 1"]
+    D --> E["main query, template chosen"]
+    E --> F["wp_head: wp_enqueue_scripts at 1, styles printed at 8"]
+    F --> G["the template prints the page"]
+    G --> H["wp_footer: footer scripts printed at 20"]
+                </div>
+
+                <p>The priorities come from <code>wp-includes/default-filters.php</code>: <code>add_action( 'wp_head', 'wp_enqueue_scripts', 1 )</code>, <code>wp_print_styles</code> at 8 and <code>wp_print_footer_scripts</code> at 20 on <code>wp_footer</code>. That is the real reason a classic template must call <code>wp_head()</code> and <code>wp_footer()</code> (Lesson 3.1): without them, no theme or plugin can add a single stylesheet or script to the page. The convention you will follow is the one core themes use: one small, prefixed function per job, each hooked to its moment.</p>
+            </section>
+
+            <section id="theme-supports" class="lesson-section">
+                <h2>🧩 Theme Supports</h2>
+                <p>Some features of WordPress are opt-in for classic themes, because old themes did those jobs themselves and would break if WordPress suddenly did them too. A theme switches a feature on with <code>add_theme_support( $feature )</code> in a callback on <code>after_setup_theme</code>. Look at what <code>get_search_form()</code> prints right now, the form on your 404 page:</p>
+                <pre data-cli><code class="language-bash">wp eval 'echo get_search_form( array( "echo" =&gt; false ) );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;form role="search" method="get" id="searchform" class="searchform" action="http://localhost:8080/"&gt;
+				&lt;div&gt;
+					&lt;label class="screen-reader-text" for="s"&gt;Search for:&lt;/label&gt;
+					&lt;input type="text" value="" name="s" id="s" /&gt;
+					&lt;input type="submit" id="searchsubmit" value="Search" /&gt;
+				&lt;/div&gt;
+			&lt;/form&gt;</code></pre>
+                </div>
+                <p>That is the "xhtml" format from the early 2000s: an <code>id="searchform"</code> that can only exist once per page, a <code>&lt;div&gt;</code> where a label would help, and a plain text field. Now replace <code>wordpress/wp-content/themes/pagesco-classic/functions.php</code> with this version. The new <code>pagesco_classic_setup()</code> comes first; the <code>pre_get_posts</code> callback from Lesson 4.2 is unchanged:</p>
+                <pre data-file="wp-content/themes/pagesco-classic/functions.php"><code class="language-php">&lt;?php
+/**
+ * Pages &amp; Co. Classic functions and definitions.
+ *
+ * @package pagesco-classic
+ */
+
+/**
+ * Sets up translations and the theme features WordPress should provide.
+ */
+function pagesco_classic_setup() {
+	load_theme_textdomain( 'pagesco-classic', get_template_directory() . '/languages' );
+
+	add_theme_support( 'title-tag' );
+	add_theme_support( 'automatic-feed-links' );
+	add_theme_support( 'post-thumbnails' );
+	add_theme_support( 'responsive-embeds' );
+	add_theme_support(
+		'html5',
+		array( 'search-form', 'comment-form', 'comment-list', 'gallery', 'caption', 'navigation-widgets' )
+	);
+}
+add_action( 'after_setup_theme', 'pagesco_classic_setup' );
+
+/**
+ * Shows three posts per page on the blog home.
+ *
+ * @param WP_Query $query The query WordPress is about to run.
+ */
+function pagesco_classic_adjust_main_query( $query ) {
+	if ( is_admin() || ! $query-&gt;is_main_query() ) {
+		return;
+	}
+
+	if ( $query-&gt;is_home() ) {
+		$query-&gt;set( 'posts_per_page', 3 );
+	}
+}
+add_action( 'pre_get_posts', 'pagesco_classic_adjust_main_query' );</code></pre>
+                <p>Five supports (the <code>load_theme_textdomain()</code> line is for translations, later in this lesson):</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Feature</th><th>What WordPress then does</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>title-tag</code></td><td>Prints the <code>&lt;title&gt;</code> in <code>wp_head()</code> (<code>_wp_render_title_tag</code> at priority 1, Lesson 2.3), built by <code>wp_get_document_title()</code> with its filters</td></tr>
+                            <tr><td><code>automatic-feed-links</code></td><td>Adds <code>&lt;link rel="alternate"&gt;</code> tags for the posts and comments RSS feeds</td></tr>
+                            <tr><td><code>post-thumbnails</code></td><td>Shows the Featured image panel in the editor and enables <code>the_post_thumbnail()</code> (books get covers in Module 5)</td></tr>
+                            <tr><td><code>responsive-embeds</code></td><td>Lets embedded videos keep their aspect ratio as the page narrows</td></tr>
+                            <tr><td><code>html5</code> + list</td><td>Modern markup for the search form, comment form and list, galleries, captions and the navigation widgets</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The first one has a visible side effect. Count the <code>&lt;title&gt;</code> elements on the About page:</p>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/about/ | grep '&lt;title&gt;'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>	&lt;title&gt;About Us &amp;#8211; Pages &amp;amp; Co.&lt;/title&gt;
+	&lt;title&gt;About Us &amp;#8211; Pages &amp;amp; Co.&lt;/title&gt;</code></pre>
+                </div>
+                <p>Two titles: WordPress's, printed by <code>wp_head()</code>, and the one <code>header.php</code> still writes by hand from Lesson 4.1. A page must have exactly one, so the hand-written line goes. Delete the <code>&lt;title&gt;</code> line from <code>header.php</code> in your editor, or let <code>sed</code> do it from the WP-CLI container:</p>
+                <pre data-cli><code class="language-bash">sed -i '/&lt;title&gt;/d' wp-content/themes/pagesco-classic/header.php
+curl -s http://localhost:8080/about/ | grep '&lt;title&gt;'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>	&lt;title&gt;About Us &amp;#8211; Pages &amp;amp; Co.&lt;/title&gt;</code></pre>
+                </div>
+                <p>One title, from WordPress, which plugins can now change through the <code>document_title_parts</code> and <code>document_title_separator</code> filters (you used the second one in Lesson 2.3). SEO plugins rely on exactly that, which is why a theme should never print its own title any more. The search form changed too:</p>
+                <pre data-cli><code class="language-bash">wp eval 'echo get_search_form( array( "echo" =&gt; false ) );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;form role="search" method="get" class="search-form" action="http://localhost:8080/"&gt;
+				&lt;label&gt;
+					&lt;span class="screen-reader-text"&gt;Search for:&lt;/span&gt;
+					&lt;input type="search" class="search-field" placeholder="Search &amp;hellip;" value="" name="s" /&gt;
+				&lt;/label&gt;
+				&lt;input type="submit" class="search-submit" value="Search" /&gt;
+			&lt;/form&gt;</code></pre>
+                </div>
+                <p><code>role="search"</code>, a class instead of an ID, a <code>&lt;label&gt;</code> around a <code>type="search"</code> field and a visually hidden "Search for:" text for screen readers. That <code>screen-reader-text</code> class is important later in this lesson. (<code>html5</code> also used to accept <code>'script'</code> and <code>'style'</code>, to drop the old <code>type="text/javascript"</code> attributes. Since WordPress 7.0 those two values are deprecated and do nothing: core never prints the attributes any more.)</p>
+
+                <h3>What block themes get for free</h3>
+                <p>You never declared a single support in <code>pagesco</code>, yet it had a title and an HTML5 search form. WordPress adds a set of supports to every block theme itself, on <code>after_setup_theme</code> at priority 1:</p>
+                <pre data-cli><code class="language-bash">grep -n -A 14 "^function _add_default_theme_supports" wp-includes/theme.php | grep "add_theme_support"</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>4400-	add_theme_support( 'post-thumbnails' );
+4401-	add_theme_support( 'responsive-embeds' );
+4402-	add_theme_support( 'editor-styles' );
+4408-	add_theme_support( 'html5', array( 'comment-form', 'comment-list', 'search-form', 'gallery', 'caption', 'style', 'script' ) );
+4409-	add_theme_support( 'automatic-feed-links' );</code></pre>
+                </div>
+                <p>The title is not even on that list: for block themes, <code>wp-includes/block-template.php</code> prints it unconditionally, "regardless of whether theme has title-tag support", as its comment says. Classic themes must ask for each feature, which is why every classic theme you will meet starts with a setup function like yours.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Legacy supports: the Customizer family</h4>
+                    <p>Old tutorials also add <code>custom-logo</code>, <code>custom-header</code> and <code>custom-background</code>. Each one adds a panel to the <strong>Customizer</strong> (Appearance &gt; Customize), where the site owner uploads a logo or picks a background color, and the theme prints it with functions such as <code>the_custom_logo()</code>. They still work in classic themes, and you will see them on client sites. For new work they are legacy: block themes do the same with the Site Logo block and <code>theme.json</code> styles that the Site Editor edits (Lesson 3.1 showed the Customizer stepping aside).</p>
+                </div>
+            </section>
+
+            <section id="assets" class="lesson-section">
+                <h2>🎨 Enqueueing Styles and Scripts</h2>
+                <p>A block theme gets most of its CSS from <code>theme.json</code>. A classic theme, even a hybrid like yours, has to deliver its own CSS files, and you saw in Lesson 4.1 that WordPress does not print <code>styles.css</code> custom CSS for it. You could type a <code>&lt;link rel="stylesheet"&gt;</code> into <code>header.php</code>, but then WordPress would not know about the file: plugins could not remove or replace it, a child theme could not depend on it, and nothing would stop the same library being loaded twice by two plugins. So themes and plugins <strong>enqueue</strong> their assets: they put them on WordPress's list with a unique name (the <strong>handle</strong>), and WordPress prints the list in the right place, in dependency order, each file once.</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Argument</th><th><code>wp_enqueue_style( $handle, $src, $deps, $ver, $media )</code></th><th><code>wp_enqueue_script( $handle, $src, $deps, $ver, $args )</code></th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>handle</td><td colspan="2">Unique, prefixed name: <code>pagesco-classic-style</code>. WordPress adds <code>-css</code> / <code>-js</code> for the element's <code>id</code></td></tr>
+                            <tr><td>src</td><td colspan="2">Full URL: build it with <code>get_parent_theme_file_uri()</code> / <code>get_theme_file_uri()</code> (Lesson 3.4) or <code>plugins_url()</code> in a plugin</td></tr>
+                            <tr><td>deps</td><td colspan="2">Handles that must be printed first, for example <code>array( 'pagesco-classic-style' )</code></td></tr>
+                            <tr><td>ver</td><td colspan="2">Added as <code>?ver=…</code> so browsers fetch the file again when it changes; use the theme's <code>Version</code></td></tr>
+                            <tr><td>last</td><td><code>'all'</code>, <code>'print'</code>, or any media query</td><td><code>array( 'strategy' =&gt; 'defer' or 'async', 'in_footer' =&gt; true )</code> (6.3+)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Start with the menu script, because the menu comes next. On a small screen it will fold the menu away behind a "Menu" button. Note how it adds the class that hides the menu only once it runs: without JavaScript, the menu simply stays visible. Create <code>wordpress/wp-content/themes/pagesco-classic/assets/js/navigation.js</code>:</p>
+                <pre data-file="wp-content/themes/pagesco-classic/assets/js/navigation.js"><code class="language-js">/**
+ * Pages &amp; Co. Classic: opens and closes the primary menu on small screens.
+ */
+( function () {
+	const nav = document.querySelector( '.site-nav' );
+	const button = nav ? nav.querySelector( '.menu-toggle' ) : null;
+
+	if ( ! button ) {
+		return;
+	}
+
+	// Only now, with JavaScript running, may the menu start closed.
+	nav.classList.add( 'is-collapsible' );
+
+	button.addEventListener( 'click', function () {
+		const open = 'true' !== button.getAttribute( 'aria-expanded' );
+		button.setAttribute( 'aria-expanded', String( open ) );
+		nav.classList.toggle( 'is-open', open );
+	} );
+}() );</code></pre>
+                <p>Then add the enqueue callback to the end of <code>functions.php</code>. It runs on <code>wp_enqueue_scripts</code>, the front-end moment for assets (admin screens have <code>admin_enqueue_scripts</code>, the login page <code>login_enqueue_scripts</code>):</p>
+                <pre data-append="wp-content/themes/pagesco-classic/functions.php"><code class="language-php">/**
+ * Loads the theme's stylesheet and its menu script.
+ */
+function pagesco_classic_enqueue_assets() {
+	$version = wp_get_theme( get_template() )-&gt;get( 'Version' );
+
+	wp_enqueue_style(
+		'pagesco-classic-style',
+		get_parent_theme_file_uri( 'style.css' ),
+		array(),
+		$version
+	);
+
+	wp_enqueue_script(
+		'pagesco-classic-navigation',
+		get_parent_theme_file_uri( 'assets/js/navigation.js' ),
+		array(),
+		$version,
+		array(
+			'strategy'  =&gt; 'defer',
+			'in_footer' =&gt; true,
+		)
+	);
+}
+add_action( 'wp_enqueue_scripts', 'pagesco_classic_enqueue_assets' );</code></pre>
+                <p>Three choices in it are worth a sentence each. <code>get_parent_theme_file_uri( 'style.css' )</code> always means <em>this</em> theme's file, even when someone builds a child theme on <code>pagesco-classic</code>; <code>get_stylesheet_uri()</code> would quietly load the child's <code>style.css</code> instead (the template-versus-stylesheet distinction from Lesson 3.4). For the same reason the version comes from <code>wp_get_theme( get_template() )</code>, the theme in the <code>template</code> option. And the script is deferred: the browser downloads it while it reads the page and runs it at the end, so it never blocks the page from appearing. Look at what WordPress prints:</p>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | grep 'pagesco-classic-'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;link rel='stylesheet' id='pagesco-classic-style-css' href='http://localhost:8080/wp-content/themes/pagesco-classic/style.css?ver=1.0.0' media='all' /&gt;
+&lt;script data-wp-strategy="defer" defer id="pagesco-classic-navigation-js" src="http://localhost:8080/wp-content/themes/pagesco-classic/assets/js/navigation.js?ver=1.0.0"&gt;&lt;/script&gt;</code></pre>
+                </div>
+                <p>The stylesheet is a <code>&lt;link&gt;</code> in the <code>&lt;head&gt;</code> with the ID <code>pagesco-classic-style-css</code>; the script a <code>&lt;script defer&gt;</code> at the end of the body (WordPress also writes the strategy into <code>data-wp-strategy</code>, so it can keep dependent scripts in a safe order). Both URLs end in <code>?ver=1.0.0</code>, the <code>Version</code> line of <code>style.css</code>. When you change the CSS for a release, you raise that number, every visitor's browser sees a new URL, and nobody is stuck with yesterday's styles in their cache. The project does exactly that.</p>
+                <div class="card card-success">
+                    <h4>✅ Register once, enqueue where needed</h4>
+                    <p><code>wp_register_style()</code> and <code>wp_register_script()</code> take the same arguments but only make a handle <em>known</em>; a later <code>wp_enqueue_style( 'handle' )</code> with just the handle puts it on the page. Plugins use that pair to load a file only on the pages that need it, for example a shortcode's CSS only when the shortcode appears (Lesson 5.5). Conditional tags work inside a <code>wp_enqueue_scripts</code> callback, because the main query has run by then: <code>if ( is_front_page() ) { … }</code> (Exercise 2).</p>
+                </div>
+            </section>
+
+            <section id="menus" class="lesson-section">
+                <h2>🧭 Navigation Menus</h2>
+                <p>Classic menus have two halves. The <strong>theme</strong> declares <em>locations</em>, named places in its templates where a menu may appear ("primary", "footer"). The <strong>site owner</strong> builds <em>menus</em> under Appearance &gt; Menus and assigns one to each location. The theme never knows which links a menu holds; it only prints "whatever menu is in the primary location". Register the location at the end of <code>functions.php</code>, on <code>after_setup_theme</code> like the supports (a second, separate callback keeps each job readable):</p>
+                <pre data-append="wp-content/themes/pagesco-classic/functions.php"><code class="language-php">/**
+ * Registers the menu location the header prints.
+ */
+function pagesco_classic_register_menus() {
+	register_nav_menus(
+		array(
+			'primary' =&gt; __( 'Primary menu', 'pagesco-classic' ),
+		)
+	);
+}
+add_action( 'after_setup_theme', 'pagesco_classic_register_menus' );</code></pre>
+                <p>The key <code>'primary'</code> is the location's ID that templates use; the translatable value is what the admin shows. Now replace <code>header.php</code>. It prints the menu with <code>wp_nav_menu()</code> inside a labelled <code>&lt;nav&gt;</code>, only when a menu is assigned (<code>has_nav_menu()</code>), next to the button your script controls. It also gains a skip link, explained in the accessibility section below:</p>
+                <pre data-file="wp-content/themes/pagesco-classic/header.php"><code class="language-php">&lt;?php
+/**
+ * The header: the document head and the top of every page.
+ *
+ * @package pagesco-classic
+ */
+
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html &lt;?php language_attributes(); ?&gt;&gt;
+&lt;head&gt;
+	&lt;meta charset="&lt;?php bloginfo( 'charset' ); ?&gt;"&gt;
+	&lt;meta name="viewport" content="width=device-width, initial-scale=1"&gt;
+	&lt;?php wp_head(); ?&gt;
+&lt;/head&gt;
+&lt;body &lt;?php body_class(); ?&gt;&gt;
+&lt;?php wp_body_open(); ?&gt;
+&lt;a class="skip-link screen-reader-text" href="#main"&gt;&lt;?php esc_html_e( 'Skip to content', 'pagesco-classic' ); ?&gt;&lt;/a&gt;
+&lt;header class="site-header"&gt;
+	&lt;p class="site-title"&gt;&lt;a href="&lt;?php echo esc_url( home_url( '/' ) ); ?&gt;"&gt;&lt;?php bloginfo( 'name' ); ?&gt;&lt;/a&gt;&lt;/p&gt;
+	&lt;?php if ( has_nav_menu( 'primary' ) ) : ?&gt;
+		&lt;nav class="site-nav" aria-label="&lt;?php esc_attr_e( 'Primary', 'pagesco-classic' ); ?&gt;"&gt;
+			&lt;button type="button" class="menu-toggle" aria-controls="primary-menu" aria-expanded="false"&gt;&lt;?php esc_html_e( 'Menu', 'pagesco-classic' ); ?&gt;&lt;/button&gt;
+			&lt;?php
+			wp_nav_menu(
+				array(
+					'theme_location' =&gt; 'primary',
+					'menu_id'        =&gt; 'primary-menu',
+					'container'      =&gt; false,
+					'depth'          =&gt; 1,
+				)
+			);
+			?&gt;
+		&lt;/nav&gt;
+	&lt;?php endif; ?&gt;
+&lt;/header&gt;
+&lt;main id="main" class="site-main"&gt;</code></pre>
+                <p><code>'container' =&gt; false</code> drops the <code>&lt;div&gt;</code> that <code>wp_nav_menu()</code> would wrap around the list (the theme already has its <code>&lt;nav&gt;</code>), <code>menu_id</code> gives the list the ID the button's <code>aria-controls</code> points to, and <code>depth</code> 1 prints top-level items only. Nothing appears yet: the location is empty. Build the shop's menu from the WP-CLI container, with the three pages from Lesson 2.1 by ID, and assign it:</p>
+                <pre data-cli><code class="language-bash">wp menu location list
+wp menu create "Main menu"
+wp menu item add-post main-menu 12
+wp menu item add-post main-menu 14
+wp menu item add-post main-menu 13
+wp menu location assign main-menu primary
+wp menu item list main-menu --fields=db_id,title,link</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your IDs may differ)</h4>
+                    <pre><code>+----------+--------------+
+| location | description  |
++----------+--------------+
+| primary  | Primary menu |
++----------+--------------+
+Success: Created menu 4.
+Success: Menu item added.
+Success: Menu item added.
+Success: Menu item added.
+Success: Assigned location primary to menu main-menu.
++-------+----------+--------------------------------+
+| db_id | title    | link                           |
++-------+----------+--------------------------------+
+| 27    | About Us | http://localhost:8080/about/   |
+| 28    | Events   | http://localhost:8080/events/  |
+| 29    | Contact  | http://localhost:8080/contact/ |
++-------+----------+--------------------------------+</code></pre>
+                </div>
+                <p>The menu is a term in the <code>nav_menu</code> taxonomy (ID 4 here), each item a post of type <code>nav_menu_item</code> (27 to 29), and the assignment lives in the theme's mods, the <code>theme_mods_pagesco-classic</code> option, as <code>nav_menu_locations</code>. If you have edited content of your own, your IDs differ, which is why the items were added by page ID only after checking them (<code>wp post list --post_type=page</code>). Open the About page:</p>
+                <pre data-web="/about/" data-select="nav.site-nav"><code class="language-text">http://localhost:8080/about/   (View Source, the site navigation)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;nav class="site-nav" aria-label="Primary"&gt;
+			&lt;button type="button" class="menu-toggle" aria-controls="primary-menu" aria-expanded="false"&gt;Menu&lt;/button&gt;
+			&lt;ul id="primary-menu" class="menu"&gt;&lt;li id="menu-item-27" class="menu-item menu-item-type-post_type menu-item-object-page current-menu-item page_item page-item-12 current_page_item menu-item-27"&gt;&lt;a href="http://localhost:8080/about/" aria-current="page"&gt;About Us&lt;/a&gt;&lt;/li&gt;
+&lt;li id="menu-item-28" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-28"&gt;&lt;a href="http://localhost:8080/events/"&gt;Events&lt;/a&gt;&lt;/li&gt;
+&lt;li id="menu-item-29" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-29"&gt;&lt;a href="http://localhost:8080/contact/"&gt;Contact&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;		&lt;/nav&gt;</code></pre>
+                </div>
+                <p>Every item has classes for styling (<code>menu-item</code>, its type and object), and the item for the page you are on also has <code>current-menu-item</code> and a link with <code>aria-current="page"</code>, which screen readers announce as "current page". You get that for free; a hand-written list of links in <code>header.php</code> would have to work it out itself. With a theme that supports menus, the Menus screen opens again (it refused with Twenty Twenty-Five in Lesson 3.1):</p>
+                <pre data-web="/wp-admin/nav-menus.php" data-login="admin" data-select="h1"><code class="language-text">http://localhost:8080/wp-admin/nav-menus.php   (Appearance &gt; Menus)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;h1 class="wp-heading-inline"&gt;Menus&lt;/h1&gt;</code></pre>
+                </div>
+                <p>There the shop can reorder items, add custom links and nest submenus without asking a developer. (Registering a location is enough for WordPress to switch the <code>menus</code> support on; you do not need <code>add_theme_support( 'menus' )</code> as well.)</p>
+            </section>
+
+            <section id="widgets" class="lesson-section">
+                <h2>🧱 Widget Areas</h2>
+                <p>A <strong>widget area</strong> (WordPress still calls it a "sidebar" in function names, from the days when that is where they always went) is a slot in a classic theme where the site owner places small blocks of content: opening hours, a search box, a list of categories. The theme registers the area on <code>widgets_init</code> and prints it in a template. Add the registration to the end of <code>functions.php</code>:</p>
+                <pre data-append="wp-content/themes/pagesco-classic/functions.php"><code class="language-php">/**
+ * Registers the footer widget area.
+ */
+function pagesco_classic_widgets_init() {
+	register_sidebar(
+		array(
+			'id'            =&gt; 'footer',
+			'name'          =&gt; __( 'Footer', 'pagesco-classic' ),
+			'description'   =&gt; __( 'Shown in the site footer, above the address.', 'pagesco-classic' ),
+			'before_widget' =&gt; '&lt;section id="%1$s" class="widget %2$s"&gt;',
+			'after_widget'  =&gt; '&lt;/section&gt;',
+			'before_title'  =&gt; '&lt;h2 class="widget-title"&gt;',
+			'after_title'   =&gt; '&lt;/h2&gt;',
+		)
+	);
+}
+add_action( 'widgets_init', 'pagesco_classic_widgets_init' );</code></pre>
+                <p>The <code>id</code> is what templates use (always set it; Common Mistakes shows why). <code>before_widget</code> and <code>after_widget</code> wrap each widget; <code>%1$s</code> becomes the widget's ID and <code>%2$s</code> its classes. The title wrappers are for widgets with a title field. Print the area in <code>footer.php</code>, only when it has widgets (<code>is_active_sidebar()</code>), so an empty area leaves no empty <code>&lt;div&gt;</code>:</p>
+                <pre data-file="wp-content/themes/pagesco-classic/footer.php"><code class="language-php">&lt;?php
+/**
+ * The footer: the end of the main content and the bottom of every page.
+ *
+ * @package pagesco-classic
+ */
+
+?&gt;
+&lt;/main&gt;
+&lt;footer class="site-footer"&gt;
+	&lt;?php if ( is_active_sidebar( 'footer' ) ) : ?&gt;
+		&lt;div class="footer-widgets"&gt;
+			&lt;?php dynamic_sidebar( 'footer' ); ?&gt;
+		&lt;/div&gt;
+	&lt;?php endif; ?&gt;
+	&lt;p&gt;&lt;?php esc_html_e( 'Pages &amp; Co. · 12 Market Street · 555-0142', 'pagesco-classic' ); ?&gt;&lt;/p&gt;
+&lt;/footer&gt;
+&lt;?php wp_footer(); ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+                <p>Since WordPress 5.8, widgets are blocks: Appearance &gt; Widgets is a block editor, and each widget is stored as a little piece of block markup in the <code>widget_block</code> option. WP-CLI can add one, with the content as block markup (Lesson 2.1):</p>
+                <pre data-cli><code class="language-bash">wp sidebar list --fields=name,id
+wp widget add block footer --content='&lt;!-- wp:paragraph --&gt;&lt;p&gt;Open Monday to Saturday, and until 9 p.m. on Thursdays.&lt;/p&gt;&lt;!-- /wp:paragraph --&gt;'
+wp widget list footer --fields=name,id,position</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+------------------+---------------------+
+| name             | id                  |
++------------------+---------------------+
+| Footer           | footer              |
+| Inactive Widgets | wp_inactive_widgets |
++------------------+---------------------+
+Success: Added widget to sidebar.
++-------+---------+----------+
+| name  | id      | position |
++-------+---------+----------+
+| block | block-7 | 1        |
++-------+---------+----------+</code></pre>
+                </div>
+                <p>Two areas: your <code>footer</code> and <code>wp_inactive_widgets</code>, where WordPress parks widgets that belong to no area. The new widget is <code>block-7</code>: a fresh install ships five default block widgets (Search, Recent Posts, Recent Comments, Archives, Categories), numbers 2 to 6, which have been sitting among the inactive widgets because Twenty Twenty-Five has no widget areas. The footer now prints it:</p>
+                <pre data-web="/" data-select=".footer-widgets"><code class="language-text">http://localhost:8080/   (View Source, the footer widget area)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;div class="footer-widgets"&gt;
+			&lt;section id="block-7" class="widget widget_block widget_text"&gt;&lt;p class="wp-block-paragraph"&gt;Open Monday to Saturday, and until 9 p.m. on Thursdays.&lt;/p&gt;&lt;/section&gt;		&lt;/div&gt;</code></pre>
+                </div>
+                <p>Your <code>before_widget</code> markup with the widget's ID and classes, and inside it the rendered paragraph block. A block widget has no title field, so <code>before_title</code> is unused here; a heading is just another block in the widget.</p>
+                <div class="card card-info">
+                    <h4>💡 Widgets are legacy, and still everywhere</h4>
+                    <p>Block themes have no widget areas: their templates and patterns hold that content directly, as Lesson 3.3 showed with the opening-hours synced pattern. Widgets matter for classic themes, which is most existing sites. Older "legacy widgets" are PHP classes that extend <code>WP_Widget</code> (the Search, Archives and Recent Posts widgets still exist that way, and plugins add their own); they appear in the block widget editor as a Legacy Widget block. Plugins such as Classic Widgets bring back the old drag-and-drop screen, and a theme can do the same with <code>remove_theme_support( 'widgets-block-editor' )</code>.</p>
+                </div>
+            </section>
+
+            <section id="a11y-i18n" class="lesson-section">
+                <h2>♿ Accessibility and Translation</h2>
+                <p>Two jobs are easy to forget because a sighted, English-speaking developer never notices them missing: making the theme work for people who use a keyboard or a screen reader, and making every word in it translatable. WordPress does a lot of both for you, but only if the theme plays along.</p>
+
+                <h3>Text for screen readers only</h3>
+                <p>Core prints helpful text that is meant to be <em>heard</em>, not seen: the "Search for:" label you just saw, the "Posts pagination" heading in front of page numbers (Lesson 4.2), the "Post navigation" heading. It marks all of it with the class <code>screen-reader-text</code> and expects the theme's CSS to hide it visually while keeping it available to assistive technology. Block themes get that CSS from core. A classic theme has to bring it, and <code>pagesco-classic</code> does not have any CSS yet. Here is what everyone sees in the home page's pagination right now:</p>
+                <pre data-web="/" data-select="nav.pagination" data-text><code class="language-text">http://localhost:8080/   (the pagination, as visible text)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Posts pagination
+1
+2
+Next</code></pre>
+                </div>
+                <p>The heading "Posts pagination" is printed as a normal, visible <code>h2</code> above the page numbers. Do not delete such text; hide it the standard way. The project's stylesheet starts with the rule core themes use for <code>.screen-reader-text</code> (clipped to one invisible pixel, not <code>display: none</code>, which would hide it from screen readers too).</p>
+
+                <h3>The theme's accessibility checklist</h3>
+                <ul>
+                    <li><strong>A skip link</strong> as one of the first things in <code>&lt;body&gt;</code>: "Skip to content", pointing at <code>&lt;main id="main"&gt;</code>, hidden until it receives keyboard focus. Keyboard users press <kbd>Tab</kbd> once and jump past the header and menu on every page. Your <code>header.php</code> now has one, right after the store notice; block themes print the same link automatically (<code>id="wp-skip-link"</code>, pointing at <code>#wp--skip-link--target</code>, the ID you saw on <code>pagesco</code>'s <code>&lt;main&gt;</code> in Lesson 3.2).</li>
+                    <li><strong>Landmarks with names</strong>: one <code>&lt;header&gt;</code>, <code>&lt;main&gt;</code> and <code>&lt;footer&gt;</code> per page, and an <code>aria-label</code> on each <code>&lt;nav&gt;</code> ("Primary"; core labels its own, such as "Posts pagination").</li>
+                    <li><strong>Real buttons for actions</strong>: the menu toggle is a <code>&lt;button&gt;</code> with <code>aria-expanded</code> and <code>aria-controls</code>, which the script keeps up to date, not a clickable <code>&lt;div&gt;</code>.</li>
+                    <li><strong>Visible focus and enough contrast</strong>: the stylesheet draws a clear outline on <code>:focus-visible</code> and only uses the palette pairs you checked against WCAG AA in Lesson 3.2.</li>
+                    <li><strong>One <code>h1</code> per page</strong>, headings in order, which your templates already do (Lessons 4.1 and 4.2). Lesson 8.3 tests all of this with real tools.</li>
+                </ul>
+
+                <h3>Strings WordPress can translate</h3>
+                <p>Since Lesson 4.1 every word in <code>pagesco-classic</code> goes through a translation function with the text domain <code>pagesco-classic</code> (Lesson 1.3). The text domain must be a literal string, in every call, or translation tools cannot find it. A quick audit from the WP-CLI container lists the translation calls in the theme that do <em>not</em> name the domain:</p>
+                <pre data-cli data-exit="1"><code class="language-bash">grep -rhE "(__|_e|_n|esc_html__|esc_html_e|esc_attr__|esc_attr_e)\(" wp-content/themes/pagesco-classic | grep -vc "'pagesco-classic'"</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>0</code></pre>
+                </div>
+                <p>None (<code>grep -c</code> exits with status 1 when it counts zero). Translations for a theme are files named after the language, such as <code>es_ES.mo</code> or, since WordPress 6.5, the faster <code>es_ES.l10n.php</code>, in the theme's <code>languages/</code> folder. Lesson 8.3 generates real ones with WP-CLI's <code>i18n</code> commands. To see the mechanism today, write a tiny Spanish translation by hand, <code>wordpress/wp-content/themes/pagesco-classic/languages/es_ES.l10n.php</code>. It is just a PHP array of original and translated strings:</p>
+                <pre data-file="wp-content/themes/pagesco-classic/languages/es_ES.l10n.php"><code class="language-php">&lt;?php
+return array(
+	'domain'       =&gt; 'pagesco-classic',
+	'language'     =&gt; 'es_ES',
+	'plural-forms' =&gt; 'nplurals=2; plural=n != 1;',
+	'messages'     =&gt; array(
+		'Skip to content'    =&gt; 'Saltar al contenido',
+		'Menu'               =&gt; 'Menú',
+		'Visit us'           =&gt; 'Visítanos',
+		'News from the shop' =&gt; 'Noticias de la tienda',
+	),
+);</code></pre>
+                <p>Then switch the site to Spanish for a moment with a test must-use plugin that filters the <code>locale</code> (on a real site you would choose the language under Settings &gt; General), and look at the home page:</p>
+                <pre data-file="wp-content/mu-plugins/pagesco-spanish.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Pages &amp; Co. Spanish Test
+ * Description: Lesson 4.3 test: shows the site in Spanish (es_ES). Delete it after the test.
+ */
+
+add_filter( 'locale', fn() =&gt; 'es_ES' );</code></pre>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | grep -o '&lt;html [^&gt;]*&gt;\|Saltar[^&lt;]*\|Skip to[^&lt;]*\|&lt;h2&gt;[^&lt;]*&lt;/h2&gt;\|Posts pagination'
+rm wp-content/mu-plugins/pagesco-spanish.php wp-content/themes/pagesco-classic/languages/es_ES.l10n.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;html lang="es-ES"&gt;
+Saltar al contenido
+&lt;h2&gt;Visítanos&lt;/h2&gt;
+&lt;h2&gt;Noticias de la tienda&lt;/h2&gt;
+Posts pagination
+Posts pagination</code></pre>
+                </div>
+                <p><code>language_attributes()</code> printed <code>lang="es-ES"</code>, and the theme's strings that have a translation came out in Spanish: the skip link, "Visítanos", "Noticias de la tienda". "Posts pagination" stayed English: it belongs to core's <code>default</code> text domain, and this site has no Spanish core translation installed (Lesson 1.3 installed one with <code>wp language core install</code>). WordPress loaded your file <em>just in time</em>, the first time a <code>pagesco-classic</code> string was needed. The last command removed both test files again.</p>
+                <div class="card card-info">
+                    <h4>🧩 Version note: WordPress 6.7 and older need load_theme_textdomain()</h4>
+                    <p>WordPress 7.1 found <code>languages/</code> by itself: since 6.8, <code>wp-settings.php</code> calls <code>$wp_theme-&gt;load_textdomain()</code> for the active theme just before it includes <code>functions.php</code>, using the <code>Text Domain</code> and <code>Domain Path</code> headers (default <code>/languages</code>), and does the same for each active plugin. WordPress 6.7 and older do not (checked in the official 6.7 and 6.8 images): there a theme that ships its own translations must call <code>load_theme_textdomain( 'pagesco-classic', get_template_directory() . '/languages' )</code> on <code>after_setup_theme</code>. <code>pagesco-classic</code> says <code>Requires at least: 6.6</code>, so it keeps the call; on 7.1 it is harmless. Translations installed from WordPress.org land in <code>wp-content/languages/themes/</code> and never needed it.</p>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <p>Each mistake uses a scratch file you delete afterwards; <code>pagesco-classic</code> itself stays as it is.</p>
+
+                <h3>1. Enqueueing at the top level of a file</h3>
+                <p>The shop wants a small stylesheet for an opening-hours box, and someone writes the enqueue call straight into a file instead of a callback, here a must-use plugin (the same happens at the top of <code>functions.php</code>):</p>
+                <pre data-file="wp-content/mu-plugins/mistake-enqueue.php" data-norun><code class="language-php">&lt;?php
+wp_enqueue_style( 'pagesco-hours', content_url( 'mu-plugins/hours.css' ) );</code></pre>
+                <pre data-cli data-raises="doing_it_wrong"><code class="language-bash">curl -s http://localhost:8080/ | head -n 6
+rm wp-content/mu-plugins/mistake-enqueue.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Notice: Function wp_enqueue_style was called &lt;strong&gt;incorrectly&lt;/strong&gt;. Scripts and styles should not be registered or enqueued until the &lt;code&gt;wp_enqueue_scripts&lt;/code&gt;, &lt;code&gt;admin_enqueue_scripts&lt;/code&gt;, or &lt;code&gt;login_enqueue_scripts&lt;/code&gt; hooks. This notice was triggered by the &lt;code&gt;pagesco-hours&lt;/code&gt; handle. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 3.3.0.) in /var/www/html/wp-includes/functions.php on line 6260
+
+Notice: Function wp_is_block_theme was called &lt;strong&gt;incorrectly&lt;/strong&gt;. This function should not be called before the theme directory is registered. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 6.8.0.) in /var/www/html/wp-includes/functions.php on line 6260
+
+Notice: Function is_feed was called &lt;strong&gt;incorrectly&lt;/strong&gt;. Conditional query tags do not work before the query is run. Before then, they always return false. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 3.1.0.) in /var/www/html/wp-includes/functions.php on line 6260</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the file runs while plugins load, long before <code>wp_enqueue_scripts</code>, and WordPress tells you so, naming the handle: "Scripts and styles should not be registered or enqueued until the <code>wp_enqueue_scripts</code>, <code>admin_enqueue_scripts</code>, or <code>login_enqueue_scripts</code> hooks." Two more notices follow, from core functions that your early call dragged in (<code>wp_is_block_theme()</code> before the theme is known, <code>is_feed()</code> before the query): one misplaced line, three messages, and the first one is the one to read. The style is still added, and that is the real damage: top-level code runs on every request, so the front-end CSS would also load on admin screens and the login page. <strong>Fix:</strong> wrap the call in a function on <code>wp_enqueue_scripts</code>, as <code>pagesco_classic_enqueue_assets()</code> does.</p>
+
+                <h3>2. Leaving out the version</h3>
+                <pre data-file="wp-content/mu-plugins/mistake-version.php"><code class="language-php">&lt;?php
+add_action(
+	'wp_enqueue_scripts',
+	function () {
+		wp_enqueue_style( 'pagesco-hours', content_url( 'mu-plugins/hours.css' ) );
+	}
+);</code></pre>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | grep 'pagesco-hours'
+rm wp-content/mu-plugins/mistake-version.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;link rel='stylesheet' id='pagesco-hours-css' href='http://localhost:8080/wp-content/mu-plugins/hours.css?ver=7.1.3' media='all' /&gt;</code></pre>
+                </div>
+                <p><strong>What it means:</strong> no error, and the file loads. But without a version WordPress uses its <em>own</em> version, <code>?ver=7.1.3</code>. That number only changes when WordPress updates, so after you edit the CSS, browsers and caching plugins keep serving the old file, and the client reports that "the change did not work". <strong>Fix:</strong> always pass a version that changes with the file: the theme's (or plugin's) <code>Version</code>, raised on every release. (Passing <code>null</code> removes <code>?ver=</code> entirely, which is worse.)</p>
+
+                <h3>3. A typo in the menu location</h3>
+                <pre data-file="mistake-menu.php"><code class="language-php">&lt;?php
+wp_nav_menu( array( 'theme_location' =&gt; 'primery' ) );</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file mistake-menu.php
+rm mistake-menu.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;div class="menu"&gt;&lt;ul&gt;
+&lt;li class="page_item page-item-12"&gt;&lt;a href="http://localhost:8080/about/"&gt;About Us&lt;/a&gt;&lt;/li&gt;
+&lt;li class="page_item page-item-13"&gt;&lt;a href="http://localhost:8080/contact/"&gt;Contact&lt;/a&gt;&lt;/li&gt;
+&lt;li class="page_item page-item-14"&gt;&lt;a href="http://localhost:8080/events/"&gt;Events&lt;/a&gt;&lt;/li&gt;
+&lt;li class="page_item page-item-2"&gt;&lt;a href="http://localhost:8080/sample-page/"&gt;Sample Page&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/div&gt;</code></pre>
+                </div>
+                <p><strong>What it means:</strong> there is no location <code>primery</code>, so <code>wp_nav_menu()</code> finds no menu and calls its fallback, <code>wp_page_menu()</code>, which lists <em>every</em> published page, Sample Page included, in a <code>&lt;div class="menu"&gt;</code>. On a real site that looks almost right, which is why it survives for months. <strong>Fix:</strong> copy the location ID from <code>register_nav_menus()</code>, guard the call with <code>has_nav_menu( 'primary' )</code> as <code>header.php</code> does, or pass <code>'fallback_cb' =&gt; false</code> so a missing menu prints nothing.</p>
+
+                <h3>4. A widget area without an ID</h3>
+                <pre data-file="wp-content/mu-plugins/mistake-sidebar.php" data-norun><code class="language-php">&lt;?php
+add_action(
+	'widgets_init',
+	function () {
+		register_sidebar( array( 'name' =&gt; 'Shop sidebar' ) );
+	}
+);</code></pre>
+                <pre data-cli data-raises="doing_it_wrong"><code class="language-bash">wp sidebar list --fields=name,id
+rm wp-content/mu-plugins/mistake-sidebar.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Notice: Function register_sidebar was called &lt;strong&gt;incorrectly&lt;/strong&gt;. No &lt;code&gt;id&lt;/code&gt; was set in the arguments array for the "Shop sidebar" sidebar. Defaulting to "sidebar-1". Manually set the &lt;code&gt;id&lt;/code&gt; to "sidebar-1" to silence this notice and keep existing sidebar content. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 4.2.0.) in /var/www/html/wp-includes/functions.php on line 6260
++------------------+---------------------+
+| name             | id                  |
++------------------+---------------------+
+| Shop sidebar     | sidebar-1           |
+| Footer           | footer              |
+| Inactive Widgets | wp_inactive_widgets |
++------------------+---------------------+</code></pre>
+                </div>
+                <p><strong>What it means:</strong> without an <code>id</code>, WordPress numbers the area itself, <code>sidebar-1</code>, and says so with a notice. The number depends on how many areas were registered before it, so when you add or remove another area later, the IDs shift and the widgets the owner placed show up in the wrong place or vanish into Inactive Widgets. <strong>Fix:</strong> always give <code>register_sidebar()</code> a fixed, prefixed-enough <code>id</code> such as <code>footer</code>, and never change it once the site is live.</p>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Finish the Classic Theme, Then Back to pagesco</h2>
+                <p>Everything is wired up; what is missing is the look. In this project <code>pagesco-classic</code> gets its stylesheet (and with it the notice bar's dark band, as Lesson 4.1 promised), you check every page, and then the site switches back to <code>pagesco</code> for Module 5, with a <code>functions.php</code> of its own. Allow about 35 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: The stylesheet, and a new version <span class="step-time">(15 min)</span></h3>
+                    <p>Replace <code>style.css</code> with the version below. The header is the same except for <code>Version: 1.1.0</code>: the theme's CSS changes, so its version does. The rules use the presets from your <code>theme.json</code> (<code>--wp--preset--color--ink</code> and friends, Lesson 4.1), so the colors stay in one place. They cover the screen-reader text and skip link, the notice bar, the header and menu (folded behind the button on narrow screens), the content column and the footer:</p>
+                    <pre data-file="wp-content/themes/pagesco-classic/style.css"><code class="language-css">/*
+Theme Name: Pages &amp; Co. Classic
+Theme URI: https://example.com/pagesco-classic/
+Author: Pages &amp; Co.
+Author URI: https://example.com/
+Description: A classic PHP theme for the Pages &amp; Co. bookstore, built in Module 4.
+Requires at least: 6.6
+Tested up to: 7.1
+Requires PHP: 7.4
+Version: 1.1.0
+License: GNU General Public License v2 or later
+License URI: http://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: pagesco-classic
+*/
+
+/* Accessibility helpers: WordPress core prints these classes, the theme styles them. */
+.screen-reader-text {
+	border: 0;
+	clip-path: inset(50%);
+	height: 1px;
+	margin: -1px;
+	overflow: hidden;
+	padding: 0;
+	position: absolute;
+	width: 1px;
+	word-wrap: normal !important;
+}
+
+.skip-link:focus {
+	background: var(--wp--preset--color--paper);
+	clip-path: none;
+	color: var(--wp--preset--color--ink);
+	height: auto;
+	left: 0.5rem;
+	padding: 0.75rem 1rem;
+	top: 0.5rem;
+	width: auto;
+	z-index: 100000;
+}
+
+:focus-visible {
+	outline: 2px solid var(--wp--preset--color--oxblood);
+	outline-offset: 2px;
+}
+
+/* The store notice from the pagesco-site must-use plugin (Lesson 2.3). */
+.pagesco-notice {
+	background: var(--wp--preset--color--ink);
+	color: var(--wp--preset--color--paper);
+	font-family: var(--wp--preset--font-family--sans);
+	font-size: var(--wp--preset--font-size--small);
+	padding: 0.5rem 1rem;
+	text-align: center;
+}
+
+.pagesco-notice a {
+	color: inherit;
+}
+
+/* Header and menu. */
+.site-header {
+	align-items: center;
+	background: var(--wp--preset--color--sage);
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+	justify-content: space-between;
+	padding: 1rem max(1rem, calc((100% - 1180px) / 2));
+}
+
+.site-title {
+	font-family: var(--wp--preset--font-family--sans);
+	font-size: var(--wp--preset--font-size--large);
+	font-weight: 700;
+	margin: 0;
+}
+
+.site-title a {
+	color: var(--wp--preset--color--ink);
+	text-decoration: none;
+}
+
+.site-nav ul {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1.25rem;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.site-nav a {
+	font-family: var(--wp--preset--font-family--sans);
+}
+
+.site-nav .current-menu-item &gt; a {
+	font-weight: 700;
+	text-decoration: none;
+}
+
+.menu-toggle {
+	display: none;
+}
+
+@media (max-width: 600px) {
+	.is-collapsible .menu-toggle {
+		display: inline-block;
+	}
+
+	.is-collapsible:not(.is-open) ul {
+		display: none;
+	}
+
+	.is-collapsible.is-open ul {
+		flex-direction: column;
+		padding-top: 0.75rem;
+	}
+}
+
+/* Content. */
+.site-main {
+	margin: 0 auto;
+	max-width: 680px;
+	padding: 2rem 1rem 3rem;
+}
+
+.hero {
+	border-bottom: 1px solid var(--wp--preset--color--sage);
+	margin-bottom: 2rem;
+}
+
+.entry-meta,
+.related-posts,
+.nav-links {
+	font-family: var(--wp--preset--font-family--sans);
+	font-size: var(--wp--preset--font-size--small);
+}
+
+.entry-meta {
+	color: var(--wp--preset--color--slate);
+}
+
+.related-posts {
+	background: var(--wp--preset--color--sage);
+	margin: 2rem 0;
+	padding: 1rem 1.5rem;
+}
+
+/* Footer and its widget area. */
+.site-footer {
+	background: var(--wp--preset--color--ink);
+	color: var(--wp--preset--color--paper);
+	font-family: var(--wp--preset--font-family--sans);
+	font-size: var(--wp--preset--font-size--small);
+	padding: 2rem max(1rem, calc((100% - 1180px) / 2));
+}
+
+.site-footer a {
+	color: inherit;
+}
+
+.widget-title {
+	font-size: var(--wp--preset--font-size--medium);
+}</code></pre>
+                    <pre data-cli><code class="language-bash">wp theme list --name=pagesco-classic --fields=name,status,version
+curl -s http://localhost:8080/ | grep -o "pagesco-classic-style-css' href='[^']*'"</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>+-----------------+--------+---------+
+| name            | status | version |
++-----------------+--------+---------+
+| pagesco-classic | active | 1.1.0   |
++-----------------+--------+---------+
+pagesco-classic-style-css' href='http://localhost:8080/wp-content/themes/pagesco-classic/style.css?ver=1.1.0'</code></pre>
+                    </div>
+                    <p>Version 1.1.0, and the stylesheet URL changed with it. Open <code>http://localhost:8080/</code> in your browser (reload once):</p>
+                    <figure>
+                        <img src="images/lesson_13_classic.png" alt="The Pages and Co. front page in the finished pagesco-classic theme: a dark notice bar with the free shipping text and a See events link, a sage header with the site title and a menu with About Us, Events and Contact, the heading Good books, good company with the welcome text, the Visit us links, three news posts with dates in small gray type, page numbers, and a dark footer with the opening-hours widget and the address." width="1100" height="1347" loading="lazy">
+                        <figcaption>pagesco-classic with its stylesheet: the notice bar has its band back, the header has the menu, the footer shows the widget.</figcaption>
+                    </figure>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: Check every kind of page <span class="step-time">(8 min)</span></h3>
+                    <p>Run the URL loop once more, now checking what this lesson added: exactly one <code>&lt;title&gt;</code>, the stylesheet, the menu (with <code>aria-current</code> on the current page's item) and the footer widget:</p>
+                    <pre data-cli><code class="language-bash">for url in / /hello-world/ /about/ /category/news/ "/?s=dune" /nothing-here/; do
+  page=$(curl -s "http://localhost:8080$url")
+  titles=$(printf '%s' "$page" | grep -c '&lt;title&gt;')
+  css=$(printf '%s' "$page" | grep -c 'pagesco-classic-style-css')
+  current=$(printf '%s' "$page" | grep -o '&lt;a [^&gt;]*aria-current="page"&gt;[^&lt;]*' | sed 's/&lt;[^&gt;]*&gt;//')
+  widget=$(printf '%s' "$page" | grep -c 'class="widget widget_block')
+  printf '%-15s title: %s  css: %s  widget: %s  current: %s\n' "$url" "$titles" "$css" "$widget" "${current:--}"
+done</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>/               title: 1  css: 1  widget: 1  current: -
+/hello-world/   title: 1  css: 1  widget: 1  current: -
+/about/         title: 1  css: 1  widget: 1  current: About Us
+/category/news/ title: 1  css: 1  widget: 1  current: -
+/?s=dune        title: 1  css: 1  widget: 1  current: -
+/nothing-here/  title: 1  css: 1  widget: 1  current: -</code></pre>
+                    </div>
+                    <p>Every page has one title, the stylesheet and the widget, and the About page marks its menu item as current. In <code>pagesco-plan.txt</code>, tick off the classic theme: "pagesco-classic finished: supports, assets, menu, widget area, skip link, translatable".</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: Back to pagesco, with its own functions.php <span class="step-time">(12 min)</span></h3>
+                    <p>The rest of the course builds on the block theme. Before you switch, keep a promise from Lesson 3.3: the shop's patterns get a category of their own, "Pages &amp; Co.", so editors find them in one place in the inserter. A block theme can have a <code>functions.php</code> too (Twenty Twenty-Five has one); <code>pagesco</code> simply did not need one until now. Create <code>wordpress/wp-content/themes/pagesco/functions.php</code>:</p>
+                    <pre data-file="wp-content/themes/pagesco/functions.php"><code class="language-php">&lt;?php
+/**
+ * Pages &amp; Co. functions and definitions.
+ *
+ * @package pagesco
+ */
+
+/**
+ * Registers the theme's own pattern category.
+ */
+function pagesco_register_pattern_categories() {
+	register_block_pattern_category(
+		'pagesco',
+		array(
+			'label'       =&gt; __( 'Pages &amp; Co.', 'pagesco' ),
+			'description' =&gt; __( 'Sections designed for the Pages &amp; Co. website.', 'pagesco' ),
+		)
+	);
+}
+add_action( 'init', 'pagesco_register_pattern_categories' );</code></pre>
+                    <p>Pattern categories are registered on <code>init</code>, as Twenty Twenty-Five does it. Then add <code>pagesco</code> to the <code>Categories:</code> header of the three pattern files, in front of the core categories they already have (edit the three lines in your editor, or use <code>sed</code>), switch themes, and check:</p>
+                    <pre data-cli data-checkpoint><code class="language-bash">sed -i 's/^ \* Categories: /&amp;pagesco, /' wp-content/themes/pagesco/patterns/*.php
+grep -h "Categories:" wp-content/themes/pagesco/patterns/*.php
+wp theme activate pagesco
+wp eval 'foreach ( array( "pagesco/hero", "pagesco/featured-books", "pagesco/call-to-action" ) as $name ) { echo $name, ": ", implode( ", ", WP_Block_Patterns_Registry::get_instance()-&gt;get_registered( $name )["categories"] ), "\n"; } echo WP_Block_Pattern_Categories_Registry::get_instance()-&gt;get_registered( "pagesco" )["label"], "\n";'
+for url in / /about/ /hello-world/; do printf '%-13s titles: %s  notice: %s\n' "$url" "$(curl -s "http://localhost:8080$url" | grep -c '&lt;title&gt;')" "$(curl -s "http://localhost:8080$url" | grep -c 'class="pagesco-notice"')"; done</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code> * Categories: pagesco, call-to-action
+ * Categories: pagesco, featured
+ * Categories: pagesco, banner, featured
+Success: Switched to 'Pages &amp;amp; Co.' theme.
+pagesco/hero: pagesco, banner, featured
+pagesco/featured-books: pagesco, featured
+pagesco/call-to-action: pagesco, call-to-action
+Pages &amp; Co.
+/             titles: 1  notice: 1
+/about/       titles: 1  notice: 1
+/hello-world/ titles: 1  notice: 1</code></pre>
+                    </div>
+                    <p>Each pattern lists <code>pagesco</code> first, the category's label is "Pages &amp; Co.", <code>pagesco</code> is active again, and its pages still have one title and one notice bar, now styled by <code>theme.json</code> again. (<code>WP_DEVELOPMENT_MODE</code> is <code>theme</code> since Lesson 3.3, so the changed headers show up at once instead of after the 30-minute pattern cache.) In the editor, the inserter's Patterns tab now has a "Pages &amp; Co." category with the hero, the staff picks and the book-club band.</p>
+                    <p>The classic menu and the footer widget stay in the database: <code>pagesco</code>'s header uses its Navigation block (the <code>wp_navigation</code> post from Lesson 2.1), and a block theme has no widget areas. If you switch to <code>pagesco-classic</code> again, its menu location and widget come straight back, because WordPress keeps each theme's mods in its own option.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>pagesco-classic/functions.php</code> has five prefixed callbacks: setup (supports, text domain), the main-query change, assets, the menu location and the widget area</li>
+                        <li><code>header.php</code> no longer writes a <code>&lt;title&gt;</code>; it has the skip link and the labelled primary menu with its toggle button</li>
+                        <li><code>style.css</code> is at version 1.1.0, enqueued with that version, and the notice bar, header, menu and footer look like the shop</li>
+                        <li>The "Main menu" (About Us, Events, Contact) sits in the primary location and the footer widget area shows the opening hours</li>
+                        <li><code>pagesco</code> is active again, with a <code>functions.php</code> that registers the "Pages &amp; Co." pattern category used by all three patterns</li>
+                        <li>No test files are left: the Spanish test plugin, the translation file and the four mistake files are deleted</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p><code>pagesco</code> is active again. Exercises 1 and 2 add a must-use plugin and remove it; 3 and 4 only read. Try each one before you open the solution.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: The Shop's Name on the Login Page</h3>
+                    <p>In Lesson 2.3's Exercise 2 you pointed the login page's logo at the shop with two filters (and deleted the file again), and noted that the WordPress logo image itself is CSS. Finish the job in one must-use plugin, <code>exercise-login-logo.php</code>: on the login page only, add CSS that removes the logo image and shows the link's text instead, in oxblood, and bring back the two filters so that text is the site name and the link leads to the home page.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The login page has its own asset hook, <code>login_enqueue_scripts</code>, and its stylesheet's handle is <code>login</code>. <code>wp_add_inline_style( 'login', $css )</code> prints your rules right after it, no file needed. The logo is a background image on <code>#login h1 a</code>, whose text is pushed off screen with <code>text-indent</code>. The text and the URL come from the <code>login_headertext</code> and <code>login_headerurl</code> filters.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/mu-plugins/exercise-login-logo.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Exercise: Login Logo
+ */
+
+/**
+ * Replaces the WordPress logo on the login page with the shop's name.
+ */
+function pagesco_login_logo_styles() {
+	$css = '#login h1 a { background-image: none; color: #7a2e2e; font-size: 1.75rem; height: auto; text-indent: 0; width: auto; }';
+
+	wp_add_inline_style( 'login', $css );
+}
+add_action( 'login_enqueue_scripts', 'pagesco_login_logo_styles' );
+
+/**
+ * Uses the site name as the logo's text.
+ */
+function pagesco_login_logo_text() {
+	return get_bloginfo( 'name', 'display' );
+}
+add_filter( 'login_headertext', 'pagesco_login_logo_text' );
+
+/**
+ * Points the logo at the shop's home page (Lesson 2.3).
+ */
+function pagesco_login_logo_url() {
+	return home_url( '/' );
+}
+add_filter( 'login_headerurl', 'pagesco_login_logo_url' );</code></pre>
+                        <pre data-cli><code class="language-bash">curl -s http://localhost:8080/wp-login.php | grep -A 2 'login-inline-css'
+curl -s http://localhost:8080/wp-login.php | grep -o '&lt;h1[^&gt;]*&gt;&lt;a [^&gt;]*&gt;[^&lt;]*'
+rm wp-content/mu-plugins/exercise-login-logo.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>&lt;style id="login-inline-css"&gt;
+#login h1 a { background-image: none; color: #7a2e2e; font-size: 1.75rem; height: auto; text-indent: 0; width: auto; }
+/*# sourceURL=login-inline-css */
+&lt;/style&gt;
+	&lt;meta name='referrer' content='strict-origin-when-cross-origin' /&gt;
+&lt;h1 role="presentation" class="wp-login-logo"&gt;&lt;a href="http://localhost:8080/"&gt;Pages &amp;amp; Co.</code></pre>
+                        </div>
+                        <p>WordPress printed your rules in a <code>&lt;style id="login-inline-css"&gt;</code> right after the login stylesheet, so they win; the link now reads "Pages &amp; Co." and leads to the home page. <code>wp_add_inline_style()</code> is the tool for a few rules that belong to an existing handle; anything longer belongs in a file you enqueue.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: A Stylesheet for One Page</h3>
+                    <p>Write <code>exercise-front-page-css.php</code> that enqueues a scratch stylesheet, <code>wp-content/mu-plugins/front-page.css</code>, on the front page only. Prove that <code>/</code> loads it and <code>/about/</code> does not, then delete both files.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Conditional tags work inside a <code>wp_enqueue_scripts</code> callback. <code>content_url( 'mu-plugins/front-page.css' )</code> builds the file's URL. Count the handle's ID (<code>pagesco-front-page-css</code>) on each page.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/mu-plugins/front-page.css"><code class="language-css">/* Exercise 2: only the front page loads this file. */
+.wp-block-group.alignfull:first-child h1 {
+	letter-spacing: 0.02em;
+}</code></pre>
+                        <pre data-file="wp-content/mu-plugins/exercise-front-page-css.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Exercise: Front Page CSS
+ */
+
+/**
+ * Loads an extra stylesheet on the front page only.
+ */
+function pagesco_front_page_styles() {
+	if ( ! is_front_page() ) {
+		return;
+	}
+
+	wp_enqueue_style(
+		'pagesco-front-page',
+		content_url( 'mu-plugins/front-page.css' ),
+		array(),
+		'1.0.0'
+	);
+}
+add_action( 'wp_enqueue_scripts', 'pagesco_front_page_styles' );</code></pre>
+                        <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | grep -c 'pagesco-front-page-css'
+curl -s http://localhost:8080/about/ | grep -c 'pagesco-front-page-css'
+rm wp-content/mu-plugins/exercise-front-page-css.php wp-content/mu-plugins/front-page.css</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>1
+0</code></pre>
+                        </div>
+                        <p>Loaded once on the front page, not at all on About. Loading CSS and JavaScript only where they are used is one of the cheapest speed-ups there is; Lesson 8.2 measures it.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: What pagesco Supports Without Asking</h3>
+                    <p>Predict which of these features <code>pagesco</code>, which declares none, supports: <code>title-tag</code>, <code>automatic-feed-links</code>, <code>post-thumbnails</code>, <code>responsive-embeds</code>, <code>editor-styles</code>, <code>html5</code>, <code>menus</code>, <code>widgets</code>. Then check with a file for <code>wp eval-file</code>. How can a theme without <code>title-tag</code> support have a title on every page?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>current_theme_supports( $feature )</code> answers for the active theme. Compare with the <code>_add_default_theme_supports()</code> list in this lesson, and with what registering a menu location or a widget area switched on in <code>pagesco-classic</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="exercise-supports.php"><code class="language-php">&lt;?php
+$pagesco_features = array( 'title-tag', 'automatic-feed-links', 'post-thumbnails', 'responsive-embeds', 'editor-styles', 'html5', 'menus', 'widgets' );
+
+foreach ( $pagesco_features as $pagesco_feature ) {
+	printf( "%-21s %s\n", $pagesco_feature, current_theme_supports( $pagesco_feature ) ? 'yes' : 'no' );
+}</code></pre>
+                        <pre data-cli><code class="language-bash">wp eval-file exercise-supports.php
+rm exercise-supports.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>title-tag             no
+automatic-feed-links  yes
+post-thumbnails       yes
+responsive-embeds     yes
+editor-styles         yes
+html5                 yes
+menus                 no
+widgets               no</code></pre>
+                        </div>
+                        <p>Everything on the default list says yes; <code>title-tag</code> says no, and so do <code>menus</code> and <code>widgets</code>, because <code>pagesco</code> registers neither a location nor an area. The title comes from <code>_block_template_render_title_tag()</code>, which block themes print no matter what. The lesson: in a block theme, "does the theme support X?" is the wrong question for the title; for a classic theme it is the only one.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 4: From a Classic Menu to a Navigation Block (Stretch)</h3>
+                    <p>Your "Main menu" lives on in the database while <code>pagesco</code> is active. When a site moves from a classic to a block theme, the Navigation block offers to import classic menus. Find the class in <code>wp-includes/</code> that converts a classic menu into navigation block markup, and use it in a WP-CLI one-liner to print the markup for "Main menu". Which block does each item become?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>grep -rl "class WP_Classic" wp-includes/</code>. Its static <code>convert()</code> method takes the menu object, which <code>wp_get_nav_menu_object( 'main-menu' )</code> returns.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">grep -rl "class WP_Classic" wp-includes/
+wp eval 'echo str_replace( "/--&gt;", "/--&gt;\n", WP_Classic_To_Block_Menu_Converter::convert( wp_get_nav_menu_object( "main-menu" ) ) );'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>wp-includes/class-wp-classic-to-block-menu-converter.php
+&lt;!-- wp:navigation-link {"className":" menu-item menu-item-type-post_type menu-item-object-page","description":"","id":"12","kind":"post-type","label":"About Us","opensInNewTab":false,"rel":null,"title":"","type":"page","url":"http://localhost:8080/about/"} /--&gt;
+&lt;!-- wp:navigation-link {"className":" menu-item menu-item-type-post_type menu-item-object-page","description":"","id":"14","kind":"post-type","label":"Events","opensInNewTab":false,"rel":null,"title":"","type":"page","url":"http://localhost:8080/events/"} /--&gt;
+&lt;!-- wp:navigation-link {"className":" menu-item menu-item-type-post_type menu-item-object-page","description":"","id":"13","kind":"post-type","label":"Contact","opensInNewTab":false,"rel":null,"title":"","type":"page","url":"http://localhost:8080/contact/"} /--&gt;</code></pre>
+                        </div>
+                        <p>Each menu item becomes a self-closing <code>core/navigation-link</code> block with the page's ID, label and URL (<code>str_replace()</code> only put one block per line). That markup is what the Site Editor saves into a <code>wp_navigation</code> post when you import the menu, and what you would put inside <code>pagesco</code>'s Navigation block to show the same three links instead of the page list. Nothing was saved here; the conversion only printed.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> Where does a classic theme call <code>add_theme_support( 'title-tag' )</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="wp_head is where WordPress prints the title. When does it need to know whether the theme wants that?">
+                                A) In header.php, just before wp_head()
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Theme supports are declared on after_setup_theme, which fires right after functions.php is included and long before any template runs.">
+                                B) In a functions.php callback hooked to after_setup_theme
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That hook is for CSS and JavaScript. Which hook did the setup function use?">
+                                C) In a callback on wp_enqueue_scripts
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> A theme calls <code>wp_enqueue_style( 'pagesco-extra', get_parent_theme_file_uri( 'extra.css' ) );</code> with no other arguments, on WordPress 7.1.3. What ends the URL in the page?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="WordPress does not read your theme header for this. Whose version does it fall back to? Common Mistakes 2 showed it.">
+                                A) ?ver= followed by the theme's Version
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Only null removes the version. What does the default value false do?">
+                                B) Nothing: there is no ?ver= at all
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Without a version WordPress adds its own, 7.1.3, which does not change when your CSS does, so browsers keep the old file. Pass the theme's Version instead.">
+                                C) ?ver=7.1.3
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> A classic theme's header calls <code>wp_nav_menu( array( 'theme_location' =&gt; 'primary' ) )</code> without <code>has_nav_menu()</code>. The location is registered, but nobody has assigned a menu yet. What do visitors see?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="With no menu found, wp_nav_menu calls its default fallback, wp_page_menu, which lists every published page. fallback_cb false or a has_nav_menu check prevents it.">
+                                A) A list of all published pages, from the fallback wp_page_menu()
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="wp_nav_menu does not give up silently by default. What is its fallback_cb?">
+                                B) Nothing at all
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="An empty location is a normal situation for a new site. Does WordPress treat it as an error?">
+                                C) A notice that the location has no menu
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> On which hook should <code>register_sidebar()</code> run?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That one runs while the footer is printed, far too late for the Widgets screen to know the area. Which hook is named after widgets?">
+                                A) wp_footer
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="widgets_init fires during init (at priority 1), the moment WordPress sets up widgets, on every request including the admin's Widgets screen.">
+                                B) widgets_init
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Top-level code runs before WordPress is ready for widgets. Which hook did this lesson use?">
+                                C) At the top level of functions.php, outside any function
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> A new classic theme shows a visible heading "Posts pagination" above the page numbers. What is the right fix?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The heading tells screen reader users what the links are. Should it disappear for them too?">
+                                A) Remove the heading with a filter
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="display: none also hides it from screen readers. Which kind of hiding keeps it audible?">
+                                B) Add .screen-reader-text { display: none; } to the stylesheet
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Core marks text meant for screen readers with screen-reader-text and expects the theme to hide it visually only. Block themes get this CSS from core; classic themes must add it.">
+                                C) Add the standard .screen-reader-text CSS that clips it visually but keeps it for screen readers
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Should the version be filemtime() instead of the theme's Version?</summary>
+                    <p>Many tutorials use <code>filemtime( get_parent_theme_file_path( 'style.css' ) )</code>, the file's modification time, so every save changes the URL. It is convenient while you develop, and costs a file-system check on every request. The theme's <code>Version</code> is the release number your client sees, it changes exactly when you ship, and it also resets the pattern cache (Lesson 3.3), which is why this course uses it; Lesson 8.4 makes bumping it part of every deployment. During development a hard reload in the browser does the rest.</p>
+                </details>
+                <details>
+                    <summary>Can I load a CSS framework or a font from a CDN?</summary>
+                    <p>Technically yes: <code>$src</code> can be any URL. But each external host is an extra connection that slows the first visit, it can go down or change the file, and fonts from third-party servers send your visitors' IP addresses there, which privacy laws in some countries frown upon. Bundle the files with the theme, as <code>pagesco</code> does with Vollkorn (Lesson 3.3), and keep their licenses in <code>readme.txt</code>.</p>
+                </details>
+                <details>
+                    <summary>Does the block theme need wp_enqueue_scripts for anything?</summary>
+                    <p>Sometimes. Block themes get their CSS from <code>theme.json</code> and from each block's own stylesheet, so most never enqueue a file (Lesson 3.2's FAQ: WordPress does not even load a block theme's <code>style.css</code>). Twenty Twenty-Five still enqueues a small stylesheet for a few rules <code>theme.json</code> cannot express, and Lesson 3.4's child theme enqueued its <code>style.css</code> the same way. Scripts for interactive features are usually blocks with their own assets (Module 6).</p>
+                </details>
+                <details>
+                    <summary>Why did the menu items become posts?</summary>
+                    <p>For the same reason as almost everything in WordPress (Lesson 2.1): a menu item needs an order, a parent for submenus, a title and some settings, and posts already have all of that, plus caching and the APIs to edit them. The menu itself is a term that groups them. Block themes moved on to <code>wp_navigation</code> posts that hold block markup, one post per menu.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>The block editor still shows posts in its default fonts while <code>pagesco-classic</code> is active, because the editor iframe does not load the front-end stylesheet. Switch to the classic theme, add <code>add_theme_support( 'editor-styles' )</code> and <code>add_editor_style( 'style.css' )</code> to <code>pagesco_classic_setup()</code>, and open a post in the editor: the content area now uses the theme's rules (WordPress rewrites the selectors so they only apply inside the editor). Which of your rules make sense in the editor and which do not, for example the header and footer? Many themes keep a separate <code>editor-style.css</code> for that reason. Switch back to <code>pagesco</code> when you are done.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Make a two-column table, <code>pagesco</code> and <code>pagesco-classic</code>, with one row per job from this lesson: the page title, the CSS, the menu, the footer content, the skip link, screen-reader text, translations. For each cell, write who does the job (core, <code>theme.json</code>, a template, <code>functions.php</code>, the site owner in an admin screen). Which theme puts more of the work on WordPress, and which gives a developer more control?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li><code>functions.php</code> runs on every request while the theme is active, admin and WP-CLI included; put its code in prefixed callbacks on the right hooks</li>
+                        <li>Theme supports (<code>title-tag</code>, <code>html5</code>, <code>post-thumbnails</code>…) are declared on <code>after_setup_theme</code>; block themes get most of them automatically, and their title always</li>
+                        <li>Enqueue assets on <code>wp_enqueue_scripts</code> with a prefixed handle, dependencies and a version that changes with the file; scripts can be deferred and printed in the footer</li>
+                        <li>Menus: the theme registers locations (<code>register_nav_menus()</code>), the owner assigns menus, the template prints <code>wp_nav_menu()</code> behind <code>has_nav_menu()</code></li>
+                        <li>Widget areas: <code>register_sidebar()</code> with a fixed <code>id</code> on <code>widgets_init</code>, printed with <code>is_active_sidebar()</code> and <code>dynamic_sidebar()</code>; widgets are blocks since 5.8, and legacy in block themes</li>
+                        <li>Every theme needs a skip link, <code>.screen-reader-text</code> CSS, labelled navigation and strings with its literal text domain; WordPress 6.8+ finds a theme's <code>languages/</code> folder itself</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>WordPress to print the title</td><td><code>add_theme_support( 'title-tag' );</code> on <code>after_setup_theme</code></td></tr>
+                            <tr><td>Modern form markup</td><td><code>add_theme_support( 'html5', array( 'search-form', … ) );</code></td></tr>
+                            <tr><td>The theme's stylesheet</td><td><code>wp_enqueue_style( 'pagesco-classic-style', get_parent_theme_file_uri( 'style.css' ), array(), $version );</code></td></tr>
+                            <tr><td>A script that never blocks the page</td><td><code>wp_enqueue_script( $handle, $src, array(), $version, array( 'strategy' =&gt; 'defer', 'in_footer' =&gt; true ) );</code></td></tr>
+                            <tr><td>A few rules for an existing handle</td><td><code>wp_add_inline_style( 'login', $css );</code></td></tr>
+                            <tr><td>A menu location</td><td><code>register_nav_menus( array( 'primary' =&gt; __( 'Primary menu', 'pagesco-classic' ) ) );</code></td></tr>
+                            <tr><td>Print the menu</td><td><code>if ( has_nav_menu( 'primary' ) ) { wp_nav_menu( array( 'theme_location' =&gt; 'primary' ) ); }</code></td></tr>
+                            <tr><td>A widget area</td><td><code>register_sidebar( array( 'id' =&gt; 'footer', … ) );</code> on <code>widgets_init</code>, then <code>dynamic_sidebar( 'footer' );</code></td></tr>
+                            <tr><td>A pattern category (any theme)</td><td><code>register_block_pattern_category( 'pagesco', array( 'label' =&gt; … ) );</code> on <code>init</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You finished <code>pagesco-classic</code>: WordPress prints its title and HTML5 forms, it loads a versioned stylesheet and a deferred menu script, and it has a primary menu and a footer widget area filled from WP-CLI</li>
+                        <li>You made it accessible (skip link, screen-reader text, labelled navigation, a real toggle button) and saw it switch to Spanish from a translation file</li>
+                        <li>You met four quiet or noisy theme mistakes on purpose and know how to spot each one</li>
+                        <li>You gave <code>pagesco</code> its first <code>functions.php</code>, a "Pages &amp; Co." pattern category, and made it the active theme again</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>Module 4 is done: you can read, build and extend a classic theme. Module 5 moves the shop's features to where they belong. In <a href="lesson_14.html"><strong>Lesson 5.1: Your First Plugin</strong></a> you create <code>pagesco-books</code>, the plugin the rest of the course grows: its header and folder layout, the <code>PagesCo\Books</code> namespace with Composer autoloading, and what happens on activation, deactivation and uninstall. Its first job: taking over the two store-notice callbacks that have been waiting in <code>pagesco-site.php</code> since Lesson 2.3.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>pagesco</code> is active (<code>wp theme list</code>) and that the front page looks as it did after Lesson 3.3</li>
+                    <li>Check that <code>mu-plugins/</code> holds only <code>mailpit-smtp.php</code> and <code>pagesco-site.php</code>, and that no exercise files are left in the WordPress root</li>
+                    <li>Read the header of <code>wordpress/wp-content/plugins/hello.php</code> (Hello Dolly): a complete plugin in one file. Next lesson starts there</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>This lesson had more small pieces than any before it: five supports, two enqueue functions, menus, widgets, a skip link, a translation file. None of them is hard on its own, and none of them needs to be memorized; every classic theme you open will have the same handful of functions near the top of its <code>functions.php</code>, and now you can read them at a glance. What you practiced underneath is the habit that makes a WordPress developer: asking which hook, at which moment, and letting WordPress do the work it already knows how to do.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_12.html" class="prev-lesson">← Previous: Custom Queries</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_14.html" class="next-lesson">Next: Your First Plugin →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

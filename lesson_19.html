@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Setting up block development for WordPress 7.1: Node 24, @wordpress/create-block in --no-plugin mode inside an existing plugin, block.json, building with @wordpress/scripts and a blocks manifest, and registering built blocks with wp_register_block_types_from_metadata_collection. PHP and WordPress Development Lesson 6.1.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Block Development Setup - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 6: Block Development</a></li>
+            <li aria-current="page">Lesson 6.1: Block Development Setup</li>
+        </ul>
+    </nav>
+    <main id="main-content" data-state="after:lesson_18">
+        <div class="container">
+            <header>
+                <h1>🧱 Lesson 6.1: Block Development Setup</h1>
+                <p class="lead">Lesson 5.5 ended with a fair complaint: a shortcode works, but editors only ever see <code>[pagesco_book id="30"]</code> in brackets. Blocks are what editors actually see and arrange, and they are written partly in JavaScript. This lesson sets up the toolchain every block developer uses, Node 24 with <code>@wordpress/create-block</code> and <code>@wordpress/scripts</code>, and puts the first block, the start of the Pages &amp; Co. book card, <em>inside</em> the <code>pagesco-books</code> plugin you have been growing since Lesson 5.1. One plugin, one more feature class, one new folder of JavaScript.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Describe a block type as WordPress sees it: <code>block.json</code> metadata, an editor script with <code>edit</code> and <code>save</code>, styles, and (later) PHP rendering</li>
+                        <li>Scaffold a block into an existing plugin with <code>npx @wordpress/create-block</code> and <code>--no-plugin</code>, and read every generated file</li>
+                        <li>Build blocks with <code>@wordpress/scripts</code>, and say what each file in <code>build/</code> is for, including <code>index.asset.php</code> and the blocks manifest</li>
+                        <li>Register all built blocks from a plugin feature with <code>wp_register_block_types_from_metadata_collection()</code></li>
+                        <li>Recognize the setup mistakes that cost beginners an afternoon: a second plugin by accident, a missing build, and stale build files</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 135 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_18.html">Lesson 5.5: Shortcodes, $wpdb &amp; Custom Tables</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> the first draft of the <code>pagesco/book-card</code> block in <code>pagesco-books/src/blocks/</code>, built into <code>build/blocks/</code> and registered by a new <code>Blocks</code> feature</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (the blocks manifest and collection registration need WordPress 6.8+, which the plugin already requires)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 5.5, plus Node.js 24 LTS on your computer (or the <code>node:24</code> Docker image)</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#what-is-a-block" class="toc-link">What a Block Is, for a Developer</a></li>
+                        <li><a href="#node" class="toc-link">Node 24 and the Toolchain</a></li>
+                        <li><a href="#create-block" class="toc-link">Scaffolding a Block into pagesco-books</a></li>
+                        <li><a href="#build" class="toc-link">Building with @wordpress/scripts</a></li>
+                        <li><a href="#register" class="toc-link">Registering the Built Blocks</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: The Book Card's First Draft</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="what-is-a-block" class="lesson-section">
+                <h2>🧩 What a Block Is, for a Developer</h2>
+                <p>In Lesson 2.1 you read blocks from the outside: <code>post_content</code> holds HTML wrapped in comments such as <code>&lt;!-- wp:paragraph --&gt;</code>, with attributes as JSON in the opening comment. Now you look from the inside. A <strong>block type</strong> is a definition that WordPress and the editor share, and it has four parts:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Part</th><th>Where it lives</th><th>Who uses it</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Metadata: name, title, icon, category, attributes, supports, files</td><td><code>block.json</code></td><td>PHP (registration, REST, translations) and the editor</td></tr>
+                            <tr><td><code>edit</code>: what the block looks like and does <em>while editing</em></td><td>a React component in the editor script</td><td>the editor only</td></tr>
+                            <tr><td><code>save</code>: the HTML stored in <code>post_content</code></td><td>a function in the editor script</td><td>the editor, when saving and when checking a stored block</td></tr>
+                            <tr><td>Styles, and for dynamic blocks a PHP <code>render</code></td><td>CSS files; <code>render.php</code> (Lesson 6.3)</td><td>the editor and the front end</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>WordPress itself registers over a hundred block types this way. Ask the registry how many it knows on a bare request (WP-CLI loads WordPress like any other request, Lesson 2.2):</p>
+                <pre data-cli><code class="language-bash">wp eval 'echo count( WP_Block_Type_Registry::get_instance()-&gt;get_all_registered() ), "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>116</code></pre>
+                </div>
+                <p>Every one of those is a <code>block.json</code> in <code>wp-includes/blocks/</code> plus JavaScript that core ships prebuilt. Your block will join this registry the same way. The important consequence of the table above: a static block's <em>front end needs no JavaScript at all</em>. The editor runs <code>save</code> once, stores the HTML, and visitors get that stored HTML, styled by the block's CSS. JavaScript is for editors.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: a kit, a workshop and a shelf</h4>
+                    <p>Think of the source files in <code>src/blocks/book-card/</code> as a flat-pack kit: modern JavaScript with JSX and SCSS that no browser reads as is. The build step is the workshop: <code>@wordpress/scripts</code> assembles the kit into plain JavaScript and CSS in <code>build/blocks/book-card/</code>. WordPress only ever looks at the shelf, the <code>build/</code> folder, through the registration call in your plugin. Change the kit and nothing happens on the shelf until the workshop runs again. That one picture explains most of the mistakes later in this lesson.</p>
+                </div>
+
+                <div class="mermaid">
+graph TD
+    A["src/blocks/book-card"] -->|"npm run build"| B["build/blocks + manifest"]
+    B -->|"Blocks feature, init"| C["block type pagesco/book-card"]
+    C --> D["editor: edit, save"]
+    C --> E["front end: saved HTML, CSS"]
+                </div>
+            </section>
+
+            <section id="node" class="lesson-section">
+                <h2>🟢 Node 24 and the Toolchain</h2>
+                <p>Block code is written in modern JavaScript with JSX (the HTML-like syntax of React) and styles in SCSS. Browsers need plain JavaScript and CSS, and WordPress needs to know which of its own scripts your code depends on. The official tool for both jobs is <code>@wordpress/scripts</code>, a package that wraps webpack, Babel, Sass and the WordPress dependency extraction. It runs on Node.js, so Node is the one new program on your machine for this module.</p>
+                <p>Install <strong>Node.js 24 LTS</strong> (the long-term-support line; Lesson 5.5 asked you to have it ready). On macOS and Linux, a version manager such as <code>nvm</code> (<code>nvm install 24</code>) keeps versions per project; on Windows, install Node inside your WSL distribution, where the project lives (Lesson 1.2), not in Windows itself. Node brings <code>npm</code>, the package manager, and <code>npx</code>, which runs a package's command without installing it for good. Check both from the plugin's folder, <code>wordpress/wp-content/plugins/pagesco-books</code>, where every command in this module runs:</p>
+                <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">node --version
+npm --version</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your patch versions may differ)</h4>
+                    <pre><code>v24.21.0
+11.19.0</code></pre>
+                </div>
+                <p>Any 24.x prints <code>v24</code> first; that is what matters. If you would rather not install Node, use Docker as you did for Composer in Lesson 5.1: the official <code>node:24</code> image runs the same commands. From your project folder (on Windows PowerShell, leave out <code>--user</code> and write <code>${PWD}</code>):</p>
+                <pre data-norun><code class="language-bash">docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD/wordpress:/var/www/html" -w /var/www/html/wp-content/plugins/pagesco-books node:24 npm run build</code></pre>
+                <p>Replace <code>npm run build</code> with any command from this module. The examples below show the commands alone, as you type them with Node installed.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Why the browser never downloads React from you</h4>
+                    <p>Your block will <code>import</code> from packages such as <code>@wordpress/blocks</code> and <code>@wordpress/block-editor</code>, but those are not bundled into your file. The editor already loads them as global scripts (<code>wp.blocks</code>, <code>wp.blockEditor</code>, React itself), and the build replaces each import with a reference to the global and writes the list of script handles your file needs into <code>index.asset.php</code>. WordPress reads that list and loads the dependencies first. That is why a block's built JavaScript is a kilobyte or two, not hundreds.</p>
+                </div>
+            </section>
+
+            <section id="create-block" class="lesson-section">
+                <h2>🏗️ Scaffolding a Block into pagesco-books</h2>
+                <p><code>@wordpress/create-block</code> generates a working block so you do not start from an empty folder. Its default, and every quick-start tutorial you will find, creates a <strong>whole new plugin</strong>: a folder with its own main PHP file, <code>package.json</code>, <code>node_modules/</code> and a <code>build/</code> folder (Common Mistake 1 shows it). Pages &amp; Co. already has its plugin, and the course keeps everything the shop does in that one plugin. So you use the mode made for this case, <code>--no-plugin</code>, which writes only the block's own files into a folder you choose.</p>
+                <p>Run without a slug, create-block asks its questions one by one: in <code>--no-plugin</code> mode it opens with "Let's add a new block to your existing WordPress plugin:", asks for the template variant (<code>static</code> or <code>dynamic</code>), then the block slug, the internal namespace, the display title, a short description, a dashicon, a category and the text domain. Answering the same questions with options is quicker to repeat and to read, so this is the command. Run it in the plugin's folder:</p>
+                <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npx @wordpress/create-block@latest book-card --no-plugin --target-dir=src/blocks/book-card --namespace=pagesco --textdomain=pagesco-books --short-description="A book recommended by the Pages &amp; Co. staff."</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>...
+
+Creating a "block.json" file.
+
+...
+
+Code is Poetry</code></pre>
+                </div>
+                <p>The two <code>...</code> lines name the folder on your computer. The first time, <code>npx</code> asks "Need to install the following packages: @wordpress/create-block@5.0.0. Ok to proceed? (y)": answer <code>y</code>. Each option has a job:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Option</th><th>What it sets</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>book-card</code></td><td>The slug: the second half of the block name and, without <code>--title</code>, the title "Book Card"</td></tr>
+                            <tr><td><code>--no-plugin</code></td><td>Only block files: no plugin PHP file, no <code>package.json</code>, no <code>npm install</code></td></tr>
+                            <tr><td><code>--target-dir=src/blocks/book-card</code></td><td>The folder to write into (the course's place for block sources, next to the PHP classes in <code>src/</code>)</td></tr>
+                            <tr><td><code>--namespace=pagesco</code></td><td>The first half of the name: <code>pagesco/book-card</code>. Without it the block would be <code>create-block/book-card</code></td></tr>
+                            <tr><td><code>--textdomain=pagesco-books</code></td><td>The plugin's text domain (Lesson 5.1), so the block's strings translate with the plugin</td></tr>
+                            <tr><td><code>--short-description</code></td><td>The description shown in the editor's block sidebar</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The variant defaults to <code>static</code>, the kind this lesson and the next build; Lesson 6.3 uses <code>--variant dynamic</code>. Remember that <code>src/</code> now holds two kinds of code side by side: PHP classes such as <code>src/Plugin.php</code>, loaded by Composer's PSR-4 autoloader (Lesson 5.1), and JavaScript in <code>src/blocks/</code>, read only by the build. Neither tool looks at the other's files. Here is what create-block wrote, from the WP-CLI container:</p>
+                <pre data-cli><code class="language-bash">ls wp-content/plugins/pagesco-books/src/blocks/book-card
+cat wp-content/plugins/pagesco-books/src/blocks/book-card/block.json</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>block.json   edit.js      editor.scss  index.js     save.js      style.scss   view.js
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "pagesco/book-card",
+	"version": "0.1.0",
+	"title": "Book Card",
+	"category": "widgets",
+	"icon": "smiley",
+	"description": "A book recommended by the Pages &amp; Co. staff.",
+	"example": {},
+	"supports": {
+		"html": false
+	},
+	"textdomain": "pagesco-books",
+	"editorScript": "file:./index.js",
+	"editorStyle": "file:./index.css",
+	"style": "file:./style-index.css",
+	"viewScript": "file:./view.js"
+}</code></pre>
+                </div>
+
+                <h3>Reading block.json</h3>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Field</th><th>Meaning</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>$schema</code></td><td>Lets your editor autocomplete and check the file, like the theme.json schema in Lesson 3.2</td></tr>
+                            <tr><td><code>apiVersion: 3</code></td><td>The block API version. 3 is current: the editor canvas is an iframe and the editor logs a deprecation for blocks on 2 or lower</td></tr>
+                            <tr><td><code>name</code></td><td><code>namespace/slug</code>, lowercase, unique. It is stored in every post that uses the block (<code>&lt;!-- wp:pagesco/book-card --&gt;</code>), so never rename it once content exists</td></tr>
+                            <tr><td><code>version</code></td><td>The block's version; WordPress appends it to the CSS URLs for cache busting</td></tr>
+                            <tr><td><code>title</code>, <code>category</code>, <code>icon</code>, <code>description</code></td><td>How the block appears in the inserter and the sidebar. <code>icon</code> is a Dashicon name</td></tr>
+                            <tr><td><code>example</code></td><td>Turns on the preview when you hover the block in the inserter</td></tr>
+                            <tr><td><code>supports</code></td><td>Editor features the block opts into. <code>"html": false</code> hides "Edit as HTML" (Lesson 6.2 adds colors and spacing here)</td></tr>
+                            <tr><td><code>textdomain</code></td><td>Translations of the title, description and the JavaScript strings</td></tr>
+                            <tr><td><code>editorScript</code>, <code>editorStyle</code>, <code>style</code>, <code>viewScript</code></td><td>The built files: <code>file:./</code> paths are relative to the <code>block.json</code> in <code>build/</code>. <code>style</code> loads in the editor and on the front end, <code>editorStyle</code> only in the editor, <code>viewScript</code> only on the front end</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Reading the JavaScript</h3>
+                <p>Three small files hold the behavior. Without their long comments, <code>index.js</code> registers the block in the editor with the name and settings from <code>block.json</code>, and connects the two functions:</p>
+                <pre><code class="language-js">import { registerBlockType } from '@wordpress/blocks';
+import './style.scss';
+import Edit from './edit';
+import save from './save';
+import metadata from './block.json';
+
+registerBlockType( metadata.name, {
+	edit: Edit,
+	save,
+} );</code></pre>
+                <p><code>edit.js</code> is a React component. <code>useBlockProps()</code> returns the wrapper's attributes (its class <code>wp-block-pagesco-book-card</code>, plus what the editor needs to select and move the block), so you spread them onto the outer element:</p>
+                <pre><code class="language-js">import { __ } from '@wordpress/i18n';
+import { useBlockProps } from '@wordpress/block-editor';
+import './editor.scss';
+
+export default function Edit() {
+	return (
+		&lt;p { ...useBlockProps() }&gt;
+			{ __( 'Book Card – hello from the editor!', 'pagesco-books' ) }
+		&lt;/p&gt;
+	);
+}</code></pre>
+                <p><code>save.js</code> returns the markup to store, with <code>useBlockProps.save()</code> for the wrapper. It must be a pure function of the block's attributes: same attributes, same HTML, every time (Lesson 6.2 shows what happens otherwise):</p>
+                <pre><code class="language-js">import { useBlockProps } from '@wordpress/block-editor';
+
+export default function save() {
+	return (
+		&lt;p { ...useBlockProps.save() }&gt;
+			{ 'Book Card – hello from the saved content!' }
+		&lt;/p&gt;
+	);
+}</code></pre>
+                <p>The two texts differ on purpose, so you can see which function produced what. <code>view.js</code> holds front-end JavaScript (it only logs "Hello World!" to the console); a book card needs none, and its own comment says to delete it in that case, which the project does. <code>style.scss</code> and <code>editor.scss</code> hold the two kinds of styles.</p>
+            </section>
+
+            <section id="build" class="lesson-section">
+                <h2>⚙️ Building with @wordpress/scripts</h2>
+                <p>A plugin made by create-block in its default mode comes with a <code>package.json</code>; in <code>--no-plugin</code> mode you add one to <code>pagesco-books</code> yourself, once. It names the build tool as a development dependency and defines two scripts. Create <code>wordpress/wp-content/plugins/pagesco-books/package.json</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/package.json"><code class="language-json">{
+	"name": "pagesco-books",
+	"version": "1.0.0",
+	"private": true,
+	"description": "The blocks of the Pages &amp; Co. Books plugin.",
+	"license": "GPL-2.0-or-later",
+	"scripts": {
+		"build": "wp-scripts build --webpack-src-dir=src/blocks --output-path=build/blocks --blocks-manifest",
+		"start": "wp-scripts start --webpack-src-dir=src/blocks --output-path=build/blocks --blocks-manifest"
+	},
+	"devDependencies": {
+		"@wordpress/scripts": "^37.0.0"
+	}
+}</code></pre>
+                <ul>
+                    <li><code>"private": true</code> stops npm from ever publishing the plugin to the npm registry by accident.</li>
+                    <li><code>--webpack-src-dir=src/blocks</code> tells the build where the block sources are. Its default is all of <code>src/</code>, which in this plugin is mostly PHP; pointing it at <code>src/blocks</code> keeps the build away from your classes.</li>
+                    <li><code>--output-path=build/blocks</code> is where the built blocks go, one folder per block.</li>
+                    <li><code>--blocks-manifest</code> also writes <code>blocks-manifest.php</code>: every block's <code>block.json</code> as one PHP array, so WordPress can register all the plugin's blocks without opening and decoding each JSON file on every request.</li>
+                </ul>
+                <p>Install the tool. <code>npm install</code> reads <code>package.json</code>, downloads <code>@wordpress/scripts</code> with everything it needs into <code>node_modules/</code> and records the exact versions in <code>package-lock.json</code>:</p>
+                <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm install</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your package counts and timings will differ)</h4>
+                    <pre><code>npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+npm warn deprecated abab@2.0.6: Use your platform's native atob() and btoa() methods instead
+npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated @opentelemetry/sdk-trace-base@2.12.0: Use @opentelemetry/sdk-trace package
+npm warn deprecated eslint@9.39.5: This version is no longer supported. Please see https://eslint.org/version-support for other options.
+
+added 1261 packages, and audited 1262 packages in 36s
+
+18 vulnerabilities (3 low, 14 moderate, 1 high)
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+npm warn install-scripts 4 packages have install scripts not yet covered by allowScripts:
+npm warn install-scripts   core-js-pure@3.51.0 (postinstall: node -e "try{require('./postinstall')}catch(e){}")
+npm warn install-scripts   core-js@3.51.0 (postinstall: node -e "try{require('./postinstall')}catch(e){}")
+npm warn install-scripts   unrs-resolver@1.12.2 (postinstall: node postinstall.js)
+npm warn install-scripts   @parcel/watcher@2.6.0 (install: node scripts/build-from-source.js)
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve &lt;pkg&gt;` to allow.</code></pre>
+                </div>
+                <p>It takes a minute or two and adds about 1,260 packages (roughly 540 MB) to <code>node_modules/</code>: webpack, Babel, Sass, ESLint and their friends, all of them development tools that never reach the server. Read the warnings once so they do not worry you later. "deprecated" lines are about packages deep inside the toolchain, not your code. The <code>npm audit</code> summary counts known issues in those build tools, which run only on your machine. The <code>install-scripts</code> lines come from npm 11's safety rule: dependencies' install scripts no longer run unless you approve them in <code>package.json</code>. None of the four listed is needed to build blocks, so leave them unapproved.</p>
+                <p>Now build:</p>
+                <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your sizes and timings will differ)</h4>
+                    <pre><code>&gt; pagesco-books@1.0.0 build
+&gt; wp-scripts build --webpack-src-dir=src/blocks --output-path=build/blocks --blocks-manifest
+
+assets by chunk 1.48 KiB (name: book-card/index)
+  assets by path book-card/*.css 102 bytes
+    asset book-card/index-rtl.css 51 bytes [emitted] (name: book-card/index)
+    asset book-card/index.css 51 bytes [emitted] (name: book-card/index)
+  asset book-card/index.js 1.23 KiB [emitted] [minimized] (name: book-card/index)
+  asset book-card/index.asset.php 161 bytes [emitted] (name: book-card/index)
+assets by chunk 152 bytes (name: book-card/view)
+  asset book-card/view.asset.php 93 bytes [emitted] (name: book-card/view)
+  asset book-card/view.js 59 bytes [emitted] [minimized] (name: book-card/view)
+assets by chunk 154 bytes (name: book-card/style-index)
+  asset book-card/style-index-rtl.css 77 bytes [emitted] (name: book-card/style-index) (id hint: style)
+  asset book-card/style-index.css 77 bytes [emitted] (name: book-card/style-index) (id hint: style)
+asset book-card/block.json 498 bytes [emitted] [from: src/blocks/book-card/block.json] [copied]
+Entrypoint book-card/view 152 bytes = book-card/view.js 59 bytes book-card/view.asset.php 93 bytes
+Entrypoint book-card/index 1.63 KiB = 6 assets
+orphan modules 6.07 KiB (javascript) 1.68 KiB (runtime) [orphan] 21 modules
+runtime modules 2.1 KiB 3 modules
+built modules 4.42 KiB (javascript) 126 bytes (css/mini-extract) [built]
+  javascript modules 4.42 KiB
+    ./src/blocks/book-card/view.js 809 bytes [built] [code generated]
+    ./src/blocks/book-card/index.js + 7 modules 3.63 KiB [not cacheable] [built] [code generated]
+  modules by path ./src/blocks/book-card/*.scss 126 bytes
+    css ./node_modules/css-loader/dist/cjs.js??ruleSet[1].rules[3].use[1]!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[3].use[2]!./node_modules/sass-loader/dist/cjs.js??ruleSet[1].rules[3].use[3]!./src/blocks/book-card/style.scss 76 bytes [built] [code generated]
+    css ./node_modules/css-loader/dist/cjs.js??ruleSet[1].rules[3].use[1]!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[3].use[2]!./node_modules/sass-loader/dist/cjs.js??ruleSet[1].rules[3].use[3]!./src/blocks/book-card/editor.scss 50 bytes [built] [code generated]
+webpack 5.112.2 compiled successfully in 811 ms</code></pre>
+                </div>
+                <p>webpack found the block through its <code>block.json</code>, compiled each script and style the file names, and copied <code>block.json</code> itself. The result, from the WP-CLI container:</p>
+                <pre data-cli><code class="language-bash">cd wp-content/plugins/pagesco-books
+find build -type f | sort
+cat build/blocks/blocks-manifest.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>build/blocks/blocks-manifest.php
+build/blocks/book-card/block.json
+build/blocks/book-card/index-rtl.css
+build/blocks/book-card/index.asset.php
+build/blocks/book-card/index.css
+build/blocks/book-card/index.js
+build/blocks/book-card/style-index-rtl.css
+build/blocks/book-card/style-index.css
+build/blocks/book-card/view.asset.php
+build/blocks/book-card/view.js
+&lt;?php
+// This file is generated. Do not modify it manually.
+return array(
+	'book-card' =&gt; array(
+		'$schema' =&gt; 'https://schemas.wp.org/trunk/block.json',
+		'apiVersion' =&gt; 3,
+		'name' =&gt; 'pagesco/book-card',
+		'version' =&gt; '0.1.0',
+		'title' =&gt; 'Book Card',
+		'category' =&gt; 'widgets',
+		'icon' =&gt; 'smiley',
+		'description' =&gt; 'A book recommended by the Pages &amp; Co. staff.',
+		'example' =&gt; array(
+
+		),
+		'supports' =&gt; array(
+			'html' =&gt; false
+		),
+		'textdomain' =&gt; 'pagesco-books',
+		'editorScript' =&gt; 'file:./index.js',
+		'editorStyle' =&gt; 'file:./index.css',
+		'style' =&gt; 'file:./style-index.css',
+		'viewScript' =&gt; 'file:./view.js'
+	)
+);</code></pre>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Built file</th><th>From</th><th>Loaded</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>index.js</code> + <code>index.asset.php</code></td><td><code>index.js</code>, <code>edit.js</code>, <code>save.js</code></td><td>in the editor (<code>editorScript</code>)</td></tr>
+                            <tr><td><code>index.css</code> (+ <code>-rtl</code>)</td><td><code>editor.scss</code> (imported by <code>edit.js</code>)</td><td>in the editor (<code>editorStyle</code>)</td></tr>
+                            <tr><td><code>style-index.css</code> (+ <code>-rtl</code>)</td><td><code>style.scss</code> (imported by <code>index.js</code>)</td><td>editor and front end (<code>style</code>)</td></tr>
+                            <tr><td><code>view.js</code> + <code>view.asset.php</code></td><td><code>view.js</code></td><td>front end (<code>viewScript</code>)</td></tr>
+                            <tr><td><code>block.json</code></td><td>copied</td><td>read at registration</td></tr>
+                            <tr><td><code>blocks-manifest.php</code></td><td>all <code>block.json</code> files</td><td>read at registration</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The <code>-rtl</code> files are mirrored versions for right-to-left languages such as Arabic and Hebrew; WordPress picks them automatically. The manifest's key, <code>'book-card'</code>, is the block's folder inside <code>build/blocks</code>. Finally, the dependency list:</p>
+                <pre data-cli><code class="language-bash">cat wp-content/plugins/pagesco-books/build/blocks/book-card/index.asset.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your version hash will differ)</h4>
+                    <pre><code>&lt;?php return array(
+	'dependencies' =&gt; array(
+		'react-jsx-runtime',
+		'wp-block-editor',
+		'wp-blocks',
+		'wp-i18n'
+	),
+	'version' =&gt; 'e4dd14a0fd30d395bc2c'
+);</code></pre>
+                </div>
+                <p>Four handles WordPress must load before your script (the JSX runtime, the block editor, the blocks API, i18n), and a <code>version</code> hash of the file's content, which changes whenever the code does, so browsers never keep a stale copy.</p>
+
+                <h3>While you work: npm start</h3>
+                <p>For day-to-day work, run <code>npm start</code> in a second terminal and leave it running. It builds once, then watches <code>src/blocks/</code> and rebuilds within a second of every save; you only reload the editor. Stop it with <kbd>Ctrl</kbd>+<kbd>C</kbd>.</p>
+                <pre data-norun><code class="language-bash">npm start</code></pre>
+                <p>The development build is not minified and adds <code>.map</code> files (source maps) so the browser's developer tools show your original code. Run <code>npm run build</code> before you commit or deploy, so <code>build/</code> holds the small production files again.</p>
+            </section>
+
+            <section id="register" class="lesson-section">
+                <h2>🔌 Registering the Built Blocks</h2>
+                <p>The block exists on disk; WordPress does not know about it yet. A plugin made by create-block registers its blocks in its main file with one call on <code>init</code>. In <code>pagesco-books</code>, that call becomes a feature, following the rule from Lesson 5.1: one class in <code>src/</code>, one line in <code>Plugin::feature_classes()</code>. Create <code>src/Blocks.php</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/Blocks.php"><code class="language-php">&lt;?php
+/**
+ * The plugin's blocks, built from src/blocks/ into build/blocks/.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books;
+
+/**
+ * Registers every block in build/blocks/ from the manifest that npm run build writes.
+ */
+final class Blocks implements Feature {
+
+	/**
+	 * Registers the blocks on init, like core registers its own.
+	 */
+	public function register(): void {
+		add_action( 'init', array( $this, 'register_blocks' ) );
+	}
+
+	/**
+	 * Registers the block types listed in build/blocks/blocks-manifest.php.
+	 */
+	public function register_blocks(): void {
+		wp_register_block_types_from_metadata_collection(
+			PAGESCO_BOOKS_DIR . 'build/blocks',
+			PAGESCO_BOOKS_DIR . 'build/blocks/blocks-manifest.php'
+		);
+	}
+}</code></pre>
+                <p><code>wp_register_block_types_from_metadata_collection( $path, $manifest )</code> (WordPress 6.8) does two things. It registers the <em>collection</em>, telling WordPress "the <code>block.json</code> files under this path are already in this manifest", which is what <code>wp_register_block_metadata_collection()</code> (6.7) does on its own. Then it calls <code>register_block_type_from_metadata()</code> for every block in the manifest, which registers the block type and its scripts and styles under handles derived from the name. Older plugins call <code>register_block_type( __DIR__ . '/build' )</code> once per block; that still works, it just reads and decodes each <code>block.json</code> on every request. List the feature after the shortcodes:</p>
+                <pre data-cli><code class="language-bash">sed -i '/Shortcodes\\EventsShortcode::class,/a\			Blocks::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+wp eval '$type = WP_Block_Type_Registry::get_instance()-&gt;get_registered( "pagesco/book-card" );
+echo $type-&gt;title, " (", $type-&gt;category, ")\n";
+echo "editor script: ", implode( ", ", $type-&gt;editor_script_handles ), "\n";
+echo "styles: ", implode( ", ", $type-&gt;style_handles ), " / editor: ", implode( ", ", $type-&gt;editor_style_handles ), "\n";
+echo "view script: ", implode( ", ", $type-&gt;view_script_handles ), "\n";
+echo wp_scripts()-&gt;registered["pagesco-book-card-editor-script"]-&gt;src, "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Book Card (widgets)
+editor script: pagesco-book-card-editor-script
+styles: pagesco-book-card-style / editor: pagesco-book-card-editor-style
+view script: pagesco-book-card-view-script
+http://localhost:8080/wp-content/plugins/pagesco-books/build/blocks/book-card/index.js</code></pre>
+                </div>
+                <p>The block type is registered, and each file from <code>block.json</code> became a registered script or style with a handle built from the block name: <code>pagesco-book-card-editor-script</code>, <code>pagesco-book-card-style</code> and so on, pointing into <code>build/blocks/book-card/</code>. The editor gets the same information over REST, from the <code>block-types</code> route (Module 7 explores the REST API; here you only read):</p>
+                <pre data-web="/wp-json/wp/v2/block-types/pagesco/book-card" data-auth="admin" data-json-pick="name,title,description,category,api_version,editor_script_handles,style_handles"><code class="language-text">http://localhost:8080/wp-json/wp/v2/block-types/pagesco/book-card   (as a logged-in administrator)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>{
+  "name": "pagesco/book-card",
+  "title": "Book Card",
+  "description": "A book recommended by the Pages &amp; Co. staff.",
+  "category": "widgets",
+  "api_version": 3,
+  "editor_script_handles": [
+    "pagesco-book-card-editor-script"
+  ],
+  "style_handles": [
+    "pagesco-book-card-style"
+  ]
+}</code></pre>
+                </div>
+                <p>Open the post editor now (<strong>Posts &gt; Add Post</strong>), click the <strong>+</strong> inserter and type "book": the Book Card is there under Widgets, with create-block's default smiley icon. Insert it and you see "Book Card – hello from the editor!". The project makes it the shop's own.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <h3>1. Following a quick-start: a second plugin</h3>
+                <p>Almost every tutorial starts with <code>npx @wordpress/create-block@latest my-block</code> in <code>wp-content/plugins</code>. Do that here and you get a plugin of its own. (The demo adds <code>--no-wp-scripts</code> so it skips its own two-minute <code>npm install</code>; without it the new folder would also get a second, 540 MB <code>node_modules/</code>.)</p>
+                <pre data-node="wp-content/plugins"><code class="language-bash">npx @wordpress/create-block@latest book-card --namespace=pagesco --no-wp-scripts</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>...
+
+Creating a "block.json" file.
+
+Creating a "package.json" file.
+
+...
+
+Code is Poetry</code></pre>
+                </div>
+                <pre data-cli><code class="language-bash">wp plugin list --fields=name,status,version
+head -n 14 wp-content/plugins/book-card/book-card.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+---------------+----------+---------+
+| name          | status   | version |
++---------------+----------+---------+
+| akismet       | inactive | 5.7.2   |
+| book-card     | inactive | 0.1.0   |
+| hello         | inactive | 1.7.2   |
+| pagesco-books | active   | 1.0.0   |
+| mailpit-smtp  | must-use |         |
+| pagesco-site  | must-use | 1.1.0   |
++---------------+----------+---------+
+&lt;?php
+/**
+ * Plugin Name:       Book Card
+ * Description:       Example block scaffolded with Create Block tool.
+ * Version:           0.1.0
+ * Requires at least: 6.8
+ * Requires PHP:      7.4
+ * Author:            The WordPress Contributors
+ * License:           GPL-2.0-or-later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain:       book-card
+ *
+ * @package Pagesco
+ */</code></pre>
+                </div>
+                <p>(The <code>...</code> lines in the first card name your folder.) <strong>What it means:</strong> create-block's default made <code>wp-content/plugins/book-card/</code> with a plugin header ("Plugin Name: Book Card", by "The WordPress Contributors") and its own registration function. Activate it and the shop runs two plugins with two build setups and two places to look for block code, and the block cannot use anything from <code>pagesco-books</code> (its settings, its <code>Settings::get()</code>, its features) without depending on the other plugin. <strong>Fix:</strong> scaffold into an existing plugin with <code>--no-plugin</code> and <code>--target-dir</code>, as you did. Delete the accidental plugin:</p>
+                <pre data-cli><code class="language-bash">rm -r wp-content/plugins/book-card</code></pre>
+
+                <h3>2. A missing build</h3>
+                <p>You copy the plugin to a new machine from Git, where <code>build/</code> is usually not committed (FAQ), and forget to build. Simulate it by renaming the folder, and load the home page:</p>
+                <pre data-cli data-raises="doing_it_wrong"><code class="language-bash">mv wp-content/plugins/pagesco-books/build wp-content/plugins/pagesco-books/build-off
+curl -s http://localhost:8080/ | head -n 2</code></pre>
+                <div class="card card-output">
+                    <h4>Error</h4>
+                    <pre><code>Notice: Function WP_Block_Metadata_Registry::register_collection was called &lt;strong&gt;incorrectly&lt;/strong&gt;. The specified manifest file does not exist. Please see &lt;a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/"&gt;Debugging in WordPress&lt;/a&gt; for more information. (This message was added in version 6.7.0.) in /var/www/html/wp-includes/functions.php on line 6260</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the registration call got a manifest path that does not exist, so <code>WP_Block_Metadata_Registry::register_collection()</code> reported it with a "called incorrectly" notice and registered nothing. A second notice follows (in the page and in <code>debug.log</code>): with no collection registered, <code>get_collection_block_metadata_files()</code> found no blocks either. Both print above the page, because the block theme renders its template first (Lesson 2.3), and with <code>WP_DEBUG_DISPLAY</code> on they print above every admin screen too, which breaks the editor until you fix it. On a production site with display off, you would only notice that the Book Card is missing from the inserter; posts that already contain one keep showing their saved HTML on the front end, because that HTML is in the post. <strong>Fix:</strong> run <code>npm install</code> and <code>npm run build</code> wherever the plugin is installed from source, or deploy <code>build/</code> with it (Lesson 8.4). Put the folder back:</p>
+                <pre data-cli><code class="language-bash">mv wp-content/plugins/pagesco-books/build-off wp-content/plugins/pagesco-books/build
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>200</code></pre>
+                </div>
+
+                <h3>3. Editing src/ and expecting WordPress to notice</h3>
+                <p>The smiley icon has to go. Change <code>"icon": "smiley"</code> to <code>"icon": "book"</code> in <code>src/blocks/book-card/block.json</code> (in your editor; here with <code>sed</code>) and ask WordPress for the icon:</p>
+                <pre data-cli><code class="language-bash">sed -i 's/"icon": "smiley"/"icon": "book"/' wp-content/plugins/pagesco-books/src/blocks/book-card/block.json
+grep '"icon"' wp-content/plugins/pagesco-books/src/blocks/book-card/block.json
+wp eval 'echo WP_Block_Type_Registry::get_instance()-&gt;get_registered( "pagesco/book-card" )-&gt;icon, "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>	"icon": "book",
+smiley</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the source says <code>book</code>, WordPress still says <code>smiley</code>. WordPress reads <code>build/blocks/blocks-manifest.php</code> and <code>build/</code>, never <code>src/</code>: the kit changed, the shelf did not. The same happens with JavaScript and styles, where it is more confusing, because the editor keeps showing your old code and you start doubting the new code. <strong>Fix:</strong> rebuild after every change, or keep <code>npm start</code> running while you work. Rebuild and ask again; keep the new icon, the project needs it:</p>
+                <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null</code></pre>
+                <pre data-cli><code class="language-bash">wp eval 'echo WP_Block_Type_Registry::get_instance()-&gt;get_registered( "pagesco/book-card" )-&gt;icon, "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>book</code></pre>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: The Book Card's First Draft</h2>
+                <p>The scaffold works; now make it the shop's. You will trim it to what a book card needs, check it in the editor and on the front end, and leave a clean plugin for Lesson 6.2 to fill with real fields. Allow about 35 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: Make the block the shop's <span class="step-time">(12 min)</span></h3>
+                    <p>A static book card needs no front-end JavaScript, so delete <code>src/blocks/book-card/view.js</code> and remove the <code>viewScript</code> line from <code>block.json</code>. Replace <code>src/blocks/book-card/block.json</code> (the icon from Common Mistake 3 is already in it):</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-card/block.json"><code class="language-json">{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "pagesco/book-card",
+	"version": "0.1.0",
+	"title": "Book Card",
+	"category": "widgets",
+	"icon": "book",
+	"description": "A book recommended by the Pages &amp; Co. staff.",
+	"example": {},
+	"supports": {
+		"html": false
+	},
+	"textdomain": "pagesco-books",
+	"editorScript": "file:./index.js",
+	"editorStyle": "file:./index.css",
+	"style": "file:./style-index.css"
+}</code></pre>
+                    <p>Replace <code>src/blocks/book-card/edit.js</code> and <code>src/blocks/book-card/save.js</code> with short versions that say what the block will become (the editor text is translatable; why the saved text is not waits for Lesson 6.2):</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-card/edit.js"><code class="language-js">/**
+ * The Book Card in the editor.
+ */
+import { __ } from '@wordpress/i18n';
+import { useBlockProps } from '@wordpress/block-editor';
+import './editor.scss';
+
+export default function Edit() {
+	return (
+		&lt;p { ...useBlockProps() }&gt;
+			{ __( 'Book Card: the staff pick will be written here.', 'pagesco-books' ) }
+		&lt;/p&gt;
+	);
+}</code></pre>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-card/save.js"><code class="language-js">/**
+ * The Book Card's saved HTML.
+ */
+import { useBlockProps } from '@wordpress/block-editor';
+
+export default function save() {
+	return (
+		&lt;p { ...useBlockProps.save() }&gt;
+			{ 'Book Card: a staff pick is coming soon.' }
+		&lt;/p&gt;
+	);
+}</code></pre>
+                    <p>And the styles: <code>src/blocks/book-card/style.scss</code> for everywhere, <code>src/blocks/book-card/editor.scss</code> for the editor only. <code>currentColor</code> borrows the text color, so the card fits any theme's palette:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-card/style.scss"><code class="language-css">/* The Book Card, in the editor and on the front end. */
+.wp-block-pagesco-book-card {
+	border: 1px solid currentColor;
+	border-radius: 4px;
+	padding: 1.25rem 1.5rem;
+}</code></pre>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-card/editor.scss"><code class="language-css">/* Editor only: a dashed outline shows where the block starts and ends. */
+.wp-block-pagesco-book-card {
+	outline: 1px dashed currentColor;
+	outline-offset: 4px;
+}</code></pre>
+                    <p>Delete <code>view.js</code>, build, and list what the build made:</p>
+                    <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">rm src/blocks/book-card/view.js
+npm run build &gt; /dev/null
+ls src/blocks/book-card build/blocks/book-card</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>build/blocks/book-card:
+block.json
+index-rtl.css
+index.asset.php
+index.css
+index.js
+style-index-rtl.css
+style-index.css
+
+src/blocks/book-card:
+block.json
+edit.js
+editor.scss
+index.js
+save.js
+style.scss</code></pre>
+                    </div>
+                    <p>No <code>view.js</code> on either side: the build empties <code>build/blocks/</code> before it writes, so files you remove from the sources disappear from the build too.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: Meet it in the editor <span class="step-time">(8 min)</span></h3>
+                    <p>Reload the post editor (<strong>Posts &gt; Add Post</strong>), open the inserter and search for "book". Insert the Book Card. The editor runs <code>edit</code>, loads <code>style-index.css</code> (the border) and <code>index.css</code> (a dashed outline, visible when the block is not selected; while it is selected, the editor's blue selection outline covers it), and the sidebar's <strong>Block</strong> tab shows the icon, title and description from <code>block.json</code>:</p>
+                    <figure>
+                        <img src="images/lesson_19_editor.png" alt="The post editor with the Book Card block selected: a bordered box reading 'Book Card: the staff pick will be written here.', the block toolbar with the book icon, and the Block sidebar showing the book icon, the title Book Card and the description A book recommended by the Pages and Co. staff." width="1100" height="700" loading="lazy">
+                        <figcaption>The first draft of the Book Card in the editor.</figcaption>
+                    </figure>
+                    <p>Open the editor's <strong>Code editor</strong> view (the ⋮ menu at the top right, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd>): the block is stored as the HTML from <code>save</code>, inside its comment delimiters. You do not need to save this post; the next step puts the same markup into a test post from the command line.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: See it on the front end <span class="step-time">(8 min)</span></h3>
+                    <p>This is the markup the editor stores for the block, exactly as the Code editor shows it. Save it as the content of a published test post: in the editor, paste it into the Code editor and publish with the title "Block test" (here the course tools create the post for you):</p>
+                    <pre data-content="post:block-test" data-title="Block test"><code class="language-html">&lt;!-- wp:pagesco/book-card --&gt;
+&lt;p class="wp-block-pagesco-book-card"&gt;Book Card: a staff pick is coming soon.&lt;/p&gt;
+&lt;!-- /wp:pagesco/book-card --&gt;</code></pre>
+                    <pre data-web="/block-test/" data-select=".wp-block-pagesco-book-card"><code class="language-text">http://localhost:8080/block-test/   (View Source: the block)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;p class="wp-block-pagesco-book-card"&gt;Book Card: a staff pick is coming soon.&lt;/p&gt;</code></pre>
+                    </div>
+                    <p>The stored HTML, untouched. No script of the plugin runs on the front end. The styles, though, are there; look for the block's stylesheet handle in the page, then count it on the home page, which has no Book Card, and delete the test post:</p>
+                    <pre data-cli><code class="language-bash">curl -s http://localhost:8080/block-test/ | grep -A 3 'pagesco-book-card-style-inline-css'
+curl -s http://localhost:8080/ | grep -c 'pagesco-book-card-style'
+wp post delete $(wp post list --name=block-test --field=ID) --force &gt; /dev/null</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;style id="pagesco-book-card-style-inline-css"&gt;
+.wp-block-pagesco-book-card{border:1px solid;border-radius:4px;padding:1.25rem 1.5rem}
+
+/*# sourceURL=http://localhost:8080/wp-content/plugins/pagesco-books/build/blocks/book-card/style-index.css */
+0</code></pre>
+                    </div>
+                    <p>Two things to notice. WordPress did not link <code>style-index.css</code>; it printed its contents into a <code>&lt;style&gt;</code> element, because small block stylesheets are inlined to save the browser a request (the comment at the end names the file; the <code>styles_inline_size_limit</code> filter sets the budget for all inlined styles of a page, 40,000 bytes by default since WordPress 6.9). And the home page has none: block themes print a block's styles only on pages that contain the block, so visitors download only what the page uses. (The minifier even dropped <code>currentColor</code> from the border, because it is the default border color anyway.)</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 4: Check the plugin <span class="step-time">(7 min)</span></h3>
+                    <p>List the plugin's own files (not <code>vendor/</code> or <code>node_modules/</code>), the features, and the registered block, in one go from the WP-CLI container:</p>
+                    <pre data-cli data-checkpoint><code class="language-bash">cd wp-content/plugins/pagesco-books
+find . \( -path ./vendor -o -path ./node_modules \) -prune -o -type f -print | sort
+grep -c "::class," src/Plugin.php
+wp eval 'echo WP_Block_Type_Registry::get_instance()-&gt;is_registered( "pagesco/book-card" ) ? "pagesco/book-card is registered\n" : "missing\n";'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>./build/blocks/blocks-manifest.php
+./build/blocks/book-card/block.json
+./build/blocks/book-card/index-rtl.css
+./build/blocks/book-card/index.asset.php
+./build/blocks/book-card/index.css
+./build/blocks/book-card/index.js
+./build/blocks/book-card/style-index-rtl.css
+./build/blocks/book-card/style-index.css
+./composer.json
+./package-lock.json
+./package.json
+./pagesco-books.php
+./src/Activator.php
+./src/Admin/BookColumns.php
+./src/Admin/BookMetaBox.php
+./src/Admin/SettingsPage.php
+./src/Admin/StockAction.php
+./src/Blocks.php
+./src/BookMeta.php
+./src/BookPostType.php
+./src/EventsTable.php
+./src/Feature.php
+./src/GenreTaxonomy.php
+./src/Plugin.php
+./src/Settings.php
+./src/Shortcodes/BookShortcode.php
+./src/Shortcodes/EventsShortcode.php
+./src/StoreNotice.php
+./src/blocks/book-card/block.json
+./src/blocks/book-card/edit.js
+./src/blocks/book-card/editor.scss
+./src/blocks/book-card/index.js
+./src/blocks/book-card/save.js
+./src/blocks/book-card/style.scss
+./uninstall.php
+13
+pagesco/book-card is registered</code></pre>
+                    </div>
+                    <p>The PHP classes, now thirteen features with <code>Blocks</code>; the block's sources in <code>src/blocks/book-card/</code>; its build in <code>build/blocks/</code>; and the Node files <code>package.json</code> and <code>package-lock.json</code>. Add a line to <code>pagesco-plan.txt</code>: "Blocks: sources in <code>src/blocks/&lt;name&gt;/</code>, <code>npm run build</code> into <code>build/blocks/</code>, registered by the <code>Blocks</code> feature from the manifest."</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>node --version</code> prints v24, and <code>pagesco-books</code> has a <code>package.json</code> with <code>build</code> and <code>start</code> scripts and <code>@wordpress/scripts</code> installed</li>
+                        <li><code>src/blocks/book-card/</code> holds <code>block.json</code>, <code>index.js</code>, <code>edit.js</code>, <code>save.js</code>, <code>style.scss</code> and <code>editor.scss</code>, and no <code>view.js</code></li>
+                        <li><code>npm run build</code> writes <code>build/blocks/book-card/</code> and <code>build/blocks/blocks-manifest.php</code></li>
+                        <li><code>src/Blocks.php</code> registers the collection on <code>init</code>, and <code>Blocks::class</code> is the thirteenth feature</li>
+                        <li>The Book Card, with the book icon, appears in the editor's inserter, and its front-end styles appear only where the block is used</li>
+                        <li>No accidental <code>wp-content/plugins/book-card/</code> plugin and no Block test post are left</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>The exercises leave the block as the project did (Exercise 1's change is one Lesson 6.2 makes anyway). Try each one before you open the solution.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Help Editors Find the Card</h3>
+                    <p>Editors who search the inserter for "staff pick" or "recommendation" should find the Book Card. Add <code>keywords</code> to <code>block.json</code>, rebuild, and confirm that WordPress has them.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>"keywords": [ "staff pick", "recommendation" ]</code> goes next to <code>description</code>. After the build, the registered type's <code>keywords</code> property is an array.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">sed -i 's|^\t"example": {},|\t"keywords": [ "staff pick", "recommendation" ],\n&amp;|' wp-content/plugins/pagesco-books/src/blocks/book-card/block.json
+grep -n -A 1 '"keywords"' wp-content/plugins/pagesco-books/src/blocks/book-card/block.json</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>10:	"keywords": [ "staff pick", "recommendation" ],
+11-	"example": {},</code></pre>
+                        </div>
+                        <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null</code></pre>
+                        <pre data-cli><code class="language-bash">wp eval 'echo implode( ", ", WP_Block_Type_Registry::get_instance()-&gt;get_registered( "pagesco/book-card" )-&gt;keywords ), "\n";'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>staff pick, recommendation</code></pre>
+                        </div>
+                        <p>Keywords are searched together with the title, so "staff pick" now finds the card even though neither word is in its name. Like the title, they are translatable through the <code>textdomain</code>.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Your Block Among Core's</h3>
+                    <p>Print the names of all registered block types in the <code>widgets</code> category, in alphabetical order, with a count at the end. Where does <code>pagesco/book-card</code> appear?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>get_all_registered()</code> returns an array of <code>WP_Block_Type</code> objects keyed by name. <code>wp_list_filter()</code> (Lesson 1.3's Exercise 4) keeps the objects whose <code>category</code> is <code>widgets</code>; <code>array_keys()</code> and <code>sort()</code> do the rest.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="widget-blocks.php" data-wp><code class="language-php">&lt;?php
+$widgets = wp_list_filter( WP_Block_Type_Registry::get_instance()-&gt;get_all_registered(), array( 'category' =&gt; 'widgets' ) );
+$names   = array_keys( $widgets );
+sort( $names );
+echo implode( "\n", $names ), "\n", count( $names ), " blocks\n";</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>core/archives
+core/calendar
+core/categories
+core/html
+core/latest-comments
+core/latest-posts
+core/legacy-widget
+core/page-list
+core/page-list-item
+core/rss
+core/search
+core/shortcode
+core/social-link
+core/social-links
+core/tag-cloud
+core/widget-group
+pagesco/book-card
+17 blocks</code></pre>
+                        </div>
+                        <p>Your block sits between core's, registered the same way and treated the same. Remove the script: <code>rm widget-blocks.php</code>.</p>
+                        <pre data-cli><code class="language-bash">rm widget-blocks.php</code></pre>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: Does the Text Domain Survive the Build?</h3>
+                    <p>The production build is minified: names are shortened and whitespace is gone. For Lesson 8.3's JavaScript translations to work, the strings and the <code>pagesco-books</code> text domain must still be readable in <code>build/blocks/book-card/index.js</code>. Check it with <code>grep</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>grep -o</code> prints only the matching part of a line, which matters for a file that is one long line. Search for <code>"Book Card: the staff pick[^"]*","pagesco-books"</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">grep -o '"Book Card: the staff pick[^"]*","pagesco-books"' wp-content/plugins/pagesco-books/build/blocks/book-card/index.js</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>"Book Card: the staff pick will be written here.","pagesco-books"</code></pre>
+                        </div>
+                        <p>Minification renamed the <code>__</code> function, but the string and the text domain survive word for word, side by side. That is what WordPress's translation tools look for in built files, which is why you never build a string out of pieces (<code>'Book ' + 'Card'</code>): the tools could not find it.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 4: A Second Block, No New PHP (Stretch)</h3>
+                    <p>Prove that the <code>Blocks</code> feature scales: scaffold a second static block, <code>pagesco/shop-hours</code>, into <code>src/blocks/shop-hours</code>, build, and check that WordPress registered it without any change to <code>src/Blocks.php</code>. Then remove it again (sources and build).</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The same create-block command with a different slug and target folder. After the build, <code>blocks-manifest.php</code> has two keys. Removing means deleting the source folder and building again.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npx @wordpress/create-block@latest shop-hours --no-plugin --target-dir=src/blocks/shop-hours --namespace=pagesco --textdomain=pagesco-books &gt; /dev/null
+npm run build &gt; /dev/null
+grep "^	'" build/blocks/blocks-manifest.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>	'book-card' =&gt; array(
+	'shop-hours' =&gt; array(</code></pre>
+                        </div>
+                        <pre data-cli><code class="language-bash">wp eval 'foreach ( array( "pagesco/book-card", "pagesco/shop-hours" ) as $name ) { echo $name, ": ", WP_Block_Type_Registry::get_instance()-&gt;is_registered( $name ) ? "registered" : "missing", "\n"; }'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>pagesco/book-card: registered
+pagesco/shop-hours: registered</code></pre>
+                        </div>
+                        <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">rm -r src/blocks/shop-hours
+npm run build &gt; /dev/null
+ls build/blocks</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>blocks-manifest.php
+book-card</code></pre>
+                        </div>
+                        <p>The build found the second <code>block.json</code> on its own, the manifest listed both blocks, and the one registration call registered both. Deleting the sources and rebuilding removed every trace. Lesson 6.3's book list and Lesson 6.4's filter will join the collection exactly like this.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> Which folder does WordPress read when it registers the Book Card?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Those are the sources. Can a browser run JSX and SCSS?">
+                                A) src/blocks/book-card/
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The Blocks feature passes build/blocks and its manifest to the registration function; src/ is only read by the build, which is why an unbuilt change never shows up.">
+                                B) build/blocks/ and its blocks-manifest.php
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="node_modules holds the build tools, which never reach WordPress. What does the Blocks feature point at?">
+                                C) node_modules/@wordpress/scripts/
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> Why did the course run create-block with <code>--no-plugin</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="Without it create-block scaffolds a separate plugin with its own PHP file and build setup; --no-plugin writes only the block files, so the block lives in pagesco-books with everything else.">
+                                A) To add the block to the existing pagesco-books plugin instead of creating a second plugin
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Static and dynamic are chosen with --variant. What else does create-block make by default?">
+                                B) To make a static block instead of a dynamic one
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Both modes run on Node. What was the accidental extra in Common Mistake 1?">
+                                C) To avoid needing Node.js
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> What is <code>index.asset.php</code> for?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The PHP registration is in the Blocks feature. What did the file contain?">
+                                A) It registers the block in PHP
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Styles are in the .css files. Look at the two keys of the returned array.">
+                                B) It holds the block's styles
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The build writes the script handles the file needs (wp-blocks, wp-block-editor...) and a content hash; WordPress loads those dependencies first and uses the hash as the version.">
+                                C) It lists the WordPress scripts index.js depends on, and a version hash for caching
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> You change the block's title in <code>src/blocks/book-card/block.json</code> and reload the editor. The inserter still shows the old title. Why?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Titles in block.json can change freely; the name is the part that must not. What reads the source file?">
+                                A) Titles cannot be changed after the block is registered
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Registration reads build/blocks-manifest.php and build/, which still hold the old title until npm run build (or npm start) runs again.">
+                                B) The build has not run since the change
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The editor's cache would not survive a reload that long. What did Common Mistake 3 show?">
+                                C) The browser cached the old editor
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> A visitor opens a post containing the static Book Card. Which of the block's files does the browser load?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="index.js holds edit and save, which only the editor runs. Did the front end in Step 3 include any script of the plugin?">
+                                A) index.js, to run save() for the visitor
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The editor styles stay in the editor. Which styles appeared in the page's source?">
+                                B) index.css and style-index.css
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The HTML was stored when the editor saved the post; the front end only needs the shared styles, which a block theme adds (here inlined) only on pages that contain the block.">
+                                C) Only the styles from style-index.css; the HTML is already in the post
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>What goes into Git, and what reaches the server?</summary>
+                    <p>Commit the sources (<code>src/blocks/</code>), <code>package.json</code> and <code>package-lock.json</code>; leave out <code>node_modules/</code> always and usually <code>build/</code>, which anyone can recreate with <code>npm ci</code> (an exact install from the lock file) and <code>npm run build</code>. The server needs the opposite: <code>build/</code> yes, <code>node_modules/</code> and the sources no. Lesson 8.4 sets up a <code>.gitignore</code> and a deployment that builds first; until then, simply never copy <code>node_modules/</code> anywhere.</p>
+                </details>
+                <details>
+                    <summary>Do I have to learn React first?</summary>
+                    <p>No. Blocks use a small part of React: components as functions that return JSX, props (Lesson 6.2's <code>attributes</code> and <code>setAttributes</code>) and ready-made components from WordPress packages. You know enough JavaScript from earlier courses to read and change them, and the next lessons introduce each piece when it is needed. If you later want React itself, the course's sibling React course (Lesson 9.2) goes deep.</p>
+                </details>
+                <details>
+                    <summary>Could I write a block without a build step?</summary>
+                    <p>Yes: plain JavaScript using <code>wp.element.createElement()</code> instead of JSX, loaded directly as the <code>editorScript</code>. create-block still offers an "es5" template for it, and it is how blocks were written in the early days. You give up JSX, imports, SCSS and the automatic dependency list, so almost nobody does it for real work. Another way to avoid most JavaScript is a dynamic block (Lesson 6.3), whose output comes from PHP.</p>
+                </details>
+                <details>
+                    <summary>Why wp-scripts and not my own webpack setup?</summary>
+                    <p><code>@wordpress/scripts</code> is WordPress's own configuration: it knows the <code>block.json</code> conventions, externalizes every <code>@wordpress/*</code> package and React, writes <code>index.asset.php</code>, RTL styles and the manifest, and its version (37 here) moves with WordPress. You can extend it with a <code>webpack.config.js</code> when you need something unusual, but starting from it saves days, and other WordPress developers recognize your setup at once.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>The <code>package.json</code> scripts can do more than build. Add three: <code>"lint:js": "wp-scripts lint-js src/blocks"</code>, <code>"lint:css": "wp-scripts lint-style \"src/blocks/**/*.scss\""</code> and <code>"format": "wp-scripts format src/blocks"</code>, run each one, and read what the WordPress JavaScript and CSS coding standards say about the scaffolded files and your edits. (The ESLint rules may ask you to add <code>@wordpress/block-editor</code> and friends to <code>package.json</code> as dependencies, the way create-block's own plugin template lists them. Why does the build work without them?) Lesson 8.1 adds PHPCS for the PHP side.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Draw the path of the Book Card from <code>src/blocks/book-card/</code> to a visitor's screen in your own boxes and arrows, without looking at the lesson's diagram: which program reads which files, and when. Then write one sentence each on what you would check first if (a) the block is missing from the inserter, (b) the inserter shows an old version, (c) the front end looks unstyled.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>A block type is <code>block.json</code> metadata plus an editor script with <code>edit</code> (the editing view) and <code>save</code> (the stored HTML), plus styles; a static block's front end needs no JavaScript</li>
+                        <li><code>npx @wordpress/create-block@latest &lt;slug&gt; --no-plugin --target-dir=… --namespace=… --textdomain=…</code> adds a block to an existing plugin; without <code>--no-plugin</code> you get a new plugin</li>
+                        <li><code>@wordpress/scripts</code> builds <code>src/blocks</code> into <code>build/blocks</code>: compiled scripts and styles, <code>index.asset.php</code> with the dependencies and a version hash, and with <code>--blocks-manifest</code> a PHP manifest of all blocks</li>
+                        <li><code>wp_register_block_types_from_metadata_collection( $build_dir, $manifest )</code> on <code>init</code> registers every built block and its asset handles in one call</li>
+                        <li>WordPress reads only <code>build/</code>: rebuild after every change (or keep <code>npm start</code> running), and build wherever the plugin is installed from source</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Run or write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>A new block in this plugin</td><td><code>npx @wordpress/create-block@latest &lt;slug&gt; --no-plugin --target-dir=src/blocks/&lt;slug&gt; --namespace=pagesco --textdomain=pagesco-books</code></td></tr>
+                            <tr><td>The build tool (once)</td><td><code>npm install</code> with <code>@wordpress/scripts</code> in <code>devDependencies</code></td></tr>
+                            <tr><td>A production build</td><td><code>npm run build</code></td></tr>
+                            <tr><td>Rebuild while you work</td><td><code>npm start</code> (stop with <kbd>Ctrl</kbd>+<kbd>C</kbd>)</td></tr>
+                            <tr><td>Register every built block</td><td><code>wp_register_block_types_from_metadata_collection( PAGESCO_BOOKS_DIR . 'build/blocks', PAGESCO_BOOKS_DIR . 'build/blocks/blocks-manifest.php' );</code> on <code>init</code></td></tr>
+                            <tr><td>Check a registration</td><td><code>WP_Block_Type_Registry::get_instance()-&gt;get_registered( 'pagesco/book-card' )</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You set up Node 24 and the official WordPress block toolchain</li>
+                        <li>You scaffolded <code>pagesco/book-card</code> into <code>pagesco-books</code> without creating a second plugin</li>
+                        <li>You built it and can name every file in <code>build/</code> and what loads it</li>
+                        <li>You registered all of the plugin's blocks with one feature class, the plugin's thirteenth</li>
+                        <li>You saw the block in the editor and on the front end, and broke the setup three ways on purpose</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>The Book Card says "coming soon" and cannot be edited. In <a href="lesson_20.html"><strong>Lesson 6.2: Static Blocks: Attributes, Controls &amp; Supports</strong></a> it becomes a real staff pick: attributes for the title, author and recommendation, typed directly into the card with <code>RichText</code>, settings in the sidebar with <code>InspectorControls</code>, colors and spacing from block supports, and a careful look at what happens to cards already in posts when you change <code>save</code>.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Run <code>npm run build</code> once more and check that the Book Card appears in the inserter with the book icon</li>
+                    <li>Make sure <code>wp-content/plugins/book-card/</code> is gone and no Block test post is left</li>
+                    <li>Try <code>npm start</code>, change the editor text in <code>edit.js</code>, reload the editor and watch it change; then stop it and run <code>npm run build</code></li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Setup lessons are the least glamorous, and this one asked you to take in a new runtime, a package manager, a build tool and a new kind of registration at once. If the pieces still feel loose, that is normal: the kit, workshop and shelf picture will settle as you use it every day in the next three lessons. You now have the same setup WordPress core's own blocks are built with, inside a plugin structure you understand line by line.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_18.html" class="prev-lesson">← Previous: Shortcodes, $wpdb &amp; Custom Tables</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_20.html" class="next-lesson">Next: Static Blocks: Attributes, Controls &amp; Supports →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

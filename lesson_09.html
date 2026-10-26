@@ -1,0 +1,1501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Block patterns as PHP files, synced patterns, section styles, style variations, web fonts with fontFace and the round trip from the Site Editor back to theme files, on WordPress 7.1 and PHP 8.5. PHP and WordPress Development Lesson 3.3.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Patterns, Style Variations &amp; the Site Editor - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 3: Block Themes</a></li>
+            <li aria-current="page">Lesson 3.3: Patterns, Style Variations &amp; the Site Editor</li>
+        </ul>
+    </nav>
+
+    <main id="main-content" data-state="after:lesson_08">
+        <div class="container">
+            <header>
+                <h1>🧩 Lesson 3.3: Patterns, Style Variations &amp; the Site Editor</h1>
+                <p class="lead">The <code>pagesco</code> theme from Lesson 3.2 draws every page correctly, but the shop's staff still face an empty canvas whenever they want something nicer than a heading and a paragraph. In this lesson you give them ready-made sections (patterns), color bands they can apply with one click (section styles), a second look for the whole site (a style variation) and the shop's own typeface. You build a real front page out of patterns, and you learn the workflow that keeps the theme's files and the Site Editor's database copies from drifting apart.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Write PHP pattern files with the right header fields, translatable text and escaped theme URLs, and place them in templates with the Pattern block</li>
+                        <li>Explain the difference between theme patterns, synced patterns and template parts, and create a synced pattern that updates every page it is used on</li>
+                        <li>Define section styles and a style variation as JSON files in <code>styles/</code> and read what the Site Editor saves when someone chooses one</li>
+                        <li>Bundle a web font with <code>fontFace</code> in <code>theme.json</code>, checking that its license allows redistribution</li>
+                        <li>Bring Site Editor changes back into the theme's files with Export and WP-CLI, then reset the database copies</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 145 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_08.html">Lesson 3.2: Building a Block Theme</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> three patterns, two section styles, the Evening style variation, the Vollkorn web font, a synced "Opening hours" pattern and a front page for Pages &amp; Co.</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (section styles need WordPress 6.6 or later; <code>WP_DEVELOPMENT_MODE</code> 6.3 or later)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 3.2 with <code>pagesco</code> active and no Site Editor copies</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#patterns" class="toc-link">Patterns: Sections You Design Once</a></li>
+                        <li><a href="#front-page" class="toc-link">A Front Page Built from Patterns</a></li>
+                        <li><a href="#synced" class="toc-link">Synced Patterns</a></li>
+                        <li><a href="#styles" class="toc-link">Section Styles and Style Variations</a></li>
+                        <li><a href="#fonts" class="toc-link">Web Fonts with fontFace</a></li>
+                        <li><a href="#export" class="toc-link">From the Site Editor Back to Code</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: The Pages &amp; Co. Front Page</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="patterns" class="lesson-section">
+                <h2>🧩 Patterns: Sections You Design Once</h2>
+                <p>A <strong>pattern</strong> is a named, ready-made group of blocks: a welcome banner, a row of featured books, a "join the book club" band. Editors find patterns in the inserter (the <strong>+</strong> button, then <strong>Patterns</strong>), click one, and get a finished section they only need to adjust. For a theme developer, patterns are how you hand your design over to people who will never open <code>theme.json</code>.</p>
+                <p>WordPress has three related tools, and choosing the right one is half the skill:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Tool</th><th>Lives in</th><th>After it is inserted</th><th>Use it for</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Theme pattern</td><td>a PHP file in the theme's <code>patterns/</code> folder</td><td>Its blocks are <strong>copied</strong> in; each copy is edited on its own</td><td>Starting points: a hero, a features row, a call to action</td></tr>
+                            <tr><td>Synced pattern</td><td>a <code>wp_block</code> post in the database (Lesson 2.1's list of post types)</td><td>Every use <strong>points to</strong> the one original; edit it once, every page changes</td><td>Content that must stay the same everywhere: opening hours, a disclaimer</td></tr>
+                            <tr><td>Template part</td><td>a file in <code>parts/</code> (Lesson 3.2)</td><td>Included by slug in templates</td><td>Site structure: header, footer</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: a rubber stamp and a hanging sign</h4>
+                    <p>A theme pattern is a <strong>rubber stamp</strong>. You press it onto the page and get a perfect print; after that the print is just ink on paper, and changing the stamp does not change prints you already made. A synced pattern is a <strong>sign hung in several rooms</strong>: there is only one sign, so repainting it changes what every room shows. Template parts are the signs fixed to the building itself, at every entrance.</p>
+                </div>
+
+                <h3>Your first pattern file</h3>
+                <p>The shop wants its front page to open with a welcome: a big heading, a sentence about the shop, two buttons and a picture of a book. Twenty Twenty-Five ships a public-domain book image that fits; copy it into your theme (from the WP-CLI container, as in Lesson 1.2; a file manager works too). Its license is in Twenty Twenty-Five's <code>readme.txt</code>: the photo is CC0 and the book template public domain, so you may redistribute it with your theme.</p>
+                <pre data-cli><code class="language-bash">mkdir -p wp-content/themes/pagesco/assets/images wp-content/themes/pagesco/patterns
+cp wp-content/themes/twentytwentyfive/assets/images/book-image.webp wp-content/themes/pagesco/assets/images/
+ls wp-content/themes/pagesco/assets/images</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>book-image.webp</code></pre>
+                </div>
+                <p>Before you write the pattern, count the patterns WordPress has registered for your theme so far (core registers some of its own; you only want the ones whose name starts with <code>pagesco/</code>):</p>
+                <pre data-cli><code class="language-bash">wp eval 'echo count( array_filter( WP_Block_Patterns_Registry::get_instance()-&gt;get_all_registered(), fn( $p ) =&gt; str_starts_with( $p["name"], "pagesco/" ) ) ), "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>0</code></pre>
+                </div>
+                <p>None yet, as expected. A theme pattern is a PHP file in <code>patterns/</code>: a comment header that describes it, then the block markup. Create <code>wordpress/wp-content/themes/pagesco/patterns/hero.php</code>:</p>
+                <pre data-file="wp-content/themes/pagesco/patterns/hero.php"><code class="language-php">&lt;?php
+/**
+ * Title: Hero: welcome to the shop
+ * Slug: pagesco/hero
+ * Categories: banner, featured
+ * Keywords: hero, welcome, intro
+ * Description: A full-width welcome with the page heading, a short text, two buttons and a book image.
+ * Viewport Width: 1200
+ * Post Types: wp_template
+ * Template Types: front-page
+ *
+ * @package pagesco
+ */
+
+?&gt;
+&lt;!-- wp:group {"align":"full","className":"is-style-section-sage","style":{"spacing":{"padding":{"top":"var:preset|spacing|large","bottom":"var:preset|spacing|large"}}},"layout":{"type":"constrained"}} --&gt;
+&lt;div class="wp-block-group alignfull is-style-section-sage" style="padding-top:var(--wp--preset--spacing--large);padding-bottom:var(--wp--preset--spacing--large)"&gt;
+	&lt;!-- wp:columns {"verticalAlignment":"center","align":"wide"} --&gt;
+	&lt;div class="wp-block-columns alignwide are-vertically-aligned-center"&gt;
+		&lt;!-- wp:column {"verticalAlignment":"center","width":"60%"} --&gt;
+		&lt;div class="wp-block-column is-vertically-aligned-center" style="flex-basis:60%"&gt;
+			&lt;!-- wp:heading {"level":1} --&gt;
+			&lt;h1 class="wp-block-heading"&gt;&lt;?php esc_html_e( 'Good books, good company', 'pagesco' ); ?&gt;&lt;/h1&gt;
+			&lt;!-- /wp:heading --&gt;
+
+			&lt;!-- wp:paragraph --&gt;
+			&lt;p&gt;&lt;?php esc_html_e( 'An independent bookstore with a big reading corner, a small café and staff who love to talk about books.', 'pagesco' ); ?&gt;&lt;/p&gt;
+			&lt;!-- /wp:paragraph --&gt;
+
+			&lt;!-- wp:buttons --&gt;
+			&lt;div class="wp-block-buttons"&gt;
+				&lt;!-- wp:button --&gt;
+				&lt;div class="wp-block-button"&gt;&lt;a class="wp-block-button__link wp-element-button" href="&lt;?php echo esc_url( home_url( '/events/' ) ); ?&gt;"&gt;&lt;?php esc_html_e( 'See what is on', 'pagesco' ); ?&gt;&lt;/a&gt;&lt;/div&gt;
+				&lt;!-- /wp:button --&gt;
+
+				&lt;!-- wp:button {"className":"is-style-outline"} --&gt;
+				&lt;div class="wp-block-button is-style-outline"&gt;&lt;a class="wp-block-button__link wp-element-button" href="&lt;?php echo esc_url( home_url( '/about/' ) ); ?&gt;"&gt;&lt;?php esc_html_e( 'About the shop', 'pagesco' ); ?&gt;&lt;/a&gt;&lt;/div&gt;
+				&lt;!-- /wp:button --&gt;
+			&lt;/div&gt;
+			&lt;!-- /wp:buttons --&gt;
+		&lt;/div&gt;
+		&lt;!-- /wp:column --&gt;
+
+		&lt;!-- wp:column {"verticalAlignment":"center","width":"40%"} --&gt;
+		&lt;div class="wp-block-column is-vertically-aligned-center" style="flex-basis:40%"&gt;
+			&lt;!-- wp:image {"width":"280px","sizeSlug":"full","linkDestination":"none","align":"center"} --&gt;
+			&lt;figure class="wp-block-image aligncenter size-full is-resized"&gt;&lt;img src="&lt;?php echo esc_url( get_theme_file_uri( 'assets/images/book-image.webp' ) ); ?&gt;" alt="&lt;?php esc_attr_e( 'A hardcover book with a black-and-white photo on its cover', 'pagesco' ); ?&gt;" style="width:280px"/&gt;&lt;/figure&gt;
+			&lt;!-- /wp:image --&gt;
+		&lt;/div&gt;
+		&lt;!-- /wp:column --&gt;
+	&lt;/div&gt;
+	&lt;!-- /wp:columns --&gt;
+&lt;/div&gt;
+&lt;!-- /wp:group --&gt;</code></pre>
+                <p>Three things make this a PHP file rather than plain block markup, and all three are reasons patterns are PHP:</p>
+                <ul>
+                    <li><strong>Translatable text.</strong> Every visible string goes through <code>esc_html_e()</code> or <code>esc_attr_e()</code> with the theme's text domain (Lesson 1.3), so a Spanish site gets Spanish buttons.</li>
+                    <li><strong>URLs that work on every site.</strong> <code>get_theme_file_uri( 'assets/images/book-image.webp' )</code> builds the image URL for whatever domain and folder the theme is installed in, and <code>home_url( '/events/' )</code> does the same for links. A hard-coded <code>http://localhost:8080/…</code> would break the moment the site goes live.</li>
+                    <li><strong>Escaping.</strong> The output of those functions is escaped late, with <code>esc_url()</code>, like any other output (Lesson 1.3).</li>
+                </ul>
+                <p>The <code>className</code> <code>is-style-section-sage</code> on the outer Group is a <em>section style</em> you define later in this lesson; until then it does nothing. The header fields work like the <code>style.css</code> header in Lesson 3.2: WordPress reads them with the same function, <code>get_file_data()</code>.</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Header</th><th>What it does</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>Title</code>, <code>Slug</code></td><td>Required. The slug is <code>namespace/name</code>; use your theme's text domain as the namespace so it cannot clash with another theme's or plugin's</td></tr>
+                            <tr><td><code>Categories</code></td><td>Where the inserter lists it. Core's categories include <code>banner</code>, <code>featured</code>, <code>call-to-action</code>, <code>text</code>, <code>about</code>, <code>contact</code>, <code>header</code> and <code>footer</code>; a theme can register its own with <code>register_block_pattern_category()</code> in <code>functions.php</code> (Module 4)</td></tr>
+                            <tr><td><code>Keywords</code>, <code>Description</code></td><td>Help the inserter's search and screen readers</td></tr>
+                            <tr><td><code>Viewport Width</code></td><td>Width in pixels of the preview thumbnail</td></tr>
+                            <tr><td><code>Post Types</code></td><td>Only offer the pattern when editing these post types. <code>wp_template</code> means "only in the Site Editor's templates", which suits a hero with an <code>&lt;h1&gt;</code>: inserted into a page, it would compete with the page title's <code>&lt;h1&gt;</code></td></tr>
+                            <tr><td><code>Template Types</code></td><td>Suggest it when someone creates a template of that type (here <code>front-page</code>)</td></tr>
+                            <tr><td><code>Block Types</code></td><td>Offer it as a replacement for a block, for example <code>core/template-part/footer</code> for footer designs (Exercise 2)</td></tr>
+                            <tr><td><code>Inserter</code></td><td><code>no</code> hides it from the inserter; it can still be used in templates by slug</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Why is my pattern missing?</h3>
+                <p>WordPress registers every file in the active theme's <code>patterns/</code> folder automatically on <code>init</code>; there is nothing to call. Ask the pattern registry whether it knows yours:</p>
+                <pre data-cli><code class="language-bash">wp eval 'var_dump( WP_Block_Patterns_Registry::get_instance()-&gt;is_registered( "pagesco/hero" ) );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>bool(false)</code></pre>
+                </div>
+                <p>It does not, and nothing on screen tells you why. The reason is a cache. Scanning a folder and reading every file's header on every request is slow, so since WordPress 6.4 the list of a theme's pattern files is stored in a transient (a cached value in the options table; Lesson 7.3 covers transients) for 30 minutes, and rebuilt early only when the theme's <code>Version</code> changes or you switch themes. The count you just ran built that list, while <code>pagesco</code> had no <code>patterns/</code> folder:</p>
+                <pre data-cli><code class="language-bash">wp transient list --network --search="wp_theme_files*" --fields=name,value</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+----------------------------------------------------------+-------------------------------------------------------+
+| name                                                     | value                                                 |
++----------------------------------------------------------+-------------------------------------------------------+
+| wp_theme_files_patterns-ab0ac91d73cd40af5667134910f64f93 | a:2:{s:7:"version";s:5:"1.0.0";s:8:"patterns";a:0:{}} |
++----------------------------------------------------------+-------------------------------------------------------+</code></pre>
+                </div>
+                <p>An empty list of patterns for version 1.0.0. On a live site that cache is exactly what you want. While you are developing a theme, tell WordPress so: the <code>WP_DEVELOPMENT_MODE</code> constant (WordPress 6.3 and later) set to <code>theme</code> switches off the theme caches that get in a developer's way, this one included. WP-CLI adds it to <code>wp-config.php</code> for you:</p>
+                <pre data-cli><code class="language-bash">wp config set WP_DEVELOPMENT_MODE theme
+wp eval 'var_dump( wp_get_development_mode(), WP_Block_Patterns_Registry::get_instance()-&gt;is_registered( "pagesco/hero" ) );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Added the constant 'WP_DEVELOPMENT_MODE' to the 'wp-config.php' file with the value 'theme'.
+string(5) "theme"
+bool(true)</code></pre>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Development mode is for development sites</h4>
+                    <p><code>WP_DEVELOPMENT_MODE</code> belongs in your local <code>wp-config.php</code> only. On a production site it makes every request rescan theme files; leave it out there, and when you deploy a theme with new patterns, raise its <code>Version</code> in <code>style.css</code> so the cache rebuilds (Lesson 8.4). Its other values are <code>core</code>, <code>plugin</code> and <code>all</code>.</p>
+                </div>
+            </section>
+
+            <section id="front-page" class="lesson-section">
+                <h2>🏠 A Front Page Built from Patterns</h2>
+                <p>Your template map from Lesson 3.1 noted "front-page if the shop wants one". It does. <code>front-page.html</code> sits at the top of the hierarchy for the site's front page, above <code>home</code> and <code>index</code>, whether the front page shows the latest posts (as yours does) or a static page. Templates use a pattern with the <strong>Pattern</strong> block, by slug. Create <code>templates/front-page.html</code>: the hero, then the news list from <code>index.html</code> with smaller headings.</p>
+                <pre data-file="wp-content/themes/pagesco/templates/front-page.html"><code class="language-html">&lt;!-- wp:template-part {"slug":"header","tagName":"header"} /--&gt;
+
+&lt;!-- wp:group {"tagName":"main","style":{"spacing":{"margin":{"top":"0"},"padding":{"bottom":"var:preset|spacing|large"}}},"layout":{"type":"constrained"}} --&gt;
+&lt;main class="wp-block-group" style="margin-top:0;padding-bottom:var(--wp--preset--spacing--large)"&gt;
+	&lt;!-- wp:pattern {"slug":"pagesco/hero"} /--&gt;
+
+	&lt;!-- wp:heading --&gt;
+	&lt;h2 class="wp-block-heading"&gt;News from the shop&lt;/h2&gt;
+	&lt;!-- /wp:heading --&gt;
+
+	&lt;!-- wp:query {"queryId":1,"query":{"inherit":true}} --&gt;
+	&lt;div class="wp-block-query"&gt;
+		&lt;!-- wp:post-template --&gt;
+			&lt;!-- wp:post-title {"isLink":true,"level":3} /--&gt;
+			&lt;!-- wp:post-date /--&gt;
+		&lt;!-- /wp:post-template --&gt;
+	&lt;/div&gt;
+	&lt;!-- /wp:query --&gt;
+&lt;/main&gt;
+&lt;!-- /wp:group --&gt;
+
+&lt;!-- wp:template-part {"slug":"footer","tagName":"footer"} /--&gt;</code></pre>
+                <p>The <code>main</code> group has <code>"margin":{"top":"0"}</code> so the hero meets the header without a gap. Because the front page shows the latest posts, the Query Loop's <code>"inherit":true</code> still lists them. Request the page and look at what the Pattern block became:</p>
+                <pre data-web="/" data-select="h1"><code class="language-text">http://localhost:8080/</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;h1 class="wp-block-heading"&gt;Good books, good company&lt;/h1&gt;</code></pre>
+                </div>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | grep -o 'wp:pattern\|&lt;img [^&gt;]*&gt;\|&lt;a class="wp-block-button__link[^&gt;]*&gt;'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;a class="wp-block-button__link wp-element-button" href="http://localhost:8080/events/"&gt;
+&lt;a class="wp-block-button__link wp-element-button" href="http://localhost:8080/about/"&gt;
+&lt;img src="http://localhost:8080/wp-content/themes/pagesco/assets/images/book-image.webp" alt="A hardcover book with a black-and-white photo on its cover" style="width:280px"/&gt;</code></pre>
+                </div>
+                <p>The Pattern block left no trace: WordPress included <code>hero.php</code>, ran its PHP and rendered the blocks it printed, so the visitor gets ordinary HTML with full URLs. The <code>wp:pattern</code> comment itself never reaches the browser.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Patterns in templates are expanded when someone edits the template</h4>
+                    <p>In a template file, <code>&lt;!-- wp:pattern {"slug":"pagesco/hero"} /--&gt;</code> is a reference: change <code>hero.php</code> and the front page follows. But the moment someone opens the template in the Site Editor, the editor replaces the reference with a copy of the pattern's blocks, and if they save, that copy (with the PHP already run) is what the database stores. You will see exactly that in the last teaching section, and why it matters when you bring edits back into code.</p>
+                </div>
+            </section>
+
+            <section id="synced" class="lesson-section">
+                <h2>🔁 Synced Patterns</h2>
+                <p>The About page (Lesson 2.1) lists the opening hours, and the shop wants them on the Contact page too. Two copies of a list will disagree the first time the hours change, so this is a job for a <strong>synced pattern</strong>: one <code>wp_block</code> post, shown wherever it is referenced. (Before WordPress 6.3 these were called "reusable blocks"; the post type kept its old name.)</p>
+                <p>In the editor you make one from existing blocks: open the About page, select the "Opening hours" heading and the list below it, open the block toolbar's <strong>⋮</strong> menu, choose <strong>Create pattern</strong>, name it "Opening hours", leave <strong>Synced</strong> switched on, and click <strong>Add</strong>. On the Contact page, insert it from the inserter's <strong>Patterns</strong> tab, under <strong>My patterns</strong>. Here is what those clicks store, done with WP-CLI so you can see each piece. First the pattern itself: a post whose content is the two blocks.</p>
+                <pre data-file="pagesco-content/opening-hours.html"><code class="language-html">&lt;!-- wp:heading --&gt;
+&lt;h2 class="wp-block-heading"&gt;Opening hours&lt;/h2&gt;
+&lt;!-- /wp:heading --&gt;
+
+&lt;!-- wp:list --&gt;
+&lt;ul class="wp-block-list"&gt;&lt;!-- wp:list-item --&gt;
+&lt;li&gt;Monday to Wednesday, Friday: 9 a.m. to 6 p.m.&lt;/li&gt;
+&lt;!-- /wp:list-item --&gt;
+
+&lt;!-- wp:list-item --&gt;
+&lt;li&gt;Thursday: 9 a.m. to 9 p.m.&lt;/li&gt;
+&lt;!-- /wp:list-item --&gt;
+
+&lt;!-- wp:list-item --&gt;
+&lt;li&gt;Saturday: 10 a.m. to 5 p.m.&lt;/li&gt;
+&lt;!-- /wp:list-item --&gt;&lt;/ul&gt;
+&lt;!-- /wp:list --&gt;</code></pre>
+                <pre data-cli><code class="language-bash">wp post create pagesco-content/opening-hours.html --post_type=wp_block --post_title="Opening hours" --post_status=publish --porcelain</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your ID will differ)</h4>
+                    <pre><code>20</code></pre>
+                </div>
+                <p><code>--porcelain</code> prints only the new ID. Everywhere the pattern appears, the page stores a self-closing <strong>Pattern</strong> reference, <code>&lt;!-- wp:block {"ref":ID} /--&gt;</code>, instead of the blocks. Here are the new About page (the heading and list replaced by the reference, as <strong>Create pattern</strong> does) and the Contact page with the reference added; use your own ID in both files:</p>
+                <pre data-file="pagesco-content/about.html"><code class="language-html">&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;Pages &amp;amp; Co. is an independent bookstore with a big reading corner, a small café and staff who love to talk about books.&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;
+
+&lt;!-- wp:block {"ref":20} /--&gt;
+
+&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;Questions about an order? See our Contact page.&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;</code></pre>
+                <pre data-file="pagesco-content/contact.html"><code class="language-html">&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;Visit us at 12 Market Street, call 555-0142, or write to &lt;a href="mailto:hello@example.com"&gt;hello@example.com&lt;/a&gt;.&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;
+
+&lt;!-- wp:block {"ref":20} /--&gt;</code></pre>
+                <pre data-cli><code class="language-bash">wp post update 12 pagesco-content/about.html
+wp post update 13 pagesco-content/contact.html
+curl -s http://localhost:8080/contact/ | grep -o '&lt;h2 class="wp-block-heading"&gt;[^&lt;]*\|&lt;li&gt;[^&lt;]*'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Updated post 12.
+Success: Updated post 13.
+&lt;h2 class="wp-block-heading"&gt;Opening hours
+&lt;li&gt;Monday to Wednesday, Friday: 9 a.m. to 6 p.m.
+&lt;li&gt;Thursday: 9 a.m. to 9 p.m.
+&lt;li&gt;Saturday: 10 a.m. to 5 p.m.</code></pre>
+                </div>
+                <p>Now the test that matters. The shop starts closing at 6 p.m. on Saturdays. Change the pattern once, in <strong>Appearance &gt; Editor &gt; Patterns</strong> (or, as here, in the file and with one command), and check both pages:</p>
+                <pre data-cli><code class="language-bash">sed -i 's/Saturday: 10 a.m. to 5 p.m./Saturday: 10 a.m. to 6 p.m./' pagesco-content/opening-hours.html
+wp post update 20 pagesco-content/opening-hours.html
+curl -s http://localhost:8080/about/ | grep -o 'Saturday: [^&lt;]*'
+curl -s http://localhost:8080/contact/ | grep -o 'Saturday: [^&lt;]*'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Updated post 20.
+Saturday: 10 a.m. to 6 p.m.
+Saturday: 10 a.m. to 6 p.m.</code></pre>
+                </div>
+                <p>One edit, two pages. Keep the <code>pagesco-content</code> folder for now (you delete it after Common Mistakes), and see what WordPress stores for a synced pattern compared with an <em>unsynced</em> one. When you switch <strong>Synced</strong> off in the <strong>Create pattern</strong> dialog, WordPress still saves a <code>wp_block</code> post, but marks it with the meta key <code>wp_pattern_sync_status</code> = <code>unsynced</code>; inserting it then copies the blocks, like a theme pattern. Your pattern has no such meta, which means synced:</p>
+                <pre data-cli><code class="language-bash">wp post meta list 20 --format=count</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>0</code></pre>
+                </div>
+                <div class="card card-success">
+                    <h4>✅ Synced patterns are content, not theme</h4>
+                    <p>A synced pattern lives in the database and is referenced by its post ID, which is different on every site. That is why themes do not ship synced patterns, and why you should never write <code>wp:block {"ref":…}</code> into a template file: on another site the ID points at nothing or at something else. Theme files use theme patterns (by slug) and template parts; synced patterns belong to the people who run the site.</p>
+                </div>
+            </section>
+
+            <section id="styles" class="lesson-section">
+                <h2>🎨 Section Styles and Style Variations</h2>
+                <p>Lesson 3.2 put all of the design system in one <code>theme.json</code>. Two kinds of extra JSON files in the theme's <code>styles/</code> folder build on it. Both use the same format as <code>theme.json</code>, and WordPress tells them apart by one key:</p>
+                <ul>
+                    <li>A file <strong>with</strong> <code>"blockTypes"</code> is a <strong>section style</strong> (a block style variation, WordPress 6.6 and later): a named look that editors apply to one Group or Columns block, changing the colors of everything inside it.</li>
+                    <li>A file <strong>without</strong> <code>"blockTypes"</code> is a <strong>style variation</strong>: an alternative <code>theme.json</code> for the whole site that the site owner can switch to in the Styles panel.</li>
+                </ul>
+
+                <h3>A section style: the sage band</h3>
+                <p>Create <code>styles/sections/section-sage.json</code> (the subfolder is only for order; WordPress reads every JSON file under <code>styles/</code>):</p>
+                <pre data-file="wp-content/themes/pagesco/styles/sections/section-sage.json"><code class="language-json">{
+	"$schema": "https://schemas.wp.org/wp/7.1/theme.json",
+	"version": 3,
+	"slug": "section-sage",
+	"title": "Sage band",
+	"blockTypes": [ "core/group", "core/columns" ],
+	"styles": {
+		"color": {
+			"background": "var:preset|color|sage",
+			"text": "var:preset|color|ink"
+		},
+		"elements": {
+			"link": { "color": { "text": "var:preset|color|ink" } }
+		}
+	}
+}</code></pre>
+                <p><code>slug</code> becomes the class <code>is-style-section-sage</code>; <code>title</code> is what editors see under the block's <strong>Styles</strong> in the sidebar; <code>blockTypes</code> lists the blocks it can be applied to; <code>styles</code> is a small <code>theme.json</code> <code>styles</code> section that applies only inside the block. Your hero already carries the class, so reload the front page and look for the CSS WordPress generated:</p>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | grep -o 'class="wp-block-group alignfull is-style-section-sage[^"]*"\|:root :where(.wp-block-group.is-style-section-sage--[0-9]*){[^}]*}'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>:root :where(.wp-block-group.is-style-section-sage--2){background-color: var(--wp--preset--color--sage);color: var(--wp--preset--color--ink);}
+class="wp-block-group alignfull is-style-section-sage has-global-padding is-layout-constrained wp-block-group-is-layout-constrained is-style-section-sage--2"</code></pre>
+                </div>
+                <p>WordPress gave this one Group an extra, numbered class (<code>is-style-section-sage--</code> plus a number that is unique on the page) and printed a rule only for it. The rule uses <code>:where()</code>, so it has the same low specificity as the theme's other styles (Lesson 3.2), and it points at the <code>sage</code> preset, not a hex value. The second section style, an ink-colored band, comes in the project.</p>
+
+                <h3>A style variation: Evening</h3>
+                <p>The shop wants a darker look for winter evenings. Because every template and part refers to presets, a variation that redefines the five colors is enough to recolor the whole site. Create <code>styles/evening.json</code>:</p>
+                <pre data-file="wp-content/themes/pagesco/styles/evening.json"><code class="language-json">{
+	"$schema": "https://schemas.wp.org/wp/7.1/theme.json",
+	"version": 3,
+	"title": "Evening",
+	"settings": {
+		"color": {
+			"palette": [
+				{ "slug": "paper", "name": "Paper", "color": "#1b2326" },
+				{ "slug": "ink", "name": "Ink", "color": "#f1ece0" },
+				{ "slug": "oxblood", "name": "Oxblood", "color": "#f0a99f" },
+				{ "slug": "sage", "name": "Sage", "color": "#2c3d36" },
+				{ "slug": "slate", "name": "Slate", "color": "#b4bec2" }
+			]
+		}
+	}
+}</code></pre>
+                <p>The slugs stay the same and keep their jobs ("paper" is still the page, "ink" the text); only the hex values change. The pale <code>ink</code> on dark <code>paper</code> is about 13.5:1, the light oxblood links about 8.3:1, so the contrast rules from Lesson 3.2 still hold.</p>
+                <div class="card card-info">
+                    <h4>💡 Name colors by their job</h4>
+                    <p>Twenty Twenty-Five names its colors <code>base</code>, <code>contrast</code> and <code>accent-1</code> to <code>accent-6</code> rather than "white" or "blue" for exactly this reason: in a dark variation, "white" would be a lie. The <code>pagesco</code> names are describing hues, but each one has a single job, so the Evening variation can redefine "paper" as dark without confusing anyone who reads the templates. For a theme you publish, role names are the safer choice.</p>
+                </div>
+                <p>Ask WordPress which variations the theme now offers, of each kind:</p>
+                <pre data-cli><code class="language-bash">wp eval 'foreach ( WP_Theme_JSON_Resolver::get_style_variations() as $v ) { echo "site: ", $v["title"], "\n"; } foreach ( WP_Theme_JSON_Resolver::get_style_variations( "block" ) as $v ) { echo "section: ", $v["title"], " (", implode( ", ", $v["blockTypes"] ), ")\n"; }'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>site: Evening
+section: Sage band (core/group, core/columns)</code></pre>
+                </div>
+                <p>Now open <strong>Appearance &gt; Editor &gt; Styles &gt; Browse styles</strong>. Because Evening only changes colors, the Site Editor lists it under <strong>Color Variations</strong>, next to <strong>Default</strong> (variations that change only typography are listed the same way; Twenty Twenty-Five keeps such partial files in <code>styles/colors/</code> and <code>styles/typography/</code>). Click Evening and the preview recolors:</p>
+                <figure>
+                    <img src="images/lesson_09_styles.png" alt="The Site Editor's Browse styles panel with two color variations, Default and Evening; the preview on the right shows the Pages and Co. front page in dark Evening colors with a light pink button." width="1100" height="825" loading="lazy">
+                    <figcaption>Browse styles: the Evening variation previewed on the front page.</figcaption>
+                </figure>
+                <p>Clicking <strong>Save</strong> there does not touch your files. It writes the chosen settings into the site's <strong>user global styles</strong>: one <code>wp_global_styles</code> post per theme (Lesson 3.1), the top layer of the three that WordPress merges (core, theme, user). The Site Editor saves it through the REST API. The script below sends the same request with the variation's palette, so you can see the result without clicking; save it as <code>wordpress/pagesco-choose-evening.php</code> and run it as admin (as a REST request it needs a user who may edit theme options):</p>
+                <pre data-file="pagesco-choose-evening.php" data-wp="admin"><code class="language-php">&lt;?php
+// The request the Site Editor sends when you choose Evening and click Save.
+$variation = wp_json_file_decode( get_theme_file_path( 'styles/evening.json' ), array( 'associative' =&gt; true ) );
+$id        = WP_Theme_JSON_Resolver::get_user_global_styles_post_id();
+
+$request = new WP_REST_Request( 'POST', '/wp/v2/global-styles/' . $id );
+$request-&gt;set_param( 'settings', array( 'color' =&gt; array( 'palette' =&gt; array( 'theme' =&gt; $variation['settings']['color']['palette'] ) ) ) );
+$response = rest_do_request( $request );
+
+echo $response-&gt;get_status(), ' ', get_post_field( 'post_content', $id ), "\n";</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>200 {"settings":{"color":{"palette":{"theme":[{"slug":"paper","name":"Paper","color":"#1b2326"},{"slug":"ink","name":"Ink","color":"#f1ece0"},{"slug":"oxblood","name":"Oxblood","color":"#f0a99f"},{"slug":"sage","name":"Sage","color":"#2c3d36"},{"slug":"slate","name":"Slate","color":"#b4bec2"}]}}},"isGlobalStylesUserThemeJSON":true,"version":3}</code></pre>
+                </div>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | grep -o -- '--wp--preset--color--paper: #[0-9a-f]*'
+wp post list --post_type=wp_global_styles --fields=ID,post_name</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your ID will differ)</h4>
+                    <pre><code>--wp--preset--color--paper: #1b2326
++----+--------------------------+
+| ID | post_name                |
++----+--------------------------+
+| 24 | wp-global-styles-pagesco |
++----+--------------------------+</code></pre>
+                </div>
+                <p>The page is now dark, and the choice lives in the database as post <code>wp-global-styles-pagesco</code>, not in your theme. That is the same situation as the template copy in Lesson 3.2's Common Mistakes, and it is fine as long as you know it. The shop decides to keep the light design for now, so reset it: in the Site Editor, <strong>Styles</strong>, the <strong>⋮</strong> menu, <strong>Reset styles</strong>; or delete the post with WP-CLI (the Site Editor creates a new, empty one the next time you open Styles). Then delete the script.</p>
+                <pre data-cli><code class="language-bash">wp post delete $(wp post list --post_type=wp_global_styles --field=ID) --force
+rm pagesco-choose-evening.php
+curl -s http://localhost:8080/ | grep -o -- '--wp--preset--color--paper: #[0-9a-f]*'</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your ID will differ)</h4>
+                    <pre><code>Success: Deleted post 24.
+--wp--preset--color--paper: #fbf8f1</code></pre>
+                </div>
+            </section>
+
+            <section id="fonts" class="lesson-section">
+                <h2>🔤 Web Fonts with fontFace</h2>
+                <p>In Lesson 3.2 you used system font stacks, which cost nothing to load. The shop now wants a bookish serif that looks the same on every device, so the theme will <strong>bundle</strong> a font: ship the font files inside the theme and describe them with <code>fontFace</code> in <code>theme.json</code>. WordPress then prints the <code>@font-face</code> rules itself, and visitors download the font from your site, not from a third-party server (better for privacy and for speed).</p>
+                <div class="card card-danger">
+                    <h4>🛑 Check the license before you ship a font</h4>
+                    <p>A font is software with a license, and a theme that bundles it redistributes it. Fonts under the <strong>SIL Open Font License (OFL) 1.1</strong> may be bundled with and redistributed in other software, including commercial themes, as long as the copyright notice and license travel with them and you do not sell the font on its own; the license text is usually stored inside the font file's metadata too. Most fonts on Google Fonts are OFL. A font you bought for print, or one from a font subscription, usually may <em>not</em> be redistributed in a theme. If you cannot confirm the license, keep a system stack.</p>
+                </div>
+                <p>The course uses <strong>Vollkorn</strong>, a serif designed for long reading. It is OFL 1.1, and you already have it: Twenty Twenty-Five bundles it, and its <code>readme.txt</code> records the license ("Copyright (c) 2005–2018, Friedrich Althausen", OFL 1.1). Copy the two variable font files (upright and italic, each covering weights 400 to 900):</p>
+                <pre data-cli><code class="language-bash">mkdir -p wp-content/themes/pagesco/assets/fonts/vollkorn
+cp wp-content/themes/twentytwentyfive/assets/fonts/vollkorn/*.woff2 wp-content/themes/pagesco/assets/fonts/vollkorn/
+ls wp-content/themes/pagesco/assets/fonts/vollkorn</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Vollkorn-Italic-VariableFont_wght.woff2  Vollkorn-VariableFont_wght.woff2</code></pre>
+                </div>
+                <p>Then give the theme a <code>readme.txt</code> that credits what it bundles, in the format the WordPress.org theme directory uses (Lesson 8.3 covers <code>readme.txt</code> in full). Create <code>wordpress/wp-content/themes/pagesco/readme.txt</code>:</p>
+                <pre data-file="wp-content/themes/pagesco/readme.txt"><code class="language-text">=== Pages &amp; Co. ===
+Requires at least: 6.6
+Tested up to: 7.1
+Requires PHP: 7.4
+License: GPLv2 or later
+License URI: http://www.gnu.org/licenses/gpl-2.0.html
+
+The block theme of the Pages &amp; Co. independent bookstore.
+
+== Copyright ==
+
+Pages &amp; Co. WordPress Theme, (C) Pages &amp; Co.
+Pages &amp; Co. is distributed under the terms of the GNU GPL.
+
+This theme bundles the following third-party resources:
+
+Vollkorn Font
+Copyright (c) 2005-2018, Friedrich Althausen
+License: SIL Open Font License, 1.1, https://opensource.org/licenses/OFL-1.1
+Source: https://fonts.google.com/specimen/Vollkorn
+
+Image: assets/images/book-image.webp (from Twenty Twenty-Five)
+Book template by Beatriz Fialho, public domain; photo "Bust" by Mathew Brady, public domain (CC0)
+License: CC0, https://creativecommons.org/publicdomain/zero/1.0/
+Source: https://www.rawpixel.com/image/8799536</code></pre>
+                <p>Now the <code>theme.json</code> change. Only the <code>serif</code> entry in <code>settings.typography.fontFamilies</code> changes: Vollkorn goes first in its stack (the old stack stays as the fallback while the font loads), and a <code>fontFace</code> array describes the two files. <code>file:./</code> means "relative to the theme folder".</p>
+                <pre><code class="language-json">{
+	"slug": "serif",
+	"name": "Serif",
+	"fontFamily": "Vollkorn, Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif",
+	"fontFace": [
+		{
+			"fontFamily": "Vollkorn",
+			"fontStyle": "normal",
+			"fontWeight": "400 900",
+			"src": [ "file:./assets/fonts/vollkorn/Vollkorn-VariableFont_wght.woff2" ]
+		},
+		{
+			"fontFamily": "Vollkorn",
+			"fontStyle": "italic",
+			"fontWeight": "400 900",
+			"src": [ "file:./assets/fonts/vollkorn/Vollkorn-Italic-VariableFont_wght.woff2" ]
+		}
+	]
+},</code></pre>
+                <details>
+                    <summary>The complete theme.json with the change (copy this if you prefer to replace the whole file)</summary>
+                    <pre data-file="wp-content/themes/pagesco/theme.json"><code class="language-json">{
+	"$schema": "https://schemas.wp.org/wp/7.1/theme.json",
+	"version": 3,
+	"settings": {
+		"appearanceTools": true,
+		"color": {
+			"defaultPalette": false,
+			"defaultGradients": false,
+			"defaultDuotone": false,
+			"palette": [
+				{ "slug": "paper", "name": "Paper", "color": "#fbf8f1" },
+				{ "slug": "ink", "name": "Ink", "color": "#1f2a2e" },
+				{ "slug": "oxblood", "name": "Oxblood", "color": "#7a2e2e" },
+				{ "slug": "sage", "name": "Sage", "color": "#e3eadf" },
+				{ "slug": "slate", "name": "Slate", "color": "#56636a" }
+			]
+		},
+		"layout": {
+			"contentSize": "680px",
+			"wideSize": "1180px"
+		},
+		"spacing": {
+			"defaultSpacingSizes": false,
+			"spacingSizes": [
+				{ "slug": "small", "name": "Small", "size": "1rem" },
+				{ "slug": "medium", "name": "Medium", "size": "clamp(1.5rem, 4vw, 2.5rem)" },
+				{ "slug": "large", "name": "Large", "size": "clamp(2.5rem, 8vw, 5rem)" }
+			]
+		},
+		"typography": {
+			"defaultFontSizes": false,
+			"fluid": true,
+			"fontFamilies": [
+				{
+					"slug": "serif",
+					"name": "Serif",
+					"fontFamily": "Vollkorn, Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif",
+					"fontFace": [
+						{
+							"fontFamily": "Vollkorn",
+							"fontStyle": "normal",
+							"fontWeight": "400 900",
+							"src": [ "file:./assets/fonts/vollkorn/Vollkorn-VariableFont_wght.woff2" ]
+						},
+						{
+							"fontFamily": "Vollkorn",
+							"fontStyle": "italic",
+							"fontWeight": "400 900",
+							"src": [ "file:./assets/fonts/vollkorn/Vollkorn-Italic-VariableFont_wght.woff2" ]
+						}
+					]
+				},
+				{ "slug": "sans", "name": "Sans", "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" }
+			],
+			"fontSizes": [
+				{ "slug": "small", "name": "Small", "size": "0.9rem", "fluid": false },
+				{ "slug": "medium", "name": "Medium", "size": "1.125rem", "fluid": false },
+				{ "slug": "large", "name": "Large", "size": "1.75rem", "fluid": { "min": "1.4rem", "max": "1.75rem" } },
+				{ "slug": "x-large", "name": "Extra Large", "size": "2.75rem", "fluid": { "min": "2rem", "max": "2.75rem" } }
+			]
+		},
+		"useRootPaddingAwareAlignments": true
+	},
+	"styles": {
+		"color": {
+			"background": "var:preset|color|paper",
+			"text": "var:preset|color|ink"
+		},
+		"spacing": {
+			"blockGap": "1.25rem",
+			"padding": {
+				"left": "var:preset|spacing|small",
+				"right": "var:preset|spacing|small"
+			}
+		},
+		"typography": {
+			"fontFamily": "var:preset|font-family|serif",
+			"fontSize": "var:preset|font-size|medium",
+			"lineHeight": "1.6"
+		},
+		"elements": {
+			"link": {
+				"color": { "text": "var:preset|color|oxblood" },
+				":hover": { "typography": { "textDecoration": "none" } }
+			},
+			"heading": {
+				"typography": {
+					"fontFamily": "var:preset|font-family|sans",
+					"fontWeight": "700",
+					"lineHeight": "1.2"
+				}
+			},
+			"h1": { "typography": { "fontSize": "var:preset|font-size|x-large" } },
+			"h2": { "typography": { "fontSize": "var:preset|font-size|large" } },
+			"button": {
+				"color": {
+					"background": "var:preset|color|oxblood",
+					"text": "var:preset|color|paper"
+				}
+			}
+		},
+		"blocks": {
+			"core/site-title": {
+				"typography": {
+					"fontFamily": "var:preset|font-family|sans",
+					"fontSize": "var:preset|font-size|large",
+					"fontWeight": "700"
+				},
+				"elements": {
+					"link": { "color": { "text": "var:preset|color|ink" } }
+				}
+			},
+			"core/post-date": {
+				"color": { "text": "var:preset|color|slate" },
+				"typography": { "fontSize": "var:preset|font-size|small" }
+			}
+		},
+		"css": ".pagesco-notice { background: var(--wp--preset--color--ink); color: var(--wp--preset--color--paper); font-family: var(--wp--preset--font-family--sans); font-size: var(--wp--preset--font-size--small); padding: 0.5rem 1rem; text-align: center; } .pagesco-notice a { color: inherit; }"
+	},
+	"templateParts": [
+		{ "name": "header", "title": "Header", "area": "header" },
+		{ "name": "footer", "title": "Footer", "area": "footer" }
+	]
+}</code></pre>
+                </details>
+                <p>The slug is still <code>serif</code>, so every style that uses <code>var:preset|font-family|serif</code> switches to Vollkorn without another change: the style guide at work again. Look at what WordPress prints in the page's <code>&lt;head&gt;</code>, and check that the font URL really answers:</p>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | grep -A 3 'wp-fonts-local'
+curl -s -o /dev/null -w '%{http_code} %{content_type}\n' http://localhost:8080/wp-content/themes/pagesco/assets/fonts/vollkorn/Vollkorn-VariableFont_wght.woff2</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;style class="wp-fonts-local"&gt;
+@font-face{font-family:Vollkorn;font-style:normal;font-weight:400 900;font-display:fallback;src:url('http://localhost:8080/wp-content/themes/pagesco/assets/fonts/vollkorn/Vollkorn-VariableFont_wght.woff2') format('woff2');}
+@font-face{font-family:Vollkorn;font-style:italic;font-weight:400 900;font-display:fallback;src:url('http://localhost:8080/wp-content/themes/pagesco/assets/fonts/vollkorn/Vollkorn-Italic-VariableFont_wght.woff2') format('woff2');}
+&lt;/style&gt;
+200 font/woff2</code></pre>
+                </div>
+                <p>One <code>@font-face</code> rule per entry, with the full URL resolved from <code>file:./</code>, and <code>font-display:fallback</code> added by WordPress (the browser shows the fallback font briefly instead of invisible text). <strong>Appearance &gt; Fonts</strong> now lists, under <strong>Theme</strong>, the font families by their preset names: Sans (1 of 1 active) and Serif (2 of 2 active, the two Vollkorn files). Fonts that a site owner installs there instead are stored in <code>wp-content/fonts/</code> and as <code>wp_font_family</code> posts: site content again, not part of your theme.</p>
+            </section>
+
+            <section id="export" class="lesson-section">
+                <h2>📤 From the Site Editor Back to Code</h2>
+                <p>Here is the situation every block-theme developer meets. The shop manager opens the front page in the Site Editor, adds "Open late on Thursdays." to the hero text, and clicks Save. As the tip in the front-page section warned, the editor expanded the patterns before saving. This script sends the same request the Site Editor does (save it as <code>wordpress/pagesco-manager-edit.php</code> and run it as admin), so you can follow along without clicking; in your own browser you can make the edit by hand instead.</p>
+                <pre data-file="pagesco-manager-edit.php" data-wp="admin"><code class="language-php">&lt;?php
+// What the Site Editor saves: the template with every Pattern block expanded, plus the manager's edit.
+$template = get_block_template( 'pagesco//front-page' );
+$blocks   = resolve_pattern_blocks( parse_blocks( $template-&gt;content ) );
+$content  = str_replace( 'talk about books.', 'talk about books. Open late on Thursdays.', serialize_blocks( $blocks ) );
+
+$request = new WP_REST_Request( 'POST', '/wp/v2/templates/pagesco//front-page' );
+$request-&gt;set_param( 'content', $content );
+$response = rest_do_request( $request );
+
+echo $response-&gt;get_status(), ' ', $response-&gt;get_data()['source'], "\n";</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>200 custom</code></pre>
+                </div>
+                <p>The template's source is now <code>custom</code>: a database copy that wins over <code>templates/front-page.html</code> (Lesson 3.2). Look inside it:</p>
+                <pre data-cli><code class="language-bash">wp post list --post_type=wp_template --fields=ID,post_name
+wp post get $(wp post list --post_type=wp_template --field=ID) --field=post_content | grep -o 'wp:pattern\|"patternName":"[a-z/-]*"\|src="[^"]*"\|Open late on Thursdays.'</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your ID will differ)</h4>
+                    <pre><code>+----+------------+
+| ID | post_name  |
++----+------------+
+| 26 | front-page |
++----+------------+
+"patternName":"pagesco/hero"
+Open late on Thursdays.
+src="http://localhost:8080/wp-content/themes/pagesco/assets/images/book-image.webp"</code></pre>
+                </div>
+                <p>Read that carefully. No <code>wp:pattern</code> reference is left: the hero's blocks are copied in, with a <code>patternName</code> note in their metadata recording where they came from. The image URL is now <strong>hard-coded</strong> to <code>http://localhost:8080</code>, and the translatable strings are frozen in English, because the PHP ran before the save. If you simply copied this template over your file, you would lose all three benefits of the pattern file.</p>
+
+                <div class="mermaid">
+graph TD
+    A["patterns/hero.php"] -->|"used by slug"| B["front-page.html"]
+    B -->|"edited in Site Editor"| C["patterns expanded"]
+    C -->|"Save"| D["wp_template copy"]
+    D -->|"Export or wp post get"| E["the change, found"]
+    E -->|"moved into hero.php"| F["copy reset: file rules"]
+                </div>
+
+                <h3>Two ways to get the changes out</h3>
+                <p><strong>Export</strong> downloads the whole theme with the database changes merged in. In the Site Editor, open a template, click the <strong>⋮</strong> Options menu in the top bar and choose <strong>Export</strong> ("Download your theme with updated templates and styles."). You get <code>pagesco.zip</code>; unzip it somewhere outside <code>wordpress/</code> and compare it with your theme folder before copying anything. The Export button calls the core function <code>wp_generate_block_templates_export_file()</code>, so you can produce the same zip from the WP-CLI container and inspect it:</p>
+                <pre data-cli><code class="language-bash">zip=$(wp eval 'echo wp_generate_block_templates_export_file();')
+rm -rf /tmp/pagesco-export &amp;&amp; mkdir /tmp/pagesco-export &amp;&amp; unzip -q "$zip" -d /tmp/pagesco-export &amp;&amp; rm "$zip"
+cd /tmp/pagesco-export
+find . -type f | sort
+grep -c 'wp:pattern' templates/front-page.html
+head -n 5 theme.json</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>./assets/fonts/vollkorn/Vollkorn-Italic-VariableFont_wght.woff2
+./assets/fonts/vollkorn/Vollkorn-VariableFont_wght.woff2
+./assets/images/book-image.webp
+./parts/footer.html
+./parts/header.html
+./patterns/hero.php
+./readme.txt
+./style.css
+./styles/evening.json
+./styles/sections/section-sage.json
+./templates/404.html
+./templates/archive.html
+./templates/front-page.html
+./templates/index.html
+./templates/page.html
+./templates/search.html
+./templates/single.html
+./theme.json
+0
+{
+	"$schema": "https://schemas.wp.org/wp/7.1/theme.json",
+	"settings": {
+		"appearanceTools": true,
+		"color": {</code></pre>
+                </div>
+                <p>Every file of the theme is there, and every template too, whether it came from a file or the database. Two warnings in that output: <code>templates/front-page.html</code> has no Pattern references left (<code>0</code>), and <code>theme.json</code> was <em>regenerated</em> from WordPress's merged data, with keys reordered and every entry expanded over several lines. Export is a great way to <em>see</em> everything the Site Editor changed; it is not a file to paste over your work. The official free <strong>Create Block Theme</strong> plugin goes further ("Save Changes to Theme" writes edits straight into the theme folder) and is worth knowing; it has the same pattern-expansion caveat.</p>
+                <p><strong>WP-CLI</strong> is the precise way for one template: read the copy, move the change to where it belongs, then remove the copy. Here the change belongs in the hero pattern, not in the template:</p>
+                <pre data-cli><code class="language-bash">sed -i "s/talk about books.', 'pagesco'/talk about books. Open late on Thursdays.', 'pagesco'/" wp-content/themes/pagesco/patterns/hero.php
+grep -o 'talk about books[^,]*' wp-content/themes/pagesco/patterns/hero.php
+wp post delete $(wp post list --post_type=wp_template --field=ID) --force
+rm -rf /tmp/pagesco-export pagesco-manager-edit.php
+curl -s http://localhost:8080/ | grep -o 'talk about books[^&lt;]*'</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your ID will differ)</h4>
+                    <pre><code>talk about books. Open late on Thursdays.'
+Success: Deleted post 26.
+talk about books. Open late on Thursdays.</code></pre>
+                </div>
+                <p>The front page is drawn from your file again, the manager's sentence is in the pattern where it is translatable, and the image URL is built by PHP again. In the Site Editor the same reset is <strong>Templates</strong>, the template's <strong>⋮</strong> menu, <strong>Reset</strong>. Make this loop a habit: whenever <code>wp post list --post_type=wp_template,wp_template_part,wp_global_styles</code> shows something, decide for each item whether it moves into code or stays as the owner's customization.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <p>All three of these fail quietly for visitors. Make each one on purpose, then fix it.</p>
+
+                <h3>1. A pattern file without a Slug</h3>
+                <p>You start a "Visit us" pattern and forget the <code>Slug</code> line:</p>
+                <pre data-file="wp-content/themes/pagesco/patterns/visit-us.php"><code class="language-php">&lt;?php
+/**
+ * Title: Visit us
+ * Categories: contact
+ *
+ * @package pagesco
+ */
+
+?&gt;
+&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;&lt;?php esc_html_e( 'Visit us at 12 Market Street.', 'pagesco' ); ?&gt;&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;</code></pre>
+                <pre data-web="/about/" data-select="body" data-text data-raises="doing_it_wrong"><code class="language-text">http://localhost:8080/about/   (the visible text)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Free shipping on orders over $35. Open until 9 p.m. on Thursdays. See events
+Skip to content
+Pages &amp; Co.
+About Us
+Contact
+Events
+Sample Page
+About Us
+Pages &amp; Co. is an independent bookstore with a big reading corner, a small café and staff who love to talk about books.
+Opening hours
+Monday to Wednesday, Friday: 9 a.m. to 6 p.m.
+Thursday: 9 a.m. to 9 p.m.
+Saturday: 10 a.m. to 6 p.m.
+Questions about an order? See our Contact page.
+Pages &amp; Co. · 12 Market Street · 555-0142
+Open Monday to Saturday · hello@example.com
+Notice: Function get_block_patterns was called incorrectly. Could not register file "/var/www/html/wp-content/themes/pagesco/patterns/visit-us.php" as a block pattern ("Slug" field missing) Please see Debugging in WordPress for more information. (This message was added in version 6.0.0.) in /var/www/html/wp-includes/functions.php on line 6260</code></pre>
+                </div>
+                <p><strong>What it means:</strong> WordPress skipped the file: "Could not register file … as a block pattern ("Slug" field missing)". It is a <code>_doing_it_wrong()</code> notice (the function name in it is the one that read the file), so it appears only with <code>WP_DEBUG</code> on, at the top of every page and in <code>debug.log</code>. Without development mode you might not see it at all: the file list is cached, so the notice appears once and the pattern is simply missing from then on. <strong>Fix:</strong> add <code>Slug: pagesco/visit-us</code>. A slug may only contain letters, digits, <code>/</code>, <code>_</code> and <code>-</code>. You do not need this pattern, so delete it:</p>
+                <pre data-cli><code class="language-bash">rm wp-content/themes/pagesco/patterns/visit-us.php</code></pre>
+
+                <h3>2. A font path with a typo</h3>
+                <p>Font folders have long names, and one missing letter is easy. Simulate it by renaming the folder:</p>
+                <pre data-cli><code class="language-bash">mv wp-content/themes/pagesco/assets/fonts/vollkorn wp-content/themes/pagesco/assets/fonts/volkorn
+curl -s http://localhost:8080/ | grep -c 'Vollkorn-VariableFont_wght.woff2'
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/wp-content/themes/pagesco/assets/fonts/vollkorn/Vollkorn-VariableFont_wght.woff2</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>1
+404</code></pre>
+                </div>
+                <p><strong>What it means:</strong> WordPress builds the <code>@font-face</code> URL from <code>theme.json</code> without checking that the file exists, so the page still announces the font, and the browser's request for it gets a 404. Visitors silently see the fallback serif. No PHP message, nothing in <code>debug.log</code>. <strong>Fix:</strong> open the browser's developer tools, Network tab, filter by "Font": a red 404 there points straight at the wrong path. Put the folder name back:</p>
+                <pre data-cli><code class="language-bash">mv wp-content/themes/pagesco/assets/fonts/volkorn wp-content/themes/pagesco/assets/fonts/vollkorn
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/wp-content/themes/pagesco/assets/fonts/vollkorn/Vollkorn-VariableFont_wght.woff2</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>200</code></pre>
+                </div>
+
+                <h3>3. Deleting a synced pattern that pages still use</h3>
+                <p>Tidying up <strong>Appearance &gt; Editor &gt; Patterns</strong>, someone opens the "Opening hours" card's actions menu, chooses <strong>Delete</strong> and confirms. That deletes the <code>wp_block</code> post permanently (it does not go to the trash), exactly like this command:</p>
+                <pre data-cli data-exit="1"><code class="language-bash">wp post delete 20 --force
+curl -s http://localhost:8080/about/ | grep -c 'Thursday: 9 a.m.'
+curl -s http://localhost:8080/contact/ | grep -c 'Thursday: 9 a.m.'</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your ID will differ)</h4>
+                    <pre><code>Success: Deleted post 20.
+0
+0</code></pre>
+                </div>
+                <p><strong>What it means:</strong> both pages still contain <code>&lt;!-- wp:block {"ref":20} /--&gt;</code>, and the block renders a published <code>wp_block</code> or nothing at all. So the hours vanished from every page that used them, with no message for visitors and nothing in <code>debug.log</code>. (<code>grep -c</code> found nothing and exited with status 1.) Creating a new "Opening hours" pattern does not help: it gets a new ID, and the pages point at the old one. <strong>Fix:</strong> recreate the pattern <em>with its old ID</em> from a copy. The Patterns screen's <strong>Export as JSON</strong> action and your database backups (Lesson 8.4) are such copies; here you have the block markup in <code>pagesco-content/</code>. <code>wp post create</code> passes <code>--import_id</code> to <code>wp_insert_post()</code>, which uses that ID if it is free:</p>
+                <pre data-cli><code class="language-bash">wp post create pagesco-content/opening-hours.html --post_type=wp_block --post_title="Opening hours" --post_status=publish --import_id=20 --porcelain
+curl -s http://localhost:8080/contact/ | grep -c 'Thursday: 9 a.m.'
+rm -r pagesco-content</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your ID will differ)</h4>
+                    <pre><code>20
+1</code></pre>
+                </div>
+                <p>Better still, prevent it: before deleting a synced pattern, find the pages that use it (Exercise 3 shows how), and on each one either remove it or choose <strong>Detach</strong> in the block toolbar, which turns the reference back into ordinary blocks.</p>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: The Pages &amp; Co. Front Page</h2>
+                <p>You have a hero pattern, one section style, the Evening variation, the web font and the synced opening hours. Now finish the front page: a featured-books row, an ink-colored call to action with its own section style, the final template, a theme screenshot, and a check of the whole site. Allow about 45 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: The featured-books pattern <span class="step-time">(12 min)</span></h3>
+                    <p>The shop wants three staff picks on the front page. The books are not WordPress content yet (the Book post type arrives in Lesson 5.2, and Module 6 builds blocks that show real book data), so this pattern holds them in a PHP array and loops over it. That is another reason patterns are PHP: you can generate repetitive markup instead of copying it. Create <code>patterns/featured-books.php</code>:</p>
+                    <pre data-file="wp-content/themes/pagesco/patterns/featured-books.php"><code class="language-php">&lt;?php
+/**
+ * Title: Featured books: staff picks
+ * Slug: pagesco/featured-books
+ * Categories: featured
+ * Keywords: books, staff picks, featured
+ * Description: Three featured books in a row, with title, author and price.
+ * Viewport Width: 1200
+ *
+ * @package pagesco
+ */
+
+$pagesco_picks = array(
+	array(
+		'title'  =&gt; 'Dune',
+		'author' =&gt; 'Frank Herbert',
+		'price'  =&gt; 14.99,
+	),
+	array(
+		'title'  =&gt; 'The Hobbit',
+		'author' =&gt; 'J.R.R. Tolkien',
+		'price'  =&gt; 10.99,
+	),
+	array(
+		'title'  =&gt; 'Fahrenheit 451',
+		'author' =&gt; 'Ray Bradbury',
+		'price'  =&gt; 10.49,
+	),
+);
+?&gt;
+&lt;!-- wp:group {"align":"wide","style":{"spacing":{"padding":{"top":"var:preset|spacing|medium","bottom":"var:preset|spacing|medium"}}}} --&gt;
+&lt;div class="wp-block-group alignwide" style="padding-top:var(--wp--preset--spacing--medium);padding-bottom:var(--wp--preset--spacing--medium)"&gt;
+	&lt;!-- wp:heading --&gt;
+	&lt;h2 class="wp-block-heading"&gt;&lt;?php esc_html_e( 'Staff picks', 'pagesco' ); ?&gt;&lt;/h2&gt;
+	&lt;!-- /wp:heading --&gt;
+
+	&lt;!-- wp:columns --&gt;
+	&lt;div class="wp-block-columns"&gt;
+		&lt;?php foreach ( $pagesco_picks as $pagesco_book ) : ?&gt;
+		&lt;!-- wp:column --&gt;
+		&lt;div class="wp-block-column"&gt;
+			&lt;!-- wp:heading {"level":3} --&gt;
+			&lt;h3 class="wp-block-heading"&gt;&lt;?php echo esc_html( $pagesco_book['title'] ); ?&gt;&lt;/h3&gt;
+			&lt;!-- /wp:heading --&gt;
+
+			&lt;!-- wp:paragraph --&gt;
+			&lt;p&gt;&lt;?php /* translators: %s: author name. */ printf( esc_html__( 'by %s', 'pagesco' ), esc_html( $pagesco_book['author'] ) ); ?&gt;&lt;/p&gt;
+			&lt;!-- /wp:paragraph --&gt;
+
+			&lt;!-- wp:paragraph {"fontSize":"small"} --&gt;
+			&lt;p class="has-small-font-size"&gt;&lt;?php echo esc_html( '$' . number_format_i18n( $pagesco_book['price'], 2 ) ); ?&gt;&lt;/p&gt;
+			&lt;!-- /wp:paragraph --&gt;
+		&lt;/div&gt;
+		&lt;!-- /wp:column --&gt;
+		&lt;?php endforeach; ?&gt;
+	&lt;/div&gt;
+	&lt;!-- /wp:columns --&gt;
+&lt;/div&gt;
+&lt;!-- /wp:group --&gt;</code></pre>
+                    <p>Variables in a pattern file run inside a WordPress function, but give them your prefix anyway (<code>$pagesco_picks</code>): coding-standard checks cannot tell they are local, and a prefix never hurts. The price is formatted with <code>number_format_i18n()</code> so a French site would print 14,99, and the <code>/* translators: */</code> comment explains the <code>%s</code> to translators (Lesson 1.3). Check that WordPress registered it and runs the loop:</p>
+                    <pre data-cli><code class="language-bash">wp eval '$p = WP_Block_Patterns_Registry::get_instance()-&gt;get_registered( "pagesco/featured-books" ); echo $p["title"], " | ", implode( ", ", $p["categories"] ), "\n";'
+wp eval 'echo WP_Block_Patterns_Registry::get_instance()-&gt;get_registered( "pagesco/featured-books" )["content"];' | grep -o '&lt;h3[^&gt;]*&gt;[^&lt;]*\|&lt;p&gt;by [^&lt;]*\|\$[0-9.]*'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Featured books: staff picks | featured
+&lt;h3 class="wp-block-heading"&gt;Dune
+&lt;p&gt;by Frank Herbert
+$14.99
+&lt;h3 class="wp-block-heading"&gt;The Hobbit
+&lt;p&gt;by J.R.R. Tolkien
+$10.99
+&lt;h3 class="wp-block-heading"&gt;Fahrenheit 451
+&lt;p&gt;by Ray Bradbury
+$10.49</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: The ink band and the call to action <span class="step-time">(10 min)</span></h3>
+                    <p>A second section style, the reverse of the page: ink background, paper text, and paper buttons with ink text so the button stays visible on the dark band. Create <code>styles/sections/section-ink.json</code>:</p>
+                    <pre data-file="wp-content/themes/pagesco/styles/sections/section-ink.json"><code class="language-json">{
+	"$schema": "https://schemas.wp.org/wp/7.1/theme.json",
+	"version": 3,
+	"slug": "section-ink",
+	"title": "Ink band",
+	"blockTypes": [ "core/group", "core/columns" ],
+	"styles": {
+		"color": {
+			"background": "var:preset|color|ink",
+			"text": "var:preset|color|paper"
+		},
+		"elements": {
+			"heading": { "color": { "text": "var:preset|color|paper" } },
+			"link": { "color": { "text": "var:preset|color|paper" } },
+			"button": {
+				"color": {
+					"background": "var:preset|color|paper",
+					"text": "var:preset|color|ink"
+				}
+			}
+		}
+	}
+}</code></pre>
+                    <p>Section styles can set <code>elements</code> (links, headings, buttons) just like <code>theme.json</code>; here headings need their own color, because <code>styles.elements.heading</code> in <code>theme.json</code> would otherwise not reach them. Then the call to action that uses it, <code>patterns/call-to-action.php</code>:</p>
+                    <pre data-file="wp-content/themes/pagesco/patterns/call-to-action.php"><code class="language-php">&lt;?php
+/**
+ * Title: Call to action: book club
+ * Slug: pagesco/call-to-action
+ * Categories: call-to-action
+ * Keywords: book club, events, join
+ * Description: An ink-colored band inviting readers to the Thursday book club.
+ * Viewport Width: 1200
+ *
+ * @package pagesco
+ */
+
+?&gt;
+&lt;!-- wp:group {"align":"full","className":"is-style-section-ink","style":{"spacing":{"padding":{"top":"var:preset|spacing|medium","bottom":"var:preset|spacing|medium"}}},"layout":{"type":"constrained"}} --&gt;
+&lt;div class="wp-block-group alignfull is-style-section-ink" style="padding-top:var(--wp--preset--spacing--medium);padding-bottom:var(--wp--preset--spacing--medium)"&gt;
+	&lt;!-- wp:heading --&gt;
+	&lt;h2 class="wp-block-heading"&gt;&lt;?php esc_html_e( 'Join the Thursday book club', 'pagesco' ); ?&gt;&lt;/h2&gt;
+	&lt;!-- /wp:heading --&gt;
+
+	&lt;!-- wp:paragraph --&gt;
+	&lt;p&gt;&lt;?php esc_html_e( 'We meet at 7 p.m. in the reading corner. Everyone is welcome, and the first coffee is on us.', 'pagesco' ); ?&gt;&lt;/p&gt;
+	&lt;!-- /wp:paragraph --&gt;
+
+	&lt;!-- wp:buttons --&gt;
+	&lt;div class="wp-block-buttons"&gt;
+		&lt;!-- wp:button --&gt;
+		&lt;div class="wp-block-button"&gt;&lt;a class="wp-block-button__link wp-element-button" href="&lt;?php echo esc_url( home_url( '/events/' ) ); ?&gt;"&gt;&lt;?php esc_html_e( 'See all events', 'pagesco' ); ?&gt;&lt;/a&gt;&lt;/div&gt;
+		&lt;!-- /wp:button --&gt;
+	&lt;/div&gt;
+	&lt;!-- /wp:buttons --&gt;
+&lt;/div&gt;
+&lt;!-- /wp:group --&gt;</code></pre>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: The finished front page <span class="step-time">(8 min)</span></h3>
+                    <p>Replace <code>templates/front-page.html</code>: hero, staff picks, call to action, then the news.</p>
+                    <pre data-file="wp-content/themes/pagesco/templates/front-page.html"><code class="language-html">&lt;!-- wp:template-part {"slug":"header","tagName":"header"} /--&gt;
+
+&lt;!-- wp:group {"tagName":"main","style":{"spacing":{"margin":{"top":"0"},"padding":{"bottom":"var:preset|spacing|large"}}},"layout":{"type":"constrained"}} --&gt;
+&lt;main class="wp-block-group" style="margin-top:0;padding-bottom:var(--wp--preset--spacing--large)"&gt;
+	&lt;!-- wp:pattern {"slug":"pagesco/hero"} /--&gt;
+
+	&lt;!-- wp:pattern {"slug":"pagesco/featured-books"} /--&gt;
+
+	&lt;!-- wp:pattern {"slug":"pagesco/call-to-action"} /--&gt;
+
+	&lt;!-- wp:heading --&gt;
+	&lt;h2 class="wp-block-heading"&gt;News from the shop&lt;/h2&gt;
+	&lt;!-- /wp:heading --&gt;
+
+	&lt;!-- wp:query {"queryId":1,"query":{"inherit":true}} --&gt;
+	&lt;div class="wp-block-query"&gt;
+		&lt;!-- wp:post-template --&gt;
+			&lt;!-- wp:post-title {"isLink":true,"level":3} /--&gt;
+			&lt;!-- wp:post-date /--&gt;
+		&lt;!-- /wp:post-template --&gt;
+	&lt;/div&gt;
+	&lt;!-- /wp:query --&gt;
+&lt;/main&gt;
+&lt;!-- /wp:group --&gt;
+
+&lt;!-- wp:template-part {"slug":"footer","tagName":"footer"} /--&gt;</code></pre>
+                    <p>Check the order of the sections, and that the ink band got its own generated rule:</p>
+                    <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | grep -o '&lt;h[123] class="wp-block-heading"&gt;[^&lt;]*'
+curl -s http://localhost:8080/ | grep -o ':root :where(.wp-block-group.is-style-section-ink--[0-9]*){[^}]*}'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;h1 class="wp-block-heading"&gt;Good books, good company
+&lt;h2 class="wp-block-heading"&gt;Staff picks
+&lt;h3 class="wp-block-heading"&gt;Dune
+&lt;h3 class="wp-block-heading"&gt;The Hobbit
+&lt;h3 class="wp-block-heading"&gt;Fahrenheit 451
+&lt;h2 class="wp-block-heading"&gt;Join the Thursday book club
+&lt;h2 class="wp-block-heading"&gt;News from the shop
+:root :where(.wp-block-group.is-style-section-ink--4){background-color: var(--wp--preset--color--ink);color: var(--wp--preset--color--paper);}</code></pre>
+                    </div>
+                    <p>The front page now looks like this:</p>
+                    <figure>
+                        <img src="images/lesson_09_front.png" alt="The finished Pages and Co. front page: a sage hero with the heading Good books, good company, two buttons and a book image; a Staff picks row with Dune, The Hobbit and Fahrenheit 451 and their prices; a dark ink band inviting readers to the Thursday book club; and the news list." width="1085" height="1886" loading="lazy">
+                        <figcaption>The <code>pagesco</code> front page, built from three patterns, in the Vollkorn font.</figcaption>
+                    </figure>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 4: A screenshot and a final check <span class="step-time">(15 min)</span></h3>
+                    <p>The Themes screen shows <code>screenshot.png</code> from the theme folder; the recommended size is 1200 × 900 pixels. Take it yourself: open <code>http://localhost:8080/</code> in Chrome or Edge, open the developer tools, switch on the device toolbar, type 1200 and 900 as the size, then choose <strong>Capture screenshot</strong> from the device toolbar's <strong>⋮</strong> menu. Save the file as <code>wordpress/wp-content/themes/pagesco/screenshot.png</code> and check that WordPress finds it:</p>
+                    <pre data-norun><code class="language-bash">wp theme get pagesco --field=screenshot</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>screenshot.png</code></pre>
+                    </div>
+                    <p>(This command is not run by the course's automatic checks, because they have no screenshot you took; on your site it prints the file name, and an empty line if the file is missing.) Now check the whole theme. First the patterns and styles WordPress found, then every row of your template map from Lessons 3.1 and 3.2, the front page included:</p>
+                    <pre data-cli><code class="language-bash">wp eval 'foreach ( WP_Block_Patterns_Registry::get_instance()-&gt;get_all_registered() as $p ) { if ( str_starts_with( $p["name"], "pagesco/" ) ) { echo $p["name"], "\n"; } }'
+find wp-content/themes/pagesco -type f -not -name '*.woff2' -not -name 'screenshot.png' | sort
+wp post list --post_type=wp_template,wp_template_part,wp_global_styles,wp_block --fields=ID,post_type,post_title</code></pre>
+                    <div class="card card-output">
+                        <h4>Output (your IDs will differ)</h4>
+                        <pre><code>pagesco/call-to-action
+pagesco/featured-books
+pagesco/hero
+wp-content/themes/pagesco/assets/images/book-image.webp
+wp-content/themes/pagesco/parts/footer.html
+wp-content/themes/pagesco/parts/header.html
+wp-content/themes/pagesco/patterns/call-to-action.php
+wp-content/themes/pagesco/patterns/featured-books.php
+wp-content/themes/pagesco/patterns/hero.php
+wp-content/themes/pagesco/readme.txt
+wp-content/themes/pagesco/style.css
+wp-content/themes/pagesco/styles/evening.json
+wp-content/themes/pagesco/styles/sections/section-ink.json
+wp-content/themes/pagesco/styles/sections/section-sage.json
+wp-content/themes/pagesco/templates/404.html
+wp-content/themes/pagesco/templates/archive.html
+wp-content/themes/pagesco/templates/front-page.html
+wp-content/themes/pagesco/templates/index.html
+wp-content/themes/pagesco/templates/page.html
+wp-content/themes/pagesco/templates/search.html
+wp-content/themes/pagesco/templates/single.html
+wp-content/themes/pagesco/theme.json
++----+-----------+---------------+
+| ID | post_type | post_title    |
++----+-----------+---------------+
+| 20 | wp_block  | Opening hours |
++----+-----------+---------------+</code></pre>
+                    </div>
+                    <pre data-cli data-checkpoint><code class="language-bash">for url in / /hello-world/ /about/ /contact/ /category/news/ /?s=dune /nothing-here/; do
+	page=$(curl -s -w '\n%{http_code}' "http://localhost:8080$url")
+	echo "$url  $(echo "$page" | tail -n 1)  notice:$(echo "$page" | grep -c '&lt;div class="pagesco-notice"')  fonts:$(echo "$page" | grep -c 'wp-fonts-local')  hours:$(echo "$page" | grep -c 'Thursday: 9 a.m.')  h1: $(echo "$page" | grep -o '&lt;h1.*&lt;/h1&gt;' | head -n 1 | sed 's/&lt;[^&gt;]*&gt;//g')"
+done</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>/  200  notice:1  fonts:1  hours:0  h1: Good books, good company
+/hello-world/  200  notice:1  fonts:1  hours:0  h1: Hello world!
+/about/  200  notice:1  fonts:1  hours:1  h1: About Us
+/contact/  200  notice:1  fonts:1  hours:1  h1: Contact
+/category/news/  200  notice:1  fonts:1  hours:0  h1: Category: News
+/?s=dune  200  notice:1  fonts:1  hours:0  h1: Search results for: &amp;#8220;dune&amp;#8221;
+/nothing-here/  404  notice:1  fonts:1  hours:0  h1: This page is not on our shelves</code></pre>
+                    </div>
+                    <p>Every page loads the font, the opening hours appear on About and Contact only, and the front page's <code>&lt;h1&gt;</code> now comes from the hero pattern.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>WP_DEVELOPMENT_MODE</code> is <code>theme</code> in your local <code>wp-config.php</code></li>
+                        <li><code>patterns/</code> holds <code>hero.php</code>, <code>featured-books.php</code> and <code>call-to-action.php</code>, all registered as <code>pagesco/…</code></li>
+                        <li><code>styles/</code> holds <code>evening.json</code> and the two section styles in <code>styles/sections/</code>; the Evening variation is <em>not</em> active</li>
+                        <li><code>templates/front-page.html</code> shows hero, staff picks, call to action and news, in Vollkorn, and <code>screenshot.png</code> appears on the Themes screen</li>
+                        <li>The synced "Opening hours" pattern appears on About and Contact, with Saturday until 6 p.m.</li>
+                        <li><code>wp post list --post_type=wp_template,wp_template_part,wp_global_styles</code> lists nothing: no Site Editor copies left</li>
+                        <li>You updated <code>pagesco-plan.txt</code>: tick off the front page in your template map</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Later lessons expect <code>pagesco</code> exactly as the project left it, so undo each change when you have seen it work (the solutions show how).</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: A Typography-Only Variation</h3>
+                    <p>Create <code>styles/typography/all-sans.json</code>, titled "All Sans", that sets the body text to the <code>sans</code> preset and changes nothing else. Prove that WordPress lists it as a site variation next to Evening, then delete it.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>A style variation has <code>version</code>, <code>title</code> and only the parts it changes: here <code>styles.typography.fontFamily</code> set to <code>var:preset|font-family|sans</code>. No <code>blockTypes</code>, or it would be a section style. List the variations with <code>WP_Theme_JSON_Resolver::get_style_variations()</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/themes/pagesco/styles/typography/all-sans.json"><code class="language-json">{
+	"$schema": "https://schemas.wp.org/wp/7.1/theme.json",
+	"version": 3,
+	"title": "All Sans",
+	"styles": {
+		"typography": {
+			"fontFamily": "var:preset|font-family|sans"
+		}
+	}
+}</code></pre>
+                        <pre data-cli><code class="language-bash">wp eval 'foreach ( WP_Theme_JSON_Resolver::get_style_variations() as $v ) { echo $v["title"], ": ", implode( ", ", array_keys( $v["styles"] ?? $v["settings"] ) ), "\n"; }'
+rm -r wp-content/themes/pagesco/styles/typography</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Evening: color
+All Sans: typography</code></pre>
+                        </div>
+                        <p>Both are site variations, sorted by file path. In <strong>Browse styles</strong> the Site Editor shows All Sans in a typography list, because it only touches typography, just as it shows Evening among the color variations.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: A Pattern for the Footer Area</h3>
+                    <p>Write <code>patterns/footer-hours.php</code> (slug <code>pagesco/footer-hours</code>, title "Footer with opening hours") that the Site Editor offers when someone replaces the footer template part. Its content can be one paragraph. Check the registered pattern's <code>blockTypes</code>, then delete the file.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The header is <code>Block Types: core/template-part/footer</code> (the block name plus the template part area). Categories <code>footer</code> lists it with the core footer patterns.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/themes/pagesco/patterns/footer-hours.php"><code class="language-php">&lt;?php
+/**
+ * Title: Footer with opening hours
+ * Slug: pagesco/footer-hours
+ * Categories: footer
+ * Block Types: core/template-part/footer
+ *
+ * @package pagesco
+ */
+
+?&gt;
+&lt;!-- wp:paragraph {"fontSize":"small"} --&gt;
+&lt;p class="has-small-font-size"&gt;&lt;?php esc_html_e( 'Pages &amp; Co. · Open late on Thursdays', 'pagesco' ); ?&gt;&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;</code></pre>
+                        <pre data-cli><code class="language-bash">wp eval 'print_r( WP_Block_Patterns_Registry::get_instance()-&gt;get_registered( "pagesco/footer-hours" )["blockTypes"] );'
+rm wp-content/themes/pagesco/patterns/footer-hours.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Array
+(
+    [0] =&gt; core/template-part/footer
+)</code></pre>
+                        </div>
+                        <p>In the Site Editor, selecting the footer and choosing <strong>Replace</strong> (or the template part's design suggestions) now includes this pattern. Note that <code>esc_html_e()</code> turns the <code>&amp;</code> into <code>&amp;amp;</code> in the output, which is correct HTML.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: Who Uses This Pattern?</h3>
+                    <p>Before anyone deletes "Opening hours", the shop wants to know where it is used. Find every published post or page whose content contains a reference to your synced pattern's ID, printing the ID and title.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The reference is the text <code>"ref":ID</code> inside <code>post_content</code>. <code>get_posts()</code> accepts <code>'s'</code> for search, but that also searches titles and splits words; a <code>$wpdb</code> <code>LIKE</code> query is exact. Escape the search string with <code>$wpdb-&gt;esc_like()</code> and use <code>$wpdb-&gt;prepare()</code> (Lesson 2.2).</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="pagesco-pattern-usage.php" data-wp><code class="language-php">&lt;?php
+global $wpdb;
+
+$pattern_id = (int) get_page_by_path( 'opening-hours', OBJECT, 'wp_block' )-&gt;ID;
+$like       = '%' . $wpdb-&gt;esc_like( '"ref":' . $pattern_id . '}' ) . '%';
+
+$rows = $wpdb-&gt;get_results(
+	$wpdb-&gt;prepare(
+		"SELECT ID, post_title FROM {$wpdb-&gt;posts} WHERE post_status = 'publish' AND post_content LIKE %s ORDER BY ID",
+		$like
+	)
+);
+foreach ( $rows as $row ) {
+	echo $row-&gt;ID, ' ', $row-&gt;post_title, "\n";
+}</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>12 About Us
+13 Contact</code></pre>
+                        </div>
+                        <p>About Us (12) and Contact (13). The pattern is found by its slug, <code>opening-hours</code>, made from its title, so the script works on any site whatever the ID. Delete the script with <code>rm pagesco-pattern-usage.php</code>.</p>
+                        <pre data-cli><code class="language-bash">rm pagesco-pattern-usage.php</code></pre>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 4: Pattern Overrides (Stretch)</h3>
+                    <p>The Contact page should title the hours "When to find us" while About keeps "Opening hours", without giving up syncing. Since WordPress 6.6, a synced pattern can allow <strong>overrides</strong>: in the editor, select the heading inside the pattern, open <strong>Advanced</strong>, click <strong>Enable overrides</strong> and give it a name. Reproduce what that stores, give the Contact page its own heading, and check both pages. Then put both posts back as they were.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Enabling overrides adds <code>"metadata":{"bindings":{"__default":{"source":"core/pattern-overrides"}},"name":"Hours heading"}</code> to the heading inside the <code>wp_block</code>. A page that overrides it adds <code>"content":{"Hours heading":{"content":"When to find us"}}</code> to its <code>wp:block</code> reference. The binding source is the same block bindings system Lesson 6.3 uses for book data.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="pagesco-overrides.php" data-wp><code class="language-php">&lt;?php
+$pattern = get_page_by_path( 'opening-hours', OBJECT, 'wp_block' );
+$contact = get_post( 13 );
+$old     = array( $pattern-&gt;post_content, $contact-&gt;post_content );
+
+// 1. Allow an override of the heading inside the synced pattern.
+wp_update_post(
+	array(
+		'ID'           =&gt; $pattern-&gt;ID,
+		'post_content' =&gt; wp_slash(
+			str_replace(
+				'&lt;!-- wp:heading --&gt;',
+				'&lt;!-- wp:heading {"metadata":{"bindings":{"__default":{"source":"core/pattern-overrides"}},"name":"Hours heading"}} --&gt;',
+				$pattern-&gt;post_content
+			)
+		),
+	)
+);
+
+// 2. Override it on the Contact page only.
+$ref = '{"ref":' . $pattern-&gt;ID . '}';
+wp_update_post(
+	array(
+		'ID'           =&gt; 13,
+		'post_content' =&gt; wp_slash( str_replace( $ref, '{"ref":' . $pattern-&gt;ID . ',"content":{"Hours heading":{"content":"When to find us"}}}', $contact-&gt;post_content ) ),
+	)
+);
+
+foreach ( array( '/about/', '/contact/' ) as $path ) {
+	preg_match( '/&lt;h2 class="wp-block-heading"&gt;([^&lt;]*)/', wp_remote_retrieve_body( wp_remote_get( home_url( $path ) ) ), $m );
+	echo $path, ' ', $m[1], "\n";
+}
+
+// Put everything back.
+wp_update_post( array( 'ID' =&gt; $pattern-&gt;ID, 'post_content' =&gt; wp_slash( $old[0] ) ) );
+wp_update_post( array( 'ID' =&gt; 13, 'post_content' =&gt; wp_slash( $old[1] ) ) );</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>/about/ Opening hours
+/contact/ When to find us</code></pre>
+                        </div>
+                        <p>The pattern is still one post, so a change to the list still reaches both pages; only the named, overridable heading differs per page. Delete the script with <code>rm pagesco-overrides.php</code>.</p>
+                        <pre data-cli><code class="language-bash">rm pagesco-overrides.php</code></pre>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> You add <code>patterns/newsletter.php</code> with a correct header, but the pattern is not in the inserter and <code>is_registered()</code> returns false. <code>WP_DEBUG</code> shows no notice. What is the most likely cause on a development site?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Theme patterns need no registration code at all. What did WordPress do with the list of pattern files in this lesson?">
+                                A) You forgot to call register_block_pattern() in functions.php
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="WordPress caches the list of pattern files per theme version. Set WP_DEVELOPMENT_MODE to theme on a development site, or raise the theme Version when you deploy.">
+                                B) The cached list of the theme's pattern files is still the old one
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="A PHP extension is what WordPress expects in patterns/. Which files does it scan for?">
+                                C) Pattern files must end in .html, not .php
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> The shop's returns policy must read exactly the same on six pages, and staff must be able to change it once. Which tool fits?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Inserting a theme pattern copies its blocks. What happens to the six copies when the policy changes?">
+                                A) A theme pattern in patterns/
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Template parts belong in templates, and pages are content. Who should be able to edit the policy?">
+                                B) A template part in parts/
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="A synced pattern is one wp_block post; every page references it, so editing it once updates all six.">
+                                C) A synced pattern
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> Which JSON file in <code>styles/</code> is a section style that editors can apply to a Group block?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="The blockTypes key is what makes a file in styles/ a block style variation (section style) instead of a style variation for the whole site.">
+                                A) One with "blockTypes": [ "core/group" ] and a styles section
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The folder name is only for order; WordPress reads every JSON file under styles/. Which key did it check?">
+                                B) Any file placed in styles/sections/
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That describes a site-wide style variation such as Evening. What did the section files have that Evening did not?">
+                                C) One with a title and a settings.color.palette
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> The manager edited the front page in the Site Editor. You export the theme and want to keep the change. What should you do with the exported <code>templates/front-page.html</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Look at what the export contained: were the Pattern references and the theme file URLs still there?">
+                                A) Copy it over your file; it is the newest version
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The export has the patterns expanded, with hard-coded URLs and frozen text. Move the actual change into the file it belongs to, usually a pattern, then reset the database copy.">
+                                B) Find the actual change, put it into the right theme file (often a pattern), then reset the copy
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Deleting the copy without reading it would throw away the manager's work. What comes first?">
+                                C) Delete the wp_template post; the file is always right
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> A client sends you a font bought for their printed brochures and asks you to bundle it in their theme. What is the right first step?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="A theme that bundles a font redistributes it. Does a print license usually allow that?">
+                                A) Add it to fontFace; the client owns a license
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Loading it from another server still needs a license for web use, and it hurts privacy. What should you check before anything else?">
+                                B) Load it from a public font CDN instead of bundling it
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Desktop or print licenses usually forbid web embedding and redistribution. Check the license (or buy a web license); until then use an OFL font or a system stack.">
+                                C) Check whether its license allows web use and redistribution in a theme
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Can a pattern show live data, such as the newest books?</summary>
+                    <p>Not by itself. A pattern file's PHP runs when the pattern is used, and in the editor its output is copied into the page, frozen. For data that must be current on every request, put a dynamic block in the pattern: a Query Loop (as the front page does for news), or the dynamic book blocks you build in Module 6.</p>
+                </details>
+                <details>
+                    <summary>How do I give my patterns their own category, such as "Pages &amp; Co."?</summary>
+                    <p>Call <code>register_block_pattern_category( 'pagesco', array( 'label' =&gt; __( 'Pages &amp; Co.', 'pagesco' ) ) )</code> on <code>init</code> from the theme's <code>functions.php</code>, then use <code>Categories: pagesco</code> in the headers. Twenty Twenty-Five does exactly that (you saw its <code>functions.php</code> in Lesson 3.1). <code>functions.php</code> is the subject of Lesson 4.3; the core categories serve <code>pagesco</code> well until then.</p>
+                </details>
+                <details>
+                    <summary>What about patterns from the WordPress.org Pattern Directory?</summary>
+                    <p>A block theme can list directory patterns by slug in a top-level <code>"patterns"</code> array in <code>theme.json</code>, and core loads some directory patterns by default. Your own pattern files are better for a client theme: they are versioned with the theme and work offline.</p>
+                </details>
+                <details>
+                    <summary>Does a style variation replace theme.json?</summary>
+                    <p>No, it is merged on top of it, like the user layer. Evening only redefines the palette; every other setting and style still comes from <code>theme.json</code>. When someone chooses it, WordPress copies the variation into the user global styles post, so later edits to <code>styles/evening.json</code> do not reach a site that already chose it until they choose it again.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Design a "Meet the staff" pattern for the About page: three columns, each with a name, a role and a favorite book, using only presets from your palette and the <code>sage</code> section style. Build it in the editor, copy the markup from the Code editor, then turn it into <code>patterns/staff.php</code> with every string translatable. Which header fields would you give it so it is offered on pages but not in templates?</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Today the design of Pages &amp; Co. lives in four places: theme files, synced patterns, user global styles and Site Editor template copies. For each, write who should be allowed to change it (you, the shop manager, any editor) and how you would notice if it changed. Where would you draw the line between "the developer's design" and "the owner's content" for this shop?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Theme patterns are PHP files in <code>patterns/</code> with a header (Title and Slug required); PHP gives them translatable text, theme URLs and escaping</li>
+                        <li>WordPress caches the list of pattern files per theme version; use <code>WP_DEVELOPMENT_MODE</code> <code>theme</code> while developing</li>
+                        <li>Templates use patterns by slug with <code>wp:pattern</code>; the Site Editor expands them into plain blocks when it saves</li>
+                        <li>Synced patterns are <code>wp_block</code> posts referenced by ID: content, not theme</li>
+                        <li>JSON files in <code>styles/</code> with <code>blockTypes</code> are section styles; without it they are style variations for the whole site</li>
+                        <li><code>fontFace</code> bundles web fonts, but only fonts whose license allows redistribution</li>
+                        <li>Export or <code>wp post get</code> shows what the Site Editor changed; move the change into the right file, then reset the copy</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>A ready-made section</td><td><code>patterns/hero.php</code> with <code>Title:</code> and <code>Slug: pagesco/hero</code></td></tr>
+                            <tr><td>Use it in a template</td><td><code>&lt;!-- wp:pattern {"slug":"pagesco/hero"} /--&gt;</code></td></tr>
+                            <tr><td>See new pattern files at once</td><td><code>wp config set WP_DEVELOPMENT_MODE theme</code> (local only)</td></tr>
+                            <tr><td>Content shared by many pages</td><td>a synced pattern: <code>&lt;!-- wp:block {"ref":ID} /--&gt;</code></td></tr>
+                            <tr><td>A color band for one block</td><td><code>styles/sections/section-ink.json</code> with <code>"blockTypes"</code></td></tr>
+                            <tr><td>A second look for the site</td><td><code>styles/evening.json</code> (no <code>blockTypes</code>)</td></tr>
+                            <tr><td>A bundled web font</td><td><code>fontFace</code> with <code>"src": [ "file:./assets/fonts/…" ]</code></td></tr>
+                            <tr><td>Find Site Editor copies</td><td><code>wp post list --post_type=wp_template,wp_template_part,wp_global_styles</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You built a front page for Pages &amp; Co. out of three translatable, escaped pattern files</li>
+                        <li>You gave the theme two section styles, a style variation and a properly licensed web font</li>
+                        <li>You made the opening hours a synced pattern and changed them on two pages with one edit</li>
+                        <li>You followed a Site Editor change into the database, out through Export, and back into the right file</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>In <a href="lesson_10.html"><strong>Lesson 3.4: Child Themes &amp; Customizing Existing Themes</strong></a> you switch sides: instead of building your own theme, you customize someone else's without touching its files. You build <code>pagesco-tt5-child</code>, a child theme of Twenty Twenty-Five, override its <code>theme.json</code>, templates and patterns, add a <code>functions.php</code>, and learn how classic child themes differ. At the end you switch back to <code>pagesco</code>.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>pagesco</code> is active, the Evening variation is not chosen, and the exercise files are gone</li>
+                    <li>Run <code>wp post list --post_type=wp_template,wp_template_part,wp_global_styles</code>: it should list nothing</li>
+                    <li>Look at the Twenty Twenty-Five theme in the Site Editor and note one thing you would change if a client used it; Lesson 3.4 shows how to change it safely</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>This lesson asked you to keep three copies of "the design" in your head at once: files, database and what the editor shows. That is genuinely one of the hardest ideas in modern WordPress, and plenty of experienced developers still trip over it. If the export section felt slippery, run the loop once more on your own site with a small change of your own; after two or three rounds it becomes a habit you will not have to think about.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_08.html" class="prev-lesson">← Previous: Building a Block Theme</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_10.html" class="next-lesson">Next: Child Themes &amp; Customizing Existing Themes →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Custom WordPress queries: WP_Query arguments, secondary loops and wp_reset_postdata(), changing the main query with pre_get_posts, and pagination, on the pagesco-classic theme with WordPress 7.1 and PHP 8.5. PHP and WordPress Development Lesson 4.2.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Custom Queries - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 4: Classic &amp; Hybrid Theme Development</a></li>
+            <li aria-current="page">Lesson 4.2: Custom Queries</li>
+        </ul>
+    </nav>
+
+    <main id="main-content" data-state="after:lesson_11">
+        <div class="container">
+            <header>
+                <h1>🔎 Lesson 4.2: Custom Queries</h1>
+                <p class="lead">Every Loop in Lesson 4.1 walked the main query, the list WordPress chose from the URL. Real pages need more: a front page with a welcome, the shop's pages and the latest news, a "More from the shop" box under each post, news pages of three posts each. In this lesson you ask WordPress for your own lists with <code>WP_Query</code>, change the main query the right way with <code>pre_get_posts</code>, add pagination that never ends in a 404, and learn the one cleanup call that keeps template tags pointing at the right post.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Tell the main query from secondary queries, and pick <code>WP_Query</code>, <code>get_posts()</code> or <code>pre_get_posts</code> for a task</li>
+                        <li>Write <code>WP_Query</code> arguments for post types, categories, authors, dates, searches, ordering and limits, and read <code>found_posts</code> and <code>max_num_pages</code></li>
+                        <li>Run a secondary Loop on the same page as the main one and restore the current post with <code>wp_reset_postdata()</code></li>
+                        <li>Change the main query with a <code>pre_get_posts</code> callback guarded by <code>is_main_query()</code> and <code>is_admin()</code></li>
+                        <li>Paginate lists with <code>the_posts_pagination()</code>, and explain why paging a custom query in a template leads to a 404</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 130 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_11.html">Lesson 4.1: The Loop &amp; Template Tags</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> <code>functions.php</code> with a <code>pre_get_posts</code> callback, paginated news, a <code>front-page.php</code> with several Loops, and a related-posts box for <code>pagesco-classic</code></li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (everything here works the same on any recent WordPress; <code>WP_Query</code> is unchanged in 7.x)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 4.1, with <code>pagesco-classic</code> active</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#main-and-secondary" class="toc-link">The Main Query and Your Own Queries</a></li>
+                        <li><a href="#wp-query" class="toc-link">WP_Query Arguments</a></li>
+                        <li><a href="#secondary-loops" class="toc-link">Secondary Loops and wp_reset_postdata()</a></li>
+                        <li><a href="#pre-get-posts" class="toc-link">Changing the Main Query: pre_get_posts</a></li>
+                        <li><a href="#pagination" class="toc-link">Pagination</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: A Front Page with Several Loops</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="main-and-secondary" class="lesson-section">
+                <h2>🗂️ The Main Query and Your Own Queries</h2>
+                <p>For each request WordPress builds exactly one <strong>main query</strong>: it turns the URL into query variables (<code>category_name=news</code>, <code>s=dune</code>, <code>paged=2</code>), runs one <code>WP_Query</code> with them, and keeps the result in <code>$wp_query</code>. The template hierarchy, the conditional tags and the Loop of Lesson 4.1 all work from that one object. Any other list on the page comes from a <strong>secondary query</strong>: a <code>WP_Query</code> object your code creates with arguments of its own.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: the customer's order and the shop's displays</h4>
+                    <p>The main query is the customer's order at the counter: they asked for News, so they get News, and the whole page is organized around it. Secondary queries are the displays the shop sets up next to the counter: "staff picks", "you might also like". They never change the customer's order. And when you want the order itself to be different, say "news comes in bundles of three", you do not grab the receipt after it is printed; you tell the person taking orders before they write it down. That is <code>pre_get_posts</code>.</p>
+                </div>
+
+                <div class="mermaid">
+graph TD
+    A["GET /page/2/"] --> B["URL becomes query vars"]
+    B --> C["main WP_Query starts"]
+    C --> D["action: pre_get_posts"]
+    D --> E["SQL runs, posts found"]
+    E --> F["template and the Loop"]
+    F --> G["secondary WP_Query objects"]
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Use</th><th>Why</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>A different main list (3 per page, posts only in search)</td><td><code>pre_get_posts</code></td><td>Changes the query before it runs; pagination, conditional tags and the template stay consistent</td></tr>
+                            <tr><td>An extra list with template tags (a box, a section)</td><td><code>new WP_Query( $args )</code> + Loop + <code>wp_reset_postdata()</code></td><td>Full Loop support: <code>the_title()</code>, <code>post_class()</code>, pagination data</td></tr>
+                            <tr><td>An array of posts to process in PHP</td><td><code>get_posts( $args )</code></td><td>Returns <code>WP_Post</code> objects; does not touch the global <code>$post</code></td></tr>
+                            <tr><td>To replace the main query in a template</td><td>Nothing: <code>query_posts()</code> is the old way and is discouraged</td><td>It throws the main query away and runs a second one, breaking pagination and conditional tags</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="wp-query" class="lesson-section">
+                <h2>⚙️ WP_Query Arguments</h2>
+                <p><code>WP_Query</code> takes one array of arguments, the arguments-array pattern from Lesson 1.3, and runs the query as soon as you create it. You met its SQL in Lesson 2.2; now you use it as a developer does, through the arguments. Save this as <code>wordpress/query-news.php</code> and run it from the WP-CLI container:</p>
+                <pre data-file="query-news.php"><code class="language-php">&lt;?php
+$pagesco_query = new WP_Query(
+	array(
+		'category_name'  =&gt; 'news',
+		'posts_per_page' =&gt; 2,
+		'orderby'        =&gt; 'title',
+		'order'          =&gt; 'ASC',
+	)
+);
+
+printf(
+	"found_posts: %d, max_num_pages: %d, post_count: %d\n",
+	$pagesco_query-&gt;found_posts,
+	$pagesco_query-&gt;max_num_pages,
+	$pagesco_query-&gt;post_count
+);
+
+while ( $pagesco_query-&gt;have_posts() ) {
+	$pagesco_query-&gt;the_post();
+	echo get_the_ID(), '  ', get_the_title(), "\n";
+}
+
+wp_reset_postdata();</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file query-news.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>found_posts: 3, max_num_pages: 2, post_count: 2
+17  Book club: Dune
+16  Staff picks for the season</code></pre>
+                </div>
+                <p>The query object carries three numbers you will use for pagination: <code>post_count</code> is how many posts it holds now (2, the page size), <code>found_posts</code> how many match in total (3 News posts), and <code>max_num_pages</code> how many pages of 2 that makes. The Loop is the one from Lesson 4.1, but every call goes to <em>your</em> object: <code>$pagesco_query-&gt;have_posts()</code> and <code>$pagesco_query-&gt;the_post()</code>. The bare <code>have_posts()</code> would ask the main query. <code>the_post()</code> on your object still sets the global <code>$post</code>, which is why the template tag <code>get_the_title()</code> works, and why <code>wp_reset_postdata()</code> at the end puts the global back (more on that in the next section).</p>
+
+                <h3>The arguments you will use most</h3>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Argument</th><th>Example</th><th>Notes</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>post_type</code></td><td><code>'page'</code>, <code>array( 'post', 'page' )</code>, <code>'any'</code></td><td>Default <code>'post'</code>; <code>'book'</code> from Lesson 5.2</td></tr>
+                            <tr><td><code>post_status</code></td><td><code>'publish'</code></td><td>Default: published only (unlike <code>wp post list</code>)</td></tr>
+                            <tr><td><code>posts_per_page</code>, <code>paged</code></td><td><code>3</code>, <code>2</code></td><td><code>-1</code> means all: avoid on lists that can grow</td></tr>
+                            <tr><td><code>category_name</code> / <code>cat</code></td><td><code>'news'</code> / <code>2</code></td><td>Slug vs ID (Common Mistakes)</td></tr>
+                            <tr><td><code>tax_query</code></td><td><code>array( array( 'taxonomy' =&gt; 'category', 'field' =&gt; 'slug', 'terms' =&gt; 'news' ) )</code></td><td>Any taxonomy, <code>IN</code> / <code>NOT IN</code> / <code>AND</code>; how you will query genres in Module 5</td></tr>
+                            <tr><td><code>author_name</code> / <code>author</code></td><td><code>'devon'</code> / <code>3</code></td><td>Login slug (user_nicename) vs ID</td></tr>
+                            <tr><td><code>date_query</code></td><td><code>array( array( 'year' =&gt; 2026, 'month' =&gt; 9 ) )</code></td><td>Also <code>after</code>, <code>before</code>, <code>inclusive</code></td></tr>
+                            <tr><td><code>s</code></td><td><code>'club'</code></td><td>The same search as <code>/?s=club</code></td></tr>
+                            <tr><td><code>post__in</code>, <code>post__not_in</code>, <code>post_name__in</code></td><td><code>array( get_the_ID() )</code></td><td>Include or exclude specific posts; slugs are portable between sites, IDs are not</td></tr>
+                            <tr><td><code>orderby</code>, <code>order</code></td><td><code>'title'</code>, <code>'ASC'</code></td><td>Default <code>'date'</code>, <code>'DESC'</code>; also <code>'post_name__in'</code>, <code>'rand'</code>, <code>'meta_value_num'</code></td></tr>
+                            <tr><td><code>meta_query</code></td><td>(Lesson 5.2)</td><td>Filters on post meta such as <code>pagesco_price</code>; the book meta does not exist yet</td></tr>
+                            <tr><td><code>no_found_rows</code>, <code>fields</code>, <code>ignore_sticky_posts</code></td><td><code>true</code>, <code>'ids'</code>, <code>true</code></td><td>Speed and shape: skip counting, return IDs only, ignore sticky posts</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Try several at once. This file runs one query per line and prints the titles each one found. Save it as <code>wordpress/query-args.php</code>:</p>
+                <pre data-file="query-args.php"><code class="language-php">&lt;?php
+/**
+ * Runs a WP_Query and prints the titles it found.
+ */
+function pagesco_show_query( $label, $args ) {
+	$query  = new WP_Query( $args );
+	$titles = wp_list_pluck( $query-&gt;posts, 'post_title' );
+	printf( "%-12s %s  (found_posts: %d)\n", $label, implode( ', ', $titles ), $query-&gt;found_posts );
+}
+
+pagesco_show_query( 'pages:', array( 'post_type' =&gt; 'page', 'post_name__in' =&gt; array( 'about', 'events', 'contact' ), 'orderby' =&gt; 'post_name__in' ) );
+pagesco_show_query( 'devon:', array( 'author_name' =&gt; 'devon' ) );
+pagesco_show_query( 'september:', array( 'date_query' =&gt; array( array( 'year' =&gt; 2026, 'month' =&gt; 9 ) ), 'order' =&gt; 'ASC' ) );
+pagesco_show_query( 'club:', array( 's' =&gt; 'club', 'post_type' =&gt; 'any' ) );
+pagesco_show_query( 'not news:', array( 'tax_query' =&gt; array( array( 'taxonomy' =&gt; 'category', 'field' =&gt; 'slug', 'terms' =&gt; 'news', 'operator' =&gt; 'NOT IN' ) ) ) );
+pagesco_show_query( 'newest 2:', array( 'posts_per_page' =&gt; 2, 'no_found_rows' =&gt; true ) );</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file query-args.php
+rm query-news.php query-args.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>pages:       About Us, Events, Contact  (found_posts: 3)
+devon:       Staff picks for the season  (found_posts: 1)
+september:   Welcome to the new Pages &amp; Co. website, Staff picks for the season  (found_posts: 2)
+club:        Book club: Dune, Events  (found_posts: 2)
+not news:    Hello world!  (found_posts: 1)
+newest 2:    Hello world!, Book club: Dune  (found_posts: 0)</code></pre>
+                </div>
+                <p>Line by line: <code>post_name__in</code> with <code>'orderby' =&gt; 'post_name__in'</code> returned the three pages in the order you listed the slugs (by slug, so the code works on any copy of the site). Devon wrote one post. The <code>date_query</code> found the two September posts, oldest first. The search with <code>'post_type' =&gt; 'any'</code> found a post and a page ("book clubs" is in the Events page). The <code>NOT IN</code> tax query left only Hello world! (Uncategorized). And the last line shows <code>found_posts: 0</code>: with <code>no_found_rows</code> WordPress skips the extra counting query (the <code>SQL_CALC_FOUND_ROWS</code> you saw in Lesson 2.2), which is the right choice for any list you will not paginate.</p>
+            </section>
+
+            <section id="secondary-loops" class="lesson-section">
+                <h2>🔂 Secondary Loops and wp_reset_postdata()</h2>
+                <p>A secondary Loop inside a template looks exactly like the one in <code>query-news.php</code>. The only new thing is what happens around it: the template was already showing a post from the main query, and <code>$secondary-&gt;the_post()</code> just replaced the global <code>$post</code> with the secondary query's post. Until something puts it back, every template tag after your Loop talks about the wrong post.</p>
+                <p><code>wp_reset_postdata()</code> puts it back: it is a short function in <code>wp-includes/query.php</code> that asks the main query to set the global <code>$post</code> to <em>its</em> current post again:</p>
+                <pre data-cli><code class="language-bash">grep -n "^function wp_reset_postdata" -A 7 wp-includes/query.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>127:function wp_reset_postdata() {
+128-	global $wp_query;
+129-
+130-	if ( isset( $wp_query ) ) {
+131-		$wp_query-&gt;reset_postdata();
+132-	}
+133-}
+134-</code></pre>
+                </div>
+                <p>The rule is simple: <strong>every Loop over your own <code>WP_Query</code> ends with <code>wp_reset_postdata()</code></strong>, right after the <code>while</code>, even when nothing seems to need it yet. Somebody will add a template tag below your Loop one day. You will see the failure in Common Mistakes and build the box correctly in the project.</p>
+                <div class="card card-info">
+                    <h4>💡 get_posts() needs no reset</h4>
+                    <p><code>get_posts()</code> runs a <code>WP_Query</code> for you and returns the array of <code>WP_Post</code> objects, without touching the global <code>$post</code>, so there is nothing to reset as long as you pass each post to the functions you call (<code>get_the_title( $post )</code>, <code>get_permalink( $post )</code>) instead of calling <code>setup_postdata()</code>. Its defaults differ from <code>WP_Query</code>'s, as you can read in <code>get_posts()</code> in <code>wp-includes/post.php</code>: 5 posts (<code>numberposts</code>), <code>suppress_filters</code> true, sticky posts ignored and no counting. Exercise 2 uses it.</p>
+                </div>
+            </section>
+
+            <section id="pre-get-posts" class="lesson-section">
+                <h2>🎚️ Changing the Main Query: pre_get_posts</h2>
+                <p>The shop wants the news on the home page in pages of three. The tempting way is to ignore the main query in the template and run your own <code>WP_Query</code> with <code>'posts_per_page' =&gt; 3</code>. It looks right on page 1 and breaks on page 2 (Common Mistakes, number 1), because WordPress decides whether <code>/page/2/</code> exists from the <em>main</em> query. The right way is to change the main query itself, before it runs. <code>WP_Query::get_posts()</code> fires an action for that just before it builds the SQL:</p>
+                <pre data-cli><code class="language-bash">grep -n "do_action_ref_array( 'pre_get_posts'" wp-includes/class-wp-query.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>1916:		do_action_ref_array( 'pre_get_posts', array( &amp;$this ) );</code></pre>
+                </div>
+                <p>The action passes the query object, and your callback changes it with <code>$query-&gt;set()</code>. It fires for <em>every</em> <code>WP_Query</code>: the main one, every secondary one, the admin's post lists, WP-CLI's. So a callback first makes sure it has the query it means. Display choices belong to the theme, so this goes into <code>pagesco-classic</code>'s first <code>functions.php</code>. You met <code>functions.php</code> in a child theme in Lesson 3.4; Lesson 4.3 is all about this file. Create <code>wordpress/wp-content/themes/pagesco-classic/functions.php</code>:</p>
+                <pre data-file="wp-content/themes/pagesco-classic/functions.php"><code class="language-php">&lt;?php
+/**
+ * Pages &amp; Co. Classic functions and definitions.
+ *
+ * @package pagesco-classic
+ */
+
+/**
+ * Shows three posts per page on the blog home.
+ *
+ * @param WP_Query $query The query WordPress is about to run.
+ */
+function pagesco_classic_adjust_main_query( $query ) {
+	if ( is_admin() || ! $query-&gt;is_main_query() ) {
+		return;
+	}
+
+	if ( $query-&gt;is_home() ) {
+		$query-&gt;set( 'posts_per_page', 3 );
+	}
+}
+add_action( 'pre_get_posts', 'pagesco_classic_adjust_main_query' );</code></pre>
+                <ul>
+                    <li><code>is_admin()</code>: leave the admin screens alone (their lists have their own "per page" setting).</li>
+                    <li><code>$query-&gt;is_main_query()</code>: only the main query, never a box somebody adds later.</li>
+                    <li><code>$query-&gt;is_home()</code>: ask the query object, not the global <code>is_home()</code>. While <code>pre_get_posts</code> runs, the main query has parsed the URL (so its <code>is_home()</code> knows the answer), but the global functions are only reliable once it is finished.</li>
+                    <li>It is an action: the object is changed in place, nothing is returned.</li>
+                </ul>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | grep -o '&lt;h2 class="entry-title"&gt;&lt;a [^&gt;]*&gt;[^&lt;]*' | sed 's/&lt;[^&gt;]*&gt;//g'
+curl -s http://localhost:8080/category/news/ | grep -c '&lt;h2 class="entry-title"'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Hello world!
+Book club: Dune
+Staff picks for the season
+3</code></pre>
+                </div>
+                <p>Three posts on the home page; the News archive still shows all three of its posts because the callback only touches the blog home. The fourth post, Welcome, is on page 2 now, and visitors need a way to get there.</p>
+            </section>
+
+            <section id="pagination" class="lesson-section">
+                <h2>📄 Pagination</h2>
+                <p>For the main query, pagination is one call. <code>the_posts_pagination()</code> reads <code>max_num_pages</code> and the current page from <code>$wp_query</code> and prints an accessible navigation block with page numbers. Add it to <code>index.php</code>, after the Loop and inside the <code>if</code>, so empty lists get no pagination:</p>
+                <pre data-file="wp-content/themes/pagesco-classic/index.php"><code class="language-php">&lt;?php
+/**
+ * The main template: the blog home, archives and search results.
+ *
+ * @package pagesco-classic
+ */
+
+get_header();
+?&gt;
+&lt;header class="page-header"&gt;
+	&lt;?php if ( is_home() ) : ?&gt;
+		&lt;h1&gt;&lt;?php esc_html_e( 'News from the shop', 'pagesco-classic' ); ?&gt;&lt;/h1&gt;
+	&lt;?php elseif ( is_search() ) : ?&gt;
+		&lt;h1&gt;&lt;?php /* translators: %s: the search terms. */ printf( esc_html__( 'Search results for: %s', 'pagesco-classic' ), esc_html( get_search_query( false ) ) ); ?&gt;&lt;/h1&gt;
+	&lt;?php else : ?&gt;
+		&lt;?php the_archive_title( '&lt;h1&gt;', '&lt;/h1&gt;' ); ?&gt;
+		&lt;?php the_archive_description( '&lt;div class="archive-description"&gt;', '&lt;/div&gt;' ); ?&gt;
+	&lt;?php endif; ?&gt;
+&lt;/header&gt;
+
+&lt;?php
+if ( have_posts() ) {
+	while ( have_posts() ) {
+		the_post();
+		get_template_part( 'template-parts/content' );
+	}
+
+	the_posts_pagination();
+} else {
+	get_template_part( 'template-parts/content', 'none' );
+}
+
+get_footer();</code></pre>
+                <pre data-web="/" data-select="nav.pagination"><code class="language-text">http://localhost:8080/   (View Source, the pagination)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;nav class="navigation pagination" aria-label="Posts pagination"&gt;
+		&lt;h2 class="screen-reader-text"&gt;Posts pagination&lt;/h2&gt;
+		&lt;div class="nav-links"&gt;&lt;span aria-current="page" class="page-numbers current"&gt;1&lt;/span&gt;
+&lt;a class="page-numbers" href="http://localhost:8080/page/2/"&gt;2&lt;/a&gt;
+&lt;a class="next page-numbers" href="http://localhost:8080/page/2/"&gt;Next&lt;/a&gt;&lt;/div&gt;
+	&lt;/nav&gt;</code></pre>
+                </div>
+                <p>Page 1 is the current page (<code>aria-current="page"</code>, not a link), page 2 is a link, and so is "Next". The visually hidden heading tells screen reader users what the links are. Now follow it, and try one page too far:</p>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/page/2/ | grep -o '&lt;title&gt;.*&lt;/title&gt;\|&lt;h2 class="entry-title"&gt;&lt;a [^&gt;]*&gt;[^&lt;]*'
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/page/3/</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;title&gt;Pages &amp;amp; Co. &amp;#8211; Page 2&lt;/title&gt;
+&lt;h2 class="entry-title"&gt;&lt;a href="http://localhost:8080/welcome/"&gt;Welcome to the new Pages &amp;#038; Co. website
+404</code></pre>
+                </div>
+                <p>Page 2 holds the one remaining post and WordPress added "Page 2" to the document title by itself. Page 3 does not exist, so WordPress answers 404 before your template runs. All of that works because the main query and the pagination agree: there is only one query.</p>
+                <p>For a secondary query, the template has to pass the numbers itself: <code>paginate_links( array( 'total' =&gt; $query-&gt;max_num_pages ) )</code> prints the links, and the query must be created with <code>'paged' =&gt; max( 1, get_query_var( 'paged' ) )</code>. That only makes sense for a list that is not the page's main content, and Common Mistakes shows why it is fragile.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <h3>1. Paging a custom query in the template</h3>
+                <p>A developer wants pages of two posts in the News archive and, instead of <code>pre_get_posts</code>, writes a <code>category-news.php</code> that ignores the main query and runs its own, with <code>paged</code> and <code>paginate_links()</code>:</p>
+                <pre data-file="wp-content/themes/pagesco-classic/category-news.php"><code class="language-php">&lt;?php
+get_header();
+
+$pagesco_classic_news = new WP_Query(
+	array(
+		'category_name'  =&gt; 'news',
+		'posts_per_page' =&gt; 2,
+		'paged'          =&gt; max( 1, get_query_var( 'paged' ) ),
+	)
+);
+
+while ( $pagesco_classic_news-&gt;have_posts() ) {
+	$pagesco_classic_news-&gt;the_post();
+	get_template_part( 'template-parts/content' );
+}
+
+echo wp_kses_post( paginate_links( array( 'total' =&gt; $pagesco_classic_news-&gt;max_num_pages ) ) );
+wp_reset_postdata();
+
+get_footer();</code></pre>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/category/news/ | grep -o '&lt;h2 class="entry-title"&gt;&lt;a [^&gt;]*&gt;[^&lt;]*\|&lt;a class="[^"]*page-numbers" href="[^"]*"&gt;[^&lt;]*' | sed 's/&lt;h2[^&gt;]*&gt;//'
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/category/news/page/2/</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;a href="http://localhost:8080/book-club-dune/"&gt;Book club: Dune
+&lt;a href="http://localhost:8080/staff-picks/"&gt;Staff picks for the season
+&lt;a class="page-numbers" href="http://localhost:8080/category/news/page/2/"&gt;2
+&lt;a class="next page-numbers" href="http://localhost:8080/category/news/page/2/"&gt;Next &amp;raquo;
+404</code></pre>
+                </div>
+                <p><strong>What it means:</strong> page 1 looks perfect, with two posts and a link to page 2. The link answers 404. Before any template runs, WordPress runs the <em>main</em> query for <code>/category/news/page/2/</code>: ten posts per page (Settings &gt; Reading), three News posts, so there is no page 2, and WordPress picks <code>404.php</code>. Your <code>category-news.php</code> never gets the chance to run its own query. <strong>Fix:</strong> let the main query do the paging. In <code>pre_get_posts</code>, set <code>posts_per_page</code> for <code>$query-&gt;is_category( 'news' )</code>, keep the normal Loop, and use <code>the_posts_pagination()</code>. Delete the file:</p>
+                <pre data-cli><code class="language-bash">rm wp-content/themes/pagesco-classic/category-news.php</code></pre>
+
+                <h3>2. A secondary Loop without wp_reset_postdata()</h3>
+                <p>The shop wants a "More from the shop" box under each post, before the previous/next links. Add one line to <code>singular.php</code>, which loads a new template part just before <code>the_post_navigation()</code>:</p>
+                <pre data-file="wp-content/themes/pagesco-classic/singular.php"><code class="language-php">&lt;?php
+/**
+ * A single post or page.
+ *
+ * @package pagesco-classic
+ */
+
+get_header();
+
+while ( have_posts() ) {
+	the_post();
+	?&gt;
+	&lt;article id="post-&lt;?php the_ID(); ?&gt;" &lt;?php post_class(); ?&gt;&gt;
+		&lt;?php the_title( '&lt;h1 class="entry-title"&gt;', '&lt;/h1&gt;' ); ?&gt;
+		&lt;?php if ( is_singular( 'post' ) ) : ?&gt;
+			&lt;p class="entry-meta"&gt;
+				&lt;?php
+				printf(
+					/* translators: 1: publish date, 2: author name. */
+					esc_html__( '%1$s by %2$s', 'pagesco-classic' ),
+					'&lt;time datetime="' . esc_attr( get_the_date( 'c' ) ) . '"&gt;' . esc_html( get_the_date() ) . '&lt;/time&gt;',
+					esc_html( get_the_author() )
+				);
+				?&gt;
+			&lt;/p&gt;
+		&lt;?php endif; ?&gt;
+		&lt;div class="entry-content"&gt;
+			&lt;?php the_content(); ?&gt;
+		&lt;/div&gt;
+		&lt;?php if ( is_singular( 'post' ) &amp;&amp; has_category() ) : ?&gt;
+			&lt;p class="entry-terms"&gt;&lt;?php esc_html_e( 'Filed under:', 'pagesco-classic' ); ?&gt; &lt;?php the_category( ', ' ); ?&gt;&lt;/p&gt;
+		&lt;?php endif; ?&gt;
+	&lt;/article&gt;
+	&lt;?php
+	if ( is_singular( 'post' ) ) {
+		get_template_part( 'template-parts/related-posts' );
+		the_post_navigation();
+	}
+}
+
+get_footer();</code></pre>
+                <p>and write the part, <code>template-parts/related-posts.php</code>, with a secondary Loop over other posts from the same categories, but without the reset at the end:</p>
+                <pre data-file="wp-content/themes/pagesco-classic/template-parts/related-posts.php"><code class="language-php">&lt;?php
+/**
+ * Up to two other posts from the current post's categories.
+ *
+ * @package pagesco-classic
+ */
+
+$pagesco_classic_related = new WP_Query(
+	array(
+		'category__in'        =&gt; wp_get_post_categories( get_the_ID() ),
+		'post__not_in'        =&gt; array( get_the_ID() ),
+		'posts_per_page'      =&gt; 2,
+		'ignore_sticky_posts' =&gt; true,
+		'no_found_rows'       =&gt; true,
+	)
+);
+
+if ( $pagesco_classic_related-&gt;have_posts() ) :
+	?&gt;
+	&lt;aside class="related-posts"&gt;
+		&lt;h2&gt;&lt;?php esc_html_e( 'More from the shop', 'pagesco-classic' ); ?&gt;&lt;/h2&gt;
+		&lt;ul&gt;
+			&lt;?php
+			while ( $pagesco_classic_related-&gt;have_posts() ) {
+				$pagesco_classic_related-&gt;the_post();
+				the_title( '&lt;li&gt;&lt;a href="' . esc_url( get_permalink() ) . '"&gt;', '&lt;/a&gt;&lt;/li&gt;' );
+			}
+			?&gt;
+		&lt;/ul&gt;
+	&lt;/aside&gt;
+	&lt;?php
+endif;</code></pre>
+                <pre data-web="/book-club-dune/" data-select="nav.post-navigation"><code class="language-text">http://localhost:8080/book-club-dune/   (View Source, the post navigation)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;nav class="navigation post-navigation" aria-label="Posts"&gt;
+		&lt;h2 class="screen-reader-text"&gt;Post navigation&lt;/h2&gt;
+		&lt;div class="nav-links"&gt;&lt;div class="nav-next"&gt;&lt;a href="http://localhost:8080/staff-picks/" rel="next"&gt;Staff picks for the season&lt;/a&gt;&lt;/div&gt;&lt;/div&gt;
+	&lt;/nav&gt;</code></pre>
+                </div>
+                <p><strong>What it means:</strong> in Lesson 4.1 this post linked back to Staff picks and forward to Hello world!. Now there is no "previous" link, and "next" is Staff picks, which is older than Book club. The navigation was built for the wrong post: the related box's last post, Welcome, the oldest post of all, is still the global <code>$post</code>, so <code>the_post_navigation()</code> asked for Welcome's neighbors. No error anywhere, just quietly wrong links. <strong>Fix:</strong> <code>wp_reset_postdata();</code> right after the box's Loop. You write the corrected part in the project's step 2; leave <code>singular.php</code> as it is now.</p>
+
+                <h3>3. A pre_get_posts callback without guards</h3>
+                <p>Someone wants "one post at a time" somewhere on the site and writes a must-use plugin with no checks at all:</p>
+                <pre data-file="wp-content/mu-plugins/mistake-everywhere.php"><code class="language-php">&lt;?php
+add_action( 'pre_get_posts', 'pagesco_one_post_only' );
+
+function pagesco_one_post_only( $query ) {
+	$query-&gt;set( 'posts_per_page', 1 );
+}</code></pre>
+                <pre data-cli><code class="language-bash">wp post list --post_type=page --fields=ID,post_title
+wp eval 'echo count( get_posts( array( "post_type" =&gt; "page", "numberposts" =&gt; -1 ) ) ), "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+----+------------+
+| ID | post_title |
++----+------------+
+| 12 | About Us   |
++----+------------+
+1</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the site has four published pages (five with the Privacy Policy draft, and <code>wp post list</code> lists drafts too), but WP-CLI lists one, and <code>get_posts()</code> asked for all of them (<code>-1</code>) and got one. The callback changed <em>every</em> query: WP-CLI's, every <code>get_posts()</code> call in every plugin, the admin's Pages screen, your secondary Loops. (The blog home still shows three posts only because the theme's callback runs after this one and sets 3 again.) <strong>Fix:</strong> start every <code>pre_get_posts</code> callback with the guards from <code>pagesco_classic_adjust_main_query()</code>: <code>is_admin()</code>, <code>$query-&gt;is_main_query()</code> and the kind of page you mean. Delete the file:</p>
+                <pre data-cli><code class="language-bash">rm wp-content/mu-plugins/mistake-everywhere.php</code></pre>
+
+                <h3>4. A slug where an ID belongs</h3>
+                <pre data-file="mistake-cat.php"><code class="language-php">&lt;?php
+$pagesco_query = new WP_Query( array( 'cat' =&gt; 'news' ) );
+
+echo implode( ', ', wp_list_pluck( $pagesco_query-&gt;posts, 'post_title' ) ), "\n";</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file mistake-cat.php
+rm mistake-cat.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Hello world!, Book club: Dune, Staff picks for the season, Welcome to the new Pages &amp; Co. website</code></pre>
+                </div>
+                <p><strong>What it means:</strong> all four posts, including Hello world! from Uncategorized, and no warning. <code>cat</code> expects category IDs; the string <code>'news'</code> is not a number, so WordPress drops the filter and returns every post. Several arguments come in pairs like this (<code>cat</code> / <code>category_name</code>, <code>author</code> / <code>author_name</code>, <code>p</code> / <code>name</code>), and none of them complains about the wrong kind of value. <strong>Fix:</strong> <code>'category_name' =&gt; 'news'</code> for a slug, and when a query returns "too much", check the argument names against the <a href="https://developer.wordpress.org/reference/classes/wp_query/" target="_blank" rel="noopener">WP_Query reference</a> before anything else.</p>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: A Front Page with Several Loops</h2>
+                <p><code>pagesco-classic</code> already pages its news. Now give it what the block theme's front page has (Lesson 3.3): a welcome, a way into the shop's pages, and the latest news, all on one page, plus a working "More from the shop" box under each post. Allow about 40 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: front-page.php with three sections <span class="step-time">(15 min)</span></h3>
+                    <p>In the hierarchy <code>front-page</code> comes first for the site's front page (Lesson 3.1). Because Settings &gt; Reading shows the latest posts, the main query on <code>/</code> is the news list, already three per page thanks to your <code>pre_get_posts</code> callback, and <code>/page/2/</code> uses this template too. So the template keeps the main Loop for the news and adds a secondary query for the pages. On page 2 and later (<code>is_paged()</code>) it shows only the news, with an <code>h1</code>. Create <code>wordpress/wp-content/themes/pagesco-classic/front-page.php</code>:</p>
+                    <pre data-file="wp-content/themes/pagesco-classic/front-page.php"><code class="language-php">&lt;?php
+/**
+ * The front page: a welcome, the shop's pages, and the latest news.
+ *
+ * @package pagesco-classic
+ */
+
+get_header();
+
+if ( ! is_paged() ) :
+	?&gt;
+	&lt;section class="hero"&gt;
+		&lt;h1&gt;&lt;?php esc_html_e( 'Good books, good company', 'pagesco-classic' ); ?&gt;&lt;/h1&gt;
+		&lt;p&gt;&lt;?php esc_html_e( 'An independent bookstore with a big reading corner, a small café and staff who love to talk about books. Open late on Thursdays.', 'pagesco-classic' ); ?&gt;&lt;/p&gt;
+	&lt;/section&gt;
+
+	&lt;?php
+	$pagesco_classic_pages = new WP_Query(
+		array(
+			'post_type'     =&gt; 'page',
+			'post_name__in' =&gt; array( 'about', 'events', 'contact' ),
+			'orderby'       =&gt; 'post_name__in',
+			'no_found_rows' =&gt; true,
+		)
+	);
+
+	if ( $pagesco_classic_pages-&gt;have_posts() ) :
+		?&gt;
+		&lt;section class="visit-us"&gt;
+			&lt;h2&gt;&lt;?php esc_html_e( 'Visit us', 'pagesco-classic' ); ?&gt;&lt;/h2&gt;
+			&lt;ul&gt;
+				&lt;?php
+				while ( $pagesco_classic_pages-&gt;have_posts() ) {
+					$pagesco_classic_pages-&gt;the_post();
+					the_title( '&lt;li&gt;&lt;a href="' . esc_url( get_permalink() ) . '"&gt;', '&lt;/a&gt;&lt;/li&gt;' );
+				}
+				?&gt;
+			&lt;/ul&gt;
+		&lt;/section&gt;
+		&lt;?php
+	endif;
+	wp_reset_postdata();
+endif;
+?&gt;
+
+&lt;section class="latest-news"&gt;
+	&lt;?php if ( is_paged() ) : ?&gt;
+		&lt;h1&gt;&lt;?php esc_html_e( 'News from the shop', 'pagesco-classic' ); ?&gt;&lt;/h1&gt;
+	&lt;?php else : ?&gt;
+		&lt;h2&gt;&lt;?php esc_html_e( 'News from the shop', 'pagesco-classic' ); ?&gt;&lt;/h2&gt;
+	&lt;?php endif; ?&gt;
+
+	&lt;?php
+	while ( have_posts() ) {
+		the_post();
+		get_template_part( 'template-parts/content', null, array( 'heading_level' =&gt; 3 ) );
+	}
+
+	the_posts_pagination();
+	?&gt;
+&lt;/section&gt;
+&lt;?php
+get_footer();</code></pre>
+                    <p>The news items come from the same <code>template-parts/content.php</code> as everywhere else, with <code>array( 'heading_level' =&gt; 3 )</code> as its <code>$args</code>, the option you built into it in Lesson 4.1, because they now sit under the section's <code>h2</code>. The pages query uses <code>no_found_rows</code> because nobody pages through three links, and it ends with <code>wp_reset_postdata()</code> before the main Loop starts. List the headings and links of both pages:</p>
+                    <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | grep -o '&lt;h[123][^&gt;]*&gt;.*&lt;/h[123]&gt;\|&lt;li&gt;&lt;a [^&gt;]*&gt;[^&lt;]*' | sed 's/&lt;[^&gt;]*&gt;//g'
+echo ---
+curl -s http://localhost:8080/page/2/ | grep -o '&lt;h[123][^&gt;]*&gt;.*&lt;/h[123]&gt;' | sed 's/&lt;[^&gt;]*&gt;//g'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Good books, good company
+Visit us
+About Us
+Events
+Contact
+News from the shop
+Hello world!
+Book club: Dune
+Staff picks for the season
+Posts pagination
+---
+News from the shop
+Welcome to the new Pages &amp;#038; Co. website
+Posts pagination</code></pre>
+                    </div>
+                    <p>Page 1: the welcome heading, "Visit us" with the three pages in the order of the slugs, then the news section with three posts as <code>h3</code> and the pagination's hidden heading. Page 2: only the news, now with an <code>h1</code>, and Welcome.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: Fix the related-posts box <span class="step-time">(8 min)</span></h3>
+                    <p>Replace <code>template-parts/related-posts.php</code> from Common Mistakes with the corrected version. The only change is the last line:</p>
+                    <pre data-file="wp-content/themes/pagesco-classic/template-parts/related-posts.php"><code class="language-php">&lt;?php
+/**
+ * Up to two other posts from the current post's categories.
+ *
+ * @package pagesco-classic
+ */
+
+$pagesco_classic_related = new WP_Query(
+	array(
+		'category__in'        =&gt; wp_get_post_categories( get_the_ID() ),
+		'post__not_in'        =&gt; array( get_the_ID() ),
+		'posts_per_page'      =&gt; 2,
+		'ignore_sticky_posts' =&gt; true,
+		'no_found_rows'       =&gt; true,
+	)
+);
+
+if ( $pagesco_classic_related-&gt;have_posts() ) :
+	?&gt;
+	&lt;aside class="related-posts"&gt;
+		&lt;h2&gt;&lt;?php esc_html_e( 'More from the shop', 'pagesco-classic' ); ?&gt;&lt;/h2&gt;
+		&lt;ul&gt;
+			&lt;?php
+			while ( $pagesco_classic_related-&gt;have_posts() ) {
+				$pagesco_classic_related-&gt;the_post();
+				the_title( '&lt;li&gt;&lt;a href="' . esc_url( get_permalink() ) . '"&gt;', '&lt;/a&gt;&lt;/li&gt;' );
+			}
+			?&gt;
+		&lt;/ul&gt;
+	&lt;/aside&gt;
+	&lt;?php
+endif;
+
+wp_reset_postdata();</code></pre>
+                    <pre data-web="/book-club-dune/" data-select="aside.related-posts" data-text><code class="language-text">http://localhost:8080/book-club-dune/   (the box, as text)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>More from the shop
+Staff picks for the season
+Welcome to the new Pages &amp; Co. website</code></pre>
+                    </div>
+                    <pre data-web="/book-club-dune/" data-select="nav.post-navigation" data-text><code class="language-text">http://localhost:8080/book-club-dune/   (the post navigation, as text)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Post navigation
+Staff picks for the season
+Hello world!</code></pre>
+                    </div>
+                    <p>The box lists the other two News posts (<code>category__in</code> with the post's own categories, <code>post__not_in</code> with its own ID), and the navigation is right again: Staff picks before, Hello world! after. <code>ignore_sticky_posts</code> keeps sticky posts (Exercise 4) from pushing into the box.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: Check the whole theme <span class="step-time">(10 min)</span></h3>
+                    <p>Check the theme's files, the page counts and the boxes in one go from the WP-CLI container:</p>
+                    <pre data-cli data-checkpoint><code class="language-bash">find wp-content/themes/pagesco-classic -name '*.php' | sort
+for url in / /page/2/ /page/3/ /hello-world/ /book-club-dune/ /about/ /category/news/; do
+  page=$(curl -s "http://localhost:8080$url")
+  code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:8080$url")
+  items=$(printf '%s' "$page" | grep -c 'class="entry-title"&gt;&lt;a')
+  related=$(printf '%s' "$page" | grep -c 'class="related-posts"')
+  printf '%-16s %s  list items: %s  related box: %s\n' "$url" "$code" "$items" "$related"
+done</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>wp-content/themes/pagesco-classic/404.php
+wp-content/themes/pagesco-classic/footer.php
+wp-content/themes/pagesco-classic/front-page.php
+wp-content/themes/pagesco-classic/functions.php
+wp-content/themes/pagesco-classic/header.php
+wp-content/themes/pagesco-classic/index.php
+wp-content/themes/pagesco-classic/singular.php
+wp-content/themes/pagesco-classic/template-parts/content-none.php
+wp-content/themes/pagesco-classic/template-parts/content.php
+wp-content/themes/pagesco-classic/template-parts/related-posts.php
+/                200  list items: 3  related box: 0
+/page/2/         200  list items: 1  related box: 0
+/page/3/         404  list items: 0  related box: 0
+/hello-world/    200  list items: 0  related box: 0
+/book-club-dune/ 200  list items: 0  related box: 1
+/about/          200  list items: 0  related box: 0
+/category/news/  200  list items: 3  related box: 0</code></pre>
+                    </div>
+                    <p>Three news items on <code>/</code>, one on <code>/page/2/</code>, a clean 404 for <code>/page/3/</code>. Book club gets the related box. Hello world! gets none: its only category, Uncategorized, has no other posts, so the query is empty and the part prints nothing (the <code>have_posts()</code> check). The About page has no box (it is not a post), and the News archive still lists its three posts. Add to <code>pagesco-plan.txt</code>: "front page = welcome + pages (WP_Query) + news (main query, 3 per page via pre_get_posts)".</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>pagesco-classic/functions.php</code> has <code>pagesco_classic_adjust_main_query()</code> on <code>pre_get_posts</code>, guarded by <code>is_admin()</code> and <code>is_main_query()</code></li>
+                        <li>The blog home shows three posts per page with numbered pagination, and <code>/page/3/</code> answers 404</li>
+                        <li><code>front-page.php</code> shows the welcome, the "Visit us" pages and the news on page 1, and only the news on page 2</li>
+                        <li>Every secondary Loop ends with <code>wp_reset_postdata()</code>; posts show "More from the shop" and correct previous/next links</li>
+                        <li>No test files are left: <code>category-news.php</code>, <code>mistake-everywhere.php</code> and the query scripts in the WordPress root are deleted</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 2 and 3 only read; 1 and 4 change the site and undo it. Try each one before you open the solution.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Search Posts Only</h3>
+                    <p>A search for "club" currently finds the Book club post and the Events page. Make front-end searches return blog posts only, with a <code>pre_get_posts</code> callback in a must-use plugin <code>exercise-search.php</code> (so you can delete it afterwards: Lesson 5.2 wants books in the search). Compare the results before and after.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The same three guards as the theme's callback, with <code>$query-&gt;is_search()</code> as the third, then <code>$query-&gt;set( 'post_type', 'post' )</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/mu-plugins/exercise-search.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Exercise: Search Posts Only
+ */
+
+/**
+ * Limits front-end search results to blog posts.
+ *
+ * @param WP_Query $query The query WordPress is about to run.
+ */
+function pagesco_search_posts_only( $query ) {
+	if ( is_admin() || ! $query-&gt;is_main_query() || ! $query-&gt;is_search() ) {
+		return;
+	}
+
+	$query-&gt;set( 'post_type', 'post' );
+}
+add_action( 'pre_get_posts', 'pagesco_search_posts_only' );</code></pre>
+                        <pre data-cli><code class="language-bash">curl -s "http://localhost:8080/?s=club" | grep -o '&lt;h2 class="entry-title"&gt;&lt;a [^&gt;]*&gt;[^&lt;]*' | sed 's/&lt;[^&gt;]*&gt;//g'
+rm wp-content/mu-plugins/exercise-search.php
+curl -s "http://localhost:8080/?s=club" | grep -o '&lt;h2 class="entry-title"&gt;&lt;a [^&gt;]*&gt;[^&lt;]*' | sed 's/&lt;[^&gt;]*&gt;//g'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Book club: Dune
+Book club: Dune
+Events</code></pre>
+                        </div>
+                        <p>With the plugin: only the post. After deleting it: the post and the Events page again. The search template, the heading and the "Search results for" text did not change, because the main query is still a search; you only narrowed what it searches.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: The Same List with get_posts()</h3>
+                    <p>Print the "Visit us" pages as "Title: URL" lines with <code>get_posts()</code> instead of a Loop, in a file for <code>wp eval-file</code>. Then prove that it did not set the global <code>$post</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Pass the same arguments as the front page's query. Loop with <code>foreach</code> and give each <code>WP_Post</code> to <code>get_the_title()</code> and <code>get_permalink()</code>. <code>isset( $GLOBALS['post'] )</code> tells you whether a global post exists.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="visit-us-get-posts.php"><code class="language-php">&lt;?php
+$pagesco_pages = get_posts(
+	array(
+		'post_type'     =&gt; 'page',
+		'post_name__in' =&gt; array( 'about', 'events', 'contact' ),
+		'orderby'       =&gt; 'post_name__in',
+	)
+);
+
+foreach ( $pagesco_pages as $pagesco_page ) {
+	printf( "%s: %s\n", get_the_title( $pagesco_page ), get_permalink( $pagesco_page ) );
+}
+
+var_dump( isset( $GLOBALS['post'] ) );</code></pre>
+                        <pre data-cli><code class="language-bash">wp eval-file visit-us-get-posts.php
+rm visit-us-get-posts.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>About Us: http://localhost:8080/about/
+Events: http://localhost:8080/events/
+Contact: http://localhost:8080/contact/
+bool(false)</code></pre>
+                        </div>
+                        <p>The same three pages in the same order, and no global <code>$post</code> afterwards (WP-CLI has no main query, so there was none before either). Use <code>get_posts()</code> when you want data; use <code>WP_Query</code> and a Loop when you want template tags and pagination.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: Combine Arguments</h3>
+                    <p>List the IDs and titles of the News posts published on or after September 10, 2026, sorted by title, with a query that returns only IDs and skips the counting query.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>date_query</code> with <code>'after' =&gt; '2026-09-10'</code> and <code>'inclusive' =&gt; true</code>; <code>'fields' =&gt; 'ids'</code> makes <code>$query-&gt;posts</code> an array of integers.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="recent-news.php"><code class="language-php">&lt;?php
+$pagesco_query = new WP_Query(
+	array(
+		'category_name' =&gt; 'news',
+		'date_query'    =&gt; array(
+			array(
+				'after'     =&gt; '2026-09-10',
+				'inclusive' =&gt; true,
+			),
+		),
+		'orderby'       =&gt; 'title',
+		'order'         =&gt; 'ASC',
+		'fields'        =&gt; 'ids',
+		'no_found_rows' =&gt; true,
+	)
+);
+
+foreach ( $pagesco_query-&gt;posts as $pagesco_id ) {
+	echo $pagesco_id, '  ', get_the_title( $pagesco_id ), "\n";
+}</code></pre>
+                        <pre data-cli><code class="language-bash">wp eval-file recent-news.php
+rm recent-news.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>17  Book club: Dune
+16  Staff picks for the season</code></pre>
+                        </div>
+                        <p>Welcome (September 1) is too old; the other two News posts come in title order. Arguments combine with AND: category <em>and</em> date. With <code>'fields' =&gt; 'ids'</code> there are no post objects, so you pass IDs to <code>get_the_title()</code>; that is the cheapest shape when you only need a few fields.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 4: Sticky Posts and Pagination (Stretch)</h3>
+                    <p>WordPress lets editors make a post "sticky" (the Stick to the top option), stored as an array of IDs in the option <code>sticky_posts</code>. Make the oldest post, Welcome, sticky, and look at which news items appear on <code>/</code> and <code>/page/2/</code>. How many items is page 1 showing now, and why? Which of this lesson's queries are not affected? Undo it afterwards.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>wp option update sticky_posts '[15]' --format=json</code>, then the <code>grep -o</code> for <code>entry-title</code> from the project on both pages. Put back the empty list with <code>'[]'</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">wp option update sticky_posts '[15]' --format=json
+for url in / /page/2/; do echo "$url"; curl -s "http://localhost:8080$url" | grep -o '&lt;h3 class="entry-title"&gt;&lt;a [^&gt;]*&gt;[^&lt;]*' | sed 's/&lt;[^&gt;]*&gt;//g'; done
+wp option update sticky_posts '[]' --format=json</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Success: Updated 'sticky_posts' option.
+/
+Welcome to the new Pages &amp;#038; Co. website
+Hello world!
+Book club: Dune
+Staff picks for the season
+/page/2/
+Welcome to the new Pages &amp;#038; Co. website
+Success: Updated 'sticky_posts' option.</code></pre>
+                        </div>
+                        <p>Page 1 shows <em>four</em> items: the main query found its three newest posts, then WordPress put the sticky post in front of them, on the first page of the blog home only, without counting it against <code>posts_per_page</code>. Page 2 is computed as before, so Welcome appears twice across the two pages. If that bothers the shop, a <code>pre_get_posts</code> callback can set <code>ignore_sticky_posts</code> on the home query, or exclude the sticky IDs from later pages with <code>post__not_in</code>. The front page's pages query and the related box are unaffected: sticky posts only apply to posts on the blog home, and the box sets <code>ignore_sticky_posts</code> anyway.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> The shop wants 5 posts per page in the News category archive, with working page links. What do you write?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="Changing the main query before it runs keeps the 404 decision, the template, the conditional tags and the_posts_pagination in agreement.">
+                                A) A pre_get_posts callback that sets posts_per_page to 5 when the main query is_category( 'news' )
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Common Mistakes 1: who decides whether /category/news/page/2/ exists, before the template runs?">
+                                B) A category-news.php with new WP_Query( array( 'category_name' =&gt; 'news', 'posts_per_page' =&gt; 5, 'paged' =&gt; ... ) )
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That changes every list on the site, including the blog home and all other archives. Is there a narrower tool?">
+                                C) Settings &gt; Reading: Blog pages show at most 5 posts
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> After a secondary Loop without <code>wp_reset_postdata()</code>, what does <code>the_title()</code> print in the template below it?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Template tags read the global post. Who changed it last?">
+                                A) The title of the post the page is about
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Each the_post() of the secondary query replaced the global post, so the last post of that Loop is still current until wp_reset_postdata() restores the main query's post.">
+                                B) The title of the last post of the secondary Loop
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Nothing breaks loudly here. What is left in the global post?">
+                                C) Nothing, and a notice about a missing reset
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> A query with <code>'posts_per_page' =&gt; 4</code> matches 10 posts. What are <code>post_count</code>, <code>found_posts</code> and <code>max_num_pages</code> on page 1?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="post_count is what the object holds now; found_posts is the total. Which one is 10?">
+                                A) 10, 4, 3
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="10 divided into pages of 4 needs how many pages, rounding up?">
+                                B) 4, 10, 2
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="post_count is the 4 posts on this page, found_posts the 10 that match in total, and max_num_pages is 10 divided by 4, rounded up: 3.">
+                                C) 4, 10, 3
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> Which check makes a <code>pre_get_posts</code> callback leave the Pages screen in wp-admin alone?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The admin's list of pages is the main query of that admin screen. What tells you the request is an admin one?">
+                                A) ! $query-&gt;is_main_query()
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="On the admin Pages screen, is_home is false anyway. Which guard protects all admin screens, whatever you check next?">
+                                B) $query-&gt;is_home()
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Admin list screens run a main query too, so is_main_query alone does not exclude them; is_admin() returns early for every admin request.">
+                                C) is_admin()
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> What does <code>new WP_Query( array( 'cat' =&gt; 'news' ) )</code> return on the Pages &amp; Co. site?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="cat expects IDs. What happens to a value that is not a number?">
+                                A) The three News posts
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="cat takes category IDs; the string news is not one, so the filter is dropped silently and every published post comes back. category_name takes the slug.">
+                                B) All four published posts, without any warning
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="WP_Query does not validate argument values loudly. Did Common Mistakes 4 show an error?">
+                                C) An empty result and a notice about an invalid category
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Why is query_posts() so often in old tutorials?</summary>
+                    <p>For years it was the easy way to "change what a template shows": it replaced the global <code>$wp_query</code> with a new query. But the original main query had already run (wasted work), pagination and conditional tags still came from the old one in parts of WordPress, and forgetting <code>wp_reset_query()</code> afterwards broke the rest of the page. Its own documentation now tells you not to use it. Translate old code: a change to the main list becomes <code>pre_get_posts</code>; an extra list becomes <code>new WP_Query</code> with <code>wp_reset_postdata()</code>.</p>
+                </details>
+                <details>
+                    <summary>Pagination on a static front page uses page, not paged?</summary>
+                    <p>Yes, one of WordPress's oldest quirks. When Settings &gt; Reading shows a static page as the front page, the page number of <code>/page/2/</code> arrives in the query variable <code>page</code>, while every other list uses <code>paged</code>. Code that paginates a secondary query on such a front page reads both: <code>max( 1, get_query_var( 'paged' ), get_query_var( 'page' ) )</code>. Pages &amp; Co. shows the latest posts on the front page, so <code>the_posts_pagination()</code> handles it for you.</p>
+                </details>
+                <details>
+                    <summary>How expensive is a WP_Query?</summary>
+                    <p>Usually one or two SQL queries (the posts, plus the counting query unless <code>no_found_rows</code>), then cached lookups for terms and meta, which you can switch off with <code>update_post_term_cache</code> / <code>update_post_meta_cache</code> set to false when you will not use them. Three or four small queries per page are nothing to worry about. A query inside a Loop that runs per post, <code>posts_per_page =&gt; -1</code> on a growing list, or <code>orderby =&gt; rand</code> on thousands of posts are what slow sites down; Lesson 8.2 measures them.</p>
+                </details>
+                <details>
+                    <summary>Does the Query Loop block do pre_get_posts for me?</summary>
+                    <p>When its "inherit query from template" option is on, the block uses the main query, so your <code>pre_get_posts</code> callbacks apply to it as they do to a classic Loop. When it is off, the block builds its own <code>WP_Query</code> from its settings (Lesson 4.1's FAQ showed the code), and filters such as <code>query_loop_block_query_vars</code> change those. Module 6 builds blocks that run their own queries.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Give the News archive its own page size of two posts the right way: extend <code>pagesco_classic_adjust_main_query()</code> with an <code>elseif ( $query-&gt;is_category( 'news' ) )</code> branch (<code>index.php</code> already calls <code>the_posts_pagination()</code>). Check that <code>/category/news/page/2/</code> answers 200 with Welcome, the very URL that answered 404 in Common Mistakes 1. Then decide whether the shop really wants it, and if not, remove the branch again.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Think of the Pages &amp; Co. shop once the Book post type exists (Module 5). Write down three lists the website will need, for example "new arrivals" or "all fantasy books under $15". For each, decide: main query changed with <code>pre_get_posts</code>, a secondary <code>WP_Query</code>, or <code>get_posts()</code>? Which arguments would you pass?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Each request has one <strong>main query</strong> (<code>$wp_query</code>), built from the URL; every other list is a <strong>secondary query</strong> you create</li>
+                        <li><code>new WP_Query( $args )</code> runs at once; Loop over it with <code>$query-&gt;have_posts()</code> / <code>$query-&gt;the_post()</code> and finish with <code>wp_reset_postdata()</code></li>
+                        <li><code>post_count</code> (this page), <code>found_posts</code> (total) and <code>max_num_pages</code> drive pagination; <code>no_found_rows</code> skips the count for lists you do not paginate</li>
+                        <li><code>pre_get_posts</code> changes the main query before it runs; guard it with <code>is_admin()</code>, <code>$query-&gt;is_main_query()</code> and the query's own conditionals</li>
+                        <li><code>the_posts_pagination()</code> paginates the main query; paging a custom query in a template leads to 404s</li>
+                        <li><code>get_posts()</code> returns an array and leaves the global post alone; <code>query_posts()</code> belongs in old tutorials only</li>
+                        <li>Argument pairs such as <code>cat</code> / <code>category_name</code> fail silently with the wrong kind of value</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>An extra list on a page</td><td><code>$q = new WP_Query( array( … ) ); while ( $q-&gt;have_posts() ) { $q-&gt;the_post(); … } wp_reset_postdata();</code></td></tr>
+                            <tr><td>Pages in a fixed order</td><td><code>'post_name__in' =&gt; array( 'about', 'events' ), 'orderby' =&gt; 'post_name__in'</code></td></tr>
+                            <tr><td>Other posts like this one</td><td><code>'category__in' =&gt; wp_get_post_categories( get_the_ID() ), 'post__not_in' =&gt; array( get_the_ID() )</code></td></tr>
+                            <tr><td>Change the main list</td><td><code>add_action( 'pre_get_posts', … )</code> + <code>$query-&gt;set( 'posts_per_page', 3 )</code></td></tr>
+                            <tr><td>Page links for the main list</td><td><code>the_posts_pagination();</code></td></tr>
+                            <tr><td>Page 2 or later?</td><td><code>is_paged()</code></td></tr>
+                            <tr><td>Just the data</td><td><code>get_posts( $args )</code>, or <code>'fields' =&gt; 'ids'</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You queried posts and pages by category, author, date, search, slug and taxonomy, and read the numbers behind pagination</li>
+                        <li>You gave <code>pagesco-classic</code> its first <code>functions.php</code>: a guarded <code>pre_get_posts</code> callback</li>
+                        <li>You built a front page with a secondary Loop and the main Loop together, plus paginated news</li>
+                        <li>You met a 404 from pagination, a wrong post from a missing reset, a site-wide query change and a silent argument mistake, and fixed each one</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>In <a href="lesson_13.html"><strong>Lesson 4.3: functions.php: Supports, Assets, Menus &amp; Widgets</strong></a> the file you started today grows up. <code>pagesco-classic</code> gets theme supports (WordPress takes over the <code>&lt;title&gt;</code>, the search form becomes HTML5), its own stylesheet enqueued with a version (so the notice bar and the front page finally look like the shop), a navigation menu and a widget area, and the accessibility and translation details every theme needs. Then the site switches back to <code>pagesco</code> for Module 5.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Check that <code>pagesco-classic</code> has <code>functions.php</code>, <code>front-page.php</code> and <code>template-parts/related-posts.php</code>, and that <code>/</code> shows three news items</li>
+                    <li>Make sure no exercise files are left in <code>mu-plugins/</code> or the WordPress root, and that <code>sticky_posts</code> is empty again (<code>wp option get sticky_posts --format=json</code> prints <code>[]</code>)</li>
+                    <li>Open <code>wp-content/themes/twentytwentyfive/functions.php</code> again (Lesson 3.1) and list every hook it uses; you will write most of them for <code>pagesco-classic</code> next</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Custom queries are where WordPress development starts to feel like real programming: you decide what data a page needs and ask for exactly that. The bugs in this lesson were all quiet ones, a wrong link here, a 404 there, which is what makes them hard. You now know the three questions that solve almost all of them: which query is this, did it run before or after the template, and did I reset the post? Ask them, and the quiet bugs start speaking up.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_11.html" class="prev-lesson">← Previous: The Loop &amp; Template Tags</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_13.html" class="next-lesson">Next: functions.php: Supports, Assets, Menus &amp; Widgets →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

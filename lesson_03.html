@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Turn PHP Foundations habits into WordPress habits: the WordPress coding standards and PHPCS, prefixes, sanitizing and escaping functions, translation functions, callbacks, the array-of-arguments pattern, WP_Error, globals and the procedural API around core's classes, verified on WordPress 7.1 and PHP 8.5. PHP and WordPress Development Lesson 1.3.">
+    <meta name="author" content="Ray de la Paz">
+    <title>PHP the WordPress Way - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 1: Getting Started</a></li>
+            <li aria-current="page">Lesson 1.3: PHP the WordPress Way</li>
+        </ul>
+    </nav>
+
+    <main id="main-content" data-state="fresh">
+        <div class="container">
+            <header>
+                <h1>🐘 Lesson 1.3: PHP the WordPress Way</h1>
+                <p class="lead">You already write good PHP. WordPress code is still PHP, but it lives by house rules that grew out of twenty years of keeping millions of sites running: its own coding standards, a prefix on everything, a family of functions for escaping, sanitizing and translating, callbacks handed around everywhere, functions that take one array of arguments, and errors returned as objects instead of thrown. This lesson does not reteach PHP. It shows you each house rule, why it exists, and the WordPress function that replaces the habit you brought from PHP Foundations, all run on your Pages &amp; Co. site.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Write PHP that follows the WordPress coding standards, and check it with PHPCS and the <code>WordPress</code> ruleset</li>
+                        <li>Choose the right escaping function for each output context (<code>esc_html</code>, <code>esc_attr</code>, <code>esc_url</code>, <code>wp_kses_post</code>) and the right sanitizing function for each input</li>
+                        <li>Make strings translatable with <code>__()</code>, <code>esc_html__()</code>, <code>_n()</code> and <code>sprintf()</code>, with a text domain and translator comments</li>
+                        <li>Pass callbacks in every form WordPress accepts, and write functions that take an array of arguments merged with <code>wp_parse_args()</code></li>
+                        <li>Handle <code>WP_Error</code> results, and use core's globals (<code>$wpdb</code>, <code>$post</code>, <code>$wp_query</code>) and classes without fighting them</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 130 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_02.html">Lesson 1.2: Your Local Development Environment</a>, and <a href="https://rays-php.netlify.app/" target="_blank" rel="noopener">PHP Foundations</a> (functions, arrays, classes, Composer)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> <code>pagesco_book_card()</code>, a helper that renders a book card the WordPress way and passes PHPCS with zero problems</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (everything here works on any supported WordPress version; WordPress itself still runs on PHP 7.4)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. development site from Lesson 1.2, plus a throwaway Composer container for PHPCS</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#bridge" class="toc-link">From PHP Foundations to WordPress</a></li>
+                        <li><a href="#standards" class="toc-link">The WordPress Coding Standards</a></li>
+                        <li><a href="#prefixes" class="toc-link">Prefix Everything</a></li>
+                        <li><a href="#sanitize-escape" class="toc-link">Sanitize Early, Escape Late</a></li>
+                        <li><a href="#i18n" class="toc-link">Strings Ready for Translation</a></li>
+                        <li><a href="#callbacks" class="toc-link">Callbacks in Every Shape</a></li>
+                        <li><a href="#args" class="toc-link">Arrays of Arguments and WP_Error</a></li>
+                        <li><a href="#globals" class="toc-link">Globals, Classes and the Procedural API</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: The Book Card Helper</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="bridge" class="lesson-section">
+                <h2>🌉 From PHP Foundations to WordPress</h2>
+                <p>In PHP Foundations your code was the whole application. You chose the style, wrote a small <code>e()</code> helper around <code>htmlspecialchars()</code>, read input with <code>filter_input()</code>, threw exceptions, and opened your own PDO connection. In WordPress your code is a guest in a program that core, the theme and every active plugin share. Everything you define lands in the same PHP process, and core has to keep working with code written for versions from a decade ago. That explains every convention in this lesson.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: moving into a shared house</h4>
+                    <p>Your own apartment had your rules. A shared house has house rules, and they exist because of the other people: you label your food (prefixes), you use the shared kitchen tools the way everyone else does (core's functions instead of your own helpers), you leave notes others can read (coding standards and DocBlocks), and you do not rearrange the furniture in the living room (globals). None of the rules is hard. Ignoring them is what causes the fights.</p>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>In PHP Foundations you…</th><th>In WordPress you…</th><th>Where</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>followed the PER Coding Style (4 spaces, braces on their own line for functions)</td><td>follow the WordPress Coding Standards (tabs, spaces inside parentheses, braces on the same line)</td><td>this lesson</td></tr>
+                            <tr><td>started files with <code>declare(strict_types=1);</code></td><td>usually leave it out: core hands you strings where you expect numbers</td><td>this lesson, Common Mistakes 4</td></tr>
+                            <tr><td>escaped with <code>htmlspecialchars()</code> or your <code>e()</code></td><td>escape with <code>esc_html()</code>, <code>esc_attr()</code>, <code>esc_url()</code>, <code>wp_kses_post()</code></td><td>this lesson, 5.3</td></tr>
+                            <tr><td>read input with <code>filter_input()</code></td><td>unslash and sanitize: <code>sanitize_text_field( wp_unslash( $_POST['x'] ) )</code></td><td>this lesson, 5.3</td></tr>
+                            <tr><td>threw and caught exceptions</td><td>receive <code>WP_Error</code> objects from core and check them with <code>is_wp_error()</code></td><td>this lesson</td></tr>
+                            <tr><td>used namespaces and Composer autoloading</td><td>prefix global names (<code>pagesco_</code>), and use namespaces in your own plugin classes</td><td>this lesson, 5.1</td></tr>
+                            <tr><td>opened a PDO connection</td><td>use the shared <code>$wpdb</code> object, and core APIs before SQL</td><td>2.2, 5.5</td></tr>
+                            <tr><td>wrote typed parameters: <code>function f(string $a, int $b)</code></td><td>see core pass one array of arguments: <code>get_posts( array( ... ) )</code></td><td>this lesson</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p>One more difference shapes everything: WordPress 7.1 still runs on PHP 7.4. Core's own code therefore avoids syntax newer than that, and looks old-fashioned next to what you learned. Your theme and plugin are different: they declare their own minimum (a <code>Requires PHP: 8.2</code> line in the plugin header, Lesson 5.1), and above that line you may use enums, <code>match</code>, readonly properties and the rest of modern PHP. You are learning conventions, not going back in time.</p>
+
+                <h3>A practice folder</h3>
+                <p>This lesson's examples are small PHP files that WP-CLI runs with WordPress loaded (<code>wp eval-file</code>, Lesson 1.2). Keep them together in a practice folder inside the WordPress root, so the <code>wp</code> container can see them. From your project folder:</p>
+                <pre data-norun><code class="language-bash">mkdir wordpress/pagesco-practice</code></pre>
+                <p>You delete the folder at the end of the project; nothing in it becomes part of the site.</p>
+            </section>
+
+            <section id="standards" class="lesson-section">
+                <h2>📐 The WordPress Coding Standards</h2>
+                <p>The <a href="https://developer.wordpress.org/coding-standards/wordpress-coding-standards/php/" target="_blank" rel="noopener">WordPress Coding Standards</a> (WPCS) describe how core, the default themes and most professional plugins format PHP. They matter for three practical reasons: code in one style is quicker to review, the plugin and theme directories expect it, and the tool that checks the style also catches real security bugs, as you will see in a minute. Here is a function as PHP Foundations taught you to write it. Save it as <code>wordpress/pagesco-practice/style-before.php</code>:</p>
+                <pre data-file="pagesco-practice/style-before.php"><code class="language-php">&lt;?php
+function bookTitle($title)
+{
+    if ($title == "") {
+        return "Untitled";
+    }
+    $out = "&lt;h2&gt;" . $title . "&lt;/h2&gt;";
+    echo $out;
+    return $out;
+}</code></pre>
+                <p>And here is the same function the WordPress way:</p>
+                <pre data-file="pagesco-practice/style-after.php"><code class="language-php">&lt;?php
+/**
+ * Coding standards demo (Lesson 1.3).
+ *
+ * @package Pagesco
+ */
+
+/**
+ * Prints a book title as a heading and returns the HTML.
+ *
+ * @param string $title The book title.
+ * @return string The heading HTML.
+ */
+function pagesco_book_title( $title ) {
+	if ( '' === $title ) {
+		$title = 'Untitled';
+	}
+	$out = '&lt;h2&gt;' . esc_html( $title ) . '&lt;/h2&gt;';
+	echo $out; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped above.
+	return $out;
+}</code></pre>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Rule</th><th>PER (PHP Foundations)</th><th>WordPress</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Indentation</td><td>4 spaces</td><td>one tab per level</td></tr>
+                            <tr><td>Parentheses</td><td><code>if ($a)</code>, <code>f($x)</code></td><td><code>if ( $a )</code>, <code>f( $x )</code>: a space inside, except for empty <code>()</code></td></tr>
+                            <tr><td>Function braces</td><td>on their own line</td><td>on the same line as the declaration</td></tr>
+                            <tr><td>Names</td><td><code>bookTitle()</code>, <code>$bookTitle</code></td><td><code>pagesco_book_title()</code>, <code>$book_title</code>: lowercase with underscores, prefixed; classes <code>Pagesco_Book_Card</code></td></tr>
+                            <tr><td>Comparisons</td><td><code>$title === ''</code></td><td><code>'' === $title</code> ("Yoda condition": a typo <code>=</code> then fails loudly instead of assigning)</td></tr>
+                            <tr><td>Strings</td><td>either quote style</td><td>single quotes unless you interpolate</td></tr>
+                            <tr><td>Arrays</td><td><code>[1, 2]</code></td><td><code>array( 1, 2 )</code> (WPCS 3 reports short arrays; many teams relax this one rule)</td></tr>
+                            <tr><td>Documentation</td><td>optional</td><td>a DocBlock on every file, function, class and hook</td></tr>
+                            <tr><td>Files</td><td><code>BookCard.php</code></td><td><code>book-card.php</code>, classes in <code>class-pagesco-book-card.php</code> (namespaced plugin code in Module 5 uses PSR-4 names)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Let a tool check it: PHPCS</h3>
+                <p><strong>PHP_CodeSniffer</strong> (PHPCS) reads PHP files and reports every place that breaks a set of rules; <strong>phpcbf</strong>, which comes with it, fixes the mechanical ones for you. The rules for WordPress ship as a Composer package, <code>wp-coding-standards/wpcs</code>. Lesson 8.1 adds PHPCS to your plugin and your editor properly; for now, install it in the practice folder with Composer, which you know from PHP Foundations. Composer is not in the course containers, so start the official Composer image for a moment, with your <code>wordpress/</code> folder mounted at the same path as in the other containers. From your project folder:</p>
+                <pre data-norun><code class="language-bash">docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD/wordpress:/var/www/html" -w /var/www/html/pagesco-practice composer:2 sh</code></pre>
+                <p>(<code>--user</code> makes the files yours on Linux and WSL and does no harm elsewhere. In Windows PowerShell leave it out and write <code>${PWD}</code>.) You get a shell in <code>/var/www/html/pagesco-practice</code> with Composer and PHP 8.5. Create a <code>composer.json</code>, allow the small plugin that registers the WordPress rules with PHPCS, and install the standards:</p>
+                <pre data-composer="pagesco-practice"><code class="language-bash">composer init --name=pagesco/practice --no-interaction
+composer config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+composer require --dev wp-coding-standards/wpcs:^3</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your download lines and versions will differ)</h4>
+                    <pre><code>Writing ./composer.json
+...
+Running composer update wp-coding-standards/wpcs
+Loading composer repositories with package information
+Updating dependencies
+Lock file operations: 5 installs, 0 updates, 0 removals
+  - Locking dealerdirect/phpcodesniffer-composer-installer (v1.2.1)
+  - Locking phpcsstandards/phpcsextra (1.5.1)
+  - Locking phpcsstandards/phpcsutils (1.2.3)
+  - Locking squizlabs/php_codesniffer (3.13.6)
+  - Locking wp-coding-standards/wpcs (3.4.1)
+...
+Generating autoload files
+...
+PHP CodeSniffer Config installed_paths set to ../../phpcsstandards/phpcsextra,../../phpcsstandards/phpcsutils,../../wp-coding-standards/wpcs
+No security vulnerability advisories found.</code></pre>
+                </div>
+                <p>Now ask PHPCS what it thinks of the PHP Foundations version, with the <code>WordPress</code> ruleset (still in the Composer shell):</p>
+                <pre data-composer="pagesco-practice" data-exit="2"><code class="language-bash">vendor/bin/phpcs --standard=WordPress style-before.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>FILE: /var/www/html/pagesco-practice/style-before.php
+--------------------------------------------------------------------------------
+FOUND 20 ERRORS AND 1 WARNING AFFECTING 9 LINES
+--------------------------------------------------------------------------------
+ 1 | ERROR   | [ ] Missing file doc comment
+ 2 | ERROR   | [ ] Function name "bookTitle" is not in snake case format, try
+   |         |     "book_title"
+ 2 | ERROR   | [ ] Missing doc comment for function bookTitle()
+ 2 | ERROR   | [x] Expected 1 spaces after opening parenthesis; 0 found
+ 2 | ERROR   | [x] Expected 1 spaces before closing parenthesis; 0 found
+ 3 | ERROR   | [x] Opening brace should be on the same line as the declaration
+ 4 | ERROR   | [x] Tabs must be used to indent lines; spaces are not allowed
+ 4 | ERROR   | [x] No space after opening parenthesis is prohibited
+ 4 | WARNING | [x] Loose comparisons are not allowed. Expected: "==="; Found:
+   |         |     "=="
+ 4 | ERROR   | [ ] Use Yoda Condition checks, you must.
+ 4 | ERROR   | [x] String "" does not require double quotes; use single quotes
+   |         |     instead
+ 4 | ERROR   | [x] No space before closing parenthesis is prohibited
+ 5 | ERROR   | [x] Tabs must be used to indent lines; spaces are not allowed
+ 5 | ERROR   | [x] String "Untitled" does not require double quotes; use single
+   |         |     quotes instead
+ 6 | ERROR   | [x] Tabs must be used to indent lines; spaces are not allowed
+ 7 | ERROR   | [x] Tabs must be used to indent lines; spaces are not allowed
+ 7 | ERROR   | [x] String "&lt;h2&gt;" does not require double quotes; use single
+   |         |     quotes instead
+ 7 | ERROR   | [x] String "&lt;/h2&gt;" does not require double quotes; use single
+   |         |     quotes instead
+ 8 | ERROR   | [x] Tabs must be used to indent lines; spaces are not allowed
+ 8 | ERROR   | [ ] All output should be run through an escaping function (see
+   |         |     the Security sections in the WordPress Developer Handbooks),
+   |         |     found '$out'.
+ 9 | ERROR   | [x] Tabs must be used to indent lines; spaces are not allowed
+--------------------------------------------------------------------------------
+PHPCBF CAN FIX THE 16 MARKED SNIFF VIOLATIONS AUTOMATICALLY
+--------------------------------------------------------------------------------
+
+...</code></pre>
+                </div>
+                <p>Read a few lines from the left: the line number, ERROR or WARNING, <code>[x]</code> when phpcbf can fix it, and the message. Most of the list is layout. Two lines are not: "Use Yoda Condition checks" and, more important, "All output should be run through an escaping function ... found '$out'". PHPCS just found a cross-site scripting hole: <code>$title</code> goes into the page unescaped. That is the real reason professionals run it. Now the WordPress version:</p>
+                <pre data-composer="pagesco-practice"><code class="language-bash">vendor/bin/phpcs --standard=WordPress style-after.php &amp;&amp; echo "No problems found."</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>No problems found.</code></pre>
+                </div>
+                <p>PHPCS prints nothing when a file is clean, and exits with status 0, so the <code>echo</code> runs. Notice the <code>// phpcs:ignore</code> comment in <code>style-after.php</code>: PHPCS cannot see that <code>$out</code> was built from escaped parts, so the code says so explicitly, with the rule name and a reason. Use that sparingly; usually the better fix is to escape at the <code>echo</code> itself, which is the next section's rule. Type <code>exit</code> to leave the Composer shell when you are done with it; you come back to it in the project.</p>
+            </section>
+
+            <section id="prefixes" class="lesson-section">
+                <h2>🏷️ Prefix Everything</h2>
+                <p>PHP has one global namespace per request, and in WordPress that namespace is shared by core (thousands of functions such as <code>get_the_title()</code>), the theme and every plugin. Two plugins that each declare <code>format_price()</code> stop the site with a fatal error the moment both are active, and you cannot know which plugins your client will install next year. So everything global that you name gets a unique prefix. In this course that is <code>pagesco_</code>:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>What you name</th><th>Example</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Functions and global variables</td><td><code>pagesco_book_card()</code>, <code>$pagesco_books</code></td></tr>
+                            <tr><td>Classes (outside a namespace) and constants</td><td><code>Pagesco_Book_Card</code>, <code>PAGESCO_BOOKS_VERSION</code></td></tr>
+                            <tr><td>Hook names you create (Lesson 2.3)</td><td><code>pagesco_store_notice</code></td></tr>
+                            <tr><td>Options, meta keys, transients</td><td><code>pagesco_books_settings</code>, <code>pagesco_price</code></td></tr>
+                            <tr><td>Script and style handles, CSS classes</td><td><code>pagesco-book-filter</code>, <code>.pagesco-notice</code></td></tr>
+                            <tr><td>Text domain (translation)</td><td><code>pagesco</code> (the theme), <code>pagesco-books</code> (the plugin): the folder slug</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Classes inside a namespace, such as <code>PagesCo\Books\Plugin</code> in Module 5, need no prefix: the namespace is the prefix. Global variables need one even in files you think of as private, because a plugin file runs in the global scope. Ask WordPress whether a name is taken; the function list below is everything defined in this PHP process:</p>
+                <pre data-cli><code class="language-bash">wp eval 'var_dump( function_exists( "format_price" ), function_exists( "get_the_title" ), count( get_defined_functions()["user"] ) );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your count may differ)</h4>
+                    <pre><code>bool(false)
+bool(true)
+int(3690)</code></pre>
+                </div>
+                <p><code>format_price</code> is free today, <code>get_the_title</code> is core's, and thousands of functions are defined by "user" code: WordPress counts as user code to PHP. You will see what happens when you collide with one in Common Mistakes 2. (You may see old code wrapping functions in <code>if ( ! function_exists( 'x' ) )</code>. That is how classic themes let child themes replace a function, Lesson 3.4; it is not a substitute for a prefix.)</p>
+            </section>
+
+            <section id="sanitize-escape" class="lesson-section">
+                <h2>🛡️ Sanitize Early, Escape Late</h2>
+                <p>PHP Foundations taught you to validate input and escape output. WordPress has the same two jobs and a function for each situation. The rule that ties them together is short enough to memorize: <strong>sanitize early, escape late</strong>. Clean data as soon as it arrives, before you store or use it. Escape it at the last moment, right where it is printed, for the exact place it is printed into.</p>
+
+                <div class="mermaid">
+graph TD
+    A["Request: form, URL, REST"] --> B["wp_unslash, then sanitize_* or validate"]
+    B --> C["Use it, or store it in the database"]
+    C --> D["Read it back later"]
+    D --> E["esc_html, esc_attr, esc_url at the echo"]
+    E --> F["HTML sent to the browser"]
+                </div>
+
+                <h3>Escaping: pick the function for the context</h3>
+                <p>The same text needs different treatment inside an HTML element, inside an attribute, as a URL and as user-written HTML. Save this as <code>wordpress/pagesco-practice/escape.php</code> and run it:</p>
+                <pre data-file="pagesco-practice/escape.php"><code class="language-php">&lt;?php
+$pagesco_title = 'Dune &lt;script&gt;alert("hi")&lt;/script&gt; &amp; "Friends"';
+
+echo 'esc_html:    ', esc_html( $pagesco_title ), "\n";
+echo 'esc_attr:    ', esc_attr( 'Pages &amp; Co. "staff pick"' ), "\n";
+echo 'esc_url:     ', esc_url( 'https://example.com/search?q=dune&amp;page=2' ), "\n";
+echo 'esc_url:     ', esc_url( 'javascript:alert(1)' ), "(empty)\n";
+echo 'wp_kses_post:', wp_kses_post( ' &lt;p&gt;A &lt;strong&gt;classic&lt;/strong&gt;&lt;script&gt;alert(1)&lt;/script&gt; &lt;a href="https://example.com" onclick="steal()"&gt;link&lt;/a&gt;&lt;/p&gt;' ), "\n";
+echo 'twice:       ', esc_html( esc_html( 'Pages &amp; Co.' ) ), "\n";</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file pagesco-practice/escape.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>esc_html:    Dune &amp;lt;script&amp;gt;alert(&amp;quot;hi&amp;quot;)&amp;lt;/script&amp;gt; &amp;amp; &amp;quot;Friends&amp;quot;
+esc_attr:    Pages &amp;amp; Co. &amp;quot;staff pick&amp;quot;
+esc_url:     https://example.com/search?q=dune&amp;#038;page=2
+esc_url:     (empty)
+wp_kses_post: &lt;p&gt;A &lt;strong&gt;classic&lt;/strong&gt;alert(1) &lt;a href="https://example.com"&gt;link&lt;/a&gt;&lt;/p&gt;
+twice:       Pages &amp;amp; Co.</code></pre>
+                </div>
+                <ul>
+                    <li><code>esc_html()</code> turns <code>&lt;</code>, <code>&gt;</code>, <code>&amp;</code> and quotes into entities: the script is shown as text, never run. Use it for text between tags.</li>
+                    <li><code>esc_attr()</code> does the same for text inside an attribute value, <code>title="..."</code> or <code>value="..."</code>. Always quote the attribute.</li>
+                    <li><code>esc_url()</code> checks the protocol and encodes the URL for HTML (the <code>&amp;</code> becomes <code>&amp;#038;</code>). A <code>javascript:</code> URL comes back <strong>empty</strong>. Use it for every <code>href</code> and <code>src</code>; <code>esc_url_raw()</code> is the version for URLs you store or redirect to, not print.</li>
+                    <li><code>wp_kses_post()</code> keeps the HTML a post may contain (<code>&lt;strong&gt;</code>, links) and strips the rest: the <code>&lt;script&gt;</code> tags and the <code>onclick</code> attribute are gone, and what was between the script tags is left as harmless text. Use it when the value is <em>supposed</em> to be HTML.</li>
+                    <li>The last line shows a kindness: WordPress's escapers do not double-encode an entity that is already there, so escaping twice prints the same as once. That does not make "escape everything twice" a plan; it means you can escape at output even when you are not sure whether something upstream already did.</li>
+                </ul>
+                <p>Each has a translating twin that escapes a translated string in one call, which you will use constantly in themes: <code>esc_html__()</code> returns, <code>esc_html_e()</code> echoes, and the same for <code>esc_attr__()</code> / <code>esc_attr_e()</code>. The next section shows them.</p>
+
+                <div class="card card-success">
+                    <h4>✅ Why "late"?</h4>
+                    <p>Escaping depends on where the value goes, and only the line that prints it knows that. A title escaped "early" for HTML is wrong in a JSON response, an email subject or an attribute. Escape at the <code>echo</code>, and a reviewer (or PHPCS) can verify each output by looking at one line. Core does the same: <code>the_title()</code> leaves escaping to the template that prints it.</p>
+                </div>
+
+                <h3>Sanitizing: clean what comes in</h3>
+                <p>Sanitizing functions take untrusted input and return the safe version of what you expect. Save <code>wordpress/pagesco-practice/sanitize.php</code>:</p>
+                <pre data-file="pagesco-practice/sanitize.php"><code class="language-php">&lt;?php
+var_dump(
+	sanitize_text_field( "  Dune &lt;b&gt;Messiah&lt;/b&gt;\n by Frank   Herbert " ),
+	sanitize_email( ' Maria.Lopez@Example.com ' ),
+	sanitize_key( 'Book Club!' ),
+	sanitize_title( 'Dune: Part Two' ),
+	absint( '-12 books' ),
+	is_email( 'maria@@example.com' )
+);</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file pagesco-practice/sanitize.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>string(29) "Dune Messiah by Frank Herbert"
+string(23) "Maria.Lopez@Example.com"
+string(8) "bookclub"
+string(13) "dune-part-two"
+int(12)
+bool(false)</code></pre>
+                </div>
+                <ul>
+                    <li><code>sanitize_text_field()</code>: one line of plain text. Tags stripped, line breaks and extra whitespace collapsed. The default for form fields; <code>sanitize_textarea_field()</code> keeps line breaks.</li>
+                    <li><code>sanitize_email()</code>, <code>sanitize_key()</code> (lowercase letters, digits, dashes and underscores: option names, array keys), <code>sanitize_title()</code> (turns text into a URL slug).</li>
+                    <li><code>absint()</code>: a non-negative integer, for IDs and counts. Note that <code>-12</code> became <code>12</code>; when a negative number should be <em>rejected</em> rather than flipped, validate instead.</li>
+                    <li><code>is_email()</code> is a <strong>validator</strong>: it answers yes or no (<code>false</code> here) instead of cleaning. Validate when you can say exactly what is allowed (an ID that must exist, one of three sort orders: <code>in_array( $order, array( 'asc', 'desc' ), true )</code>); sanitize when you can only describe the shape.</li>
+                </ul>
+
+                <h3>WordPress adds slashes to your input</h3>
+                <p>One surprise for PHP developers: for historical reasons, WordPress adds backslashes before quotes in <code>$_GET</code>, <code>$_POST</code>, <code>$_COOKIE</code> and <code>$_SERVER</code> on every request (core calls it <code>wp_magic_quotes()</code>). Remove them with <code>wp_unslash()</code> before you sanitize. See it with a tiny must-use plugin that prints a query-string value at the bottom of the page. It uses the same <code>add_action( 'wp_footer', ... )</code> line as the demo in Lesson 1.2; Lesson 2.3 explains hooks properly. Save <code>wordpress/wp-content/mu-plugins/pagesco-slashes.php</code>:</p>
+                <pre data-file="wp-content/mu-plugins/pagesco-slashes.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Pages &amp; Co. Slashes Demo
+ * Description: Lesson 1.3 demo: shows what WordPress does to a quote in $_GET.
+ */
+
+function pagesco_slashes_demo() {
+	if ( ! isset( $_GET['pagesco_q'] ) ) {
+		return;
+	}
+	$raw   = $_GET['pagesco_q']; // phpcs:ignore -- shown raw on purpose, escaped below.
+	$clean = sanitize_text_field( wp_unslash( $_GET['pagesco_q'] ) );
+
+	echo '&lt;p class="pagesco-q"&gt;raw: ' . esc_html( $raw ) . ' | clean: ' . esc_html( $clean ) . '&lt;/p&gt;';
+}
+add_action( 'wp_footer', 'pagesco_slashes_demo' );</code></pre>
+                <pre data-web="/?pagesco_q=O%27Reilly%20%3Cb%3Ebooks%3C%2Fb%3E" data-select="p.pagesco-q"><code class="language-text">http://localhost:8080/?pagesco_q=O%27Reilly%20%3Cb%3Ebooks%3C%2Fb%3E   (View Source, search for pagesco-q)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;p class="pagesco-q"&gt;raw: O\&amp;#039;Reilly &amp;lt;b&amp;gt;books&amp;lt;/b&amp;gt; | clean: O&amp;#039;Reilly books&lt;/p&gt;</code></pre>
+                </div>
+                <p>The URL sends <code>O'Reilly &lt;b&gt;books&lt;/b&gt;</code>. The raw value arrived as <code>O\'Reilly</code> (escaped here, so the quote prints as <code>&amp;#039;</code> and the tags as text). The clean one is unslashed, then sanitized: quote kept, tags gone. Save a raw value and every apostrophe in your database grows a backslash. Delete the demo:</p>
+                <pre data-cli><code class="language-bash">rm wp-content/mu-plugins/pagesco-slashes.php</code></pre>
+
+                <div class="card card-danger">
+                    <h4>🛑 Two more rules for anything that changes data</h4>
+                    <p>Sanitizing and escaping protect the <em>content</em>. A request that changes something (a form that saves, a link that deletes) also needs to prove it came from your own form, with a <strong>nonce</strong>, and that the user may do it, with <code>current_user_can()</code>. Database queries with values go through <code>$wpdb-&gt;prepare()</code>. You will meet each of them in its lesson (5.3, 5.5); from that lesson on, no form in this course skips them.</p>
+                </div>
+            </section>
+
+            <section id="i18n" class="lesson-section">
+                <h2>🌍 Strings Ready for Translation</h2>
+                <p>WordPress runs in more than two hundred languages, and a site owner picks one in Settings. That only works if every string a visitor or admin sees goes through a translation function instead of being echoed as a literal. Core does it for its own strings, and you see the result when you switch the language. Install the Spanish translation files on your site, ask core for two of its strings in Spanish, then remove the files again:</p>
+                <pre data-cli><code class="language-bash">wp language core install es_ES</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your download lines will differ)</h4>
+                    <pre><code>Downloading translation from https://downloads.wordpress.org/translation/core/7.1.3/es_ES.zip...
+Unpacking the update...
+Installing the latest version...
+Removing the old version of the translation...
+Translation updated successfully.
+Language 'es_ES' installed.
+Success: Installed 1 of 1 languages.</code></pre>
+                </div>
+                <pre data-cli><code class="language-bash">wp eval 'switch_to_locale( "es_ES" ); echo __( "Posts" ), " / ", _n( "%s comment", "%s comments", 3 ), "\n"; restore_previous_locale(); echo __( "Posts" ), "\n";'
+wp language core uninstall es_ES</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Entradas / %s comentarios
+Posts
+Success: Language uninstalled.</code></pre>
+                </div>
+                <p><code>__( 'Posts' )</code> looked the string up in the Spanish translation file and returned "Entradas"; back in English it returns the string unchanged. Your theme and plugin work the same way, with one addition: a <strong>text domain</strong>, the second argument, that says whose translation file to look in. It is the folder slug: <code>pagesco</code> for the theme, <code>pagesco-books</code> for the plugin. The family:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Function</th><th>Does</th><th>Use for</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>__( 'Text', 'pagesco' )</code></td><td>returns the translation</td><td>values you pass on or build with</td></tr>
+                            <tr><td><code>_e( 'Text', 'pagesco' )</code></td><td>echoes it (unescaped)</td><td>rarely; prefer the escaping versions</td></tr>
+                            <tr><td><code>esc_html__()</code> / <code>esc_html_e()</code></td><td>translate + <code>esc_html</code>, return / echo</td><td>text in templates: the everyday choice</td></tr>
+                            <tr><td><code>esc_attr__()</code> / <code>esc_attr_e()</code></td><td>translate + <code>esc_attr</code></td><td>translated attribute values (<code>alt</code>, <code>placeholder</code>)</td></tr>
+                            <tr><td><code>_n( 'single', 'plural', $count, 'pagesco' )</code></td><td>picks the right plural form</td><td>"1 book", "3 books" (some languages have 3 or more forms)</td></tr>
+                            <tr><td><code>_x( 'Post', 'verb', 'pagesco' )</code></td><td>translate with context</td><td>the same English word meaning two things</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Variables go into a translated string through <code>sprintf()</code> placeholders, never by concatenating fragments: a translator must see the whole sentence, because word order changes between languages. A <code>/* translators: */</code> comment directly above explains each placeholder. Save <code>wordpress/pagesco-practice/i18n.php</code>:</p>
+                <pre data-file="pagesco-practice/i18n.php"><code class="language-php">&lt;?php
+$pagesco_count  = 3;
+$pagesco_author = 'Frank Herbert';
+
+printf(
+	/* translators: %s: author name. */
+	esc_html__( 'More books by %s', 'pagesco' ) . "\n",
+	esc_html( $pagesco_author )
+);
+
+foreach ( array( 1, $pagesco_count, 1178 ) as $pagesco_n ) {
+	printf(
+		/* translators: %s: number of books. */
+		esc_html( _n( '%s book in stock', '%s books in stock', $pagesco_n, 'pagesco' ) ) . "\n",
+		esc_html( number_format_i18n( $pagesco_n ) )
+	);
+}</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file pagesco-practice/i18n.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>More books by Frank Herbert
+1 book in stock
+3 books in stock
+1,178 books in stock</code></pre>
+                </div>
+                <p>No translation exists for the <code>pagesco</code> domain yet, so you get the English text, and that is normal: wrapping costs nothing today and makes translation possible later. <code>number_format_i18n()</code> formats numbers for the site's language (<code>1,178</code> in English, <code>1.178</code> in Spanish). The text domain must be a plain string, never a variable or constant: translation tools read your source code without running it. Lesson 8.3 generates the translation template and shows how translation files reach a site; WordPress then loads them by itself, just in time, when the first string of a domain is requested.</p>
+            </section>
+
+            <section id="callbacks" class="lesson-section">
+                <h2>📞 Callbacks in Every Shape</h2>
+                <p>A <strong>callback</strong> is a value that says "call this later", the <code>callable</code> type from PHP Foundations Lesson 2.4. WordPress asks for callbacks everywhere: for every hook (Lesson 2.3), every shortcode, every REST route, every block's render function and every settings field. It accepts every form PHP has. Save <code>wordpress/pagesco-practice/callbacks.php</code>:</p>
+                <pre data-file="pagesco-practice/callbacks.php"><code class="language-php">&lt;?php
+function pagesco_shout( $text ) {
+	return strtoupper( $text ) . '!';
+}
+
+class Pagesco_Formatter {
+	public $suffix = ' (staff pick)';
+
+	public function pick( $text ) {
+		return $text . $this-&gt;suffix;
+	}
+
+	public static function quote( $text ) {
+		return '"' . $text . '"';
+	}
+}
+
+$pagesco_formatter = new Pagesco_Formatter();
+
+$pagesco_callbacks = array(
+	'function name'   =&gt; 'pagesco_shout',
+	'closure'         =&gt; function ( $text ) {
+		return ucfirst( $text );
+	},
+	'arrow function'  =&gt; fn( $text ) =&gt; strrev( $text ),
+	'object method'   =&gt; array( $pagesco_formatter, 'pick' ),
+	'static method'   =&gt; array( 'Pagesco_Formatter', 'quote' ),
+	'static, string'  =&gt; 'Pagesco_Formatter::quote',
+	'first-class'     =&gt; pagesco_shout( ... ),
+);
+
+foreach ( $pagesco_callbacks as $pagesco_label =&gt; $pagesco_callback ) {
+	printf( "%-15s %s\n", $pagesco_label, call_user_func( $pagesco_callback, 'dune' ) );
+}</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file pagesco-practice/callbacks.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>function name   DUNE!
+closure         Dune
+arrow function  enud
+object method   dune (staff pick)
+static method   "dune"
+static, string  "dune"
+first-class     DUNE!</code></pre>
+                </div>
+                <p><code>call_user_func()</code> is what WordPress does internally with your callback when the time comes. Which form to use:</p>
+                <ul>
+                    <li><strong>A prefixed function name</strong>, <code>'pagesco_shout'</code>: the classic choice in themes and small plugins. Anyone can find it, and anyone can unhook it (Lesson 2.3).</li>
+                    <li><strong>An object method</strong>, <code>array( $this, 'register' )</code>: the norm inside plugin classes (Module 5). Removing it later needs the same object.</li>
+                    <li><strong>A static method</strong>, <code>array( 'Class', 'method' )</code> or <code>'Class::method'</code>; with a namespace, <code>array( Plugin::class, 'activate' )</code>.</li>
+                    <li><strong>Closures and arrow functions</strong>: fine for tiny, private things. They have no name, so other code cannot remove them, and the first-class callable syntax <code>pagesco_shout( ... )</code> (PHP 8.1) creates a closure too.</li>
+                </ul>
+                <p>Many WordPress helpers take a callback as data. Escaping a whole list is one line with <code>array_map()</code>, and <code>map_deep()</code> does the same for nested arrays:</p>
+                <pre data-cli><code class="language-bash">wp eval 'print_r( array_map( "esc_html", array( "Dune", "Tom &amp; Jerry", "&lt;b&gt;1984&lt;/b&gt;" ) ) );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Array
+(
+    [0] =&gt; Dune
+    [1] =&gt; Tom &amp;amp; Jerry
+    [2] =&gt; &amp;lt;b&amp;gt;1984&amp;lt;/b&amp;gt;
+)</code></pre>
+                </div>
+            </section>
+
+            <section id="args" class="lesson-section">
+                <h2>🧾 Arrays of Arguments and WP_Error</h2>
+                <p>Count the options of a function such as <code>get_posts()</code>: post type, status, number, order, author, category, date range, and dozens more. Positional parameters would be unusable, so core takes <strong>one associative array</strong> and fills in defaults for every key you leave out. It is the most common shape in the WordPress API: <code>get_posts()</code>, <code>WP_Query</code>, <code>wp_insert_post()</code>, <code>register_post_type()</code>, <code>wp_remote_get()</code> and <code>register_rest_route()</code> all work this way. Save <code>wordpress/pagesco-practice/args.php</code>:</p>
+                <pre data-file="pagesco-practice/args.php"><code class="language-php">&lt;?php
+$pagesco_pages = get_posts(
+	array(
+		'post_type'   =&gt; 'page',
+		'post_status' =&gt; array( 'publish', 'draft' ),
+		'orderby'     =&gt; 'title',
+		'order'       =&gt; 'ASC',
+	)
+);
+
+foreach ( $pagesco_pages as $pagesco_page ) {
+	printf( "%d  %-15s %s\n", $pagesco_page-&gt;ID, $pagesco_page-&gt;post_title, $pagesco_page-&gt;post_status );
+}
+
+// The same function also accepts a query string. You will meet it in older code.
+echo count( get_posts( 'post_type=page&amp;post_status=draft' ) ), " draft page(s)\n";</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file pagesco-practice/args.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>3  Privacy Policy  draft
+2  Sample Page     publish
+1 draft page(s)</code></pre>
+                </div>
+
+                <h3>Write your own with wp_parse_args()</h3>
+                <p>Your functions should offer the same shape when they have more than two or three options. <code>wp_parse_args( $args, $defaults )</code> merges what the caller passed over your defaults (and accepts an array, an object or a query string). Add this to <code>wordpress/pagesco-practice/price.php</code>:</p>
+                <pre data-file="pagesco-practice/price.php"><code class="language-php">&lt;?php
+/**
+ * Formats a book price for display.
+ *
+ * @param float        $amount The price.
+ * @param array|string $args   Optional. currency, decimals, free_label.
+ * @return string The formatted price (plain text, not escaped).
+ */
+function pagesco_format_price( $amount, $args = array() ) {
+	$defaults = array(
+		'currency'   =&gt; '$',
+		'decimals'   =&gt; 2,
+		'free_label' =&gt; 'Free',
+	);
+	$args     = wp_parse_args( $args, $defaults );
+
+	if ( 0.0 === (float) $amount ) {
+		return $args['free_label'];
+	}
+	return $args['currency'] . number_format_i18n( (float) $amount, (int) $args['decimals'] );
+}
+
+echo pagesco_format_price( 14.99 ), "\n";
+echo pagesco_format_price( 1178, array( 'decimals' =&gt; 0 ) ), "\n";
+echo pagesco_format_price( 9.5, array( 'currency' =&gt; '€ ' ) ), "\n";
+echo pagesco_format_price( 0, 'free_label=Gift' ), "\n";</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file pagesco-practice/price.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>$14.99
+$1,178
+€ 9.50
+Gift</code></pre>
+                </div>
+                <p>Callers name only what they change, in any order, and you can add a new option next year without breaking a single call. The price of the pattern is that PHP cannot check the keys for you: a typo such as <code>'decimal' =&gt; 0</code> is silently ignored. Document the keys in the DocBlock, as core does.</p>
+
+                <h3>Errors come back as WP_Error</h3>
+                <p>Core predates widespread use of exceptions, so most functions that can fail <em>return</em> a <code>WP_Error</code> object instead of throwing. It carries an error code (a string you can test), a message and optional data. Check for it with <code>is_wp_error()</code> before you use the result:</p>
+                <pre data-file="pagesco-practice/errors.php"><code class="language-php">&lt;?php
+$pagesco_result = wp_insert_user(
+	array(
+		'user_login' =&gt; 'admin',
+		'user_pass'  =&gt; 'not-used',
+	)
+);
+
+if ( is_wp_error( $pagesco_result ) ) {
+	echo 'Code:    ', $pagesco_result-&gt;get_error_code(), "\n";
+	echo 'Message: ', $pagesco_result-&gt;get_error_message(), "\n";
+} else {
+	echo "Created user {$pagesco_result}\n";
+}
+
+// Some functions return 0 on failure unless you ask for the WP_Error with a last argument of true.
+var_dump( wp_insert_post( array( 'post_title' =&gt; '' ) ) );
+echo wp_insert_post( array( 'post_title' =&gt; '' ), true )-&gt;get_error_message(), "\n";</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file pagesco-practice/errors.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Code:    existing_user_login
+Message: Sorry, that username already exists!
+int(0)
+Content, title, and excerpt are empty.</code></pre>
+                </div>
+                <p>The user <code>admin</code> exists, so <code>wp_insert_user()</code> returned a <code>WP_Error</code> with the code <code>existing_user_login</code>. <code>wp_insert_post()</code> with nothing in it returned <code>0</code> by default, and the error object only when asked with <code>true</code>: read the "Return" line of a function's page in the <a href="https://developer.wordpress.org/reference/" target="_blank" rel="noopener">Code Reference</a> before you rely on it. Your own functions can return <code>new WP_Error( 'pagesco_not_found', __( 'Book not found.', 'pagesco-books' ) )</code>, and REST endpoints (Lesson 7.2) turn such an error into a proper HTTP error response. Exceptions still exist in modern WordPress code, mostly inside classes; at the boundary to WordPress, return a <code>WP_Error</code>.</p>
+            </section>
+
+            <section id="globals" class="lesson-section">
+                <h2>🌐 Globals, Classes and the Procedural API</h2>
+                <p>Core's public API is mostly plain functions (<code>get_post()</code>, <code>wp_insert_user()</code>, <code>the_title()</code>), but most of them are thin wrappers around classes: <code>WP_Post</code>, <code>WP_User</code>, <code>WP_Query</code>, <code>wpdb</code>, <code>WP_Error</code>, and in newer areas <code>WP_REST_Request</code>, <code>WP_Block</code> and <code>WP_HTML_Tag_Processor</code>. A few of these objects live in global variables that core expects you to know:</p>
+                <pre data-cli><code class="language-bash">wp eval 'echo get_class( get_post( 1 ) ), " ", get_class( wp_get_current_user() ), " ", get_class( $GLOBALS["wpdb"] ), " ", get_class( $GLOBALS["wp_query"] ), "\n";' --user=admin</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>WP_Post WP_User wpdb WP_Query</code></pre>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Global</th><th>What it is</th><th>Prefer</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>$wpdb</code></td><td>the database connection, an object of class <code>wpdb</code> (Lessons 2.2, 5.5)</td><td>core functions first; <code>$wpdb-&gt;prepare()</code> for your own SQL</td></tr>
+                            <tr><td><code>$post</code></td><td>the post currently being displayed inside the Loop (Lesson 4.1)</td><td><code>get_post()</code>, <code>get_the_ID()</code></td></tr>
+                            <tr><td><code>$wp_query</code></td><td>the main query: what the URL asked for (Lesson 4.2)</td><td><code>get_queried_object()</code>, conditional tags such as <code>is_page()</code></td></tr>
+                            <tr><td><code>$wp_version</code></td><td>the WordPress version string</td><td><code>get_bloginfo( 'version' )</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Inside a function you reach a global with the <code>global</code> keyword, exactly as PHP Foundations showed (or through <code>$GLOBALS</code>). <code>$wpdb</code> knows the table names, including the prefix (<code>wp_</code> on your site, possibly something else on a client's), so never hard-code <code>wp_posts</code> in PHP:</p>
+                <pre data-file="pagesco-practice/globals.php"><code class="language-php">&lt;?php
+function pagesco_count_pages() {
+	global $wpdb;
+
+	echo 'Prefix: ', $wpdb-&gt;prefix, '  Posts table: ', $wpdb-&gt;posts, "\n";
+
+	return (int) $wpdb-&gt;get_var(
+		$wpdb-&gt;prepare( "SELECT COUNT(*) FROM {$wpdb-&gt;posts} WHERE post_type = %s AND post_status = %s", 'page', 'publish' )
+	);
+}
+
+$pagesco_count = pagesco_count_pages();
+echo 'Published pages: ', $pagesco_count, "\n";</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file pagesco-practice/globals.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Prefix: wp_  Posts table: wp_posts
+Published pages: 1</code></pre>
+                </div>
+                <p>(Counting pages is really a job for <code>wp_count_posts( 'page' )-&gt;publish</code>; the SQL is here to show <code>$wpdb</code>. Lesson 2.2 tours the tables.) Two rules keep globals harmless: <strong>read them, never assign to them</strong> (a stray <code>$post = ...</code> in a template replaces the post that everything after it displays), and <strong>prefer the function</strong> when there is one, because the function also works when the global is not set up yet.</p>
+
+                <div class="card card-info">
+                    <h4>💡 <code>declare(strict_types=1)</code> and WordPress</h4>
+                    <p>WordPress core does not use strict types, and values that come from the database or a form are strings: <code>get_option( 'posts_per_page' )</code> returns <code>"10"</code>, meta values and IDs from URLs are strings. In PHP Foundations every file started with <code>declare(strict_types=1);</code>, which makes PHP refuse such a string where an <code>int</code> is declared (Common Mistakes 4). In WordPress code, leave strict types out of files that call into core or receive its values, and cast deliberately instead: <code>(int) get_option( 'posts_per_page' )</code>, <code>absint( $id )</code>. Self-contained classes in your plugin may use strict types; the course says so where it does.</p>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <p>Make each one on purpose, read what WordPress and PHP tell you, then fix or delete the file. Two of these are silent, which is exactly why they are on the list.</p>
+
+                <h3>1. Escaping with the wrong function (silent)</h3>
+                <pre data-file="pagesco-practice/mistake-escape.php"><code class="language-php">&lt;?php
+$pagesco_url = 'javascript:alert(document.cookie)';
+
+echo '&lt;a href="' . esc_html( $pagesco_url ) . '"&gt;Wrong&lt;/a&gt;', "\n";
+echo '&lt;a href="' . esc_url( $pagesco_url ) . '"&gt;Right&lt;/a&gt;', "\n";</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file pagesco-practice/mistake-escape.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;a href="javascript:alert(document.cookie)"&gt;Wrong&lt;/a&gt;
+&lt;a href=""&gt;Right&lt;/a&gt;</code></pre>
+                </div>
+                <p><strong>What it means:</strong> <code>esc_html()</code> only encodes characters that are special in HTML, and <code>javascript:alert(document.cookie)</code> contains none, so the dangerous link survives untouched: one click runs the attacker's script. <code>esc_url()</code> knows that a URL's <em>protocol</em> matters and drops it. No warning appears anywhere. <strong>Fix:</strong> match the escaper to the context: <code>href</code> and <code>src</code> take <code>esc_url()</code>, other attributes <code>esc_attr()</code>, text <code>esc_html()</code>.</p>
+
+                <h3>2. A name that is already taken</h3>
+                <pre data-file="wp-content/mu-plugins/mistake-redeclare.php" data-norun><code class="language-php">&lt;?php
+function get_the_title( $post = 0 ) {
+	return 'My title';
+}</code></pre>
+                <pre data-web="/" data-text data-raises="Fatal error"><code class="language-text">http://localhost:8080/</code></pre>
+                <div class="card card-output">
+                    <h4>Error (http://localhost:8080/)</h4>
+                    <pre><code>Fatal error: Cannot redeclare function get_the_title() (previously declared in /var/www/html/wp-includes/post-template.php:118) in /var/www/html/wp-content/mu-plugins/mistake-redeclare.php on line 2
+Stack trace:
+#0 /var/www/html/wp-config.php(139): require_once()
+#1 /var/www/html/wp-load.php(50): require_once('/var/www/html/w...')
+#2 /var/www/html/wp-blog-header.php(13): require_once('/var/www/html/w...')
+#3 /var/www/html/index.php(17): require('/var/www/html/w...')
+#4 {main}</code></pre>
+                </div>
+                <p><strong>What it means:</strong> PHP cannot have two functions with the same name, and core declared <code>get_the_title()</code> before WordPress loaded your must-use plugin. The message names both places. Every page, the admin and WP-CLI are down until the file is fixed. The same happens with two plugins that both forgot a prefix, except that you only find out when someone activates the second one. <strong>Fix:</strong> prefix: <code>pagesco_get_title()</code>. To change what <code>get_the_title()</code> returns, use its filter (Lesson 2.3), never a function with its name.</p>
+                <div class="card card-info">
+                    <h4>🧩 Version note: stack traces on fatal errors (PHP 8.5)</h4>
+                    <p>PHP 8.5 prints a <code>Stack trace:</code> under every fatal error, including compile errors such as this one, which is why you see the chain of <code>require_once</code> calls that loaded the file. On PHP 8.4 and older the same error is a single line, ending with <code>on line 2</code>; uncaught exceptions such as the <code>TypeError</code> in mistake 4 have always come with a trace. Many hosts still run 8.4 or 8.3, so do not be surprised by the shorter form there.</p>
+                </div>
+                <pre data-cli><code class="language-bash">rm wp-content/mu-plugins/mistake-redeclare.php</code></pre>
+
+                <h3>3. <code>_e()</code> where you meant <code>__()</code> (silent)</h3>
+                <pre data-file="pagesco-practice/mistake-e.php"><code class="language-php">&lt;?php
+$pagesco_heading = '&lt;h2&gt;' . _e( 'New arrivals', 'pagesco' ) . '&lt;/h2&gt;';
+
+echo "\n", $pagesco_heading, "\n";
+var_dump( _e( 'New arrivals', 'pagesco' ) );</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file pagesco-practice/mistake-e.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>New arrivals
+&lt;h2&gt;&lt;/h2&gt;
+New arrivalsNULL</code></pre>
+                </div>
+                <p><strong>What it means:</strong> <code>_e()</code> <em>echoes</em> the text immediately and returns <code>null</code>. So "New arrivals" is printed while the string is still being built, and the heading itself ends up empty: <code>&lt;h2&gt;&lt;/h2&gt;</code>. The last line shows both halves at once: <code>var_dump()</code> first evaluates <code>_e()</code>, which prints the text, and then dumps its return value, <code>NULL</code>. On a real page the text appears in the wrong place and nothing complains. <strong>Fix:</strong> functions ending in <code>_e</code> echo, the others return. Inside an expression you want <code>__()</code>, or better <code>esc_html__()</code>.</p>
+
+                <h3>4. Strict types meet a WordPress string</h3>
+                <pre data-file="wp-content/mu-plugins/mistake-strict.php" data-norun><code class="language-php">&lt;?php
+declare(strict_types=1);
+
+$pagesco_rule = str_repeat( '-', get_option( 'posts_per_page' ) );</code></pre>
+                <pre data-web="/" data-text data-raises="Fatal error,TypeError"><code class="language-text">http://localhost:8080/</code></pre>
+                <div class="card card-output">
+                    <h4>Error (http://localhost:8080/)</h4>
+                    <pre><code>Fatal error: Uncaught TypeError: str_repeat(): Argument #2 ($times) must be of type int, string given in /var/www/html/wp-content/mu-plugins/mistake-strict.php:4
+Stack trace:
+#0 /var/www/html/wp-content/mu-plugins/mistake-strict.php(4): str_repeat('-', '10')
+#1 /var/www/html/wp-settings.php(508): include_once('/var/www/html/w...')
+#2 /var/www/html/wp-config.php(139): require_once('/var/www/html/w...')
+#3 /var/www/html/wp-load.php(50): require_once('/var/www/html/w...')
+#4 /var/www/html/wp-blog-header.php(13): require_once('/var/www/html/w...')
+#5 /var/www/html/index.php(17): require('/var/www/html/w...')
+#6 {main}
+thrown in /var/www/html/wp-content/mu-plugins/mistake-strict.php on line 4</code></pre>
+                </div>
+                <p><strong>What it means:</strong> options come out of the database as strings, so <code>get_option( 'posts_per_page' )</code> returns <code>"10"</code>. Without <code>declare(strict_types=1)</code> PHP would quietly convert it for <code>str_repeat()</code>; with it, PHP refuses and throws a <code>TypeError</code>. Strict mode is a good thing in self-contained code, but here it turns a harmless string into a site-wide fatal error. <strong>Fix:</strong> drop the declaration, or cast where the value enters your code: <code>str_repeat( '-', (int) get_option( 'posts_per_page' ) )</code>.</p>
+                <pre data-cli><code class="language-bash">rm wp-content/mu-plugins/mistake-strict.php</code></pre>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: The Book Card Helper</h2>
+                <p>Pages &amp; Co. will show books in many places: the shop pages, the news posts, later a custom block (Lesson 6.2). You will write the helper function that renders one book as an HTML card, using every habit from this lesson: a prefix, an array of arguments, escaping per context, translatable strings, a callback, and a clean PHPCS report. It runs from the practice folder with <code>wp eval-file</code>. Allow about 35 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: Write the helper <span class="step-time">(12 min)</span></h3>
+                    <p>Create <code>wordpress/pagesco-practice/book-card.php</code>. Read each comment as you type: it says which rule the line follows.</p>
+                    <pre data-file="pagesco-practice/book-card.php"><code class="language-php">&lt;?php
+/**
+ * Pages &amp; Co. book card helper (Lesson 1.3 practice).
+ *
+ * @package Pagesco
+ */
+
+/**
+ * Returns the HTML of one book card.
+ *
+ * @param array $book {
+ *     Book data.
+ *
+ *     @type string $title  Title.
+ *     @type string $author Author name.
+ *     @type float  $price  Price in dollars.
+ *     @type int    $pages  Number of pages.
+ *     @type string $url    Link to the book.
+ * }
+ * @param array $args {
+ *     Optional. Display options.
+ *
+ *     @type int    $heading_level Heading level, 2 to 6. Default 3.
+ *     @type bool   $show_price    Whether to show the price. Default true.
+ *     @type string $class         CSS class of the card. Default 'pagesco-book-card'.
+ * }
+ * @return string The card HTML, escaped and ready to print.
+ */
+function pagesco_book_card( $book, $args = array() ) {
+	// Array of arguments: callers pass only what they change.
+	$args = wp_parse_args(
+		$args,
+		array(
+			'heading_level' =&gt; 3,
+			'show_price'    =&gt; true,
+			'class'         =&gt; 'pagesco-book-card',
+		)
+	);
+
+	// Validate: a heading level outside 2-6 falls back to the default.
+	$level = absint( $args['heading_level'] );
+	if ( $level &lt; 2 || $level &gt; 6 ) {
+		$level = 3;
+	}
+
+	// Escape late, per context: attribute, URL, text.
+	$html  = '&lt;article class="' . esc_attr( $args['class'] ) . '"&gt;';
+	$html .= sprintf(
+		'&lt;h%1$d&gt;&lt;a href="%2$s"&gt;%3$s&lt;/a&gt;&lt;/h%1$d&gt;',
+		$level,
+		esc_url( $book['url'] ),
+		esc_html( $book['title'] )
+	);
+
+	// Translatable strings with placeholders and translator comments.
+	$html .= '&lt;p&gt;' . esc_html(
+		sprintf(
+			/* translators: %s: author name. */
+			__( 'by %s', 'pagesco' ),
+			$book['author']
+		)
+	) . '&lt;/p&gt;';
+	$html .= '&lt;p&gt;' . esc_html(
+		sprintf(
+			/* translators: %s: number of pages. */
+			_n( '%s page', '%s pages', (int) $book['pages'], 'pagesco' ),
+			number_format_i18n( (int) $book['pages'] )
+		)
+	) . '&lt;/p&gt;';
+
+	if ( $args['show_price'] ) {
+		$html .= '&lt;p class="price"&gt;' . esc_html( '$' . number_format_i18n( (float) $book['price'], 2 ) ) . '&lt;/p&gt;';
+	}
+
+	return $html . '&lt;/article&gt;';
+}</code></pre>
+                    <p>The function <em>returns</em> HTML instead of echoing it, so the caller decides where it goes; because every piece was escaped while it was built, the result is safe to print. That is the one situation where "escape late" happens inside a function, and the DocBlock says so.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: Render three books <span class="step-time">(8 min)</span></h3>
+                    <p>Create <code>wordpress/pagesco-practice/render-cards.php</code>, which loads the helper and renders three books from the Pages &amp; Co. catalog (the same books as the MySQL Foundations bookstore database). <code>array_map()</code> calls an arrow function for each book, and the second call passes options:</p>
+                    <pre data-file="pagesco-practice/render-cards.php"><code class="language-php">&lt;?php
+require __DIR__ . '/book-card.php';
+
+$pagesco_books = array(
+	array( 'title' =&gt; 'Dune', 'author' =&gt; 'Frank Herbert', 'price' =&gt; 14.99, 'pages' =&gt; 412, 'url' =&gt; home_url( '/books/dune/' ) ),
+	array( 'title' =&gt; 'Animal Farm', 'author' =&gt; 'George Orwell', 'price' =&gt; 8.49, 'pages' =&gt; 112, 'url' =&gt; home_url( '/books/animal-farm/' ) ),
+	array( 'title' =&gt; 'Lord of the Rings', 'author' =&gt; 'J.R.R. Tolkien', 'price' =&gt; 15.99, 'pages' =&gt; 1178, 'url' =&gt; home_url( '/books/lord-of-the-rings/' ) ),
+);
+
+echo implode( "\n", array_map( fn( $book ) =&gt; pagesco_book_card( $book ), $pagesco_books ) ), "\n\n";
+echo pagesco_book_card( $pagesco_books[0], array( 'heading_level' =&gt; 2, 'show_price' =&gt; false ) ), "\n";</code></pre>
+                    <pre data-cli><code class="language-bash">wp eval-file pagesco-practice/render-cards.php</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;article class="pagesco-book-card"&gt;&lt;h3&gt;&lt;a href="http://localhost:8080/books/dune/"&gt;Dune&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;by Frank Herbert&lt;/p&gt;&lt;p&gt;412 pages&lt;/p&gt;&lt;p class="price"&gt;$14.99&lt;/p&gt;&lt;/article&gt;
+&lt;article class="pagesco-book-card"&gt;&lt;h3&gt;&lt;a href="http://localhost:8080/books/animal-farm/"&gt;Animal Farm&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;by George Orwell&lt;/p&gt;&lt;p&gt;112 pages&lt;/p&gt;&lt;p class="price"&gt;$8.49&lt;/p&gt;&lt;/article&gt;
+&lt;article class="pagesco-book-card"&gt;&lt;h3&gt;&lt;a href="http://localhost:8080/books/lord-of-the-rings/"&gt;Lord of the Rings&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;by J.R.R. Tolkien&lt;/p&gt;&lt;p&gt;1,178 pages&lt;/p&gt;&lt;p class="price"&gt;$15.99&lt;/p&gt;&lt;/article&gt;
+
+&lt;article class="pagesco-book-card"&gt;&lt;h2&gt;&lt;a href="http://localhost:8080/books/dune/"&gt;Dune&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;by Frank Herbert&lt;/p&gt;&lt;p&gt;412 pages&lt;/p&gt;&lt;/article&gt;</code></pre>
+                    </div>
+                    <p>Three cards, "412 pages" and "1,178 pages" from <code>_n()</code> and <code>number_format_i18n()</code>, and a second Dune card with an <code>&lt;h2&gt;</code> and no price. The <code>/books/...</code> links do not exist yet: the Book post type arrives in Lesson 5.2.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: Try to break it <span class="step-time">(7 min)</span></h3>
+                    <p>A helper is only as good as its worst input. Pretend the data came from a careless import: HTML in the title, quotes in the class, a <code>javascript:</code> link, a silly heading level. Create <code>wordpress/pagesco-practice/break-card.php</code>:</p>
+                    <pre data-file="pagesco-practice/break-card.php"><code class="language-php">&lt;?php
+require __DIR__ . '/book-card.php';
+
+echo pagesco_book_card(
+	array(
+		'title'  =&gt; 'The &lt;em&gt;Hobbit&lt;/em&gt; &amp; "Friends"',
+		'author' =&gt; 'J.R.R. Tolkien&lt;script&gt;alert(1)&lt;/script&gt;',
+		'price'  =&gt; '10.99',
+		'pages'  =&gt; '1',
+		'url'    =&gt; 'javascript:alert(1)',
+	),
+	array(
+		'heading_level' =&gt; 99,
+		'class'         =&gt; 'card" onmouseover="alert(1)',
+	)
+), "\n";</code></pre>
+                    <pre data-cli><code class="language-bash">wp eval-file pagesco-practice/break-card.php</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;article class="card&amp;quot; onmouseover=&amp;quot;alert(1)"&gt;&lt;h3&gt;&lt;a href=""&gt;The &amp;lt;em&amp;gt;Hobbit&amp;lt;/em&amp;gt; &amp;amp; &amp;quot;Friends&amp;quot;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;by J.R.R. Tolkien&amp;lt;script&amp;gt;alert(1)&amp;lt;/script&amp;gt;&lt;/p&gt;&lt;p&gt;1 page&lt;/p&gt;&lt;p class="price"&gt;$10.99&lt;/p&gt;&lt;/article&gt;</code></pre>
+                    </div>
+                    <p>Every attack is harmless: the class's quote is encoded so <code>onmouseover</code> stays inside the attribute value, the link is empty, the tags in the title and author are text, the heading level fell back to 3, and <code>_n()</code> chose "1 page" even though the count arrived as a string.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 4: PHPCS, then clean up <span class="step-time">(8 min)</span></h3>
+                    <p>Open the Composer shell again (the <code>docker run ... composer:2 sh</code> command from the standards section) and check the helper against the WordPress rules. If PHPCS reports anything, fix it (or let <code>vendor/bin/phpcbf book-card.php</code> fix the <code>[x]</code> lines) and run it again until the message appears:</p>
+                    <pre data-composer="pagesco-practice"><code class="language-bash">vendor/bin/phpcs --standard=WordPress book-card.php &amp;&amp; echo "book-card.php: no coding standards problems."</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>book-card.php: no coding standards problems.</code></pre>
+                    </div>
+                    <p>Copy <code>book-card.php</code> to your course notes; Lesson 6.2's block does the same job in JavaScript and PHP, and you will compare. Then leave the site as the next lesson expects it: exit the Composer shell and, from the WP-CLI container, delete the practice folder (with its <code>vendor/</code> folder) and check that only the Mailpit plugin is left in <code>mu-plugins</code>:</p>
+                    <pre data-cli><code class="language-bash">rm -r pagesco-practice
+ls wp-content/mu-plugins</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>mailpit-smtp.php</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>pagesco_book_card()</code> takes a book array and an optional array of arguments merged with <code>wp_parse_args()</code></li>
+                        <li>Every value is escaped for its context: <code>esc_attr()</code> for the class, <code>esc_url()</code> for the link, <code>esc_html()</code> for text</li>
+                        <li>The "by" line and the page count are translatable, with the <code>pagesco</code> text domain, <code>_n()</code> and translator comments</li>
+                        <li>The break test printed no working script, link or attribute</li>
+                        <li>PHPCS with the <code>WordPress</code> standard reports no problems for <code>book-card.php</code></li>
+                        <li>The practice folder is deleted and <code>wp-content/mu-plugins/</code> holds only <code>mailpit-smtp.php</code></li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Recreate the practice folder for the exercises (from the WP-CLI container, or <code>mkdir wordpress/pagesco-practice</code> from your project folder). Exercise 1 needs PHPCS in it again: run the three Composer commands in the Composer shell once more. Delete the folder when you are done. Try each exercise before you open the solution.</p>
+                <pre data-cli><code class="language-bash">mkdir pagesco-practice</code></pre>
+                <pre data-composer="pagesco-practice"><code class="language-bash">composer init --name=pagesco/practice --no-interaction
+composer config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+composer require --dev wp-coding-standards/wpcs:^3</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your download lines and versions will differ)</h4>
+                    <pre><code>Writing ./composer.json
+...
+Running composer update wp-coding-standards/wpcs
+Loading composer repositories with package information
+Updating dependencies
+Lock file operations: 5 installs, 0 updates, 0 removals
+  - Locking dealerdirect/phpcodesniffer-composer-installer (v1.2.1)
+  - Locking phpcsstandards/phpcsextra (1.5.1)
+  - Locking phpcsstandards/phpcsutils (1.2.3)
+  - Locking squizlabs/php_codesniffer (3.13.6)
+  - Locking wp-coding-standards/wpcs (3.4.1)
+...
+Generating autoload files
+...
+PHP CodeSniffer Config installed_paths set to ../../phpcsstandards/phpcsextra,../../phpcsstandards/phpcsutils,../../wp-coding-standards/wpcs
+No security vulnerability advisories found.</code></pre>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Make PHPCS Happy</h3>
+                    <p>Save this function as <code>pagesco-practice/exercise-sale.php</code>, run PHPCS on it, and fix it until PHPCS is silent. Use <code>phpcbf</code> for the mechanical fixes and do the rest by hand. Which problems could phpcbf not fix, and why not?</p>
+                    <pre data-file="pagesco-practice/exercise-sale.php"><code class="language-php">&lt;?php
+function SaleBadge($percent) {
+    if ($percent &gt; 0) {
+        echo "&lt;span class='sale'&gt;" . $percent . "% off&lt;/span&gt;";
+    }
+}</code></pre>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Run <code>vendor/bin/phpcbf exercise-sale.php</code> first, then <code>vendor/bin/phpcs --standard=WordPress exercise-sale.php</code> for what is left: a file DocBlock, a function DocBlock, the prefix and snake_case name, and escaping. A number is safest as <code>absint()</code> or <code>esc_html()</code>; the text "off" should be translatable.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-composer="pagesco-practice" data-exit="2"><code class="language-bash">vendor/bin/phpcs --standard=WordPress exercise-sale.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>FILE: /var/www/html/pagesco-practice/exercise-sale.php
+--------------------------------------------------------------------------------
+FOUND 12 ERRORS AFFECTING 5 LINES
+--------------------------------------------------------------------------------
+ 1 | ERROR | [ ] Missing file doc comment
+ 2 | ERROR | [ ] Function name "SaleBadge" is not in snake case format, try
+   |       |     "sale_badge"
+ 2 | ERROR | [ ] Missing doc comment for function SaleBadge()
+ 2 | ERROR | [x] Expected 1 spaces after opening parenthesis; 0 found
+ 2 | ERROR | [x] Expected 1 spaces before closing parenthesis; 0 found
+ 3 | ERROR | [x] Tabs must be used to indent lines; spaces are not allowed
+ 3 | ERROR | [x] No space after opening parenthesis is prohibited
+ 3 | ERROR | [x] No space before closing parenthesis is prohibited
+ 4 | ERROR | [x] Tabs must be used to indent lines; spaces are not allowed
+ 4 | ERROR | [ ] All output should be run through an escaping function (see the
+   |       |     Security sections in the WordPress Developer Handbooks), found
+   |       |     '$percent'.
+ 4 | ERROR | [x] String "% off&lt;/span&gt;" does not require double quotes; use
+   |       |     single quotes instead
+ 5 | ERROR | [x] Tabs must be used to indent lines; spaces are not allowed
+--------------------------------------------------------------------------------
+PHPCBF CAN FIX THE 8 MARKED SNIFF VIOLATIONS AUTOMATICALLY
+--------------------------------------------------------------------------------
+
+...</code></pre>
+                        </div>
+                        <pre data-file="pagesco-practice/exercise-sale.php"><code class="language-php">&lt;?php
+/**
+ * Sale badge (Lesson 1.3 exercise).
+ *
+ * @package Pagesco
+ */
+
+/**
+ * Prints a sale badge such as "20% off".
+ *
+ * @param int $percent The discount in percent.
+ */
+function pagesco_sale_badge( $percent ) {
+	$percent = absint( $percent );
+	if ( 0 &lt; $percent ) {
+		printf(
+			'&lt;span class="sale"&gt;%s&lt;/span&gt;',
+			/* translators: %d: discount in percent. */
+			esc_html( sprintf( __( '%d%% off', 'pagesco' ), $percent ) )
+		);
+	}
+}</code></pre>
+                        <pre data-composer="pagesco-practice"><code class="language-bash">vendor/bin/phpcs --standard=WordPress exercise-sale.php &amp;&amp; echo "No problems found."</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>No problems found.</code></pre>
+                        </div>
+                        <p>phpcbf fixes layout: tabs, spaces inside parentheses, quote style. It cannot invent a DocBlock, rename a function (every caller would break) or know which escaping function fits: those need a human. <code>%d%%</code> in the translated string prints a literal percent sign after the number.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: One Link, Three Contexts</h3>
+                    <p>Write <code>pagesco-practice/exercise-link.php</code> that prints an author link from this data, escaping each part for its context: <code>$name = 'Ursula K. Le Guin "Earthsea"'</code>, <code>$url = 'https://example.com/authors/?name=le guin&amp;sort=new'</code>, <code>$tooltip = 'All books by Le Guin &lt;3'</code>. The result must be <code>&lt;a href="URL" title="TOOLTIP"&gt;NAME&lt;/a&gt;</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>href</code>: <code>esc_url()</code>. <code>title</code>: <code>esc_attr()</code>. Link text: <code>esc_html()</code>. <code>printf()</code> with three <code>%s</code> keeps the HTML readable. Watch what <code>esc_url()</code> does to the space.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="pagesco-practice/exercise-link.php"><code class="language-php">&lt;?php
+$pagesco_name    = 'Ursula K. Le Guin "Earthsea"';
+$pagesco_url     = 'https://example.com/authors/?name=le guin&amp;sort=new';
+$pagesco_tooltip = 'All books by Le Guin &lt;3';
+
+printf(
+	'&lt;a href="%s" title="%s"&gt;%s&lt;/a&gt;' . "\n",
+	esc_url( $pagesco_url ),
+	esc_attr( $pagesco_tooltip ),
+	esc_html( $pagesco_name )
+);</code></pre>
+                        <pre data-cli><code class="language-bash">wp eval-file pagesco-practice/exercise-link.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>&lt;a href="https://example.com/authors/?name=le%20guin&amp;#038;sort=new" title="All books by Le Guin &amp;lt;3"&gt;Ursula K. Le Guin &amp;quot;Earthsea&amp;quot;&lt;/a&gt;</code></pre>
+                        </div>
+                        <p><code>esc_url()</code> encoded the space as <code>%20</code> and the <code>&amp;</code> as <code>&amp;#038;</code>; <code>esc_attr()</code> turned <code>&lt;</code> into <code>&amp;lt;</code>; <code>esc_html()</code> encoded the quotes in the name.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: Options for the Price</h3>
+                    <p>Extend <code>pagesco_format_price()</code> from the arrays-of-arguments section with a new option <code>'sale' =&gt; 0</code> (a discount in percent). When it is above 0, return the discounted price followed by the old one in parentheses: <code>$11.99 (was $14.99)</code>. Every existing call must keep working unchanged. Test with <code>14.99</code>, <code>array( 'sale' =&gt; 20 )</code> and with no options.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Add the key to <code>$defaults</code>; that is what keeps old calls working. Compute <code>$amount * ( 100 - $sale ) / 100</code> and round it to two decimals before formatting. A small inner helper (or a closure) avoids writing the formatting twice.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="pagesco-practice/exercise-price.php"><code class="language-php">&lt;?php
+function pagesco_format_price( $amount, $args = array() ) {
+	$args = wp_parse_args(
+		$args,
+		array(
+			'currency'   =&gt; '$',
+			'decimals'   =&gt; 2,
+			'free_label' =&gt; 'Free',
+			'sale'       =&gt; 0,
+		)
+	);
+
+	$format = fn( $value ) =&gt; $args['currency'] . number_format_i18n( $value, (int) $args['decimals'] );
+
+	if ( 0.0 === (float) $amount ) {
+		return $args['free_label'];
+	}
+	$sale = absint( $args['sale'] );
+	if ( 0 &lt; $sale ) {
+		$now = round( (float) $amount * ( 100 - $sale ) / 100, 2 );
+		return $format( $now ) . ' (was ' . $format( (float) $amount ) . ')';
+	}
+	return $format( (float) $amount );
+}
+
+echo pagesco_format_price( 14.99 ), "\n";
+echo pagesco_format_price( 14.99, array( 'sale' =&gt; 20 ) ), "\n";
+echo pagesco_format_price( 0 ), "\n";</code></pre>
+                        <pre data-cli><code class="language-bash">wp eval-file pagesco-practice/exercise-price.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>$14.99
+$11.99 (was $14.99)
+Free</code></pre>
+                        </div>
+                        <p>The arrow function captures <code>$args</code> automatically, which is exactly what arrow functions are for. For a real shop, the words "was" and "Free" would go through <code>__()</code> too.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 4: List Helpers Instead of Loops (Stretch)</h3>
+                    <p>WordPress has helpers for lists of arrays or objects that save you many loops: <code>wp_list_filter()</code>, <code>wp_list_pluck()</code> and <code>wp_list_sort()</code>. Using the four books below, print the titles of the books that are in stock, sorted by price from cheapest, as one comma-separated line, without writing a <code>foreach</code>.</p>
+                    <pre data-norun><code class="language-php">$pagesco_books = array(
+	array( 'title' =&gt; 'Dune', 'price' =&gt; 14.99, 'in_stock' =&gt; true ),
+	array( 'title' =&gt; 'The Great Gatsby', 'price' =&gt; 8.99, 'in_stock' =&gt; false ),
+	array( 'title' =&gt; 'Animal Farm', 'price' =&gt; 8.49, 'in_stock' =&gt; true ),
+	array( 'title' =&gt; '1984', 'price' =&gt; 9.99, 'in_stock' =&gt; true ),
+);</code></pre>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>wp_list_filter( $list, array( 'in_stock' =&gt; true ) )</code> keeps matching items; <code>wp_list_sort( $list, 'price', 'ASC' )</code> sorts; <code>wp_list_pluck( $list, 'title' )</code> collects one field. Then <code>implode()</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="pagesco-practice/exercise-lists.php"><code class="language-php">&lt;?php
+$pagesco_books = array(
+	array( 'title' =&gt; 'Dune', 'price' =&gt; 14.99, 'in_stock' =&gt; true ),
+	array( 'title' =&gt; 'The Great Gatsby', 'price' =&gt; 8.99, 'in_stock' =&gt; false ),
+	array( 'title' =&gt; 'Animal Farm', 'price' =&gt; 8.49, 'in_stock' =&gt; true ),
+	array( 'title' =&gt; '1984', 'price' =&gt; 9.99, 'in_stock' =&gt; true ),
+);
+
+$pagesco_in_stock = wp_list_filter( $pagesco_books, array( 'in_stock' =&gt; true ) );
+$pagesco_sorted   = wp_list_sort( $pagesco_in_stock, 'price', 'ASC' );
+
+echo implode( ', ', wp_list_pluck( $pagesco_sorted, 'title' ) ), "\n";</code></pre>
+                        <pre data-cli><code class="language-bash">wp eval-file pagesco-practice/exercise-lists.php
+rm -r pagesco-practice</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Animal Farm, 1984, Dune</code></pre>
+                        </div>
+                        <p>The three helpers work on arrays of arrays and arrays of objects alike, so the same code works on the <code>WP_Post</code> objects that <code>get_posts()</code> returns. The <code>rm</code> removes the practice folder once you are done with all the exercises.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> A template prints a link to a book's website, which a staff member typed into a form. Which line is right?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="esc_html encodes HTML characters but leaves a javascript: link intact. Which escaper checks the protocol?">
+                                A) echo '&lt;a href="' . esc_html( $url ) . '"&gt;Website&lt;/a&gt;';
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="esc_attr is right for most attributes, but an href is a URL. What can a URL contain that an ordinary attribute value cannot?">
+                                B) echo '&lt;a href="' . esc_attr( $url ) . '"&gt;Website&lt;/a&gt;';
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="href and src take esc_url, which encodes the URL for HTML and drops dangerous protocols such as javascript:.">
+                                C) echo '&lt;a href="' . esc_url( $url ) . '"&gt;Website&lt;/a&gt;';
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> What does <code>wp eval-file</code> print for this file?</p>
+                        <pre data-file="quiz-args.php" data-wp><code class="language-php">&lt;?php
+function pagesco_quiz( $args = array() ) {
+	$args = wp_parse_args( $args, array( 'size' =&gt; 'small', 'color' =&gt; 'blue' ) );
+	return $args['size'] . ' ' . $args['color'];
+}
+echo pagesco_quiz( array( 'color' =&gt; 'red', 'colour' =&gt; 'green' ) );</code></pre>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="wp_parse_args keeps the default size, uses the passed color, and simply carries the misspelled colour key along without using it.">
+                                A) small red
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The caller did pass a color. Which value wins when both the defaults and the arguments have the key?">
+                                B) small blue
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="PHP cannot know that colour was meant to be color. What happens to a key the function never reads?">
+                                C) small green
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> Which line follows the WordPress coding standards?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Look at the name, the spaces inside the parentheses and the order of the comparison.">
+                                A) if ($count == 0) { pagesoCount(); }
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Spaces inside the parentheses, a Yoda condition with ===, and a prefixed snake_case function name.">
+                                B) if ( 0 === $count ) { pagesco_reset_count(); }
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The spacing is right, but which side of the comparison should the constant be on, and how strict should it be?">
+                                C) if ( $count == 0 ) { pagesco_reset_count(); }
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> <code>$id = wp_insert_user( $data );</code> Which check belongs on the next line?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="wp_insert_user returns the new user ID or a WP_Error object; is_wp_error tells the two apart, and the error object has the code and message.">
+                                A) if ( is_wp_error( $id ) ) { /* show $id-&gt;get_error_message() */ }
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="A WP_Error object is truthy, so this check passes on failure too. What does the function return when it fails?">
+                                B) if ( ! $id ) { /* failed */ }
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="wp_insert_user does not throw on a taken user name. How does core usually report failure?">
+                                C) A try/catch block around the call
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> A form field arrives as <code>$_POST['nickname']</code>. Which line saves it correctly?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Escaping is for output. What happens to the slashes WordPress added, and what do you store?">
+                                A) $nick = esc_html( $_POST['nickname'] );
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Sanitizing is right, but WordPress added backslashes before any quote. What removes them first?">
+                                B) $nick = sanitize_text_field( $_POST['nickname'] );
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Unslash first (WordPress adds slashes to request data), then sanitize on input. Escape later, when you print it.">
+                                C) $nick = sanitize_text_field( wp_unslash( $_POST['nickname'] ) );
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Can I use modern PHP (enums, match, readonly, typed properties) in WordPress code?</summary>
+                    <p>Yes, in your own theme and plugin, as long as you declare the minimum: a <code>Requires PHP: 8.2</code> header (Lesson 5.1) makes WordPress refuse to activate the plugin on an older PHP, with a clear message, instead of crashing. Core itself sticks to PHP 7.4 syntax because it must run everywhere. A plugin meant for the public directory often chooses a lower minimum to reach more sites; a plugin for one client can use whatever their host runs.</p>
+                </details>
+                <details>
+                    <summary>Do I really have to write array() instead of []?</summary>
+                    <p>WPCS 3 reports short arrays because core uses the long form, and plugins submitted to the directory are usually checked against WPCS. Many agencies switch that one rule off in their PHPCS configuration (Lesson 8.1 shows how) and write <code>[]</code>. The course uses <code>array()</code> in theme and plugin files and allows <code>[]</code> in short demos. Pick one per project and let the tool enforce it.</p>
+                </details>
+                <details>
+                    <summary>Why not just use htmlspecialchars() and my e() helper?</summary>
+                    <p><code>htmlspecialchars()</code> is roughly what <code>esc_html()</code> does, but the WordPress functions know the site's character set, do not double-encode existing entities, have filters that security plugins can hook, and come in context-specific versions (<code>esc_url()</code> has no PHP equivalent). Reviewers and PHPCS also recognize them; a home-made helper gets flagged as unescaped output.</p>
+                </details>
+                <details>
+                    <summary>Is WordPress procedural or object-oriented?</summary>
+                    <p>Both. The public API you call is mostly functions, because that is what keeps twenty years of themes and plugins working. Underneath are classes (<code>WP_Query</code>, <code>WP_Post</code>, <code>WP_REST_Server</code>, <code>WP_Block</code>), and newer parts such as the HTML API and the Interactivity API are designed object-first. Your plugin in Module 5 will be object-oriented with a namespace and Composer autoloading; it talks to WordPress through functions and hooks.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Point PHPCS at code you did not write. With the practice folder set up, run <code>vendor/bin/phpcs --standard=WordPress --report=summary ../wp-content/plugins/hello.php</code> (Hello Dolly, which ships with WordPress) and then at one of Twenty Twenty-Five's PHP files, for example <code>../wp-content/themes/twentytwentyfive/functions.php</code>. How clean are they? Then try <code>--standard=WordPress-Core</code> and <code>--standard=WordPress-Extra</code>, the smaller rule sets inside <code>WordPress</code>, and write down which kinds of problems disappear. Which set would you choose for a client project, and why?</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Make two columns: "habits I keep from PHP Foundations" and "habits I change for WordPress". Put at least four items in each (strict types, naming, escaping, error handling, arrays...). For one habit you are changing, write why WordPress does it differently in your own words. Which rule felt most like going backwards, and has the reason behind it changed how you feel about it?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>WordPress code shares one PHP process with core and every plugin, so it follows house rules: the WordPress Coding Standards, checked with PHPCS and the <code>WordPress</code> ruleset</li>
+                        <li><strong>Prefix</strong> every global name (<code>pagesco_</code>); text domains are the folder slug</li>
+                        <li><strong>Sanitize early</strong> (<code>wp_unslash()</code> + <code>sanitize_text_field()</code>, <code>absint()</code>, validators), <strong>escape late</strong> per context (<code>esc_html()</code>, <code>esc_attr()</code>, <code>esc_url()</code>, <code>wp_kses_post()</code>)</li>
+                        <li>Wrap visible strings in <code>__()</code> / <code>esc_html__()</code> / <code>_n()</code>, with <code>sprintf()</code> placeholders and translator comments; <code>_e()</code> functions echo</li>
+                        <li>Callbacks come as names, closures, <code>array( $obj, 'method' )</code> or static methods; named ones can be unhooked</li>
+                        <li>Many-option functions take one array merged with <code>wp_parse_args()</code>; failures come back as <code>WP_Error</code>, checked with <code>is_wp_error()</code></li>
+                        <li>Read core's globals (<code>$wpdb</code>, <code>$post</code>, <code>$wp_query</code>), never assign to them, and prefer the function that wraps them; values from the database are strings, so cast instead of using strict types</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Text between tags</td><td><code>esc_html( $text )</code>, translated: <code>esc_html_e( 'Text', 'pagesco' )</code></td></tr>
+                            <tr><td>An attribute value</td><td><code>esc_attr( $value )</code></td></tr>
+                            <tr><td>A link or image source</td><td><code>esc_url( $url )</code></td></tr>
+                            <tr><td>HTML a post may contain</td><td><code>wp_kses_post( $html )</code></td></tr>
+                            <tr><td>A text field from a form</td><td><code>sanitize_text_field( wp_unslash( $_POST['x'] ) )</code></td></tr>
+                            <tr><td>An ID from a URL</td><td><code>absint( $_GET['id'] )</code></td></tr>
+                            <tr><td>"3 books"</td><td><code>sprintf( _n( '%s book', '%s books', $n, 'pagesco' ), number_format_i18n( $n ) )</code></td></tr>
+                            <tr><td>Defaults for options</td><td><code>$args = wp_parse_args( $args, $defaults );</code></td></tr>
+                            <tr><td>Check a result</td><td><code>if ( is_wp_error( $result ) ) { ... }</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You installed the WordPress coding standards and let PHPCS find a security hole in PHP Foundations-style code</li>
+                        <li>You escaped, sanitized and unslashed real values, and saw core translate itself into Spanish</li>
+                        <li>You passed callbacks in seven shapes and wrote functions with arrays of arguments and <code>WP_Error</code> handling</li>
+                        <li>You built <code>pagesco_book_card()</code>, survived a break test with it, and got a clean PHPCS report</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>In <a href="lesson_04.html"><strong>Lesson 2.1: The Content Model</strong></a> you look at what WordPress stores: posts, pages, media and revisions (all of them rows of one kind, as you will see), categories and tags, users with roles and capabilities, and settings. You will read the block markup the editor saves into a post, and stock the Pages &amp; Co. site with its first staff accounts, pages and news posts, the content every lesson after it builds on.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>wordpress/pagesco-practice/</code> is deleted and <code>wp-content/mu-plugins/</code> holds only <code>mailpit-smtp.php</code></li>
+                    <li>Keep your copy of <code>book-card.php</code> in your notes</li>
+                    <li>Bookmark the <a href="https://developer.wordpress.org/apis/security/" target="_blank" rel="noopener">Security</a> and <a href="https://developer.wordpress.org/apis/internationalization/" target="_blank" rel="noopener">Internationalization</a> pages of the Common APIs handbook; you will come back to them in Lessons 5.3 and 8.3</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>A wall of PHPCS errors on code you were proud of stings for a moment. Look at what it really says: tabs and spaces, which a tool fixes in a second, plus one real security problem that you now know how to spot yourself. Everything you learned in PHP Foundations still counts; you have added a dialect. Within a few lessons the WordPress style will feel normal, and you will start noticing missing escapes in other people's code.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_02.html" class="prev-lesson">← Previous: Your Local Development Environment</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_04.html" class="next-lesson">Next: The Content Model →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

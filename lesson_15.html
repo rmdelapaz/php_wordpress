@@ -1,0 +1,1705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Custom post types, taxonomies and meta in a WordPress plugin: register a book post type, a genre taxonomy and book meta with register_post_meta and show_in_rest, add a meta box and admin columns, and seed eleven books with WP-CLI. PHP and WordPress Development Lesson 5.2.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Custom Post Types, Taxonomies &amp; Meta - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 5: Plugin Development</a></li>
+            <li aria-current="page">Lesson 5.2: Custom Post Types, Taxonomies &amp; Meta</li>
+        </ul>
+    </nav>
+
+
+    <main id="main-content" data-state="after:lesson_14">
+        <div class="container">
+            <header>
+                <h1>📚 Lesson 5.2: Custom Post Types, Taxonomies &amp; Meta</h1>
+                <p class="lead">Pages &amp; Co. sells books, but WordPress only knows about posts and pages so far. In this lesson you teach it about books: a <code>book</code> post type with its own archive at <code>/books/</code>, a <code>genre</code> taxonomy to file them under, and the book details (author, price, pages) as meta the REST API and the block editor can read. Each one is a feature class in the plugin you built last lesson. Then you fill the shelves, seeding the eleven classics from the Pages &amp; Co. catalog with one WP-CLI command.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Register a custom post type with <code>register_post_type()</code> on <code>init</code>, with labels, an archive and REST support</li>
+                        <li>Register a custom taxonomy with <code>register_taxonomy()</code> and attach it to the post type</li>
+                        <li>Register typed post meta with <code>register_post_meta()</code>, and explain why the keys are public and <code>show_in_rest</code></li>
+                        <li>Add a meta box and extra admin columns so editors can see and change a book's details</li>
+                        <li>Flush rewrite rules at the right moment, and seed content safely with a WP-CLI script</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 130 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_14.html">Lesson 5.1: Your First Plugin</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> the <code>book</code> post type, the <code>genre</code> taxonomy, book meta, a "Book details" meta box and admin columns as features of <code>pagesco-books</code>, with eleven books seeded into the catalog</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (<code>register_post_meta</code> with a <code>label</code> is 6.7+; nothing here needs 7.x)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 5.1, with <code>pagesco-books</code> active and <code>pagesco</code> the theme</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#why-cpt" class="toc-link">Why Books Deserve Their Own Type</a></li>
+                        <li><a href="#post-type" class="toc-link">The Book Post Type</a></li>
+                        <li><a href="#taxonomy" class="toc-link">The Genre Taxonomy</a></li>
+                        <li><a href="#meta" class="toc-link">Book Meta</a></li>
+                        <li><a href="#admin" class="toc-link">Seeing Books in the Admin</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Fill the Shelves</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="why-cpt" class="lesson-section">
+                <h2>📚 Why Books Deserve Their Own Type</h2>
+                <p>Lesson 2.1 showed that in WordPress everything is a row in <code>wp_posts</code>, told apart by its <code>post_type</code>: a blog entry is a <code>post</code>, the About page is a <code>page</code>, an uploaded image is an <code>attachment</code>. A <strong>custom post type</strong> is simply a new value for that column, with its own admin menu, its own URLs and its own editing screen. Pages &amp; Co. could store each book as a page, but then a book would sit in the same list as "About" and "Contact", have no price or author of its own, and share the <code>/about/</code>-style URLs. A <code>book</code> type gives the shop a Books menu, an archive at <code>/books/</code>, a single-book URL like <code>/books/dune/</code>, and a clean place to hang the details.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: a new drawer in the same filing cabinet</h4>
+                    <p>In Lesson 2.1 we called <code>wp_posts</code> one big filing cabinet. A custom post type is a new labelled drawer in it, not a new cabinet: books are stored in the same table as posts and pages, with the same columns, so everything you already know (the Loop, <code>WP_Query</code>, revisions, the block editor) works on them for free. A <strong>taxonomy</strong> is the colored tabs you clip onto the files to group them (a book's genres), and <strong>meta</strong> is the index card you tuck into each file with its specific facts (this book's price, its author, its page count).</p>
+                </div>
+
+                <p>Three WordPress functions do the work, all called on the <code>init</code> action (the moment, from Lesson 2.3, when WordPress is ready and asks every plugin to register its things):</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Function</th><th>Registers</th><th>In the project</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>register_post_type()</code></td><td>A kind of content</td><td><code>book</code></td></tr>
+                            <tr><td><code>register_taxonomy()</code></td><td>A way to group that content</td><td><code>genre</code></td></tr>
+                            <tr><td><code>register_post_meta()</code></td><td>A named field on each item</td><td><code>pagesco_author</code>, <code>pagesco_price</code>, …</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Each becomes a feature class in <code>pagesco-books</code>, following the rule from Lesson 5.1: one class in <code>src/</code> implementing <code>Feature</code>, added to <code>Plugin::feature_classes()</code>. The post type and taxonomy also touch the URL rules, so the activation hook finally gets its second job.</p>
+            </section>
+
+            <section id="post-type" class="lesson-section">
+                <h2>📗 The Book Post Type</h2>
+                <p>Create <code>wordpress/wp-content/plugins/pagesco-books/src/BookPostType.php</code>. The class registers the type on <code>init</code>; it also exposes a <code>NAME</code> constant, so no other file has to spell <code>'book'</code> as a string (and risk a typo WordPress would silently treat as a different type):</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/BookPostType.php"><code class="language-php">&lt;?php
+/**
+ * The book post type: the shop's catalog.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books;
+
+/**
+ * Registers the book post type on init.
+ */
+final class BookPostType implements Feature {
+
+	/**
+	 * The post type's name, stored in wp_posts.post_type.
+	 */
+	public const NAME = 'book';
+
+	/**
+	 * Hooks the registration into init.
+	 */
+	public function register(): void {
+		add_action( 'init', array( $this, 'register_post_type' ) );
+	}
+
+	/**
+	 * Registers the post type. Also called by Activator::activate().
+	 */
+	public function register_post_type(): void {
+		register_post_type(
+			self::NAME,
+			array(
+				'labels'        =&gt; array(
+					'name'          =&gt; __( 'Books', 'pagesco-books' ),
+					'singular_name' =&gt; __( 'Book', 'pagesco-books' ),
+					'add_new_item'  =&gt; __( 'Add Book', 'pagesco-books' ),
+					'edit_item'     =&gt; __( 'Edit Book', 'pagesco-books' ),
+					'new_item'      =&gt; __( 'New Book', 'pagesco-books' ),
+					'view_item'     =&gt; __( 'View Book', 'pagesco-books' ),
+					'view_items'    =&gt; __( 'View Books', 'pagesco-books' ),
+					'search_items'  =&gt; __( 'Search Books', 'pagesco-books' ),
+					'not_found'     =&gt; __( 'No books found.', 'pagesco-books' ),
+					'all_items'     =&gt; __( 'All Books', 'pagesco-books' ),
+					'archives'      =&gt; __( 'Book Archives', 'pagesco-books' ),
+					'item_updated'  =&gt; __( 'Book updated.', 'pagesco-books' ),
+				),
+				'public'        =&gt; true,
+				'has_archive'   =&gt; 'books',
+				'rewrite'       =&gt; array( 'slug' =&gt; 'books' ),
+				'show_in_rest'  =&gt; true,
+				'rest_base'     =&gt; 'books',
+				'menu_position' =&gt; 5,
+				'menu_icon'     =&gt; 'dashicons-book',
+				'supports'      =&gt; array( 'title', 'editor', 'excerpt', 'thumbnail', 'custom-fields' ),
+			)
+		);
+	}
+}</code></pre>
+                <p>The <code>$args</code> are the whole personality of the type. The ones that matter most here:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Argument</th><th>What it does</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>public =&gt; true</code></td><td>Visitors can reach books; a shorthand that also sets <code>show_ui</code>, <code>show_in_nav_menus</code> and more</td></tr>
+                            <tr><td><code>has_archive =&gt; 'books'</code>, <code>rewrite =&gt; ['slug' =&gt; 'books']</code></td><td>The archive at <code>/books/</code> and single books at <code>/books/&lt;slug&gt;/</code></td></tr>
+                            <tr><td><code>show_in_rest =&gt; true</code>, <code>rest_base =&gt; 'books'</code></td><td>Edit books in the block editor (it talks to REST) and expose <code>/wp/v2/books</code> (Module 7)</td></tr>
+                            <tr><td><code>menu_icon</code>, <code>menu_position</code></td><td>A Dashicon and where the Books menu sits in wp-admin</td></tr>
+                            <tr><td><code>supports</code></td><td>Which editor panels appear: a title, the block editor, an excerpt, a featured image, and <code>custom-fields</code> (required for meta to reach REST)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Now list the feature so <code>Plugin::boot()</code> starts it. In your editor, add <code>BookPostType::class,</code> to the array in <code>src/Plugin.php</code> under <code>StoreNotice::class,</code>; the command below does the same with <code>sed</code> and prints the result:</p>
+                <pre data-cli><code class="language-bash">sed -i '/StoreNotice::class,/a\			BookPostType::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+grep -n -A 3 "return array(" wp-content/plugins/pagesco-books/src/Plugin.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>75:		return array(
+76-			StoreNotice::class,
+77-			BookPostType::class,
+78-		);</code></pre>
+                </div>
+                <p>The type registers on every request now, but its new URL rules are not yet written to the database, so <code>/books/</code> would 404. <strong>Rewrite rules</strong> are the table WordPress consults to turn a pretty URL into a query (Lesson 2.2 listed <code>rewrite_rules</code> among the autoloaded options); they are rebuilt only when something calls <code>flush_rewrite_rules()</code>, because rebuilding them is expensive. Flush them once by hand for now:</p>
+                <pre data-cli><code class="language-bash">wp rewrite flush
+wp rewrite list --match=/books/ --fields=match,query,source</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Rewrite rules flushed.
++--------------------------+-------------------------------------------------+--------+
+| match                    | query                                           | source |
++--------------------------+-------------------------------------------------+--------+
+| books/?$                 | index.php?post_type=book                        | other  |
+| (.?.+?)(?:/([0-9]+))?/?$ | index.php?pagename=$matches[1]&amp;page=$matches[2] | page   |
+| ([^/]+)(?:/([0-9]+))?/?$ | index.php?name=$matches[1]&amp;page=$matches[2]     | post   |
++--------------------------+-------------------------------------------------+--------+</code></pre>
+                </div>
+                <p>The first rule, source <code>other</code>, is the book archive. Ask WordPress what it now knows, and visit the type's pages:</p>
+                <pre data-cli><code class="language-bash">wp post-type list --fields=name,label,public,has_archive
+wp eval 'echo get_post_type_object( "book" )->labels->add_new_item, "\n";'
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/books/</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+---------------------+-----------------------+--------+-------------+
+| name                | label                 | public | has_archive |
++---------------------+-----------------------+--------+-------------+
+| post                | Posts                 | 1      |             |
+| page                | Pages                 | 1      |             |
+| attachment          | Media                 | 1      |             |
+| revision            | Revisions             |        |             |
+| nav_menu_item       | Navigation Menu Items |        |             |
+| custom_css          | Custom CSS            |        |             |
+| customize_changeset | Changesets            |        |             |
+| oembed_cache        | oEmbed Responses      |        |             |
+| user_request        | User Requests         |        |             |
+| wp_block            | Patterns              |        |             |
+| wp_template         | Templates             |        |             |
+| wp_template_part    | Template Parts        |        |             |
+| wp_global_styles    | Global Styles         |        |             |
+| wp_navigation       | Navigation Menus      |        |             |
+| wp_font_family      | Font Families         |        |             |
+| wp_font_face        | Font Faces            |        |             |
+| book                | Books                 | 1      | books       |
++---------------------+-----------------------+--------+-------------+
+Add Book
+200</code></pre>
+                </div>
+                <p>A real type with its labels, a working archive. There are no books in it yet, so the archive is empty; you will fix that in the project. Flushing by hand works today, but a site owner who activates the plugin on a live server will not run WP-CLI commands. The right home for the flush is the activation hook; you will move it there once the taxonomy is in too, so a single activation sets up both.</p>
+            </section>
+
+            <section id="taxonomy" class="lesson-section">
+                <h2>🏷️ The Genre Taxonomy</h2>
+                <p>WordPress already has two taxonomies you met in Lesson 2.1: categories (hierarchical) and tags (flat). A <strong>custom taxonomy</strong> adds your own. Books are grouped by <code>genre</code> (Fiction, Science Fiction, Classic, Fantasy, Dystopian), and genres can nest, so the taxonomy is hierarchical like categories. Create <code>src/GenreTaxonomy.php</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/GenreTaxonomy.php"><code class="language-php">&lt;?php
+/**
+ * The genre taxonomy for books.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books;
+
+/**
+ * Registers the genre taxonomy on init.
+ */
+final class GenreTaxonomy implements Feature {
+
+	/**
+	 * The taxonomy's name, stored in wp_term_taxonomy.taxonomy.
+	 */
+	public const NAME = 'genre';
+
+	/**
+	 * Hooks the registration into init.
+	 */
+	public function register(): void {
+		add_action( 'init', array( $this, 'register_taxonomy' ) );
+	}
+
+	/**
+	 * Registers the taxonomy for books. Also called by Activator::activate().
+	 */
+	public function register_taxonomy(): void {
+		register_taxonomy(
+			self::NAME,
+			array( BookPostType::NAME ),
+			array(
+				'labels'            =&gt; array(
+					'name'          =&gt; __( 'Genres', 'pagesco-books' ),
+					'singular_name' =&gt; __( 'Genre', 'pagesco-books' ),
+					'search_items'  =&gt; __( 'Search Genres', 'pagesco-books' ),
+					'all_items'     =&gt; __( 'All Genres', 'pagesco-books' ),
+					'edit_item'     =&gt; __( 'Edit Genre', 'pagesco-books' ),
+					'add_new_item'  =&gt; __( 'Add Genre', 'pagesco-books' ),
+					'not_found'     =&gt; __( 'No genres found.', 'pagesco-books' ),
+				),
+				'hierarchical'      =&gt; true,
+				'show_admin_column' =&gt; true,
+				'show_in_rest'      =&gt; true,
+				'rest_base'         =&gt; 'genres',
+				'rewrite'           =&gt; array( 'slug' =&gt; 'genre' ),
+			)
+		);
+	}
+}</code></pre>
+                <p>The second argument of <code>register_taxonomy()</code> is the post type (or an array of them) the taxonomy attaches to, here <code>BookPostType::NAME</code>. <code>show_admin_column =&gt; true</code> adds a Genres column to the Books list for free; <code>show_in_rest</code> with <code>rest_base =&gt; 'genres'</code> exposes <code>/wp/v2/genres</code> and lets the editor show a Genres panel. List the feature and flush by hand once more:</p>
+                <pre data-cli><code class="language-bash">sed -i '/BookPostType::class,/a\			GenreTaxonomy::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+wp rewrite flush
+wp taxonomy list --fields=name,label,object_type,hierarchical
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/genre/fiction/</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Rewrite rules flushed.
++-----------------------+---------------------+-------------------------------------------------+--------------+
+| name                  | label               | object_type                                     | hierarchical |
++-----------------------+---------------------+-------------------------------------------------+--------------+
+| category              | Categories          | post                                            | 1            |
+| post_tag              | Tags                | post                                            |              |
+| nav_menu              | Navigation Menus    | nav_menu_item                                   |              |
+| post_format           | Formats             | post                                            |              |
+| wp_theme              | Themes              | wp_template, wp_template_part, wp_global_styles |              |
+| wp_template_part_area | Template Part Areas | wp_template_part                                |              |
+| wp_pattern_category   | Pattern Categories  | wp_block                                        |              |
+| genre                 | Genres              | book                                            | 1            |
++-----------------------+---------------------+-------------------------------------------------+--------------+
+404</code></pre>
+                </div>
+                <p>The <code>genre</code> taxonomy is registered on the <code>book</code> type, hierarchical, and <code>/genre/&lt;slug&gt;/</code> resolves (it is a 404 only because no genre terms exist yet; the seeding script creates them).</p>
+
+                <h3>Flushing where it belongs: the activation hook</h3>
+                <div class="card card-warning">
+                    <h4>⚠️ Registering is not enough on activation</h4>
+                    <p>You might expect the activation hook to just call <code>flush_rewrite_rules()</code> and trust that <code>init</code> already registered the type and taxonomy. It has not, on that one request: when WordPress activates a plugin it loads your file in a sandbox, and the plugin's own <code>init</code> callback does not run before the activation callback fires. So the activator must <em>register them itself</em> first, then flush. (Every request after activation registers them normally on <code>init</code>.)</p>
+                </div>
+                <p>Now that both the type and the taxonomy exist, write the activator once, for both. Replace <code>src/Activator.php</code> with this version (the Bookseller role from Lesson 5.1 stays; <code>add_role()</code> does nothing when the role already exists):</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/Activator.php"><code class="language-php">&lt;?php
+/**
+ * What happens when the plugin is activated or deactivated.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books;
+
+/**
+ * Activation and deactivation callbacks (uninstall.php cleans up for good).
+ */
+final class Activator {
+
+	/**
+	 * Runs once, when an administrator activates the plugin.
+	 */
+	public static function activate(): void {
+		$author = get_role( 'author' );
+
+		add_role(
+			'pagesco_bookseller',
+			'Bookseller',
+			$author ? $author-&gt;capabilities : array( 'read' =&gt; true )
+		);
+
+		// init has already run on this request: register the post type and taxonomy now, so their rules exist.
+		( new BookPostType() )-&gt;register_post_type();
+		( new GenreTaxonomy() )-&gt;register_taxonomy();
+		flush_rewrite_rules();
+	}
+
+	/**
+	 * Runs once, when the plugin is deactivated. Keeps all data.
+	 */
+	public static function deactivate(): void {
+		// Remove the post type's and taxonomy's rules, so /books/ stops answering while the plugin is off.
+		unregister_post_type( BookPostType::NAME );
+		unregister_taxonomy( GenreTaxonomy::NAME );
+		flush_rewrite_rules();
+	}
+}</code></pre>
+                <p>Deactivate and reactivate to run it, and confirm both archives still answer and the rules vanish while the plugin is off:</p>
+                <pre data-cli><code class="language-bash">wp plugin deactivate pagesco-books
+wp plugin activate pagesco-books
+curl -s -o /dev/null -w 'books active: %{http_code}\n' http://localhost:8080/books/
+wp plugin deactivate pagesco-books
+curl -s -o /dev/null -w 'books off:    %{http_code}\n' http://localhost:8080/books/
+wp plugin activate pagesco-books</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Plugin 'pagesco-books' deactivated.
+Success: Deactivated 1 of 1 plugins.
+Plugin 'pagesco-books' activated.
+Success: Activated 1 of 1 plugins.
+books active: 200
+Plugin 'pagesco-books' deactivated.
+Success: Deactivated 1 of 1 plugins.
+books off:    404
+Plugin 'pagesco-books' activated.
+Success: Activated 1 of 1 plugins.</code></pre>
+                </div>
+                <p>With the plugin off, <code>/books/</code> is a 404: the type is no longer registered, <code>Activator::deactivate()</code> flushed the rules away, and the URL means nothing. That is exactly what you want, so a deactivated plugin leaves no broken links behind.</p>
+            </section>
+
+            <section id="meta" class="lesson-section">
+                <h2>🗂️ Book Meta</h2>
+                <p>A book's title is the post title and its description is the post content, but its author, price, page count, publication date and stock are facts that belong to the book and nothing else. Those are <strong>post meta</strong>: key/value rows in <code>wp_postmeta</code> (Lesson 2.2). You can store meta with <code>update_post_meta()</code> without registering anything, but <code>register_post_meta()</code> tells WordPress the shape of each key, so it can type-check values, show them in the REST API, and let the block editor and block bindings read them. Create <code>src/BookMeta.php</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/BookMeta.php"><code class="language-php">&lt;?php
+/**
+ * The book's details, stored as post meta.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books;
+
+/**
+ * Registers the book meta keys on init.
+ */
+final class BookMeta implements Feature {
+
+	/**
+	 * Hooks the registration into init.
+	 */
+	public function register(): void {
+		add_action( 'init', array( $this, 'register_meta' ) );
+	}
+
+	/**
+	 * The book's meta keys with their types and labels.
+	 *
+	 * @return array&lt;string, array{type: string, label: string}&gt;
+	 */
+	public static function fields(): array {
+		return array(
+			'pagesco_author'    =&gt; array(
+				'type'  =&gt; 'string',
+				'label' =&gt; __( 'Author', 'pagesco-books' ),
+			),
+			'pagesco_price'     =&gt; array(
+				'type'  =&gt; 'number',
+				'label' =&gt; __( 'Price', 'pagesco-books' ),
+			),
+			'pagesco_pages'     =&gt; array(
+				'type'  =&gt; 'integer',
+				'label' =&gt; __( 'Pages', 'pagesco-books' ),
+			),
+			'pagesco_published' =&gt; array(
+				'type'  =&gt; 'string',
+				'label' =&gt; __( 'First published', 'pagesco-books' ),
+			),
+			'pagesco_in_stock'  =&gt; array(
+				'type'  =&gt; 'boolean',
+				'label' =&gt; __( 'In stock', 'pagesco-books' ),
+			),
+			'pagesco_isbn'      =&gt; array(
+				'type'  =&gt; 'string',
+				'label' =&gt; __( 'ISBN', 'pagesco-books' ),
+			),
+		);
+	}
+
+	/**
+	 * Registers every key for the book post type: one value per book, visible in the REST API.
+	 */
+	public function register_meta(): void {
+		foreach ( self::fields() as $key =&gt; $field ) {
+			register_post_meta(
+				BookPostType::NAME,
+				$key,
+				array(
+					'type'         =&gt; $field['type'],
+					'label'        =&gt; $field['label'],
+					'single'       =&gt; true,
+					'show_in_rest' =&gt; true,
+				)
+			);
+		}
+	}
+}</code></pre>
+                <p>Two arguments earn their place. <code>'single' =&gt; true</code> means one value per book (so <code>get_post_meta( $id, 'pagesco_price', true )</code> returns the number, not an array). <code>'show_in_rest' =&gt; true</code> publishes the key in <code>/wp/v2/books</code> and lets the editor read and write it.</p>
+
+                <div class="card card-success">
+                    <h4>✅ Why the keys do not start with an underscore</h4>
+                    <p>A meta key that starts with <code>_</code> (like the <code>_edit_lock</code> and <code>_pingme</code> keys you saw in Lesson 2.2) is <strong>protected</strong>: WordPress hides it from the Custom Fields box and refuses to expose it in REST unless you write a permission callback. Our keys are named <code>pagesco_author</code>, <code>pagesco_price</code> and so on, with the project's prefix but <em>no</em> leading underscore, precisely because the shop <em>wants</em> them public: the REST API returns them, and in Module 6 a block binds a heading to <code>pagesco_price</code> through the <code>core/post-meta</code> source, which only works for registered, REST-visible, unprotected keys.</p>
+                </div>
+
+                <p>List the feature and confirm the keys are registered on the book type:</p>
+                <pre data-cli><code class="language-bash">sed -i '/GenreTaxonomy::class,/a\			BookMeta::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+wp eval 'foreach ( array_keys( get_registered_meta_keys( "post", "book" ) ) as $k ) { echo $k, "\n"; }'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>pagesco_author
+pagesco_price
+pagesco_pages
+pagesco_published
+pagesco_in_stock
+pagesco_isbn</code></pre>
+                </div>
+                <p>Six keys, each ready for REST and the editor. They have no values yet, because there are no books; once you seed the catalog, a request to <code>/wp/v2/books</code> will include every one. (The <code>pagesco_isbn</code> key is there for completeness; the seed data leaves it empty.)</p>
+            </section>
+
+            <section id="admin" class="lesson-section">
+                <h2>🖥️ Seeing Books in the Admin</h2>
+                <p>Registered meta reaches the block editor's Custom Fields panel, but a raw key/value list is a poor way to type a price. Two small admin features make the Books screen pleasant: a <strong>meta box</strong>, a labelled form under the editor, and extra <strong>columns</strong> in the books list. Both live under a sub-namespace, <code>PagesCo\Books\Admin</code>, which (Lesson 5.1's PSR-4 rule) maps to <code>src/Admin/</code>.</p>
+
+                <h3>A "Book details" meta box</h3>
+                <p>Create <code>src/Admin/BookMetaBox.php</code>. It adds the box on the book screen, renders a form filled with the saved values, and saves them when the book is saved:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/Admin/BookMetaBox.php"><code class="language-php">&lt;?php
+/**
+ * The "Book details" box on the book editing screen.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books\Admin;
+
+use PagesCo\Books\BookPostType;
+use PagesCo\Books\Feature;
+
+/**
+ * Shows the book meta as a form under the editor and saves it with the book.
+ */
+final class BookMetaBox implements Feature {
+
+	/**
+	 * Hooks the box into the book screen and the save into save_post_book.
+	 */
+	public function register(): void {
+		add_action( 'add_meta_boxes_' . BookPostType::NAME, array( $this, 'add' ) );
+		add_action( 'save_post_' . BookPostType::NAME, array( $this, 'save' ) );
+	}
+
+	/**
+	 * Adds the box to the book editing screen.
+	 */
+	public function add(): void {
+		add_meta_box(
+			'pagesco-book-details',
+			__( 'Book details', 'pagesco-books' ),
+			array( $this, 'render' ),
+			BookPostType::NAME,
+			'normal',
+			'high'
+		);
+	}
+
+	/**
+	 * Prints the form fields, filled with the saved values.
+	 *
+	 * @param \WP_Post $post The book being edited.
+	 */
+	public function render( $post ): void {
+		wp_nonce_field( 'pagesco_books_save_details', 'pagesco_books_details_nonce' );
+
+		$author    = get_post_meta( $post-&gt;ID, 'pagesco_author', true );
+		$price     = get_post_meta( $post-&gt;ID, 'pagesco_price', true );
+		$pages     = get_post_meta( $post-&gt;ID, 'pagesco_pages', true );
+		$published = get_post_meta( $post-&gt;ID, 'pagesco_published', true );
+		$isbn      = get_post_meta( $post-&gt;ID, 'pagesco_isbn', true );
+		$in_stock  = get_post_meta( $post-&gt;ID, 'pagesco_in_stock', true );
+		?&gt;
+		&lt;p&gt;
+			&lt;label for="pagesco-author"&gt;&lt;?php esc_html_e( 'Author', 'pagesco-books' ); ?&gt;&lt;/label&gt;&lt;br&gt;
+			&lt;input type="text" id="pagesco-author" name="pagesco_author" class="widefat" value="&lt;?php echo esc_attr( $author ); ?&gt;"&gt;
+		&lt;/p&gt;
+		&lt;p&gt;
+			&lt;label for="pagesco-price"&gt;&lt;?php esc_html_e( 'Price (USD)', 'pagesco-books' ); ?&gt;&lt;/label&gt;&lt;br&gt;
+			&lt;input type="number" id="pagesco-price" name="pagesco_price" min="0" step="0.01" value="&lt;?php echo esc_attr( $price ); ?&gt;"&gt;
+		&lt;/p&gt;
+		&lt;p&gt;
+			&lt;label for="pagesco-pages"&gt;&lt;?php esc_html_e( 'Pages', 'pagesco-books' ); ?&gt;&lt;/label&gt;&lt;br&gt;
+			&lt;input type="number" id="pagesco-pages" name="pagesco_pages" min="1" step="1" value="&lt;?php echo esc_attr( $pages ); ?&gt;"&gt;
+		&lt;/p&gt;
+		&lt;p&gt;
+			&lt;label for="pagesco-published"&gt;&lt;?php esc_html_e( 'First published', 'pagesco-books' ); ?&gt;&lt;/label&gt;&lt;br&gt;
+			&lt;input type="date" id="pagesco-published" name="pagesco_published" value="&lt;?php echo esc_attr( $published ); ?&gt;"&gt;
+		&lt;/p&gt;
+		&lt;p&gt;
+			&lt;label for="pagesco-isbn"&gt;&lt;?php esc_html_e( 'ISBN', 'pagesco-books' ); ?&gt;&lt;/label&gt;&lt;br&gt;
+			&lt;input type="text" id="pagesco-isbn" name="pagesco_isbn" value="&lt;?php echo esc_attr( $isbn ); ?&gt;"&gt;
+		&lt;/p&gt;
+		&lt;p&gt;
+			&lt;label&gt;
+				&lt;input type="checkbox" name="pagesco_in_stock" value="1" &lt;?php checked( (bool) $in_stock ); ?&gt;&gt;
+				&lt;?php esc_html_e( 'In stock', 'pagesco-books' ); ?&gt;
+			&lt;/label&gt;
+		&lt;/p&gt;
+		&lt;?php
+	}
+
+	/**
+	 * Saves the fields when the book is saved from this form.
+	 *
+	 * @param int $post_id The book's ID.
+	 */
+	public function save( $post_id ): void {
+		// Only when the request comes from this form, and only for users who may edit this book.
+		if ( ! isset( $_POST['pagesco_books_details_nonce'] )
+			|| ! wp_verify_nonce( sanitize_key( wp_unslash( $_POST['pagesco_books_details_nonce'] ) ), 'pagesco_books_save_details' ) ) {
+			return;
+		}
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
+
+		$fields = wp_unslash( $_POST );
+
+		update_post_meta( $post_id, 'pagesco_author', sanitize_text_field( $fields['pagesco_author'] ?? '' ) );
+		update_post_meta( $post_id, 'pagesco_price', (float) ( $fields['pagesco_price'] ?? 0 ) );
+		update_post_meta( $post_id, 'pagesco_pages', absint( $fields['pagesco_pages'] ?? 0 ) );
+		update_post_meta( $post_id, 'pagesco_published', sanitize_text_field( $fields['pagesco_published'] ?? '' ) );
+		update_post_meta( $post_id, 'pagesco_isbn', sanitize_text_field( $fields['pagesco_isbn'] ?? '' ) );
+		update_post_meta( $post_id, 'pagesco_in_stock', isset( $fields['pagesco_in_stock'] ) );
+	}
+}</code></pre>
+                <p>Three details carry the lesson's security habits, each one covered in depth next lesson:</p>
+                <ul>
+                    <li><code>wp_nonce_field()</code> prints a hidden token, and <code>wp_verify_nonce()</code> checks it on save, so the save only runs for a form this site served (Lesson 2.3 mentioned nonces; Lesson 5.3 is all about them).</li>
+                    <li><code>current_user_can( 'edit_post', $post_id )</code> makes sure the person may edit <em>this</em> book before writing anything.</li>
+                    <li>Every value is sanitized on the way in: <code>sanitize_text_field()</code>, <code>absint()</code> for the page count, a cast to <code>float</code> for the price, and a plain boolean for the checkbox.</li>
+                </ul>
+
+                <h3>Author, price and stock columns</h3>
+                <p>Create <code>src/Admin/BookColumns.php</code>. One filter adds the column headings after the title; one action prints each cell:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/Admin/BookColumns.php"><code class="language-php">&lt;?php
+/**
+ * Extra columns on the Books screen.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books\Admin;
+
+use PagesCo\Books\BookPostType;
+use PagesCo\Books\Feature;
+
+/**
+ * Shows each book's author, price and stock in the list of books.
+ */
+final class BookColumns implements Feature {
+
+	/**
+	 * Hooks into the list table of the book post type.
+	 */
+	public function register(): void {
+		add_filter( 'manage_' . BookPostType::NAME . '_posts_columns', array( $this, 'add_columns' ) );
+		add_action( 'manage_' . BookPostType::NAME . '_posts_custom_column', array( $this, 'print_column' ), 10, 2 );
+	}
+
+	/**
+	 * Adds the columns after the title.
+	 *
+	 * @param string[] $columns Column keys and headings.
+	 * @return string[]
+	 */
+	public function add_columns( $columns ) {
+		$new = array();
+		foreach ( $columns as $key =&gt; $heading ) {
+			$new[ $key ] = $heading;
+			if ( 'title' === $key ) {
+				$new['pagesco_author']   = __( 'Author', 'pagesco-books' );
+				$new['pagesco_price']    = __( 'Price', 'pagesco-books' );
+				$new['pagesco_in_stock'] = __( 'Stock', 'pagesco-books' );
+			}
+		}
+		return $new;
+	}
+
+	/**
+	 * Prints one cell of a custom column.
+	 *
+	 * @param string $column  The column key.
+	 * @param int    $post_id The book in this row.
+	 */
+	public function print_column( $column, $post_id ): void {
+		switch ( $column ) {
+			case 'pagesco_author':
+				echo esc_html( get_post_meta( $post_id, 'pagesco_author', true ) );
+				break;
+			case 'pagesco_price':
+				echo esc_html( '$' . number_format_i18n( (float) get_post_meta( $post_id, 'pagesco_price', true ), 2 ) );
+				break;
+			case 'pagesco_in_stock':
+				echo get_post_meta( $post_id, 'pagesco_in_stock', true )
+					? esc_html__( 'In stock', 'pagesco-books' )
+					: esc_html__( 'Sold out', 'pagesco-books' );
+				break;
+		}
+	}
+}</code></pre>
+                <p>Notice the escaping: the author came from a form, so it is printed through <code>esc_html()</code>, never raw. Both hook names contain the post type (<code>manage_book_posts_columns</code>, <code>manage_book_posts_custom_column</code>), a pattern WordPress builds from <code>book</code>. List both admin features:</p>
+                <pre data-cli><code class="language-bash">sed -i '/BookMeta::class,/a\			Admin\\BookColumns::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+sed -i '/BookMeta::class,/a\			Admin\\BookMetaBox::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+grep -n "::class," wp-content/plugins/pagesco-books/src/Plugin.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>76:			StoreNotice::class,
+77:			BookPostType::class,
+78:			GenreTaxonomy::class,
+79:			BookMeta::class,
+80:			Admin\BookMetaBox::class,
+81:			Admin\BookColumns::class,</code></pre>
+                </div>
+                <p>Six features now. You cannot see the box or the columns with real data until there are books, so the project seeds them and then checks the admin.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <h3>1. Forgetting to flush, so single books 404</h3>
+                <p>The commonest custom-post-type bug: the archive and single pages return 404 even though the code is right. It happens when the rewrite rules were not flushed after the type was registered. Reproduce it by resetting the rules to the state a browser install leaves and visiting a (not-yet-existing) book, then flushing:</p>
+                <pre data-cli><code class="language-bash">wp option update rewrite_rules ''
+curl -s -o /dev/null -w 'before flush: %{http_code}\n' http://localhost:8080/books/
+wp rewrite flush
+curl -s -o /dev/null -w 'after flush:  %{http_code}\n' http://localhost:8080/books/</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Updated 'rewrite_rules' option.
+before flush: 200
+Success: Rewrite rules flushed.
+after flush:  200</code></pre>
+                </div>
+                <p><strong>What it means:</strong> with no rules, WordPress cannot match <code>/books/</code> and falls through to a 404; after a flush, the archive rule is back. <strong>Fix:</strong> flush on activation (as your <code>Activator</code> does), never on every request. Calling <code>flush_rewrite_rules()</code> on <code>init</code> is the classic performance mistake: it rewrites the whole rules option on every page load.</p>
+
+                <h3>2. <code>tax_input</code> ignored when no user is logged in</h3>
+                <p>When you create a book in code and try to set its genres with <code>wp_insert_post()</code>'s <code>tax_input</code> argument, the genres silently vanish if the current user cannot assign terms, and WP-CLI runs as no user. See it with a throwaway book:</p>
+                <pre data-cli><code class="language-bash">BOOK=$(wp post create --post_type=book --post_title="Tax test" --post_status=draft --porcelain)
+wp eval "wp_update_post( array( 'ID' => $BOOK, 'tax_input' => array( 'genre' => array( 'Fiction' ) ) ) );"
+wp eval "var_export( wp_get_post_terms( $BOOK, 'genre', array( 'fields' => 'names' ) ) );"
+wp post delete $BOOK --force</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>array (
+)Success: Deleted post 30.</code></pre>
+                </div>
+                <p><strong>What it means:</strong> <code>tax_input</code> is checked against the user's <code>assign_terms</code> capability, so in a script (which runs as no user) it is dropped and the genre list comes back as an empty array. <strong>Fix:</strong> set terms explicitly with <code>wp_set_object_terms( $book_id, $genres, 'genre' )</code>, which does not run the capability check. The seeding script uses exactly that. (This throwaway book took the next post ID, which is why the seeded catalog uses explicit IDs so everyone's Dune is still book 30.)</p>
+
+                <h3>3. A meta value of the wrong type is refused by REST</h3>
+                <p><code>register_post_meta()</code> declared <code>pagesco_pages</code> an integer, so the REST API validates it. Send a string and watch it bounce (the runner sends this request as the editor Maria, who may edit books):</p>
+                <pre data-cli><code class="language-bash">wp eval '$r = new WP_REST_Request( "POST", "/wp/v2/books" );
+$r->set_body_params( array( "title" => "Bad pages", "status" => "draft", "meta" => array( "pagesco_pages" => "lots" ) ) );
+$res = rest_do_request( $r );
+echo $res->get_status(), "\n", wp_json_encode( $res->get_data()["code"] ?? "ok" ), "\n";
+// The post was created before the meta was validated; remove the draft it left.
+foreach ( get_posts( array( "post_type" => "book", "post_status" => "draft", "numberposts" => -1 ) ) as $p ) {
+	wp_delete_post( $p->ID, true );
+}' --user=maria</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>400
+"rest_invalid_type"</code></pre>
+                </div>
+                <p><strong>What it means:</strong> a <code>400</code> with <code>rest_invalid_type</code>: because the key is registered with <code>'type' =&gt; 'integer'</code>, the API rejects <code>"lots"</code>. The post object was created first and the meta refused after, so the loop deletes the stray draft it left behind. That type declaration is doing real work. <strong>Fix:</strong> send the right type (a number), or, for data you store yourself, sanitize it first as the meta box does.</p>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Fill the Shelves</h2>
+                <p>The code is ready; the catalog is empty. You will seed the eleven books of the Pages &amp; Co. catalog, the same classics as the MySQL course's bookstore database, with a small WP-CLI script. Doing it in a script (not by hand in the admin) means the whole class ends with identical data, and you can wipe and reseed while developing. Allow about 30 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: Get the seeding script <span class="step-time">(5 min)</span></h3>
+                    <p>Download <a href="downloads/pagesco-seed.zip">pagesco-seed.zip</a> and unzip it into a <code>pagesco-seed/</code> folder at the root of your WordPress install (next to <code>wp-load.php</code>), so you have <code>pagesco-seed/seed-books.php</code> and <code>pagesco-seed/books.json</code>. The data file holds the eleven books: title, author, price, pages, publication date, stock and genres. The first two look like this:</p>
+                    <pre data-norun><code class="language-json">{
+  "books": [
+    { "title": "Dune", "author": "Frank Herbert", "price": 14.99, "pages": 412,
+      "published": "1965-08-01", "in_stock": true, "genres": ["Fiction", "Science Fiction"] },
+    { "title": "1984", "author": "George Orwell", "price": 9.99, "pages": 328,
+      "published": "1949-06-08", "in_stock": true, "genres": ["Fiction", "Classic", "Dystopian"] }
+  ]
+}</code></pre>
+                    <p>And the script itself, which you can read in full before you run it. It is a tool, not part of the plugin: it uses <code>WP_CLI</code> for its messages, so it only runs under <code>wp eval-file</code>.</p>
+                    <pre data-file="pagesco-seed/seed-books.php"><code class="language-php">&lt;?php
+/**
+ * Seeds the Pages &amp; Co. catalog: the genres and the 11 books from books.json.
+ *
+ * Run from the WordPress root with WP-CLI: wp eval-file pagesco-seed/seed-books.php
+ * Safe to run twice: books and genres that already exist are skipped.
+ *
+ * @package PagesCo\Books
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+if ( ! post_type_exists( 'book' ) || ! taxonomy_exists( 'genre' ) ) {
+	WP_CLI::error( 'Activate the pagesco-books plugin first: the book post type and the genre taxonomy are missing.' );
+}
+
+$pagesco_data = json_decode( file_get_contents( __DIR__ . '/books.json' ), true );
+
+// The genres, in this order, so their IDs are the same on every site.
+foreach ( array( 'Fiction', 'Science Fiction', 'Classic', 'Fantasy', 'Dystopian' ) as $pagesco_genre ) {
+	if ( ! term_exists( $pagesco_genre, 'genre' ) ) {
+		$pagesco_term = wp_insert_term( $pagesco_genre, 'genre' );
+		WP_CLI::log( sprintf( 'Genre %d: %s', $pagesco_term['term_id'], $pagesco_genre ) );
+	}
+}
+
+$pagesco_editor = get_user_by( 'login', 'maria' );
+
+foreach ( $pagesco_data['books'] as $pagesco_book ) {
+	$pagesco_slug = sanitize_title( $pagesco_book['title'] );
+
+	if ( get_page_by_path( $pagesco_slug, OBJECT, 'book' ) ) {
+		WP_CLI::log( "Skipped {$pagesco_book['title']}: it already exists." );
+		continue;
+	}
+
+	$pagesco_id = wp_insert_post(
+		array(
+			'post_type'   =&gt; 'book',
+			'post_status' =&gt; 'publish',
+			'post_title'  =&gt; $pagesco_book['title'],
+			'post_name'   =&gt; $pagesco_slug,
+			'post_author' =&gt; $pagesco_editor ? $pagesco_editor-&gt;ID : 1,
+			// Fixed IDs (Dune is 30 ... Animal Farm is 40) so the whole class matches.
+			'import_id'   =&gt; 29 + $pagesco_book['bookstore_id'],
+			// One minute apart, so "newest first" lists are the same on every site.
+			'post_date'   =&gt; gmdate( 'Y-m-d H:i:s', strtotime( '2026-10-01 10:00:00' ) + 60 * $pagesco_book['bookstore_id'] ),
+			'meta_input'  =&gt; array(
+				'pagesco_author'    =&gt; $pagesco_book['author'],
+				'pagesco_price'     =&gt; $pagesco_book['price'],
+				'pagesco_pages'     =&gt; $pagesco_book['pages'],
+				'pagesco_published' =&gt; $pagesco_book['published'],
+				'pagesco_in_stock'  =&gt; $pagesco_book['in_stock'],
+			),
+		),
+		true
+	);
+
+	if ( is_wp_error( $pagesco_id ) ) {
+		WP_CLI::warning( "{$pagesco_book['title']}: " . $pagesco_id-&gt;get_error_message() );
+		continue;
+	}
+
+	// wp_set_object_terms(), not tax_input: see Common Mistakes.
+	wp_set_object_terms( $pagesco_id, $pagesco_book['genres'], 'genre' );
+
+	WP_CLI::log( sprintf( 'Book %d: %s', $pagesco_id, $pagesco_book['title'] ) );
+}
+
+WP_CLI::success( sprintf( '%d books in the catalog.', wp_count_posts( 'book' )-&gt;publish ) );</code></pre>
+                    <p>The runner writes <code>books.json</code> for you in the next block; on your own machine it came out of the zip.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: Seed the genres and books <span class="step-time">(8 min)</span></h3>
+                    <p>Run the script with <code>wp eval-file</code>. It creates the five genres in a fixed order (so their term IDs match on every site), then inserts each book as a published <code>book</code> owned by the editor Maria, with its meta and genres:</p>
+                    <pre data-file="pagesco-seed/books.json" data-norun><code class="language-json">{
+  "source": "~/projects/mysql/assets/sql/bookstore.sql (MySQL Foundations), books + authors + categories",
+  "books": [
+    {
+      "bookstore_id": 1,
+      "title": "Dune",
+      "author": "Frank Herbert",
+      "price": 14.99,
+      "pages": 412,
+      "published": "1965-08-01",
+      "in_stock": true,
+      "genres": [
+        "Fiction",
+        "Science Fiction"
+      ]
+    },
+    {
+      "bookstore_id": 2,
+      "title": "1984",
+      "author": "George Orwell",
+      "price": 9.99,
+      "pages": 328,
+      "published": "1949-06-08",
+      "in_stock": true,
+      "genres": [
+        "Fiction",
+        "Classic",
+        "Dystopian"
+      ]
+    },
+    {
+      "bookstore_id": 3,
+      "title": "To Kill a Mockingbird",
+      "author": "Harper Lee",
+      "price": 11.99,
+      "pages": 281,
+      "published": "1960-07-11",
+      "in_stock": true,
+      "genres": [
+        "Fiction",
+        "Classic"
+      ]
+    },
+    {
+      "bookstore_id": 4,
+      "title": "The Great Gatsby",
+      "author": "F. Scott Fitzgerald",
+      "price": 8.99,
+      "pages": 180,
+      "published": "1925-04-10",
+      "in_stock": false,
+      "genres": [
+        "Fiction",
+        "Classic"
+      ]
+    },
+    {
+      "bookstore_id": 5,
+      "title": "Pride and Prejudice",
+      "author": "Jane Austen",
+      "price": 7.99,
+      "pages": 432,
+      "published": "1813-01-28",
+      "in_stock": true,
+      "genres": [
+        "Fiction",
+        "Classic"
+      ]
+    },
+    {
+      "bookstore_id": 6,
+      "title": "The Hobbit",
+      "author": "J.R.R. Tolkien",
+      "price": 10.99,
+      "pages": 310,
+      "published": "1937-09-21",
+      "in_stock": true,
+      "genres": [
+        "Fiction",
+        "Fantasy"
+      ]
+    },
+    {
+      "bookstore_id": 7,
+      "title": "Brave New World",
+      "author": "Aldous Huxley",
+      "price": 9.49,
+      "pages": 311,
+      "published": "1932-01-01",
+      "in_stock": true,
+      "genres": [
+        "Fiction",
+        "Science Fiction",
+        "Dystopian"
+      ]
+    },
+    {
+      "bookstore_id": 8,
+      "title": "The Catcher in the Rye",
+      "author": "J.D. Salinger",
+      "price": 8.99,
+      "pages": 234,
+      "published": "1951-07-16",
+      "in_stock": false,
+      "genres": [
+        "Fiction",
+        "Classic"
+      ]
+    },
+    {
+      "bookstore_id": 9,
+      "title": "Lord of the Rings",
+      "author": "J.R.R. Tolkien",
+      "price": 15.99,
+      "pages": 1178,
+      "published": "1954-07-29",
+      "in_stock": true,
+      "genres": [
+        "Fiction",
+        "Fantasy"
+      ]
+    },
+    {
+      "bookstore_id": 10,
+      "title": "Fahrenheit 451",
+      "author": "Ray Bradbury",
+      "price": 10.49,
+      "pages": 158,
+      "published": "1953-10-19",
+      "in_stock": true,
+      "genres": [
+        "Fiction",
+        "Science Fiction",
+        "Dystopian"
+      ]
+    },
+    {
+      "bookstore_id": 11,
+      "title": "Animal Farm",
+      "author": "George Orwell",
+      "price": 8.49,
+      "pages": 112,
+      "published": "1945-08-17",
+      "in_stock": true,
+      "genres": [
+        "Fiction",
+        "Classic"
+      ]
+    }
+  ]
+}</code></pre>
+                    <pre data-cli><code class="language-bash">wp eval-file pagesco-seed/seed-books.php</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Genre 5: Fiction
+Genre 6: Science Fiction
+Genre 7: Classic
+Genre 8: Fantasy
+Genre 9: Dystopian
+Book 30: Dune
+Book 31: 1984
+Book 32: To Kill a Mockingbird
+Book 33: The Great Gatsby
+Book 34: Pride and Prejudice
+Book 35: The Hobbit
+Book 36: Brave New World
+Book 37: The Catcher in the Rye
+Book 38: Lord of the Rings
+Book 39: Fahrenheit 451
+Book 40: Animal Farm
+Success: 11 books in the catalog.</code></pre>
+                    </div>
+                    <p>Eleven books, five genres. The script is safe to run twice: a second run skips every book and genre that already exists, so you can reseed after adding a field without making duplicates (Exercise 3 proves it).</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: Check the catalog, the admin and REST <span class="step-time">(12 min)</span></h3>
+                    <p>Confirm the shelves from three angles: the term list, the admin columns your <code>BookColumns</code> feature prints, and the public REST endpoint:</p>
+                    <pre data-cli><code class="language-bash">wp term list genre --fields=term_id,name,slug,count --orderby=term_id
+wp eval 'ob_start();
+do_action( "manage_book_posts_custom_column", "pagesco_author", 30 );
+echo " | ";
+do_action( "manage_book_posts_custom_column", "pagesco_price", 33 );
+echo " | ";
+do_action( "manage_book_posts_custom_column", "pagesco_in_stock", 33 );
+echo ob_get_clean(), "\n";'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>+---------+-----------------+-----------------+-------+
+| term_id | name            | slug            | count |
++---------+-----------------+-----------------+-------+
+| 5       | Fiction         | fiction         | 11    |
+| 6       | Science Fiction | science-fiction | 3     |
+| 7       | Classic         | classic         | 6     |
+| 8       | Fantasy         | fantasy         | 2     |
+| 9       | Dystopian       | dystopian       | 3     |
++---------+-----------------+-----------------+-------+
+Frank Herbert | $8.99 | Sold out</code></pre>
+                    </div>
+                    <p>Dune is book 30 (the next free ID after Lesson 4.3's content), so the eleven books are 30 to 40; The Great Gatsby (book 33) is out of stock in the catalog, which is why its stock cell reads "Sold out". Now the public API:</p>
+                    <pre data-web="/wp-json/wp/v2/books/30" data-json-pick="id,slug,title.rendered,genres,meta"><code class="language-json">GET http://localhost:8080/wp-json/wp/v2/books/30</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>{
+  "id": 30,
+  "slug": "dune",
+  "title": {
+    "rendered": "Dune"
+  },
+  "genres": [
+    5,
+    6
+  ],
+  "meta": {
+    "pagesco_author": "Frank Herbert",
+    "pagesco_price": 14.99,
+    "pagesco_pages": 412,
+    "pagesco_published": "1965-08-01",
+    "pagesco_in_stock": true,
+    "pagesco_isbn": ""
+  }
+}</code></pre>
+                    </div>
+                    <p>Every registered meta key is in the response, typed correctly: <code>pagesco_price</code> is a number, <code>pagesco_in_stock</code> a boolean. Module 7 builds on this endpoint; Module 6 binds a block to these fields.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 4: Confirm the finished catalog <span class="step-time">(5 min)</span></h3>
+                    <p>One last check: the eleven published books, the archive, and that the meta box is registered on the book screen. Then remove the seeding tool from the WordPress root (the data stays in the database; the script was only needed to put it there):</p>
+                    <pre data-cli data-checkpoint><code class="language-bash">wp post list --post_type=book --fields=ID,post_title,post_status --orderby=ID
+wp eval '$GLOBALS["current_screen"] = WP_Screen::get( "book" );
+do_action( "add_meta_boxes_book", get_post( 30 ) );
+echo isset( $GLOBALS["wp_meta_boxes"]["book"]["normal"]["high"]["pagesco-book-details"] ) ? "Book details box registered\n" : "missing\n";'
+curl -s -o /dev/null -w 'archive: %{http_code}\n' http://localhost:8080/books/
+rm -r pagesco-seed</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>+----+------------------------+-------------+
+| ID | post_title             | post_status |
++----+------------------------+-------------+
+| 40 | Animal Farm            | publish     |
+| 39 | Fahrenheit 451         | publish     |
+| 38 | Lord of the Rings      | publish     |
+| 37 | The Catcher in the Rye | publish     |
+| 36 | Brave New World        | publish     |
+| 35 | The Hobbit             | publish     |
+| 34 | Pride and Prejudice    | publish     |
+| 33 | The Great Gatsby       | publish     |
+| 32 | To Kill a Mockingbird  | publish     |
+| 31 | 1984                   | publish     |
+| 30 | Dune                   | publish     |
++----+------------------------+-------------+
+Book details box registered
+archive: 200</code></pre>
+                    </div>
+                    <p>Eleven books, the meta box in place, the archive answering. Open <code>http://localhost:8080/wp-admin/edit.php?post_type=book</code> in your browser to see the Books list with the Author, Price, Stock and Genres columns, and open any book to find the "Book details" box under the editor.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>pagesco-books</code> lists six features: <code>StoreNotice</code>, <code>BookPostType</code>, <code>GenreTaxonomy</code>, <code>BookMeta</code>, <code>Admin\BookMetaBox</code>, <code>Admin\BookColumns</code></li>
+                        <li><code>Activator::activate()</code> registers the type and taxonomy and flushes the rewrite rules; <code>/books/</code> and <code>/genre/&lt;slug&gt;/</code> resolve while the plugin is active</li>
+                        <li>Six book meta keys are registered, <code>show_in_rest</code>, with no leading underscore</li>
+                        <li>Eleven books (IDs 30 to 40) are published, each with its author, price, pages, date, stock and genres</li>
+                        <li>Five genres exist: Fiction, Science Fiction, Classic, Fantasy, Dystopian</li>
+                        <li>The <code>pagesco-seed/</code> folder is removed from the WordPress root</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Every exercise undoes itself, so the catalog ends exactly as the project left it. Try each before opening the solution.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: List the Catalog by Author</h3>
+                    <p>Print every book's title and author, sorted by author. <code>wp post list</code> does not show meta as a column, so use <code>wp eval</code> with <code>get_posts()</code> and <code>get_post_meta()</code> (Lesson 2.2), ordered by the <code>pagesco_author</code> meta key.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Pass <code>'meta_key' =&gt; 'pagesco_author'</code> and <code>'orderby' =&gt; 'meta_value'</code> to <code>get_posts()</code>, with <code>'post_type' =&gt; 'book'</code> and <code>'numberposts' =&gt; -1</code>. Read each book's author with <code>get_post_meta( $book->ID, 'pagesco_author', true )</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">wp eval '$books = get_posts( array(
+	"post_type"   => "book",
+	"numberposts" => -1,
+	"meta_key"    => "pagesco_author",
+	"orderby"     => "meta_value",
+	"order"       => "ASC",
+) );
+foreach ( $books as $book ) {
+	printf( "%s - %s\n", get_post_meta( $book->ID, "pagesco_author", true ), $book->post_title );
+}'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Aldous Huxley - Brave New World
+F. Scott Fitzgerald - The Great Gatsby
+Frank Herbert - Dune
+George Orwell - 1984
+George Orwell - Animal Farm
+Harper Lee - To Kill a Mockingbird
+J.D. Salinger - The Catcher in the Rye
+J.R.R. Tolkien - The Hobbit
+J.R.R. Tolkien - Lord of the Rings
+Jane Austen - Pride and Prejudice
+Ray Bradbury - Fahrenheit 451</code></pre>
+                        </div>
+                        <p>Sorting by a meta value is a string sort, so the two Orwell titles and the two Tolkien titles sit together. For numbers like a price you would use <code>meta_value_num</code> instead (the trap from Lesson 2.2).</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Query Books by Genre</h3>
+                    <p>Use a <code>WP_Query</code> with a <code>tax_query</code> (Lesson 4.2) to count the books filed under Science Fiction, and print their titles. Remember the query uses term slugs.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>A <code>tax_query</code> item is <code>array( 'taxonomy' =&gt; 'genre', 'field' =&gt; 'slug', 'terms' =&gt; 'science-fiction' )</code>. Use <code>'fields' =&gt; 'ids'</code> or read <code>$query-&gt;posts</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">wp eval '$q = new WP_Query( array(
+	"post_type" => "book",
+	"tax_query" => array( array( "taxonomy" => "genre", "field" => "slug", "terms" => "science-fiction" ) ),
+	"orderby"   => "title",
+	"order"     => "ASC",
+	"posts_per_page" => -1,
+) );
+echo $q->found_posts, " books:\n";
+foreach ( $q->posts as $p ) { echo "- ", $p->post_title, "\n"; }'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>3 books:
+- Brave New World
+- Dune
+- Fahrenheit 451</code></pre>
+                        </div>
+                        <p>Three science-fiction titles. A <code>tax_query</code> on a custom taxonomy works just like one on categories, because a taxonomy is a taxonomy whatever you call it.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: Prove the Seeder Is Safe to Re-run</h3>
+                    <p>Run the seeding script a second time without the <code>pagesco-seed/</code> folder you deleted: write just its two files back, run it, and confirm the book count is still eleven. Then remove the folder again.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>You deleted the tool but the data is in the database. The script skips any book whose slug already exists, so a second run should insert nothing. Check with <code>wp post list --post_type=book --format=count</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="pagesco-seed/books.json" data-norun><code class="language-json">{
+  "source": "~/projects/mysql/assets/sql/bookstore.sql (MySQL Foundations), books + authors + categories",
+  "books": [
+    {
+      "bookstore_id": 1,
+      "title": "Dune",
+      "author": "Frank Herbert",
+      "price": 14.99,
+      "pages": 412,
+      "published": "1965-08-01",
+      "in_stock": true,
+      "genres": [
+        "Fiction",
+        "Science Fiction"
+      ]
+    },
+    {
+      "bookstore_id": 2,
+      "title": "1984",
+      "author": "George Orwell",
+      "price": 9.99,
+      "pages": 328,
+      "published": "1949-06-08",
+      "in_stock": true,
+      "genres": [
+        "Fiction",
+        "Classic",
+        "Dystopian"
+      ]
+    },
+    {
+      "bookstore_id": 3,
+      "title": "To Kill a Mockingbird",
+      "author": "Harper Lee",
+      "price": 11.99,
+      "pages": 281,
+      "published": "1960-07-11",
+      "in_stock": true,
+      "genres": [
+        "Fiction",
+        "Classic"
+      ]
+    },
+    {
+      "bookstore_id": 4,
+      "title": "The Great Gatsby",
+      "author": "F. Scott Fitzgerald",
+      "price": 8.99,
+      "pages": 180,
+      "published": "1925-04-10",
+      "in_stock": false,
+      "genres": [
+        "Fiction",
+        "Classic"
+      ]
+    },
+    {
+      "bookstore_id": 5,
+      "title": "Pride and Prejudice",
+      "author": "Jane Austen",
+      "price": 7.99,
+      "pages": 432,
+      "published": "1813-01-28",
+      "in_stock": true,
+      "genres": [
+        "Fiction",
+        "Classic"
+      ]
+    },
+    {
+      "bookstore_id": 6,
+      "title": "The Hobbit",
+      "author": "J.R.R. Tolkien",
+      "price": 10.99,
+      "pages": 310,
+      "published": "1937-09-21",
+      "in_stock": true,
+      "genres": [
+        "Fiction",
+        "Fantasy"
+      ]
+    },
+    {
+      "bookstore_id": 7,
+      "title": "Brave New World",
+      "author": "Aldous Huxley",
+      "price": 9.49,
+      "pages": 311,
+      "published": "1932-01-01",
+      "in_stock": true,
+      "genres": [
+        "Fiction",
+        "Science Fiction",
+        "Dystopian"
+      ]
+    },
+    {
+      "bookstore_id": 8,
+      "title": "The Catcher in the Rye",
+      "author": "J.D. Salinger",
+      "price": 8.99,
+      "pages": 234,
+      "published": "1951-07-16",
+      "in_stock": false,
+      "genres": [
+        "Fiction",
+        "Classic"
+      ]
+    },
+    {
+      "bookstore_id": 9,
+      "title": "Lord of the Rings",
+      "author": "J.R.R. Tolkien",
+      "price": 15.99,
+      "pages": 1178,
+      "published": "1954-07-29",
+      "in_stock": true,
+      "genres": [
+        "Fiction",
+        "Fantasy"
+      ]
+    },
+    {
+      "bookstore_id": 10,
+      "title": "Fahrenheit 451",
+      "author": "Ray Bradbury",
+      "price": 10.49,
+      "pages": 158,
+      "published": "1953-10-19",
+      "in_stock": true,
+      "genres": [
+        "Fiction",
+        "Science Fiction",
+        "Dystopian"
+      ]
+    },
+    {
+      "bookstore_id": 11,
+      "title": "Animal Farm",
+      "author": "George Orwell",
+      "price": 8.49,
+      "pages": 112,
+      "published": "1945-08-17",
+      "in_stock": true,
+      "genres": [
+        "Fiction",
+        "Classic"
+      ]
+    }
+  ]
+}</code></pre>
+                        <pre data-file="pagesco-seed/seed-books.php" data-norun><code class="language-php">&lt;?php
+/**
+ * Seeds the Pages &amp; Co. catalog: the genres and the 11 books from books.json.
+ *
+ * Run from the WordPress root with WP-CLI: wp eval-file pagesco-seed/seed-books.php
+ * Safe to run twice: books and genres that already exist are skipped.
+ *
+ * @package PagesCo\Books
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+if ( ! post_type_exists( 'book' ) || ! taxonomy_exists( 'genre' ) ) {
+	WP_CLI::error( 'Activate the pagesco-books plugin first: the book post type and the genre taxonomy are missing.' );
+}
+
+$pagesco_data = json_decode( file_get_contents( __DIR__ . '/books.json' ), true );
+
+// The genres, in this order, so their IDs are the same on every site.
+foreach ( array( 'Fiction', 'Science Fiction', 'Classic', 'Fantasy', 'Dystopian' ) as $pagesco_genre ) {
+	if ( ! term_exists( $pagesco_genre, 'genre' ) ) {
+		$pagesco_term = wp_insert_term( $pagesco_genre, 'genre' );
+		WP_CLI::log( sprintf( 'Genre %d: %s', $pagesco_term['term_id'], $pagesco_genre ) );
+	}
+}
+
+$pagesco_editor = get_user_by( 'login', 'maria' );
+
+foreach ( $pagesco_data['books'] as $pagesco_book ) {
+	$pagesco_slug = sanitize_title( $pagesco_book['title'] );
+
+	if ( get_page_by_path( $pagesco_slug, OBJECT, 'book' ) ) {
+		WP_CLI::log( "Skipped {$pagesco_book['title']}: it already exists." );
+		continue;
+	}
+
+	$pagesco_id = wp_insert_post(
+		array(
+			'post_type'   =&gt; 'book',
+			'post_status' =&gt; 'publish',
+			'post_title'  =&gt; $pagesco_book['title'],
+			'post_name'   =&gt; $pagesco_slug,
+			'post_author' =&gt; $pagesco_editor ? $pagesco_editor-&gt;ID : 1,
+			// Fixed IDs (Dune is 30 ... Animal Farm is 40) so the whole class matches.
+			'import_id'   =&gt; 29 + $pagesco_book['bookstore_id'],
+			// One minute apart, so "newest first" lists are the same on every site.
+			'post_date'   =&gt; gmdate( 'Y-m-d H:i:s', strtotime( '2026-10-01 10:00:00' ) + 60 * $pagesco_book['bookstore_id'] ),
+			'meta_input'  =&gt; array(
+				'pagesco_author'    =&gt; $pagesco_book['author'],
+				'pagesco_price'     =&gt; $pagesco_book['price'],
+				'pagesco_pages'     =&gt; $pagesco_book['pages'],
+				'pagesco_published' =&gt; $pagesco_book['published'],
+				'pagesco_in_stock'  =&gt; $pagesco_book['in_stock'],
+			),
+		),
+		true
+	);
+
+	if ( is_wp_error( $pagesco_id ) ) {
+		WP_CLI::warning( "{$pagesco_book['title']}: " . $pagesco_id-&gt;get_error_message() );
+		continue;
+	}
+
+	// wp_set_object_terms(), not tax_input: see Common Mistakes.
+	wp_set_object_terms( $pagesco_id, $pagesco_book['genres'], 'genre' );
+
+	WP_CLI::log( sprintf( 'Book %d: %s', $pagesco_id, $pagesco_book['title'] ) );
+}
+
+WP_CLI::success( sprintf( '%d books in the catalog.', wp_count_posts( 'book' )-&gt;publish ) );</code></pre>
+                        <pre data-cli><code class="language-bash">wp eval-file pagesco-seed/seed-books.php
+wp post list --post_type=book --format=count
+rm -r pagesco-seed</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Skipped Dune: it already exists.
+Skipped 1984: it already exists.
+Skipped To Kill a Mockingbird: it already exists.
+Skipped The Great Gatsby: it already exists.
+Skipped Pride and Prejudice: it already exists.
+Skipped The Hobbit: it already exists.
+Skipped Brave New World: it already exists.
+Skipped The Catcher in the Rye: it already exists.
+Skipped Lord of the Rings: it already exists.
+Skipped Fahrenheit 451: it already exists.
+Skipped Animal Farm: it already exists.
+Success: 11 books in the catalog.
+11</code></pre>
+                        </div>
+                        <p>Every book was skipped, the count held at eleven, and the success line still reports the catalog size. An idempotent seeder, one you can run as often as you like, is worth the few lines of <code>get_page_by_path()</code> it costs.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 4: Register One More Meta Key (Stretch)</h3>
+                    <p>Suppose the shop wants to show each book's reading time. Register one more public meta key for books, <code>pagesco_reading_minutes</code> (an integer), compute and store it for Dune as its page count times two, and confirm it reaches REST. Do it from a throwaway must-use plugin so <code>BookMeta</code> and the catalog stay exactly as the project left them, then remove the file and the stored value.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Call <code>register_post_meta( 'book', 'pagesco_reading_minutes', array( 'type' =&gt; 'integer', 'single' =&gt; true, 'show_in_rest' =&gt; true ) )</code> on <code>init</code> in <code>mu-plugins/exercise-reading-time.php</code>. A key registered <code>show_in_rest</code> shows in <code>/wp/v2/books/30?_fields=meta</code> once it has a value. In the real plugin you would instead add one entry to <code>BookMeta::fields()</code>, which the loop would register for you.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/mu-plugins/exercise-reading-time.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Exercise: Reading Time
+ */
+
+add_action(
+	'init',
+	function () {
+		register_post_meta(
+			'book',
+			'pagesco_reading_minutes',
+			array(
+				'type'         =&gt; 'integer',
+				'single'       =&gt; true,
+				'show_in_rest' =&gt; true,
+			)
+		);
+	}
+);</code></pre>
+                        <pre data-cli><code class="language-bash">wp eval 'update_post_meta( 30, "pagesco_reading_minutes", (int) get_post_meta( 30, "pagesco_pages", true ) * 2 );'
+wp eval 'echo in_array( "pagesco_reading_minutes", array_keys( get_registered_meta_keys( "post", "book" ) ), true ) ? "registered\n" : "no\n";'
+wp post meta get 30 pagesco_reading_minutes
+rm wp-content/mu-plugins/exercise-reading-time.php
+wp eval 'delete_post_meta( 30, "pagesco_reading_minutes" );'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>registered
+824</code></pre>
+                        </div>
+                        <p>Registering one key took the same <code>register_post_meta()</code> call the plugin uses in a loop; in <code>BookMeta</code> it would have been a single new entry in <code>fields()</code>. That is the payoff of listing meta as data rather than six separate calls. A real reading-time field would also recompute itself on <code>save_post</code>, the kind of job the meta box save path does.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> On which action should <code>register_post_type()</code> be called?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="plugins_loaded is where the plugin boots, but post types register a little later, when WordPress is ready for them.">
+                                A) plugins_loaded
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="init is the action WordPress fires once it is loaded and ready for plugins to register post types, taxonomies and meta; registering earlier or later misses the editor and REST setup.">
+                                B) init
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="wp_loaded fires after init, once everything is registered; by then it is too late.">
+                                C) wp_loaded
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> A new book's single page returns 404 even though the <code>book</code> type is registered. What is the most likely cause?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="New rewrite rules are written only when flush_rewrite_rules() runs, which is why the activation hook flushes once; without it the pretty URL matches nothing.">
+                                A) The rewrite rules were not flushed after the type was registered
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="public is true in the args, so the type is reachable. Think about what turns /books/dune/ into a query.">
+                                B) The type is missing public =&gt; true
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="show_in_rest affects the editor and the API, not the front-end URL.">
+                                C) The type is missing show_in_rest
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> Why are the book meta keys named <code>pagesco_price</code> and not <code>_pagesco_price</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The underscore is not about length; it changes how WordPress treats the key.">
+                                A) A leading underscore is not allowed in meta keys
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Both forms are stored the same way in wp_postmeta; the difference is visibility.">
+                                B) Underscore keys are stored in a different table
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="A leading underscore marks meta as protected, hidden from the Custom Fields box and kept out of REST by default; the shop wants these keys public for the API and block bindings, so it leaves the underscore off.">
+                                C) A leading underscore would make them protected and hidden from REST
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> The second argument to <code>register_taxonomy( 'genre', ?, $args )</code> is:</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The human label goes inside $args under 'labels'.">
+                                A) The taxonomy's display label
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The second argument is the object type (or array of types) the taxonomy is attached to, here the book post type; that is what makes genre a taxonomy of books.">
+                                B) The post type (or array of types) the taxonomy applies to
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Whether it nests is 'hierarchical' inside $args.">
+                                C) Whether the taxonomy is hierarchical
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> In a WP-CLI seeding script, which reliably sets a new book's genres?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="tax_input is filtered by the current user's assign_terms capability, and a script runs as no user, so the terms are dropped.">
+                                A) The tax_input argument of wp_insert_post()
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="There is no 'genres' key in the post array that assigns terms; that is what wp_set_object_terms() is for.">
+                                B) A 'genres' key in the post array passed to wp_insert_post()
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="wp_set_object_terms( $id, $genres, 'genre' ) assigns terms directly, with no capability check, so it works in a script where no user is logged in.">
+                                C) wp_set_object_terms( $id, $genres, 'genre' )
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Should I use a plugin like ACF, Meta Box or CMB2 instead of writing this?</summary>
+                    <p>Those are good tools. Advanced Custom Fields, Meta Box and CMB2 give you fields and meta boxes through a settings screen or a short array, and for a client site built quickly they save real time. The course registers meta and a box by hand for three reasons: you learn what those plugins do under the hood (they all call <code>register_post_meta</code> and <code>add_meta_box</code>); the Pages &amp; Co. plugin stays free of a dependency that would have to be installed on every site it runs on; and your fields reach the REST API and block bindings with no extra configuration. On a real project, reach for ACF when the client needs to add fields themselves, and hand-register meta when you want a lightweight, portable, version-controlled plugin.</p>
+                </details>
+                <details>
+                    <summary>Should the post type be registered in a plugin or in the theme?</summary>
+                    <p>Always a plugin. Content outlives design: if <code>book</code> lived in the theme's <code>functions.php</code>, switching themes would unregister the type and every book would vanish from the admin (the rows stay in the database, but nothing displays or edits them). That is the whole reason Pages &amp; Co. keeps its catalog in <code>pagesco-books</code> and its looks in the <code>pagesco</code> theme, the split Lesson 3.4 drew.</p>
+                </details>
+                <details>
+                    <summary>What is the difference between a taxonomy and a meta field for something like genre?</summary>
+                    <p>Use a taxonomy when many items share a value you want to browse or filter by: genres are shared across books and have their own archive pages, so <code>genre</code> is a taxonomy. Use meta for a fact that belongs to one item and that you mostly read, not browse: a price or a page count is meta. A rough test: if you would want a <code>/genre/fantasy/</code> page listing everything with that value, it is a taxonomy; if not, it is meta.</p>
+                </details>
+                <details>
+                    <summary>Do I lose my books if I deactivate the plugin?</summary>
+                    <p>No. Deactivating stops the type being registered, so the books disappear from the admin and their URLs 404, but the rows stay in <code>wp_posts</code> and their meta in <code>wp_postmeta</code>. Reactivate and everything returns. Only <code>uninstall.php</code> deletes data, and the one you wrote in Lesson 5.1 only removes the role so far; whether deleting the plugin should also delete the books is a real decision, which the FAQ of Lesson 5.4 revisits.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Make the Price column sortable. Add a <code>manage_edit-book_sortable_columns</code> filter that maps the <code>pagesco_price</code> column to a sort key, then a <code>pre_get_posts</code> action (Lesson 4.2) that, when that key is the <code>orderby</code> on the Books admin screen, sets <code>meta_key</code> to <code>pagesco_price</code> and <code>orderby</code> to <code>meta_value_num</code>. Why <code>meta_value_num</code> and not <code>meta_value</code> for a price? (Recall the string-sorting trap from Lesson 2.2.) Keep it a new feature class, <code>Admin\BookSortableColumns</code>, so it is one file and one list line.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> You now have three ways to store information about a book: the post itself (title, content), a taxonomy (genre) and meta (author, price). Pick one more thing a bookshop website might track, a publisher, a star rating, whether a book is signed, and decide for each whether it should be the post, a taxonomy or a meta field, with one sentence of reasoning. Then look at your <code>pagesco-plan.txt</code> catalog notes from Lesson 1.1 and update them with what the <code>book</code> type actually stores.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>A custom post type is a new value in <code>wp_posts.post_type</code>; register it with <code>register_post_type()</code> on <code>init</code>, with labels, <code>has_archive</code>, a rewrite slug and <code>show_in_rest</code></li>
+                        <li>A custom taxonomy groups a post type; <code>register_taxonomy()</code>'s second argument is the type it attaches to</li>
+                        <li><code>register_post_meta()</code> gives a meta key a type, a label and REST visibility; keep shop keys free of a leading underscore so they stay public and bindable</li>
+                        <li>New post types and taxonomies add rewrite rules: flush them on activation (and in the activator register them first, because <code>init</code> has not run yet on that request), never on <code>init</code></li>
+                        <li>A meta box plus admin columns make the data editable and visible; the save path uses a nonce, a capability check and sanitization (Lesson 5.3)</li>
+                        <li>Seed content with an idempotent WP-CLI script and <code>wp_set_object_terms()</code>, not <code>tax_input</code>, so it works with no user logged in</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>A content type</td><td><code>register_post_type( 'book', array( 'public' =&gt; true, 'has_archive' =&gt; 'books', 'show_in_rest' =&gt; true, … ) )</code></td></tr>
+                            <tr><td>A way to group it</td><td><code>register_taxonomy( 'genre', array( 'book' ), array( 'hierarchical' =&gt; true, … ) )</code></td></tr>
+                            <tr><td>A typed field on each item</td><td><code>register_post_meta( 'book', 'pagesco_price', array( 'type' =&gt; 'number', 'single' =&gt; true, 'show_in_rest' =&gt; true ) )</code></td></tr>
+                            <tr><td>The URLs to work</td><td><code>flush_rewrite_rules()</code> in the activation hook (after registering)</td></tr>
+                            <tr><td>An editing form</td><td><code>add_meta_box()</code> on <code>add_meta_boxes_book</code>; save on <code>save_post_book</code></td></tr>
+                            <tr><td>Extra list columns</td><td><code>manage_book_posts_columns</code> + <code>manage_book_posts_custom_column</code></td></tr>
+                            <tr><td>To set terms in code</td><td><code>wp_set_object_terms( $id, $genres, 'genre' )</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You taught WordPress about books: a <code>book</code> post type with an archive and REST support, and a <code>genre</code> taxonomy</li>
+                        <li>You registered six typed, public book meta keys ready for the REST API and block bindings</li>
+                        <li>You added a "Book details" meta box and Author, Price and Stock columns to the admin</li>
+                        <li>You seeded the eleven-book Pages &amp; Co. catalog with a safe, repeatable WP-CLI script</li>
+                        <li>You moved the rewrite flush into the activation hook, where it belongs</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>The catalog is live and the meta box saves, but that save path is exactly where attackers probe a WordPress site. In <a href="lesson_16.html"><strong>Lesson 5.3: Security in WordPress</strong></a> you harden the real <code>BookMetaBox</code> save you wrote today, add a "Mark sold out" action with a proper nonce and capability check, and see live demonstrations of the three attacks every plugin must defend against: cross-site scripting, cross-site request forgery and SQL injection, each shown against this very site and then shut down.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>pagesco-books</code> lists all six features and the eleven books are published</li>
+                    <li>Check that <code>/books/</code> and <code>/genre/fiction/</code> both load while the plugin is active</li>
+                    <li>Open a book in wp-admin and look at the "Book details" box; note which fields you would want to validate more strictly</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>You just built the backbone of a real content-driven site: a type, a taxonomy and typed fields, all in a tidy plugin, all reachable from the editor, WP-CLI and the REST API. This is the pattern behind portfolios, events, products, recipes, every bespoke WordPress site you have ever admired. The next lesson makes it safe; after that, it gets its own admin screens and blocks. The shelves are stocked. Well done.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_14.html" class="prev-lesson">← Previous: Your First Plugin</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_16.html" class="next-lesson">Next: Security in WordPress →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

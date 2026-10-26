@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Shortcodes with add_shortcode and shortcode_atts, when a custom table is right, creating and migrating a table with dbDelta and a schema version, and reading and writing it with $wpdb and prepare, building the Pages & Co. events calendar on WordPress 7.1 and PHP 8.5. PHP and WordPress Development Lesson 5.5.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Shortcodes, $wpdb &amp; Custom Tables - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 5: Plugin Development</a></li>
+            <li aria-current="page">Lesson 5.5: Shortcodes, $wpdb &amp; Custom Tables</li>
+        </ul>
+    </nav>
+    <main id="main-content" data-state="after:lesson_17">
+        <div class="container">
+            <header>
+                <h1>🗓️ Lesson 5.5: Shortcodes, $wpdb &amp; Custom Tables</h1>
+                <p class="lead">Since Lesson 2.1 the Events page has promised that "the full calendar is coming soon." Today it arrives. Events are not like books: the shop has many of them, each one a few fixed fields, always listed by date and never written in the block editor. That makes them a good fit for something WordPress lets you do but asks you to think twice about: a table of your own. You will create it with <code>dbDelta()</code>, upgrade it with a versioned migration, read and write it with <code>$wpdb</code> and <code>prepare()</code>, and put it on the page with a <code>[pagesco_events]</code> shortcode. A second shortcode, <code>[pagesco_book]</code>, drops a book card into any post.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Register shortcodes with <code>add_shortcode()</code> whose callbacks return escaped HTML, with attributes handled by <code>shortcode_atts()</code></li>
+                        <li>Decide when a custom table is the right storage, and when post types, meta, taxonomies or options are</li>
+                        <li>Create and upgrade a table with <code>dbDelta()</code> and a schema version stored in an option</li>
+                        <li>Read and write rows with <code>$wpdb</code>: <code>insert()</code>, <code>update()</code>, <code>delete()</code>, <code>get_row()</code>, <code>get_var()</code>, <code>get_results()</code>, always through <code>prepare()</code> or format arrays</li>
+                        <li>Remove the table and its version option in <code>uninstall.php</code></li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 140 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_17.html">Lesson 5.4: Admin Pages, Settings API &amp; Options</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> the <code>{prefix}pagesco_events</code> table with a versioned migration, six seeded events, and the <code>[pagesco_events]</code> and <code>[pagesco_book]</code> shortcodes on the Events page and the book club post</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (the <code>%i</code> placeholder needs WordPress 6.2+)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 5.4, with the settings page in place</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#shortcodes" class="toc-link">Shortcodes: Small Tags, Real Output</a></li>
+                        <li><a href="#attributes" class="toc-link">Attributes and shortcode_atts()</a></li>
+                        <li><a href="#custom-tables" class="toc-link">When a Custom Table Is Right</a></li>
+                        <li><a href="#dbdelta" class="toc-link">Creating the Table with dbDelta()</a></li>
+                        <li><a href="#wpdb" class="toc-link">Reading and Writing Rows with $wpdb</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: The Events Calendar</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="shortcodes" class="lesson-section">
+                <h2>🔖 Shortcodes: Small Tags, Real Output</h2>
+                <p>A <strong>shortcode</strong> is a tag in square brackets, such as <code>[gallery]</code> or <code>[embed]</code>, that an editor types into content and WordPress replaces with HTML when the content is displayed. Core ships a few (<code>[caption]</code>, <code>[gallery]</code>, <code>[audio]</code>, <code>[video]</code>, <code>[playlist]</code>, <code>[embed]</code>); plugins add their own. They are older than blocks, and for anything an editor arranges visually, blocks are now the better tool (Module 6 builds them). Shortcodes are still the quickest way to put plugin output into content anywhere: a paragraph, the Shortcode block, a classic widget, a classic theme's template.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: a placeholder card in the shop window</h4>
+                    <p>Picture the shop window display with a small card that reads "Book of the Month goes here". Whoever dresses the window does not need to know the price or the stock; every morning someone swaps the card for the real book. A shortcode is that card: the editor writes <code>[pagesco_book id="30"]</code>, and on every page view your callback swaps it for the book's current title, price and stock. Change the price in the catalog and every card follows.</p>
+                </div>
+
+                <p>The mechanics are one function and one rule. <code>add_shortcode( $tag, $callback )</code>, called on <code>init</code>, connects a tag to a callback. The callback receives the attributes, any enclosed content and the tag name, and <strong>returns</strong> the HTML. WordPress runs <code>do_shortcode()</code> on <code>the_content</code> at priority 11 (you saw it in Lesson 2.3's Exercise 3), right after <code>wpautop</code>, and puts whatever you return where the tag was. Create <code>wordpress/wp-content/plugins/pagesco-books/src/Shortcodes/BookShortcode.php</code> (a new <code>PagesCo\Books\Shortcodes</code> sub-namespace, so a new <code>src/Shortcodes/</code> folder):</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/Shortcodes/BookShortcode.php"><code class="language-php">&lt;?php
+/**
+ * The [pagesco_book id="30"] shortcode.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books\Shortcodes;
+
+use PagesCo\Books\BookPostType;
+use PagesCo\Books\Feature;
+
+/**
+ * Prints a one-line card for a book: title (linked), author, price and stock.
+ */
+final class BookShortcode implements Feature {
+
+	/**
+	 * The shortcode's tag, the name inside the brackets.
+	 */
+	public const TAG = 'pagesco_book';
+
+	/**
+	 * Registers the shortcode on init.
+	 */
+	public function register(): void {
+		add_action( 'init', array( $this, 'add_shortcode' ) );
+	}
+
+	/**
+	 * Tells WordPress which callback renders [pagesco_book].
+	 */
+	public function add_shortcode(): void {
+		add_shortcode( self::TAG, array( $this, 'render' ) );
+	}
+
+	/**
+	 * Returns the card's HTML; never echoes.
+	 *
+	 * @param array|string $atts The attributes written in the shortcode ('' when there are none).
+	 * @return string
+	 */
+	public function render( $atts ) {
+		$atts = shortcode_atts( array( 'id' =&gt; 0 ), $atts, self::TAG );
+		$book = get_post( absint( $atts['id'] ) );
+
+		if ( ! $book || BookPostType::NAME !== $book-&gt;post_type || 'publish' !== $book-&gt;post_status ) {
+			return '';
+		}
+
+		$author   = get_post_meta( $book-&gt;ID, 'pagesco_author', true );
+		$price    = (float) get_post_meta( $book-&gt;ID, 'pagesco_price', true );
+		$in_stock = (bool) get_post_meta( $book-&gt;ID, 'pagesco_in_stock', true );
+
+		return sprintf(
+			'&lt;span class="pagesco-book"&gt;&lt;a href="%1$s"&gt;%2$s&lt;/a&gt; %3$s, &lt;span class="pagesco-book__price"&gt;%4$s&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;%5$s&lt;/span&gt;&lt;/span&gt;',
+			esc_url( get_permalink( $book ) ),
+			esc_html( get_the_title( $book ) ),
+			/* translators: %s: the book's author. */
+			esc_html( sprintf( __( 'by %s', 'pagesco-books' ), $author ) ),
+			esc_html( '$' . number_format_i18n( $price, 2 ) ),
+			$in_stock ? esc_html__( 'In stock', 'pagesco-books' ) : esc_html__( 'Sold out', 'pagesco-books' )
+		);
+	}
+}</code></pre>
+                <p>Everything Lesson 5.3 taught applies, because a shortcode's output lands in a public page: the ID is forced to an integer with <code>absint()</code>, the post is checked to be a published book (no drafts or private posts leaking through a shortcode), and every value is escaped for its context. The card is a <code>&lt;span&gt;</code>, so it fits inside a sentence as well as on a line of its own. List the feature (after <code>Admin\SettingsPage::class,</code>) and run a shortcode by hand with <code>do_shortcode()</code>:</p>
+                <pre data-cli><code class="language-bash">sed -i '/Admin\\SettingsPage::class,/a\			Shortcodes\\BookShortcode::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+wp eval 'echo do_shortcode( "[pagesco_book id=\"30\"]" ), "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/dune/"&gt;Dune&lt;/a&gt; by Frank Herbert, &lt;span class="pagesco-book__price"&gt;$14.99&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;</code></pre>
+                </div>
+                <p>The book club post from Lesson 2.1 talks about <em>Dune</em>; give it the card. In the editor you would type the shortcode into a paragraph. Here the new content goes into a file in the WordPress root and <code>wp post update</code> reads it, as in Lesson 2.1:</p>
+                <pre data-file="club.html"><code class="language-html">&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;Our Thursday book club starts with &lt;em&gt;Dune&lt;/em&gt;. Join us at 7 p.m. in the reading corner; the first coffee is on us.&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;
+
+&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;This month's book: [pagesco_book id="30"]&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;</code></pre>
+                <pre data-cli><code class="language-bash">wp post update 17 club.html
+rm club.html</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Updated post 17.</code></pre>
+                </div>
+                <pre data-web="/book-club-dune/" data-select-all=".entry-content p"><code class="language-text">http://localhost:8080/book-club-dune/   (View Source: the post's paragraphs)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;p class="wp-block-paragraph"&gt;Our Thursday book club starts with &lt;em&gt;Dune&lt;/em&gt;. Join us at 7 p.m. in the reading corner; the first coffee is on us.&lt;/p&gt;
+&lt;p class="wp-block-paragraph"&gt;This month&amp;#8217;s book: &lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/dune/"&gt;Dune&lt;/a&gt; by Frank Herbert, &lt;span class="pagesco-book__price"&gt;$14.99&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/p&gt;</code></pre>
+                </div>
+                <p>The stored post still says <code>[pagesco_book id="30"]</code>; the card is built fresh on every view. Mark Dune sold out with Lesson 5.3's row action and this post says "Sold out" on the next page load, without anyone editing it.</p>
+            </section>
+
+            <section id="attributes" class="lesson-section">
+                <h2>🎛️ Attributes and shortcode_atts()</h2>
+                <p>Attributes arrive as an array of strings, or as an empty string when the tag has none. <code>shortcode_atts( $defaults, $atts, $tag )</code> turns that into a predictable array: every key from the defaults is present, values the editor gave replace the defaults, and attributes you did not declare are dropped. The third argument also creates a filter, <code>shortcode_atts_pagesco_book</code>, so other code can adjust the attributes (Exercise 4 uses it). Watch it handle four ways of writing the tag:</p>
+                <pre data-file="shortcode-cases.php" data-wp><code class="language-php">&lt;?php
+$cases = array(
+	'[pagesco_book id="33"]',               // another book
+	'[pagesco_book id="12"]',               // ID 12 is the About page, not a book
+	'[pagesco_book]',                       // no attributes at all
+	'[pagesco_book ID="35" color="red"]',   // upper-case name, unknown attribute
+);
+foreach ( $cases as $case ) {
+	echo $case, "\n  =&gt; '", do_shortcode( $case ), "'\n";
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>[pagesco_book id="33"]
+  =&gt; '&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/the-great-gatsby/"&gt;The Great Gatsby&lt;/a&gt; by F. Scott Fitzgerald, &lt;span class="pagesco-book__price"&gt;$8.99&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;Sold out&lt;/span&gt;&lt;/span&gt;'
+[pagesco_book id="12"]
+  =&gt; ''
+[pagesco_book]
+  =&gt; ''
+[pagesco_book ID="35" color="red"]
+  =&gt; '&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/the-hobbit/"&gt;The Hobbit&lt;/a&gt; by J.R.R. Tolkien, &lt;span class="pagesco-book__price"&gt;$10.99&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;'</code></pre>
+                </div>
+                <p>Line by line: Gatsby is found and shows "Sold out"; the About page is not a book, so the callback returns an empty string and the tag simply disappears; with no attributes <code>id</code> is the default <code>0</code>, which finds nothing; and attribute names are lowercased by the parser, so <code>ID</code> still works while <code>color</code>, never declared, is ignored. Returning <code>''</code> for bad input is a deliberate choice: a visitor should never see an error message because an editor mistyped an ID. (Delete the test file: <code>rm shortcode-cases.php</code>.)</p>
+                <pre data-cli><code class="language-bash">rm shortcode-cases.php</code></pre>
+
+                <div class="card card-success">
+                    <h4>✅ Shortcode or block?</h4>
+                    <p>Write a block when an editor should see and arrange the output in the editor (a preview, controls in the sidebar, no syntax to remember). Write a shortcode when the output must work everywhere text goes, including places blocks do not reach, or as a quick, stable interface for content that already exists. Many plugins offer both, sharing one PHP function that builds the HTML; Lesson 6.3's dynamic block can call the same code these shortcodes use.</p>
+                </div>
+            </section>
+
+            <section id="custom-tables" class="lesson-section">
+                <h2>🗄️ When a Custom Table Is Right</h2>
+                <p>Lesson 2.2 compared WordPress's storage choices; now you are about to use the last one. The default answer for plugin data is <em>not</em> a custom table: post types, meta and taxonomies give you the admin screens, the REST API, revisions, caching, export and import for free. A table of your own gives up all of that. So ask what the data looks like:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>The data is…</th><th>Store it as</th><th>Pages &amp; Co. example</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Content people write, edit and publish</td><td>A post type (+ meta)</td><td>Books (Lesson 5.2)</td></tr>
+                            <tr><td>A shared label to group and browse by</td><td>A taxonomy</td><td>Genres</td></tr>
+                            <tr><td>A few site-wide values</td><td>An option</td><td>Settings (Lesson 5.4)</td></tr>
+                            <tr><td>Many rows with the same few fields, queried by those fields (dates, ranges, counts), not edited as content</td><td>A custom table</td><td>Events; later perhaps orders, bookings, logs</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Events fit the last row: every event has the same five facts, the page always asks "the next few events in date order", and nobody needs revisions of an event or a block editor to write one. Stored as posts with meta, "events in date order" would mean a join on <code>wp_postmeta</code> and sorting a string column (the trap from Lesson 2.2); in a table, <code>starts_at</code> is a real <code>DATETIME</code> column with an index. The price you pay: you write the schema, the queries, any admin screen, the upgrade path and the cleanup yourself. This lesson does each of those.</p>
+            </section>
+
+            <section id="dbdelta" class="lesson-section">
+                <h2>🏗️ Creating the Table with dbDelta()</h2>
+                <p>WordPress creates and upgrades its own tables with a function from <code>wp-admin/includes/upgrade.php</code>: <code>dbDelta()</code>. You give it the <code>CREATE TABLE</code> statement for the table <em>as it should be</em>; it compares that with the database and creates the table, or adds the columns and indexes that are missing. That makes one statement serve both new installs and upgrades. It is also picky about how the statement is written:</p>
+                <ul>
+                    <li>One column or index per line, with <code>CREATE TABLE</code> in capitals and the table name right after it</li>
+                    <li>A <code>PRIMARY KEY</code>, and indexes written as <code>KEY name (column)</code></li>
+                    <li>The site's character set and collation appended with <code>$wpdb-&gt;get_charset_collate()</code></li>
+                    <li>The table name built from <code>$wpdb-&gt;prefix</code>, never a hard-coded <code>wp_</code> (Lesson 2.2's rule; on multisite every site has its own prefix)</li>
+                </ul>
+                <p>Here is the first version of the events table: an ID, a title, the start (in the shop's local time), the location and a <code>created_at</code> time stamp in UTC. A <strong>schema version</strong>, the constant <code>DB_VERSION</code>, is stored in the option <code>pagesco_books_db_version</code> once the table is built. Create <code>src/EventsTable.php</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/EventsTable.php"><code class="language-php">&lt;?php
+/**
+ * The shop's events, kept in a custom table.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books;
+
+/**
+ * Creates and upgrades the {prefix}pagesco_events table, and reads and writes its rows.
+ */
+final class EventsTable implements Feature {
+
+	/**
+	 * The schema version this code expects. Raise it whenever schema() changes.
+	 */
+	public const DB_VERSION = 1;
+
+	/**
+	 * The option that records the schema version installed in this database.
+	 */
+	public const VERSION_OPTION = 'pagesco_books_db_version';
+
+	/**
+	 * Checks the schema on every request, so a plugin update upgrades the table without a reactivation.
+	 */
+	public function register(): void {
+		add_action( 'init', array( $this, 'maybe_upgrade' ) );
+	}
+
+	/**
+	 * The table's full name, with this site's table prefix.
+	 */
+	public static function name(): string {
+		global $wpdb;
+
+		return $wpdb-&gt;prefix . 'pagesco_events';
+	}
+
+	/**
+	 * Runs install() when the database is older than this code.
+	 */
+	public function maybe_upgrade(): void {
+		if ( (int) get_option( self::VERSION_OPTION, 0 ) &lt; self::DB_VERSION ) {
+			self::install();
+		}
+	}
+
+	/**
+	 * Creates the table, or brings an existing one up to schema(), and records the version.
+	 */
+	public static function install(): void {
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+		dbDelta( self::schema() );
+		update_option( self::VERSION_OPTION, self::DB_VERSION );
+	}
+
+	/**
+	 * The CREATE TABLE statement in the exact shape dbDelta() expects.
+	 */
+	private static function schema(): string {
+		global $wpdb;
+
+		$table   = self::name();
+		$collate = $wpdb-&gt;get_charset_collate();
+
+		return "CREATE TABLE {$table} (
+			id bigint unsigned NOT NULL AUTO_INCREMENT,
+			title varchar(200) NOT NULL,
+			starts_at datetime NOT NULL,
+			location varchar(200) NOT NULL DEFAULT '',
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			KEY starts_at (starts_at)
+		) {$collate};";
+	}
+
+	/**
+	 * Adds one event and returns its ID (0 if the insert failed).
+	 *
+	 * @param string $title     The event's name.
+	 * @param string $starts_at Local date and time, Y-m-d H:i:s.
+	 * @param string $location  Where in the shop.
+	 */
+	public static function add( string $title, string $starts_at, string $location ): int {
+		global $wpdb;
+
+		$inserted = $wpdb-&gt;insert(
+			self::name(),
+			array(
+				'title'      =&gt; $title,
+				'starts_at'  =&gt; $starts_at,
+				'location'   =&gt; $location,
+				'created_at' =&gt; current_time( 'mysql', true ),
+			),
+			array( '%s', '%s', '%s', '%s' )
+		);
+
+		return $inserted ? (int) $wpdb-&gt;insert_id : 0;
+	}
+
+	/**
+	 * Returns events in date order, optionally only those at one location.
+	 *
+	 * @param int    $limit    How many events at most.
+	 * @param string $location Exact location, or '' for every location.
+	 * @return object[] Rows with id, title, starts_at, location.
+	 */
+	public static function find( int $limit, string $location = '' ): array {
+		global $wpdb;
+
+		if ( '' === $location ) {
+			$sql = $wpdb-&gt;prepare(
+				'SELECT id, title, starts_at, location FROM %i ORDER BY starts_at ASC LIMIT %d',
+				self::name(),
+				$limit
+			);
+		} else {
+			$sql = $wpdb-&gt;prepare(
+				'SELECT id, title, starts_at, location FROM %i WHERE location = %s ORDER BY starts_at ASC LIMIT %d',
+				self::name(),
+				$location,
+				$limit
+			);
+		}
+
+		return $wpdb-&gt;get_results( $sql );
+	}
+}</code></pre>
+                <p>Two moments build the table, and you need both. <strong>Activation</strong>: <code>Activator::activate()</code> calls <code>EventsTable::install()</code>, so the table exists from the first request. <strong>Upgrades</strong>: when a site updates the plugin, WordPress replaces its files but does <em>not</em> run the activation hook again (Lesson 5.1's life cycle). So the feature also compares the stored version with <code>DB_VERSION</code> on <code>init</code>; that costs one autoloaded <code>get_option()</code> and runs <code>install()</code> only when the code is newer than the database. Replace <code>src/Activator.php</code> (only the last lines of <code>activate()</code> are new):</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/Activator.php"><code class="language-php">&lt;?php
+/**
+ * What happens when the plugin is activated or deactivated.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books;
+
+/**
+ * Activation and deactivation callbacks (uninstall.php cleans up for good).
+ */
+final class Activator {
+
+	/**
+	 * Runs once, when an administrator activates the plugin.
+	 */
+	public static function activate(): void {
+		$author = get_role( 'author' );
+
+		add_role(
+			'pagesco_bookseller',
+			'Bookseller',
+			$author ? $author-&gt;capabilities : array( 'read' =&gt; true )
+		);
+
+		// init has already run on this request: register the post type and taxonomy now, so their rules exist.
+		( new BookPostType() )-&gt;register_post_type();
+		( new GenreTaxonomy() )-&gt;register_taxonomy();
+		flush_rewrite_rules();
+
+		// Create the events table, or bring it up to date (Lesson 5.5).
+		EventsTable::install();
+	}
+
+	/**
+	 * Runs once, when the plugin is deactivated. Keeps all data.
+	 */
+	public static function deactivate(): void {
+		// Remove the post type's and taxonomy's rules, so /books/ stops answering while the plugin is off.
+		unregister_post_type( BookPostType::NAME );
+		unregister_taxonomy( GenreTaxonomy::NAME );
+		flush_rewrite_rules();
+	}
+}</code></pre>
+                <p>List the feature, then deactivate and activate the plugin so the activator runs:</p>
+                <pre data-cli><code class="language-bash">sed -i '/Admin\\SettingsPage::class,/a\			EventsTable::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+wp plugin deactivate pagesco-books
+wp plugin activate pagesco-books
+wp option get pagesco_books_db_version</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Plugin 'pagesco-books' deactivated.
+Success: Deactivated 1 of 1 plugins.
+Plugin 'pagesco-books' activated.
+Success: Activated 1 of 1 plugins.
+1</code></pre>
+                </div>
+                <pre data-sql><code class="language-sql">DESCRIBE wp_pagesco_events;</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+------------+-----------------+------+-----+---------+----------------+
+| Field      | Type            | Null | Key | Default | Extra          |
++------------+-----------------+------+-----+---------+----------------+
+| id         | bigint unsigned | NO   | PRI | NULL    | auto_increment |
+| title      | varchar(200)    | NO   |     | NULL    |                |
+| starts_at  | datetime        | NO   | MUL | NULL    |                |
+| location   | varchar(200)    | NO   |     |         |                |
+| created_at | datetime        | NO   |     | NULL    |                |
++------------+-----------------+------+-----+---------+----------------+</code></pre>
+                </div>
+                <p>The table exists with the five columns, <code>id</code> is the auto-increment primary key, <code>starts_at</code> carries an index (<code>MUL</code>), and version 1 is recorded. (In SQL, at the MySQL prompt or with <code>wp db query</code>, you type the real name <code>wp_pagesco_events</code>; in PHP you always build it from <code>$wpdb-&gt;prefix</code>, which is what <code>EventsTable::name()</code> does.) The integer columns are written without display widths (<code>bigint unsigned</code>, not <code>bigint(20) unsigned</code>): MySQL 8 and later ignore those widths and print the type without them, and <code>dbDelta()</code> in 7.1 compares the two forms correctly either way.</p>
+            </section>
+
+            <section id="wpdb" class="lesson-section">
+                <h2>🔌 Reading and Writing Rows with $wpdb</h2>
+                <p><code>$wpdb</code> (Lesson 1.3 and 2.2) is WordPress's database object. For your own table you will use six of its methods, and the rule from Lesson 5.3 holds for all of them: values reach SQL only through placeholders, either in <code>$wpdb-&gt;prepare()</code> or as the format arrays of the write helpers.</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Method</th><th>Returns</th><th>Use it for</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>insert( $table, $data, $formats )</code></td><td>rows inserted or <code>false</code>; the new ID in <code>$wpdb-&gt;insert_id</code></td><td>Adding a row</td></tr>
+                            <tr><td><code>update( $table, $data, $where, $formats, $where_formats )</code></td><td>rows changed or <code>false</code></td><td>Changing rows</td></tr>
+                            <tr><td><code>delete( $table, $where, $where_formats )</code></td><td>rows deleted or <code>false</code></td><td>Removing rows</td></tr>
+                            <tr><td><code>get_var( $sql )</code></td><td>one value</td><td><code>COUNT(*)</code>, a single field</td></tr>
+                            <tr><td><code>get_row( $sql )</code></td><td>one row as an object</td><td>Fetching by ID</td></tr>
+                            <tr><td><code>get_results( $sql )</code></td><td>an array of row objects</td><td>Lists</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The formats are the same placeholders <code>prepare()</code> uses: <code>%s</code> string, <code>%d</code> integer, <code>%f</code> float, and for table and column names <code>%i</code>, which quotes an identifier with backticks. Walk one test event through its whole life in a script in the WordPress root:</p>
+                <pre data-file="events-crud.php" data-wp><code class="language-php">&lt;?php
+use PagesCo\Books\EventsTable;
+
+global $wpdb;
+$table = EventsTable::name();
+
+$id = EventsTable::add( 'Test event', '2027-10-31 12:00:00', 'Back office' );
+echo "insert: new ID $id\n";
+
+$row = $wpdb-&gt;get_row( $wpdb-&gt;prepare( 'SELECT title, location FROM %i WHERE id = %d', $table, $id ) );
+echo "get_row: {$row-&gt;title} in the {$row-&gt;location}\n";
+
+$changed = $wpdb-&gt;update( $table, array( 'location' =&gt; 'Café' ), array( 'id' =&gt; $id ), array( '%s' ), array( '%d' ) );
+echo "update: $changed row(s) changed\n";
+
+echo 'prepare: ', $wpdb-&gt;prepare( 'SELECT COUNT(*) FROM %i WHERE location = %s', $table, "Children's corner" ), "\n";
+
+$deleted = $wpdb-&gt;delete( $table, array( 'id' =&gt; $id ), array( '%d' ) );
+echo "delete: $deleted row(s) deleted\n";
+echo 'rows left: ', $wpdb-&gt;get_var( $wpdb-&gt;prepare( 'SELECT COUNT(*) FROM %i', $table ) ), "\n";</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>insert: new ID 1
+get_row: Test event in the Back office
+update: 1 row(s) changed
+prepare: SELECT COUNT(*) FROM `wp_pagesco_events` WHERE location = 'Children\'s corner'
+delete: 1 row(s) deleted
+rows left: 0</code></pre>
+                </div>
+                <p>Insert, read, change, delete, each with its values passed separately from the SQL. The <code>prepare:</code> line shows what reaches MySQL: the table name in backticks from <code>%i</code>, the apostrophe in "Children's corner" escaped inside quotes, so it cannot end the string early. Notice also what <code>EventsTable::add()</code> hides from its callers: the table name, the formats and the <code>created_at</code> stamp. Keeping all SQL for a table in one class means the shortcode, and later a REST endpoint, never write SQL themselves. Remove the script:</p>
+                <pre data-cli><code class="language-bash">rm events-crud.php</code></pre>
+
+                <div class="card card-info">
+                    <h4>🧩 Version note: <code>%i</code> needs WordPress 6.2</h4>
+                    <p>The identifier placeholder arrived in WordPress 6.2. The plugin's header says <code>Requires at least: 6.8</code>, so it is safe here. On a plugin that must support older versions, table names cannot go through <code>prepare()</code>: you interpolate <code>{$wpdb-&gt;prefix}</code> (a value WordPress controls, never user input) and keep placeholders for every value, which is what most older plugins you will read do.</p>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <h3>1. A shortcode that echoes instead of returning</h3>
+                <p>The most common shortcode bug, written as a throwaway must-use plugin and placed on a test page:</p>
+                <pre data-file="wp-content/mu-plugins/mistake-echo.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Mistake: Echoing Shortcode
+ */
+
+add_shortcode(
+	'pagesco_hours',
+	function () {
+		echo '&lt;p class="pagesco-hours"&gt;Open until 9 p.m. on Thursdays.&lt;/p&gt;';
+	}
+);</code></pre>
+                <pre data-file="hours-test.html"><code class="language-html">&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;Our opening hours:&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;
+
+&lt;!-- wp:shortcode --&gt;
+[pagesco_hours]
+&lt;!-- /wp:shortcode --&gt;</code></pre>
+                <pre data-cli><code class="language-bash">wp post create hours-test.html --post_type=page --post_title="Hours test" --post_name=hours-test --post_status=publish --porcelain &gt; /dev/null
+curl -s http://localhost:8080/hours-test/ | head -n 2
+curl -s http://localhost:8080/hours-test/ | grep -c 'Our opening hours'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;p class="pagesco-hours"&gt;Open until 9 p.m. on Thursdays.&lt;/p&gt;&lt;!DOCTYPE html&gt;
+&lt;html lang="en-US"&gt;
+1</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the hours appear <em>above</em> <code>&lt;!DOCTYPE html&gt;</code>, outside the page, while the paragraph that introduces them sits in the content further down. <code>echo</code> prints the moment the callback runs, and a block theme renders the whole template, content included, before it prints the <code>&lt;head&gt;</code> (the same effect as Lesson 2.3's Common Mistake 1). In a classic theme the text would land at the top of the content area instead: wrong, but less obviously. No warning, no notice. <strong>Fix:</strong> build a string and <code>return</code> it; if you prefer writing HTML in template style, wrap it in <code>ob_start()</code> … <code>return ob_get_clean();</code>. Clean up:</p>
+                <pre data-cli><code class="language-bash">wp post delete $(wp post list --post_type=page --name=hours-test --field=ID) --force &gt; /dev/null
+rm hours-test.html wp-content/mu-plugins/mistake-echo.php</code></pre>
+
+                <h3>2. Changing the schema without raising the version</h3>
+                <p>Say the shop wants a host for each event. You add the column to <code>schema()</code>, reload, and… nothing. The <code>sed</code> line adds <code>host</code> after <code>created_at</code> as you would in your editor:</p>
+                <pre data-cli><code class="language-bash">sed -i 's/^\t\t\tcreated_at datetime NOT NULL,$/&amp;\n\t\t\thost varchar(100) NOT NULL,/' wp-content/plugins/pagesco-books/src/EventsTable.php
+grep -n "host varchar" wp-content/plugins/pagesco-books/src/EventsTable.php
+curl -s -o /dev/null http://localhost:8080/
+wp option get pagesco_books_db_version
+wp db query "SELECT COUNT(*) AS host_columns FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'wp_pagesco_events' AND COLUMN_NAME = 'host'"</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>75:			host varchar(100) NOT NULL,
+1
+host_columns
+0</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the code describes a <code>host</code> column, but the table has none (<code>0</code>). <code>maybe_upgrade()</code> only runs <code>install()</code> when the stored version is lower than <code>DB_VERSION</code>, and both are still <code>1</code>, so <code>dbDelta()</code> never saw the new statement. The first query that reads <code>host</code> would fail with "Unknown column". <strong>Fix:</strong> every schema change comes with a higher <code>DB_VERSION</code>; the project does exactly that for <code>capacity</code>. Take the <code>host</code> line out again:</p>
+                <pre data-cli><code class="language-bash">sed -i '/host varchar(100)/d' wp-content/plugins/pagesco-books/src/EventsTable.php</code></pre>
+
+                <h3>3. Expecting dbDelta() to rename or drop</h3>
+                <p><code>dbDelta()</code> only adds. Rename a column in the statement and it adds a new, empty column next to the old one. See it on a throwaway table:</p>
+                <pre data-file="rename-demo.php" data-wp><code class="language-php">&lt;?php
+require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+global $wpdb;
+$table   = $wpdb-&gt;prefix . 'pagesco_demo';
+$collate = $wpdb-&gt;get_charset_collate();
+
+print_r( dbDelta( "CREATE TABLE {$table} (
+	id bigint unsigned NOT NULL AUTO_INCREMENT,
+	location varchar(200) NOT NULL DEFAULT '',
+	PRIMARY KEY  (id)
+) {$collate};" ) );
+
+// "Rename" location to venue:
+print_r( dbDelta( "CREATE TABLE {$table} (
+	id bigint unsigned NOT NULL AUTO_INCREMENT,
+	venue varchar(200) NOT NULL DEFAULT '',
+	PRIMARY KEY  (id)
+) {$collate};" ) );
+
+echo implode( ', ', $wpdb-&gt;get_col( $wpdb-&gt;prepare( 'SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s ORDER BY ORDINAL_POSITION', $table ) ) ), "\n";
+$wpdb-&gt;query( $wpdb-&gt;prepare( 'DROP TABLE %i', $table ) );</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Array
+(
+    [wp_pagesco_demo] =&gt; Created table wp_pagesco_demo
+)
+Array
+(
+    [wp_pagesco_demo.venue] =&gt; Added column wp_pagesco_demo.venue
+)
+id, location, venue</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the first call created the table, the second "added column venue", and the table ended up with both <code>location</code> and <code>venue</code>. Your data is still in <code>location</code>, and code reading <code>venue</code> finds empty strings. <code>dbDelta()</code> also never drops a column or a table, and it cannot copy data. <strong>Fix:</strong> for renames, drops and data changes, write an explicit step for that version (<code>ALTER TABLE … RENAME COLUMN …</code> run once, when the stored version is below the new one) next to the <code>dbDelta()</code> call. Delete the demo: <code>rm rename-demo.php</code>.</p>
+                <pre data-cli><code class="language-bash">rm rename-demo.php</code></pre>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: The Events Calendar</h2>
+                <p>Time to keep Lesson 2.1's promise. You will add a column with a real migration, make sure uninstalling cleans up, seed the season's events, and put the calendar on the Events page. Allow about 40 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: Migrate to version 2: seats per event <span class="step-time">(10 min)</span></h3>
+                    <p>Readings and book clubs have limited seats. Add a <code>capacity</code> column (<code>0</code> means open to all) and, because the schema changed, raise <code>DB_VERSION</code> to <code>2</code>. <code>add()</code> and <code>find()</code> learn the new column too. Replace <code>src/EventsTable.php</code>:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/EventsTable.php"><code class="language-php">&lt;?php
+/**
+ * The shop's events, kept in a custom table.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books;
+
+/**
+ * Creates and upgrades the {prefix}pagesco_events table, and reads and writes its rows.
+ */
+final class EventsTable implements Feature {
+
+	/**
+	 * The schema version this code expects. Raise it whenever schema() changes.
+	 */
+	public const DB_VERSION = 2;
+
+	/**
+	 * The option that records the schema version installed in this database.
+	 */
+	public const VERSION_OPTION = 'pagesco_books_db_version';
+
+	/**
+	 * Checks the schema on every request, so a plugin update upgrades the table without a reactivation.
+	 */
+	public function register(): void {
+		add_action( 'init', array( $this, 'maybe_upgrade' ) );
+	}
+
+	/**
+	 * The table's full name, with this site's table prefix.
+	 */
+	public static function name(): string {
+		global $wpdb;
+
+		return $wpdb-&gt;prefix . 'pagesco_events';
+	}
+
+	/**
+	 * Runs install() when the database is older than this code.
+	 */
+	public function maybe_upgrade(): void {
+		if ( (int) get_option( self::VERSION_OPTION, 0 ) &lt; self::DB_VERSION ) {
+			self::install();
+		}
+	}
+
+	/**
+	 * Creates the table, or brings an existing one up to schema(), and records the version.
+	 */
+	public static function install(): void {
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+		dbDelta( self::schema() );
+		update_option( self::VERSION_OPTION, self::DB_VERSION );
+	}
+
+	/**
+	 * The CREATE TABLE statement in the exact shape dbDelta() expects.
+	 */
+	private static function schema(): string {
+		global $wpdb;
+
+		$table   = self::name();
+		$collate = $wpdb-&gt;get_charset_collate();
+
+		return "CREATE TABLE {$table} (
+			id bigint unsigned NOT NULL AUTO_INCREMENT,
+			title varchar(200) NOT NULL,
+			starts_at datetime NOT NULL,
+			location varchar(200) NOT NULL DEFAULT '',
+			capacity smallint unsigned NOT NULL DEFAULT 0,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			KEY starts_at (starts_at)
+		) {$collate};";
+	}
+
+	/**
+	 * Adds one event and returns its ID (0 if the insert failed).
+	 *
+	 * @param string $title     The event's name.
+	 * @param string $starts_at Local date and time, Y-m-d H:i:s.
+	 * @param string $location  Where in the shop.
+	 * @param int    $capacity  Seats, or 0 for an open event.
+	 */
+	public static function add( string $title, string $starts_at, string $location, int $capacity ): int {
+		global $wpdb;
+
+		$inserted = $wpdb-&gt;insert(
+			self::name(),
+			array(
+				'title'      =&gt; $title,
+				'starts_at'  =&gt; $starts_at,
+				'location'   =&gt; $location,
+				'capacity'   =&gt; $capacity,
+				'created_at' =&gt; current_time( 'mysql', true ),
+			),
+			array( '%s', '%s', '%s', '%d', '%s' )
+		);
+
+		return $inserted ? (int) $wpdb-&gt;insert_id : 0;
+	}
+
+	/**
+	 * Returns events in date order, optionally only those at one location.
+	 *
+	 * @param int    $limit    How many events at most.
+	 * @param string $location Exact location, or '' for every location.
+	 * @return object[] Rows with id, title, starts_at, location, capacity.
+	 */
+	public static function find( int $limit, string $location = '' ): array {
+		global $wpdb;
+
+		if ( '' === $location ) {
+			$sql = $wpdb-&gt;prepare(
+				'SELECT id, title, starts_at, location, capacity FROM %i ORDER BY starts_at ASC LIMIT %d',
+				self::name(),
+				$limit
+			);
+		} else {
+			$sql = $wpdb-&gt;prepare(
+				'SELECT id, title, starts_at, location, capacity FROM %i WHERE location = %s ORDER BY starts_at ASC LIMIT %d',
+				self::name(),
+				$location,
+				$limit
+			);
+		}
+
+		return $wpdb-&gt;get_results( $sql );
+	}
+}</code></pre>
+                    <p>Do not reactivate the plugin: that is the point. A site that updates the plugin just loads the next page. Load any page, then look at the table and the stored version:</p>
+                    <pre data-cli><code class="language-bash">curl -s -o /dev/null http://localhost:8080/
+wp option get pagesco_books_db_version</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>2</code></pre>
+                    </div>
+                    <pre data-sql><code class="language-sql">SELECT COLUMN_NAME, COLUMN_TYPE, COLUMN_DEFAULT
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'wp_pagesco_events'
+ORDER BY ORDINAL_POSITION;</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>+-------------+-------------------+----------------+
+| COLUMN_NAME | COLUMN_TYPE       | COLUMN_DEFAULT |
++-------------+-------------------+----------------+
+| id          | bigint unsigned   | NULL           |
+| title       | varchar(200)      | NULL           |
+| starts_at   | datetime          | NULL           |
+| location    | varchar(200)      |                |
+| created_at  | datetime          | NULL           |
+| capacity    | smallint unsigned | 0              |
++-------------+-------------------+----------------+</code></pre>
+                    </div>
+                    <p>The request ran <code>maybe_upgrade()</code>, saw version 1 below 2, and <code>dbDelta()</code> added <code>capacity</code> with its default of <code>0</code>. Notice where: at the end, after <code>created_at</code>, because <code>ALTER TABLE … ADD COLUMN</code> appends. A site installed fresh from version 2 gets the order of the statement instead. Nothing should depend on column order, which is one more reason to name columns in every <code>SELECT</code> rather than use <code>SELECT *</code>.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: Drop the table on uninstall <span class="step-time">(8 min)</span></h3>
+                    <p>Lesson 5.4 decided the rule: <code>uninstall.php</code> removes what belongs to the plugin and keeps the shop's content. The events table and its version option belong to the plugin; no other code can read that table, so leaving it behind would only leave clutter. Replace <code>uninstall.php</code>:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/uninstall.php"><code class="language-php">&lt;?php
+/**
+ * Removes the plugin's data when an administrator deletes the plugin.
+ *
+ * Books, genres and book meta are the shop's content: they stay (Lesson 5.4).
+ * The events table belongs to the plugin and nothing else can read it: it goes (Lesson 5.5).
+ *
+ * @package PagesCo\Books
+ */
+
+defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
+
+global $wpdb;
+
+remove_role( 'pagesco_bookseller' );
+delete_option( 'pagesco_books_settings' );
+delete_option( 'pagesco_books_db_version' );
+
+$wpdb-&gt;query( $wpdb-&gt;prepare( 'DROP TABLE IF EXISTS %i', $wpdb-&gt;prefix . 'pagesco_events' ) );</code></pre>
+                    <p><code>DROP TABLE IF EXISTS %i</code> goes through <code>prepare()</code> like any other SQL. Test it now, while the table is still empty, so nothing is lost:</p>
+                    <pre data-cli><code class="language-bash">wp plugin uninstall pagesco-books --deactivate --skip-delete
+wp db query "SELECT COUNT(*) AS events_tables FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'wp_pagesco_events'"
+wp option list --search='pagesco_books*'
+wp plugin activate pagesco-books
+wp option get pagesco_books_db_version</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Deactivating 'pagesco-books'...
+Plugin 'pagesco-books' deactivated.
+Ran uninstall procedure for 'pagesco-books' plugin without deleting.
+Success: Uninstalled 1 of 1 plugins.
+events_tables
+0
+
++-------------+--------------+
+| option_name | option_value |
++-------------+--------------+
++-------------+--------------+
+Plugin 'pagesco-books' activated.
+Success: Activated 1 of 1 plugins.
+2</code></pre>
+                    </div>
+                    <p>Uninstalling removed the table and both options; activating built the table again, straight at version 2.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: The <code>[pagesco_events]</code> shortcode and the season's events <span class="step-time">(12 min)</span></h3>
+                    <p>Create <code>src/Shortcodes/EventsShortcode.php</code>. It takes two attributes: <code>limit</code>, whose default is the <strong>Events to show</strong> setting from Lesson 5.4, and <code>location</code>, which narrows the list to one place in the shop. The SQL stays in <code>EventsTable::find()</code>:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/Shortcodes/EventsShortcode.php"><code class="language-php">&lt;?php
+/**
+ * The [pagesco_events] shortcode.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books\Shortcodes;
+
+use PagesCo\Books\EventsTable;
+use PagesCo\Books\Feature;
+use PagesCo\Books\Settings;
+
+/**
+ * Lists the shop's events from the custom table.
+ */
+final class EventsShortcode implements Feature {
+
+	/**
+	 * The shortcode's tag.
+	 */
+	public const TAG = 'pagesco_events';
+
+	/**
+	 * Registers the shortcode on init.
+	 */
+	public function register(): void {
+		add_action( 'init', array( $this, 'add_shortcode' ) );
+	}
+
+	/**
+	 * Tells WordPress which callback renders [pagesco_events].
+	 */
+	public function add_shortcode(): void {
+		add_shortcode( self::TAG, array( $this, 'render' ) );
+	}
+
+	/**
+	 * Returns the list of events as HTML.
+	 *
+	 * @param array|string $atts limit (default: the Events to show setting) and location (default: all).
+	 * @return string
+	 */
+	public function render( $atts ) {
+		$atts = shortcode_atts(
+			array(
+				'limit'    =&gt; Settings::get( 'events_limit' ),
+				'location' =&gt; '',
+			),
+			$atts,
+			self::TAG
+		);
+
+		$limit  = min( 50, max( 1, absint( $atts['limit'] ) ) );
+		$events = EventsTable::find( $limit, sanitize_text_field( $atts['location'] ) );
+
+		if ( ! $events ) {
+			return '&lt;p class="pagesco-events-empty"&gt;' . esc_html__( 'No events are scheduled right now. Check back soon!', 'pagesco-books' ) . '&lt;/p&gt;';
+		}
+
+		$items = '';
+		foreach ( $events as $event ) {
+			$seats = (int) $event-&gt;capacity
+				/* translators: %d: number of seats. */
+				? sprintf( _n( '%d seat', '%d seats', (int) $event-&gt;capacity, 'pagesco-books' ), (int) $event-&gt;capacity )
+				: __( 'open to all', 'pagesco-books' );
+
+			$items .= sprintf(
+				'&lt;li class="pagesco-event"&gt;&lt;strong&gt;%1$s&lt;/strong&gt; &lt;time datetime="%2$s"&gt;%3$s&lt;/time&gt; &lt;span class="pagesco-event__where"&gt;%4$s, %5$s&lt;/span&gt;&lt;/li&gt;',
+				esc_html( $event-&gt;title ),
+				esc_attr( mysql2date( 'Y-m-d\TH:i', $event-&gt;starts_at, false ) ),
+				esc_html( mysql2date( 'l, F j, g:i a', $event-&gt;starts_at ) ),
+				esc_html( $event-&gt;location ),
+				esc_html( $seats )
+			);
+		}
+
+		return '&lt;ul class="pagesco-events"&gt;' . $items . '&lt;/ul&gt;';
+	}
+}</code></pre>
+                    <p>Dates are formatted with <code>mysql2date()</code>, which reads a MySQL <code>DATETIME</code> string as it is (the shop's local time) and translates the month and day names on a non-English site; the <code>datetime</code> attribute keeps a machine-readable copy. <code>limit</code> is clamped between 1 and 50, so <code>[pagesco_events limit="100000"]</code> cannot ask MySQL for a huge list, and <code>location</code> is sanitized and then passed as a <code>%s</code> placeholder. Now the season's events. Save the seeding script in the WordPress root:</p>
+                    <pre data-file="seed-events.php"><code class="language-php">&lt;?php
+/**
+ * Seeds the Pages &amp; Co. events table with the season's events (Lesson 5.5).
+ *
+ * Run from the WordPress root with WP-CLI: wp eval-file seed-events.php
+ *
+ * @package PagesCo\Books
+ */
+
+use PagesCo\Books\EventsTable;
+
+defined( 'ABSPATH' ) || exit;
+
+global $wpdb;
+
+if ( '0' !== $wpdb-&gt;get_var( $wpdb-&gt;prepare( 'SELECT COUNT(*) FROM %i', EventsTable::name() ) ) ) {
+	WP_CLI::error( 'The events table is not empty: nothing seeded.' );
+}
+
+$pagesco_events = array(
+	array( 'Book club: Dune', '2027-11-04 19:00:00', 'Reading corner', 20 ),
+	array( 'Story time: The Hobbit', '2027-11-06 10:30:00', "Children's corner", 15 ),
+	array( 'An evening with Ana Ruiz', '2027-11-11 18:30:00', 'Café', 40 ),
+	array( 'Poetry open mic', '2027-11-18 19:30:00', 'Café', 30 ),
+	array( 'Book club: Fahrenheit 451', '2027-12-02 19:00:00', 'Reading corner', 20 ),
+	array( 'Gift-wrapping night', '2027-12-09 17:00:00', 'Front of the shop', 0 ),
+);
+
+foreach ( $pagesco_events as $pagesco_event ) {
+	$pagesco_id = EventsTable::add( ...$pagesco_event );
+	WP_CLI::log( sprintf( 'Event %d: %s', $pagesco_id, $pagesco_event[0] ) );
+}
+
+WP_CLI::success( count( $pagesco_events ) . ' events added.' );</code></pre>
+                    <p>List the feature, run the script, and remove it:</p>
+                    <pre data-cli><code class="language-bash">sed -i '/Shortcodes\\BookShortcode::class,/a\			Shortcodes\\EventsShortcode::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+wp eval-file seed-events.php
+rm seed-events.php</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Event 1: Book club: Dune
+Event 2: Story time: The Hobbit
+Event 3: An evening with Ana Ruiz
+Event 4: Poetry open mic
+Event 5: Book club: Fahrenheit 451
+Event 6: Gift-wrapping night
+Success: 6 events added.</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 4: Put the calendar on the Events page <span class="step-time">(10 min)</span></h3>
+                    <p>In the editor, open the Events page, replace "The full calendar is coming soon." with a new sentence, and add a <strong>Shortcode</strong> block containing <code>[pagesco_events]</code>. The block markup that produces:</p>
+                    <pre data-file="events.html"><code class="language-html">&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;Author readings, book clubs and story time for kids. Everyone is welcome; where seats are listed, they go to whoever arrives first.&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;
+
+&lt;!-- wp:shortcode --&gt;
+[pagesco_events]
+&lt;!-- /wp:shortcode --&gt;</code></pre>
+                    <pre data-cli><code class="language-bash">wp post update 14 events.html
+rm events.html</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Success: Updated post 14.</code></pre>
+                    </div>
+                    <p>Open the page (or follow the "See events" link in the store notice, which has pointed here since Lesson 2.3):</p>
+                    <pre data-web="/events/" data-select-all="li.pagesco-event"><code class="language-text">http://localhost:8080/events/   (View Source: the events list)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;li class="pagesco-event"&gt;&lt;strong&gt;Book club: Dune&lt;/strong&gt; &lt;time datetime="2027-11-04T19:00"&gt;Thursday, November 4, 7:00 pm&lt;/time&gt; &lt;span class="pagesco-event__where"&gt;Reading corner, 20 seats&lt;/span&gt;&lt;/li&gt;
+&lt;li class="pagesco-event"&gt;&lt;strong&gt;Story time: The Hobbit&lt;/strong&gt; &lt;time datetime="2027-11-06T10:30"&gt;Saturday, November 6, 10:30 am&lt;/time&gt; &lt;span class="pagesco-event__where"&gt;Children&amp;#039;s corner, 15 seats&lt;/span&gt;&lt;/li&gt;
+&lt;li class="pagesco-event"&gt;&lt;strong&gt;An evening with Ana Ruiz&lt;/strong&gt; &lt;time datetime="2027-11-11T18:30"&gt;Thursday, November 11, 6:30 pm&lt;/time&gt; &lt;span class="pagesco-event__where"&gt;Café, 40 seats&lt;/span&gt;&lt;/li&gt;
+&lt;li class="pagesco-event"&gt;&lt;strong&gt;Poetry open mic&lt;/strong&gt; &lt;time datetime="2027-11-18T19:30"&gt;Thursday, November 18, 7:30 pm&lt;/time&gt; &lt;span class="pagesco-event__where"&gt;Café, 30 seats&lt;/span&gt;&lt;/li&gt;
+&lt;li class="pagesco-event"&gt;&lt;strong&gt;Book club: Fahrenheit 451&lt;/strong&gt; &lt;time datetime="2027-12-02T19:00"&gt;Thursday, December 2, 7:00 pm&lt;/time&gt; &lt;span class="pagesco-event__where"&gt;Reading corner, 20 seats&lt;/span&gt;&lt;/li&gt;</code></pre>
+                    </div>
+                    <p>Five events in date order, because Events to show defaults to 5; the sixth, the gift-wrapping night, is waiting. Change the setting to 6 under Settings &gt; Pages &amp; Co. Books and it appears, or override it in one place with <code>[pagesco_events limit="6"]</code>. Finally, check the whole plugin from the command line:</p>
+                    <pre data-cli data-checkpoint><code class="language-bash">grep -n "::class," wp-content/plugins/pagesco-books/src/Plugin.php
+wp eval 'global $shortcode_tags; foreach ( array( "pagesco_book", "pagesco_events" ) as $tag ) { echo $tag, ": ", isset( $shortcode_tags[ $tag ] ) ? "registered" : "missing", "\n"; }'
+wp db query "SELECT id, title, starts_at, capacity FROM wp_pagesco_events ORDER BY starts_at"</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>76:			StoreNotice::class,
+77:			BookPostType::class,
+78:			GenreTaxonomy::class,
+79:			BookMeta::class,
+80:			Admin\BookMetaBox::class,
+81:			Admin\BookColumns::class,
+82:			Admin\StockAction::class,
+83:			Settings::class,
+84:			Admin\SettingsPage::class,
+85:			EventsTable::class,
+86:			Shortcodes\BookShortcode::class,
+87:			Shortcodes\EventsShortcode::class,
+pagesco_book: registered
+pagesco_events: registered
+id	title	starts_at	capacity
+1	Book club: Dune	2027-11-04 19:00:00	20
+2	Story time: The Hobbit	2027-11-06 10:30:00	15
+3	An evening with Ana Ruiz	2027-11-11 18:30:00	40
+4	Poetry open mic	2027-11-18 19:30:00	30
+5	Book club: Fahrenheit 451	2027-12-02 19:00:00	20
+6	Gift-wrapping night	2027-12-09 17:00:00	0</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>pagesco-books</code> lists twelve features, ending with <code>EventsTable</code>, <code>Shortcodes\BookShortcode</code> and <code>Shortcodes\EventsShortcode</code></li>
+                        <li><code>wp_pagesco_events</code> exists with a <code>capacity</code> column, and <code>pagesco_books_db_version</code> is <code>2</code></li>
+                        <li>Six events are in the table, and the Events page lists the first five in date order</li>
+                        <li>The book club post shows the Dune card from <code>[pagesco_book id="30"]</code></li>
+                        <li><code>uninstall.php</code> also drops the events table and deletes <code>pagesco_books_db_version</code></li>
+                        <li>No helper files (<code>seed-events.php</code>, <code>events.html</code>, <code>club.html</code>) are left in the WordPress root</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Each exercise leaves the site as the project did. Try each one before you open the solution.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Events per Location</h3>
+                    <p>The shop wants to know which corner hosts the most events. Write a prepared query that counts events and total seats per location, busiest first.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>SELECT location, COUNT(*) AS events, SUM(capacity) AS seats FROM %i GROUP BY location ORDER BY events DESC, location</code>, with <code>EventsTable::name()</code> for <code>%i</code> and <code>$wpdb-&gt;get_results()</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">wp eval 'global $wpdb;
+$rows = $wpdb-&gt;get_results( $wpdb-&gt;prepare(
+	"SELECT location, COUNT(*) AS events, SUM(capacity) AS seats FROM %i GROUP BY location ORDER BY events DESC, location",
+	PagesCo\Books\EventsTable::name()
+) );
+foreach ( $rows as $row ) { printf( "%s: %d event(s), %d seats\n", $row-&gt;location, $row-&gt;events, $row-&gt;seats ); }'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Café: 2 event(s), 70 seats
+Reading corner: 2 event(s), 40 seats
+Children's corner: 1 event(s), 15 seats
+Front of the shop: 1 event(s), 0 seats</code></pre>
+                        </div>
+                        <p>Grouping and summing on real columns is where a custom table pays off: the same question over post meta would need a join per field and a cast on every value.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: One Location, and an Empty List</h3>
+                    <p>Use the shortcode's attributes to list only the next Café event, then ask for a location with no events. What does a visitor see in each case?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>do_shortcode( '[pagesco_events location="Café" limit="1"]' )</code>. The location must match exactly, accents included.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">wp eval 'echo do_shortcode( "[pagesco_events location=\"Café\" limit=\"1\"]" ), "\n";
+echo do_shortcode( "[pagesco_events location=\"Garden\"]" ), "\n";'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>&lt;ul class="pagesco-events"&gt;&lt;li class="pagesco-event"&gt;&lt;strong&gt;An evening with Ana Ruiz&lt;/strong&gt; &lt;time datetime="2027-11-11T18:30"&gt;Thursday, November 11, 6:30 pm&lt;/time&gt; &lt;span class="pagesco-event__where"&gt;Café, 40 seats&lt;/span&gt;&lt;/li&gt;&lt;/ul&gt;
+&lt;p class="pagesco-events-empty"&gt;No events are scheduled right now. Check back soon!&lt;/p&gt;</code></pre>
+                        </div>
+                        <p>One Café event, the reading with Ana Ruiz, and for the garden the friendly empty message rather than an empty list or nothing at all. An empty state is part of the design: the page should say something useful when the table has nothing to show.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: An Enclosing Shortcode</h3>
+                    <p>Shortcodes can wrap content: <code>[pagesco_staff_pick]Read it before the film![/pagesco_staff_pick]</code>. In a throwaway must-use plugin, write <code>pagesco_staff_pick</code>, which wraps its content in <code>&lt;aside class="pagesco-staff-pick"&gt;</code> with a "Staff pick:" label, allows simple HTML in the content, and runs shortcodes inside it, so a <code>[pagesco_book]</code> card can go in the box.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The callback's second parameter, <code>$content</code>, holds the text between the tags (<code>null</code> for a self-closing tag). Clean it with <code>wp_kses_post()</code> (Lesson 5.3), then expand shortcodes inside with <code>do_shortcode()</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/mu-plugins/exercise-staff-pick.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Exercise: Staff Pick
+ */
+
+add_shortcode(
+	'pagesco_staff_pick',
+	function ( $atts, $content = null ) {
+		return '&lt;aside class="pagesco-staff-pick"&gt;&lt;strong&gt;' . esc_html__( 'Staff pick:', 'pagesco-books' ) . '&lt;/strong&gt; '
+			. do_shortcode( wp_kses_post( (string) $content ) ) . '&lt;/aside&gt;';
+	}
+);</code></pre>
+                        <pre data-cli><code class="language-bash">wp eval 'echo do_shortcode( "[pagesco_staff_pick]&lt;em&gt;Read it before the film!&lt;/em&gt; [pagesco_book id=\"30\"][/pagesco_staff_pick]" ), "\n";'
+rm wp-content/mu-plugins/exercise-staff-pick.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>&lt;aside class="pagesco-staff-pick"&gt;&lt;strong&gt;Staff pick:&lt;/strong&gt; &lt;em&gt;Read it before the film!&lt;/em&gt; &lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/dune/"&gt;Dune&lt;/a&gt; by Frank Herbert, &lt;span class="pagesco-book__price"&gt;$14.99&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/aside&gt;</code></pre>
+                        </div>
+                        <p>The <code>&lt;em&gt;</code> survived <code>wp_kses_post()</code> and the nested book shortcode was expanded. WordPress does not expand shortcodes inside your output on its own: the inner one runs only because the callback calls <code>do_shortcode()</code>.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 4: Look Books Up by Slug (Stretch)</h3>
+                    <p>Editors remember slugs better than IDs. Without editing <code>BookShortcode</code>, make <code>[pagesco_book slug="the-hobbit"]</code> work, using the filter that <code>shortcode_atts()</code> creates for the tag.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>shortcode_atts_pagesco_book</code> receives <code>( $out, $pairs, $atts, $shortcode )</code>: <code>$out</code> is the merged result, <code>$atts</code> what the editor typed (including the undeclared <code>slug</code>). If a slug was given, find the book with <code>get_page_by_path( $slug, OBJECT, 'book' )</code> and set <code>$out['id']</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/mu-plugins/exercise-book-slug.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Exercise: Book Slug
+ */
+
+add_filter(
+	'shortcode_atts_pagesco_book',
+	function ( $out, $pairs, $atts ) {
+		if ( is_array( $atts ) &amp;&amp; ! empty( $atts['slug'] ) ) {
+			$book = get_page_by_path( sanitize_title( $atts['slug'] ), OBJECT, 'book' );
+			if ( $book ) {
+				$out['id'] = $book-&gt;ID;
+			}
+		}
+		return $out;
+	},
+	10,
+	3
+);</code></pre>
+                        <pre data-cli><code class="language-bash">wp eval 'echo do_shortcode( "[pagesco_book slug=\"the-hobbit\"]" ), "\n";'
+rm wp-content/mu-plugins/exercise-book-slug.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/the-hobbit/"&gt;The Hobbit&lt;/a&gt; by J.R.R. Tolkien, &lt;span class="pagesco-book__price"&gt;$10.99&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;</code></pre>
+                        </div>
+                        <p>The filter turned the slug into an ID before the callback looked for the book, so the shortcode itself did not change. Passing the tag as the third argument of <code>shortcode_atts()</code> is what made this extension point exist; always pass it in your own shortcodes.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> A shortcode callback ends with <code>echo $html;</code> instead of <code>return $html;</code>. On a block theme, where does the output appear?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="WordPress places what the callback returns. What does an echoing callback return?">
+                                A) Exactly where the shortcode was written
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="echo prints immediately, and a block theme renders the content before it prints the head, so the HTML ends up above the doctype; the shortcode's place in the content stays empty.">
+                                B) At the very top of the page, above the doctype
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="WordPress does not check what a callback does with its output, so no notice is raised. Where does printed text go?">
+                                C) Nowhere: WordPress shows a notice instead
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> Which kind of data belongs in a custom table rather than a post type?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Content people write and edit wants the editor, revisions and REST, which a post type gives you for free.">
+                                A) Blog articles with authors and revisions
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="A few site-wide values are what the options table is for.">
+                                B) Four plugin settings
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Many rows with the same fields, queried by those fields and not edited as content, are where a custom table beats post meta: real column types, indexes and simple SQL.">
+                                C) Thousands of bookings, each with the same few fields, listed by date
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> You add a column to <code>schema()</code>, update the plugin on a live site, and the column never appears. What is missing?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="maybe_upgrade only calls dbDelta when the stored version is lower than DB_VERSION. Without raising the constant, the new statement never runs.">
+                                A) A higher DB_VERSION, so maybe_upgrade() runs install() again
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Reactivating would work once, but plugin updates do not reactivate. What does the code compare on every request?">
+                                B) The site owner has to reactivate the plugin
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="dbDelta adds missing columns well. Did it get the chance to run?">
+                                C) dbDelta() cannot add columns; use ALTER TABLE
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> What does this print?</p>
+                        <pre data-file="quiz-atts.php" data-wp><code class="language-php">&lt;?php
+$atts = shortcode_atts( array( 'limit' =&gt; 5, 'location' =&gt; '' ), array( 'LIMIT' =&gt; '2', 'color' =&gt; 'red' ) );
+echo wp_json_encode( $atts ), "\n";</code></pre>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="shortcode_atts only keeps keys from the defaults. What happens to color?">
+                                A) {"limit":5,"location":"","color":"red"}
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The parser lowercases attribute names, but here the array is passed straight to shortcode_atts, which compares keys exactly. Does LIMIT match limit?">
+                                B) {"limit":"2","location":""}
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="shortcode_atts compares keys exactly and keeps only declared ones, so LIMIT and color are both ignored and the defaults stay. In a real tag, the parser lowercases names before this step, which is why [pagesco_book ID=35] worked.">
+                                C) {"limit":5,"location":""}
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> Which line safely reads the events at a location typed by a visitor?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="esc_html is for HTML output, not SQL, and the value is still glued into the SQL string. Which method keeps value and SQL apart?">
+                                A) $wpdb-&gt;get_results( "SELECT * FROM {$table} WHERE location = '" . esc_html( $loc ) . "'" )
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="prepare puts the table name in through %i and the visitor's value through %s, quoted and escaped, so it can never change the query.">
+                                B) $wpdb-&gt;get_results( $wpdb-&gt;prepare( 'SELECT title FROM %i WHERE location = %s', $table, $loc ) )
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Sanitizing text strips tags and line breaks; a quote still breaks out of the SQL string. What does the SQL need?">
+                                C) $wpdb-&gt;get_results( "SELECT title FROM {$table} WHERE location = '" . sanitize_text_field( $loc ) . "'" )
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Why are past events still listed?</summary>
+                    <p>The shortcode lists the table in date order and leaves the calendar's upkeep to whoever manages it: the seeded events are the coming season's, and the list always shows the first few. A real shop would hide events that have ended, either in the query (<code>WHERE starts_at &gt;= %s</code> with <code>current_time( 'mysql' )</code>, a nice extension to try) or by clearing old rows on a schedule, the kind of job WP-Cron does in Lesson 7.3.</p>
+                </details>
+                <details>
+                    <summary>Why not store events as a post type, like books?</summary>
+                    <p>It would work, and for a shop that writes long event descriptions with images, a post type might even be better: the editor, revisions and REST come free. Pages &amp; Co.'s events are short, structured rows listed by date, which is exactly where a table shines, and building one teaches you the tools (<code>dbDelta()</code>, migrations, <code>$wpdb</code>) that you need for data that can never be posts, such as orders, bookings or logs. In Lesson 7.2 the events get a REST route of their own, <code>/pagesco/v1/events</code>, since core's routes do not know about your table.</p>
+                </details>
+                <details>
+                    <summary>Should deactivation drop the table?</summary>
+                    <p>No. Deactivating is often temporary (troubleshooting, an update); dropping the table would destroy the calendar every time. Deactivation undoes runtime effects such as rewrite rules and scheduled events; only <code>uninstall.php</code> deletes data. The table is also included in <code>wp db export</code> backups automatically, because it lives in the same database with the same prefix.</p>
+                </details>
+                <details>
+                    <summary>Do shortcodes still work in block themes and the Site Editor?</summary>
+                    <p>Yes, wherever content is filtered through <code>do_shortcode()</code>: post content (in a paragraph or the Shortcode block) and classic widgets. The Shortcode block also renders shortcodes typed into templates in the Site Editor. What you do not get is a preview in the editor: editors see <code>[pagesco_events]</code> as text. That is the main reason Module 6 turns the book card into a block.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Give the events an admin screen: a submenu under Books, "Events", that lists the rows of the table with <code>EventsTable::find()</code> in a <code>widefat striped</code> table (the admin's own table classes), and a small form below it, posted to <code>admin-post.php</code> with a nonce and a <code>manage_options</code> check (Lesson 5.3), that adds an event through <code>EventsTable::add()</code>. Validate the date with the <code>DateTime::createFromFormat()</code> check from Lesson 5.3, and reject a capacity below zero. What would you need to add for editing and deleting events?</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Add the events table to the storage list you started in <code>pagesco-plan.txt</code> last lesson, with its owner and what deactivation and deletion do to it. Then think of a client site you know (a gym, a dentist, a club) and name one kind of data it has for each row of this lesson's "store it as" table: a post type, a taxonomy, an option and a custom table. For the custom table, write the <code>CREATE TABLE</code> columns you would start with.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>A shortcode is <code>add_shortcode( $tag, $callback )</code> on <code>init</code>; the callback <strong>returns</strong> escaped HTML and never echoes</li>
+                        <li><code>shortcode_atts( $defaults, $atts, $tag )</code> fills defaults, drops undeclared attributes and creates the <code>shortcode_atts_{$tag}</code> filter; validate every attribute as untrusted input</li>
+                        <li>Choose a custom table only for many uniform rows queried by their fields; post types, taxonomies and options come with far more for free</li>
+                        <li><code>dbDelta()</code> creates a table or adds missing columns and indexes from a carefully formatted <code>CREATE TABLE</code>; it never renames or drops</li>
+                        <li>Store a schema version in an option, compare it on every request, and raise it with every schema change, because plugin updates do not rerun activation</li>
+                        <li>Every <code>$wpdb</code> value goes through placeholders (<code>%s</code>, <code>%d</code>, <code>%f</code>, <code>%i</code>) in <code>prepare()</code> or the format arrays of <code>insert()</code>, <code>update()</code> and <code>delete()</code></li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>A shortcode</td><td><code>add_shortcode( 'pagesco_book', array( $this, 'render' ) );</code> on <code>init</code></td></tr>
+                            <tr><td>Its attributes with defaults</td><td><code>$atts = shortcode_atts( array( 'id' =&gt; 0 ), $atts, 'pagesco_book' );</code></td></tr>
+                            <tr><td>A table's name</td><td><code>$wpdb-&gt;prefix . 'pagesco_events'</code></td></tr>
+                            <tr><td>Create or upgrade it</td><td><code>require_once ABSPATH . 'wp-admin/includes/upgrade.php'; dbDelta( $sql );</code></td></tr>
+                            <tr><td>Upgrade only when needed</td><td><code>if ( (int) get_option( 'pagesco_books_db_version', 0 ) &lt; self::DB_VERSION ) { … }</code></td></tr>
+                            <tr><td>Add a row</td><td><code>$wpdb-&gt;insert( $table, $data, array( '%s', '%d' ) ); $wpdb-&gt;insert_id</code></td></tr>
+                            <tr><td>Read rows</td><td><code>$wpdb-&gt;get_results( $wpdb-&gt;prepare( 'SELECT … FROM %i WHERE location = %s', $table, $loc ) )</code></td></tr>
+                            <tr><td>Drop it on uninstall</td><td><code>$wpdb-&gt;query( $wpdb-&gt;prepare( 'DROP TABLE IF EXISTS %i', $table ) );</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You wrote two shortcodes and put a live book card into the book club post</li>
+                        <li>You created the <code>wp_pagesco_events</code> table with <code>dbDelta()</code> and migrated it to version 2 without a reactivation</li>
+                        <li>You read and wrote rows with <code>$wpdb</code>, every value through a placeholder</li>
+                        <li>You filled the Events page with the season's calendar, sized by the setting from Lesson 5.4</li>
+                        <li>You made uninstalling remove the table and its version, completing the plugin's cleanup</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>That completes Module 5: <code>pagesco-books</code> now has a catalog, a hardened admin, settings and an events calendar. Shortcodes put that data into content, but editors only see brackets. In <a href="lesson_19.html"><strong>Lesson 6.1: Block Development Setup</strong></a> you install the modern JavaScript toolchain, Node 24 with <code>@wordpress/create-block</code> and <code>@wordpress/scripts</code>, and build your first block inside this same plugin, the start of a book card editors can see and arrange in the editor.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Open <code>http://localhost:8080/events/</code> and the book club post and check both shortcodes render</li>
+                    <li>Make sure <code>pagesco_books_db_version</code> is <code>2</code> and the table has its six events</li>
+                    <li>Install Node.js 24 LTS if you do not have it yet (<code>node --version</code> should print v24): Lesson 6.1 starts with it</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>A custom table is the point where many WordPress developers feel they have left the safe path, and you just walked it carefully: a schema in one place, a version number that drives upgrades, every value through a placeholder, a clean uninstall. Those habits are what separate a table that quietly serves a shop for years from one that breaks on the first update. The calendar the shop promised its customers back in Module 2 is live, and you built every layer of it.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_17.html" class="prev-lesson">← Previous: Admin Pages, Settings API &amp; Options</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_19.html" class="next-lesson">Next: Block Development Setup →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

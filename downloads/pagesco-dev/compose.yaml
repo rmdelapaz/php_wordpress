@@ -1,0 +1,72 @@
+# Pages & Co. local WordPress (PHP and WordPress Development, Lesson 1.2)
+#   docker compose up -d                      start (first start downloads images, ~1 min)
+#   docker compose run --rm wpcli wp --info   WP-CLI (Lesson 1.2 shows a short "wp" shortcut)
+#   http://localhost:8080        the site        http://localhost:8025   Mailpit (caught email)
+#   docker compose down          stop (your files and database stay)    down -v  also deletes the database
+name: pagesco
+
+x-wordpress-env: &wp-env
+  WORDPRESS_DB_HOST: db
+  WORDPRESS_DB_NAME: wordpress
+  WORDPRESS_DB_USER: wordpress
+  WORDPRESS_DB_PASSWORD: wordpress-dev-only
+  WORDPRESS_DEBUG: 1
+  WORDPRESS_CONFIG_EXTRA: |
+    define( 'WP_ENVIRONMENT_TYPE', 'local' );
+    define( 'WP_DEBUG_LOG', true );
+    define( 'WP_DEBUG_DISPLAY', true );
+    define( 'SCRIPT_DEBUG', true );
+
+services:
+  db:
+    image: mysql:9.7
+    environment:
+      MYSQL_ROOT_PASSWORD: root-dev-only
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress-dev-only
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot-dev-only"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+  wordpress:
+    image: wordpress:7.1-php8.5-apache
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment: *wp-env
+    volumes:
+      - ./wordpress:/var/www/html
+      - ./config/apache-8080.conf:/etc/apache2/conf-enabled/zz-port-8080.conf:ro
+      - ./config/php-dev.ini:/usr/local/etc/php/conf.d/zz-dev.ini:ro
+
+  wpcli:
+    build:                             # wordpress:cli-php8.5 + fixes for MySQL 9.7 and PHP 8.5 (config/wpcli.Dockerfile)
+      context: ./config
+      dockerfile: wpcli.Dockerfile
+    image: pagesco-wpcli:php8.5
+    pull_policy: build                 # a local image: build it, never try to download it
+    profiles: ["cli"]                  # only runs when you call it: docker compose run --rm wpcli wp ...
+    user: "33:33"                      # the same user as Apache in the wordpress image (www-data)
+    network_mode: "service:wordpress"  # share its network: localhost:8080 and the db host work the same
+    depends_on:
+      - wordpress
+    environment:
+      <<: *wp-env
+      HOME: /tmp
+    volumes:
+      - ./wordpress:/var/www/html
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"
+
+volumes:
+  db_data:

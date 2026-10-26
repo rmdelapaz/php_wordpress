@@ -1,0 +1,1411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Dynamic blocks and block bindings on WordPress 7.1: render.php and server-side queries, editor previews with ServerSideRender, block variations from PHP, binding core blocks to post meta with core/post-meta and a custom binding source, building the Pages &amp; Co. Book List and book pages. PHP and WordPress Development Lesson 6.3.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Dynamic Blocks &amp; Block Bindings - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 6: Block Development</a></li>
+            <li aria-current="page">Lesson 6.3: Dynamic Blocks &amp; Block Bindings</li>
+        </ul>
+    </nav>
+    <main id="main-content" data-state="after:lesson_20">
+        <div class="container">
+            <header>
+                <h1>🔄 Lesson 6.3: Dynamic Blocks &amp; Block Bindings</h1>
+                <p class="lead">The Book Card from Lesson 6.2 stores its HTML in the post, which is perfect for a bookseller's words and wrong for anything that changes: change Dune's price and every stored copy of it is out of date. Today you build the other kind of block. The Book List asks the catalog for its books every time a page is viewed, through a PHP file you know how to write since Module 4. Then you go one step further and connect plain core blocks (a paragraph, a list item) to the book's own data with block bindings, so the shop's book pages show live prices without a single custom block.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Explain when a block should be dynamic, and what a dynamic block stores in <code>post_content</code></li>
+                        <li>Render a block on the server with <code>render.php</code>: attributes, a <code>WP_Query</code> through <code>get_posts()</code>, <code>get_block_wrapper_attributes()</code>, and escaping</li>
+                        <li>Preview a dynamic block in the editor with <code>ServerSideRender</code>, and fill its controls from the REST API through <code>@wordpress/core-data</code></li>
+                        <li>Offer ready-made versions of a block as <strong>variations</strong>, generated in PHP</li>
+                        <li>Bind core blocks to post meta with <code>core/post-meta</code>, and write a custom binding source with <code>register_block_bindings_source()</code></li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 145 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_20.html">Lesson 6.2: Static Blocks: Attributes, Controls &amp; Supports</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> the dynamic <code>pagesco/book-list</code> block with genre variations, a <code>pagesco/book</code> binding source, and a <code>single-book.html</code> template whose author, price, stock and facts come from the book's meta</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (bindings on list items are new in 7.1; everything else works from 6.8, the plugin's minimum)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 6.2, with Node 24 and the plugin's <code>npm run build</code>; a browser for the editor</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#why-dynamic" class="toc-link">Stored HTML Goes Stale</a></li>
+                        <li><a href="#scaffold" class="toc-link">Scaffolding a Dynamic Block</a></li>
+                        <li><a href="#render" class="toc-link">render.php: The Book List on the Server</a></li>
+                        <li><a href="#editor" class="toc-link">The Book List in the Editor</a></li>
+                        <li><a href="#variations" class="toc-link">Variations: Ready-Made Book Lists</a></li>
+                        <li><a href="#bindings" class="toc-link">Block Bindings: Core Blocks, Live Data</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Book Pages with Live Details</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="why-dynamic" class="lesson-section">
+                <h2>🧊 Stored HTML Goes Stale</h2>
+                <p>Lesson 3.3's <code>featured-books</code> pattern prints three staff picks with their prices on the front page, typed into the pattern file. Lesson 5.5's <code>[pagesco_book id="30"]</code> shortcode, in the "Book club: Dune" post, prints Dune's price too, but reads it from the book's meta on every view. Put Dune on sale for $12.99, as a bookseller would on the book's edit screen, and compare the two pages from the WP-CLI container:</p>
+                <pre data-cli><code class="language-bash">wp post meta update 30 pagesco_price 12.99
+curl -s http://localhost:8080/ | grep -A 10 '&gt;Dune&lt;' | grep -o '\$[0-9.]*'
+curl -s http://localhost:8080/book-club-dune/ | grep -o 'pagesco-book__price"&gt;[^&lt;]*'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Updated custom field 'pagesco_price'.
+$14.99
+pagesco-book__price"&gt;$12.99</code></pre>
+                </div>
+                <p>The front page still says $14.99; the post says $12.99. The pattern's price was fixed when the pattern was written. A static block has the same problem one level down: its HTML is fixed when the post is <em>saved</em>, which is why Lesson 6.2's Book Card holds no price. Put the price back:</p>
+                <pre data-cli><code class="language-bash">wp post meta update 30 pagesco_price 14.99</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Updated custom field 'pagesco_price'.</code></pre>
+                </div>
+                <p>A <strong>dynamic block</strong> works like the shortcode, with a block's editing experience. Its <code>save</code> returns nothing, so the post stores only the comment, for example <code>&lt;!-- wp:pagesco/book-list {"genre":"fantasy"} /--&gt;</code>. On every page view, WordPress finds the comment, and runs your PHP with the attributes to produce the HTML.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: the printed card and the departure board</h4>
+                    <p>A static block is a printed card: the shop prints it once, and it says the same thing until someone reprints it. A dynamic block is a station's departure board: what is stored is only "show the next trains from platform 2", and the board looks up the timetable whenever someone glances at it. The post keeps the instruction (the comment and its attributes); your <code>render.php</code> is the board.</p>
+                </div>
+
+                <div class="mermaid">
+graph TD
+    A["post_content: wp:pagesco/book-list comment"] -->|"page view"| B["do_blocks: parse the comment"]
+    B --> C["render.php with the attributes"]
+    C -->|"get_posts"| D["book posts and meta"]
+    C --> E["HTML sent to the visitor"]
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th></th><th>Static (Lesson 6.2)</th><th>Dynamic (this lesson)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Stored in the post</td><td>comment + finished HTML</td><td>comment only</td></tr>
+                            <tr><td>HTML made by</td><td><code>save()</code> in the editor, once</td><td><code>render.php</code> on the server, every view</td></tr>
+                            <tr><td>Changing the markup later</td><td>needs a deprecation</td><td>just edit <code>render.php</code>; every page follows</td></tr>
+                            <tr><td>Plugin deactivated</td><td>stored HTML still shows</td><td>the block shows nothing</td></tr>
+                            <tr><td>Good for</td><td>what an editor writes</td><td>data that lives elsewhere: lists, prices, stock, the current user</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="scaffold" class="lesson-section">
+                <h2>🏗️ Scaffolding a Dynamic Block</h2>
+                <p>Lesson 6.1's create-block command with one more option, <code>--variant dynamic</code>. Run it in the plugin's folder, <code>wordpress/wp-content/plugins/pagesco-books</code>:</p>
+                <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npx @wordpress/create-block@latest book-list --no-plugin --variant dynamic --target-dir=src/blocks/book-list --namespace=pagesco --textdomain=pagesco-books --short-description="Books from the Pages &amp; Co. catalog, always up to date."</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>...
+
+Creating a "block.json" file.
+
+...
+
+Code is Poetry</code></pre>
+                </div>
+                <p>As in Lesson 6.1, the <code>...</code> lines name the folder on your computer. What it wrote:</p>
+                <pre data-cli><code class="language-bash">cd wp-content/plugins/pagesco-books/src/blocks/book-list
+ls
+grep -E '"(render|viewScript)"' block.json
+cat render.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>block.json   edit.js      editor.scss  index.js     render.php   style.scss   view.js
+	"render": "file:./render.php",
+	"viewScript": "file:./view.js"
+&lt;?php
+/**
+ * PHP file to use when rendering the block type on the server to show on the front end.
+ *
+ * The following variables are exposed to the file:
+ *     $attributes (array): The block attributes.
+ *     $content (string): The block default content.
+ *     $block (WP_Block): The block instance.
+ *
+ * @see https://github.com/WordPress/gutenberg/blob/trunk/docs/reference-guides/block-api/block-metadata.md#render
+ */
+?&gt;
+&lt;p &lt;?php echo get_block_wrapper_attributes(); ?&gt;&gt;
+	&lt;?php esc_html_e( 'Book List – hello from a dynamic block!', 'pagesco-books' ); ?&gt;
+&lt;/p&gt;</code></pre>
+                </div>
+                <p>Compared with the static scaffold of Lesson 6.1, three things differ:</p>
+                <ul>
+                    <li>There is <strong>no <code>save.js</code></strong>, and <code>index.js</code> registers only <code>edit</code>. A block without <code>save</code> saves nothing but its comment.</li>
+                    <li><code>block.json</code> has <code>"render": "file:./render.php"</code>. When WordPress registers the block from <code>block.json</code>, this line turns the PHP file into the block's render callback: on each view WordPress includes the file inside a function, with the three variables the comment lists, and uses whatever it prints (an output buffer catches it, so <code>echo</code> is right here, unlike in a shortcode).</li>
+                    <li><code>render.php</code> starts the wrapper with <code>get_block_wrapper_attributes()</code>, the PHP twin of <code>useBlockProps.save()</code>: the block's class <code>wp-block-pagesco-book-list</code> plus whatever block supports add (colors, spacing). It returns attributes that are already escaped, which is why core's own blocks, and this file, print it without another escaping function.</li>
+                </ul>
+                <p>Like the Book Card, the list needs no JavaScript on the front end and no editor-only styles. Delete <code>view.js</code> and <code>editor.scss</code> (and their lines in <code>block.json</code>, next).</p>
+                <pre data-cli><code class="language-bash">rm wp-content/plugins/pagesco-books/src/blocks/book-list/view.js wp-content/plugins/pagesco-books/src/blocks/book-list/editor.scss</code></pre>
+            </section>
+
+            <section id="render" class="lesson-section">
+                <h2>🖨️ render.php: The Book List on the Server</h2>
+                <p>The shop's Book List has three attributes, all settings, so none has a <code>source</code>: they live in the comment, where PHP can read them (Lesson 6.2). <code>count</code> has <strong>no default</strong> on purpose: a list without a count uses the <strong>Books per list</strong> setting from Lesson 5.4, so the shop can change every default-length list on the site from one screen. <code>genre</code> is a term slug, empty for all genres. <code>orderBy</code> has an <code>enum</code>, the three orders the list knows. Replace <code>src/blocks/book-list/block.json</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-list/block.json"><code class="language-json">{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "pagesco/book-list",
+	"version": "0.1.0",
+	"title": "Book List",
+	"category": "widgets",
+	"icon": "list-view",
+	"description": "Books from the Pages &amp; Co. catalog, always up to date.",
+	"keywords": [ "books", "catalog", "prices" ],
+	"textdomain": "pagesco-books",
+	"attributes": {
+		"count": {
+			"type": "integer"
+		},
+		"genre": {
+			"type": "string",
+			"default": ""
+		},
+		"orderBy": {
+			"type": "string",
+			"enum": [ "title", "newest", "price" ],
+			"default": "title"
+		}
+	},
+	"supports": {
+		"html": false,
+		"color": {
+			"background": true,
+			"text": true,
+			"link": true
+		},
+		"spacing": {
+			"margin": true,
+			"padding": true
+		},
+		"typography": {
+			"fontSize": true
+		}
+	},
+	"example": {
+		"attributes": {
+			"count": 3
+		}
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css",
+	"render": "file:./render.php"
+}</code></pre>
+                <p>Same supports as the card, a <code>list-view</code> icon, an <code>example</code> for the inserter preview, and no <code>editorStyle</code> or <code>viewScript</code>. Now the PHP. Replace <code>src/blocks/book-list/render.php</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-list/render.php"><code class="language-php">&lt;?php
+/**
+ * Renders the Book List block on the server, every time a page with the block is viewed.
+ *
+ * WordPress includes this file inside a function and passes three variables:
+ *     $attributes (array):    the block's attributes, with the defaults from block.json filled in.
+ *     $content    (string):   the block's saved inner HTML (empty: this block saves nothing).
+ *     $block      (WP_Block): the block instance (name, context, parsed block).
+ *
+ * @package PagesCo\Books
+ */
+
+use PagesCo\Books\BookPostType;
+use PagesCo\Books\GenreTaxonomy;
+use PagesCo\Books\Settings;
+use PagesCo\Books\Shortcodes\BookShortcode;
+
+// No count in the block: use the Books per list setting (Lesson 5.4). Either way, 1 to 24.
+$count = isset( $attributes['count'] ) ? absint( $attributes['count'] ) : (int) Settings::get( 'books_per_page' );
+$count = min( 24, max( 1, $count ) );
+
+$query_args = array(
+	'post_type'      =&gt; BookPostType::NAME,
+	'post_status'    =&gt; 'publish',
+	'posts_per_page' =&gt; $count,
+	'orderby'        =&gt; 'title',
+	'order'          =&gt; 'ASC',
+);
+
+if ( 'newest' === $attributes['orderBy'] ) {
+	$query_args['orderby'] = 'date';
+	$query_args['order']   = 'DESC';
+} elseif ( 'price' === $attributes['orderBy'] ) {
+	$query_args['meta_key'] = 'pagesco_price';
+	$query_args['orderby']  = 'meta_value_num';
+}
+
+if ( '' !== $attributes['genre'] ) {
+	$query_args['tax_query'] = array(
+		array(
+			'taxonomy' =&gt; GenreTaxonomy::NAME,
+			'field'    =&gt; 'slug',
+			'terms'    =&gt; sanitize_key( $attributes['genre'] ),
+		),
+	);
+}
+
+$books = get_posts( $query_args );
+
+if ( ! $books ) {
+	printf(
+		'&lt;p %1$s&gt;%2$s&lt;/p&gt;',
+		get_block_wrapper_attributes(),
+		esc_html__( 'No books match this list yet.', 'pagesco-books' )
+	);
+	return;
+}
+
+$card = new BookShortcode();
+?&gt;
+&lt;ul &lt;?php echo get_block_wrapper_attributes(); ?&gt;&gt;
+	&lt;?php foreach ( $books as $book ) : ?&gt;
+		&lt;li class="wp-block-pagesco-book-list__item"&gt;&lt;?php echo wp_kses_post( $card-&gt;render( array( 'id' =&gt; $book-&gt;ID ) ) ); ?&gt;&lt;/li&gt;
+	&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;</code></pre>
+                <p>Read it top to bottom; most of it is Module 4 and Module 5:</p>
+                <ul>
+                    <li><strong><code>use</code> lines.</strong> <code>render.php</code> is a plain PHP file in the plugin, so it can use the plugin's classes. Composer's autoloader (Lesson 5.1) loads them, and the constants <code>BookPostType::NAME</code> and <code>GenreTaxonomy::NAME</code> keep the names in one place.</li>
+                    <li><strong>The count.</strong> <code>isset()</code> tells "no count chosen" from a chosen one; then <code>Settings::get( 'books_per_page' )</code> from Lesson 5.4, and a clamp to 1–24, the same range the setting allows. Attributes come from post content, which editors, imports and scripts write, so treat them as input: cast, check, limit.</li>
+                    <li><strong>The query.</strong> Lesson 4.2's <code>WP_Query</code> arguments, through <code>get_posts()</code>. It returns post objects and leaves the global <code>$post</code> alone, so there is no Loop to reset, which matters inside a block that may sit in the middle of someone else's Loop. It also loads the books' meta in one query, so the per-book <code>get_post_meta()</code> calls cost nothing. <code>meta_value_num</code> sorts the price as a number (Lesson 5.2's Going Further), and the genre filter is a <code>tax_query</code> on the slug, sanitized with <code>sanitize_key()</code>.</li>
+                    <li><strong>The markup.</strong> Each book is printed by Lesson 5.5's <code>BookShortcode::render()</code>, as that lesson promised: one function formats a book's line for the shortcode and the block alike. Its output is escaped inside, and <code>wp_kses_post()</code> escapes it again where it is printed: escape late, every time, even your own HTML. The empty case prints a sentence with <code>esc_html__()</code>.</li>
+                    <li><strong><code>return</code></strong> in the middle of an included file stops the file, not the request: the "no books" paragraph is all that block prints.</li>
+                    <li>The variables (<code>$count</code>, <code>$books</code>…) live inside the function WordPress wraps around the file, so they need no prefix and cannot clash with other blocks.</li>
+                </ul>
+                <p>The styles. Replace <code>src/blocks/book-list/style.scss</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-list/style.scss"><code class="language-css">.wp-block-pagesco-book-list {
+	list-style: none;
+	padding-left: 0;
+}
+
+.wp-block-pagesco-book-list__item {
+	padding: 0.5rem 0;
+	border-bottom: 1px solid currentColor;
+}
+
+.wp-block-pagesco-book-list__item:last-child {
+	border-bottom: 0;
+}</code></pre>
+                <p>In the editor, the simplest honest preview of a dynamic block is the real thing: <strong><code>ServerSideRender</code></strong>, from <code>@wordpress/server-side-render</code>, asks the server to run <code>render.php</code> with the block's current attributes and shows the result (the next section looks at the request). Replace <code>src/blocks/book-list/edit.js</code> with a first version, and <code>src/blocks/book-list/index.js</code> without the scaffold's comments:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-list/edit.js"><code class="language-js">import { useBlockProps } from '@wordpress/block-editor';
+import ServerSideRender from '@wordpress/server-side-render';
+
+export default function Edit( { attributes } ) {
+	return (
+		&lt;div { ...useBlockProps() }&gt;
+			&lt;ServerSideRender
+				block="pagesco/book-list"
+				attributes={ attributes }
+				skipBlockSupportAttributes
+			/&gt;
+		&lt;/div&gt;
+	);
+}</code></pre>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-list/index.js"><code class="language-js">import { registerBlockType } from '@wordpress/blocks';
+import './style.scss';
+import Edit from './edit';
+import metadata from './block.json';
+
+registerBlockType( metadata.name, {
+	edit: Edit,
+} );</code></pre>
+                <p>Build. The build copies <code>render.php</code> next to <code>block.json</code> in <code>build/blocks/book-list/</code>, because <code>block.json</code> names it:</p>
+                <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null
+ls build/blocks/book-list</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>block.json
+index.asset.php
+index.js
+render.php
+style-index-rtl.css
+style-index.css</code></pre>
+                </div>
+                <p>No PHP change: the <code>Blocks</code> feature from Lesson 6.1 registers whatever the manifest lists. Check that WordPress sees a dynamic block:</p>
+                <pre data-cli><code class="language-bash">wp eval '$type = WP_Block_Type_Registry::get_instance()-&gt;get_registered( "pagesco/book-list" );
+echo $type-&gt;title, ": ", $type-&gt;is_dynamic() ? "dynamic" : "static", "\n";
+echo implode( ", ", array_keys( $type-&gt;get_attributes() ) ), "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Book List: dynamic
+count, genre, orderBy, lock, metadata, className, style, backgroundColor, textColor, fontSize</code></pre>
+                </div>
+
+                <h3>Try it</h3>
+                <p>Create a page "List test" with two Book Lists: one as inserted, one with the genre Fantasy and the order "price". The stored content, as the Code editor shows it, is nothing but comments:</p>
+                <pre data-content="page:list-test" data-title="List test"><code class="language-html">&lt;!-- wp:pagesco/book-list /--&gt;
+
+&lt;!-- wp:pagesco/book-list {"genre":"fantasy","orderBy":"price"} /--&gt;</code></pre>
+                <pre data-web="/list-test/" data-select-all="ul.wp-block-pagesco-book-list"><code class="language-text">http://localhost:8080/list-test/   (View Source: the two lists)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;ul class="wp-block-pagesco-book-list"&gt;
+			&lt;li class="wp-block-pagesco-book-list__item"&gt;&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/1984/"&gt;1984&lt;/a&gt; by George Orwell, &lt;span class="pagesco-book__price"&gt;$9.99&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
+			&lt;li class="wp-block-pagesco-book-list__item"&gt;&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/animal-farm/"&gt;Animal Farm&lt;/a&gt; by George Orwell, &lt;span class="pagesco-book__price"&gt;$8.49&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
+			&lt;li class="wp-block-pagesco-book-list__item"&gt;&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/brave-new-world/"&gt;Brave New World&lt;/a&gt; by Aldous Huxley, &lt;span class="pagesco-book__price"&gt;$9.49&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
+			&lt;li class="wp-block-pagesco-book-list__item"&gt;&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/dune/"&gt;Dune&lt;/a&gt; by Frank Herbert, &lt;span class="pagesco-book__price"&gt;$14.99&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
+			&lt;li class="wp-block-pagesco-book-list__item"&gt;&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/fahrenheit-451/"&gt;Fahrenheit 451&lt;/a&gt; by Ray Bradbury, &lt;span class="pagesco-book__price"&gt;$10.49&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
+			&lt;li class="wp-block-pagesco-book-list__item"&gt;&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/lord-of-the-rings/"&gt;Lord of the Rings&lt;/a&gt; by J.R.R. Tolkien, &lt;span class="pagesco-book__price"&gt;$15.99&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
+	&lt;/ul&gt;
+&lt;ul class="wp-block-pagesco-book-list"&gt;
+			&lt;li class="wp-block-pagesco-book-list__item"&gt;&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/the-hobbit/"&gt;The Hobbit&lt;/a&gt; by J.R.R. Tolkien, &lt;span class="pagesco-book__price"&gt;$10.99&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
+			&lt;li class="wp-block-pagesco-book-list__item"&gt;&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/lord-of-the-rings/"&gt;Lord of the Rings&lt;/a&gt; by J.R.R. Tolkien, &lt;span class="pagesco-book__price"&gt;$15.99&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
+	&lt;/ul&gt;</code></pre>
+                </div>
+                <p>Six books in title order, because the first list has no count and the setting's default is 6; then the two Fantasy books, cheapest first. Now let the shop change its mind on <strong>Settings &gt; Pages &amp; Co. Books</strong>: Books per list 4. From the command line that is the whole option as JSON (Lesson 5.4's Common Mistake 3: a partial array would wipe the other keys), then the count of list items on the page:</p>
+                <pre data-cli><code class="language-bash">wp option update pagesco_books_settings '{"notice_extra":"Open until 9 p.m. on Thursdays.","show_events_link":true,"books_per_page":4,"events_limit":5}' --format=json
+curl -s http://localhost:8080/list-test/ | grep -c '&lt;li class="wp-block-pagesco-book-list__item'
+wp option delete pagesco_books_settings</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Updated 'pagesco_books_settings' option.
+6
+Success: Deleted 'pagesco_books_settings' option.</code></pre>
+                </div>
+                <p>Four plus two: the first list followed the setting without anyone touching the page, and the Fantasy list, which has two books, is unchanged. Deleting the option brings back the defaults, as at the end of Lesson 5.5.</p>
+            </section>
+
+            <section id="editor" class="lesson-section">
+                <h2>🎛️ The Book List in the Editor</h2>
+                <p>The list needs the same kind of sidebar as the Book Card: a number, a genre and an order. Two things are new. The genre choices are not fixed: they are the shop's genre terms, which only the database knows. And the number has no default, so the control must be able to say "nothing chosen". Replace <code>src/blocks/book-list/edit.js</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-list/edit.js"><code class="language-js">import { __ } from '@wordpress/i18n';
+import { InspectorControls, useBlockProps } from '@wordpress/block-editor';
+import { PanelBody, RangeControl, SelectControl } from '@wordpress/components';
+import { useSelect } from '@wordpress/data';
+import { store as coreStore } from '@wordpress/core-data';
+import ServerSideRender from '@wordpress/server-side-render';
+
+export default function Edit( { attributes, setAttributes } ) {
+	const { count, genre, orderBy } = attributes;
+
+	// The genre terms, from the REST API (/wp/v2/genres), cached by the editor.
+	const genres = useSelect(
+		( select ) =&gt;
+			select( coreStore ).getEntityRecords( 'taxonomy', 'genre', {
+				per_page: -1,
+			} ),
+		[]
+	);
+
+	const genreOptions = [
+		{ label: __( 'All genres', 'pagesco-books' ), value: '' },
+		...( genres || [] ).map( ( term ) =&gt; ( {
+			label: term.name,
+			value: term.slug,
+		} ) ),
+	];
+
+	return (
+		&lt;&gt;
+			&lt;InspectorControls&gt;
+				&lt;PanelBody title={ __( 'List settings', 'pagesco-books' ) }&gt;
+					&lt;RangeControl
+						__next40pxDefaultSize
+						label={ __( 'Number of books', 'pagesco-books' ) }
+						help={ __(
+							'Reset to use the Books per list setting.',
+							'pagesco-books'
+						) }
+						value={ count }
+						onChange={ ( value ) =&gt; setAttributes( { count: value } ) }
+						min={ 1 }
+						max={ 24 }
+						allowReset
+					/&gt;
+					&lt;SelectControl
+						__next40pxDefaultSize
+						label={ __( 'Genre', 'pagesco-books' ) }
+						value={ genre }
+						options={ genreOptions }
+						onChange={ ( value ) =&gt; setAttributes( { genre: value } ) }
+					/&gt;
+					&lt;SelectControl
+						__next40pxDefaultSize
+						label={ __( 'Order', 'pagesco-books' ) }
+						value={ orderBy }
+						options={ [
+							{ label: __( 'Title, A to Z', 'pagesco-books' ), value: 'title' },
+							{ label: __( 'Newest first', 'pagesco-books' ), value: 'newest' },
+							{ label: __( 'Price, low to high', 'pagesco-books' ), value: 'price' },
+						] }
+						onChange={ ( value ) =&gt; setAttributes( { orderBy: value } ) }
+					/&gt;
+				&lt;/PanelBody&gt;
+			&lt;/InspectorControls&gt;
+			&lt;div { ...useBlockProps() }&gt;
+				&lt;ServerSideRender
+					block="pagesco/book-list"
+					attributes={ attributes }
+					skipBlockSupportAttributes
+				/&gt;
+			&lt;/div&gt;
+		&lt;/&gt;
+	);
+}</code></pre>
+                <ul>
+                    <li><strong><code>useSelect()</code> and <code>@wordpress/core-data</code>.</strong> The editor keeps a data store of WordPress records, fetched from the REST API and cached. <code>getEntityRecords( 'taxonomy', 'genre', … )</code> reads the genre terms from <code>/wp/v2/genres</code> (Lesson 5.2 set <code>show_in_rest</code> and <code>rest_base</code>); it returns <code>null</code> until the answer arrives, hence <code>genres || []</code>, and the component redraws when it does. Module 7 looks at the REST API itself.</li>
+                    <li><strong><code>RangeControl</code> with <code>allowReset</code>.</strong> A slider plus a number field and a Reset button. Reset sets <code>count</code> back to <code>undefined</code>, so the attribute disappears from the comment and the setting applies again.</li>
+                    <li><strong><code>ServerSideRender</code>.</strong> Every attribute change asks the server for a new preview. <code>skipBlockSupportAttributes</code> leaves the color and spacing classes out of that request, because <code>useBlockProps()</code> already puts them on the wrapper <code>div</code>.</li>
+                </ul>
+                <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null</code></pre>
+                <p>Insert a Book List in a new post. The canvas shows the real list, rendered by your PHP, and the sidebar's Settings tab shows the panel; the genre menu lists the five genres from the database. (The <strong>Transform to variation</strong> button above the tabs comes from the next section.)</p>
+                <figure>
+                    <img src="images/lesson_21_editor.png" alt="The post editor with a Book List block selected: the canvas shows six books, each a linked title with author, price and stock; the sidebar shows a Transform to variation button and a List settings panel with a Number of books slider and Reset button, a Genre select set to All genres and an Order select set to Title, A to Z." width="1100" height="700" loading="lazy">
+                    <figcaption>The Book List in the editor: the preview comes from <code>render.php</code>, the genres from the REST API.</figcaption>
+                </figure>
+                <p>What does <code>ServerSideRender</code> actually ask? The browser's Network tab shows a request to the <code>block-renderer</code> route of the REST API, with the attributes in the query string. You can send it yourself (logged in, because only users who can edit posts may render blocks this way):</p>
+                <pre data-web="/wp-json/wp/v2/block-renderer/pagesco/book-list?context=edit&amp;attributes%5Bgenre%5D=fantasy&amp;attributes%5BorderBy%5D=price" data-auth="admin" data-json><code class="language-text">http://localhost:8080/wp-json/wp/v2/block-renderer/pagesco/book-list?context=edit&amp;attributes[genre]=fantasy&amp;attributes[orderBy]=price</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>{
+  "rendered": "&lt;ul class=\"wp-block-pagesco-book-list\"&gt;\n\t\t\t&lt;li class=\"wp-block-pagesco-book-list__item\"&gt;&lt;span class=\"pagesco-book\"&gt;&lt;a href=\"http://localhost:8080/books/the-hobbit/\"&gt;The Hobbit&lt;/a&gt; by J.R.R. Tolkien, &lt;span class=\"pagesco-book__price\"&gt;$10.99&lt;/span&gt; &lt;span class=\"pagesco-book__stock\"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;\n\t\t\t&lt;li class=\"wp-block-pagesco-book-list__item\"&gt;&lt;span class=\"pagesco-book\"&gt;&lt;a href=\"http://localhost:8080/books/lord-of-the-rings/\"&gt;Lord of the Rings&lt;/a&gt; by J.R.R. Tolkien, &lt;span class=\"pagesco-book__price\"&gt;$15.99&lt;/span&gt; &lt;span class=\"pagesco-book__stock\"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;\n\t&lt;/ul&gt;\n"
+}</code></pre>
+                </div>
+                <p>The same HTML as on the front end, wrapped in JSON. The REST API also checks the attributes against <code>block.json</code> before it renders; an <code>orderBy</code> outside the <code>enum</code> gets a <code>400</code> error, which is one more reason to declare types and enums carefully.</p>
+                <div class="card card-warning">
+                    <h4>⚠️ Previews cost a request each</h4>
+                    <p><code>ServerSideRender</code> is the quickest way to an accurate preview, and core's own Archives and Calendar blocks use it. Each change of an attribute sends a request (debounced), and a slow <code>render.php</code> makes a sluggish editor. For blocks that editors change a lot, the alternative is to build the preview in React from data the editor already has (as core's Query Loop does with <code>core-data</code>). For a list of a few books, the server preview is right.</p>
+                </div>
+            </section>
+
+            <section id="variations" class="lesson-section">
+                <h2>🧬 Variations: Ready-Made Book Lists</h2>
+                <p>An editor who wants "our fantasy books" should not have to insert a Book List and then find the genre menu. A <strong>block variation</strong> is a named preset of an existing block: its own title, description and icon in the inserter, and a set of attribute values. Core uses them everywhere: the Embed block's YouTube and Vimeo entries, and the Group block's Row and Stack, are variations. Variations can be written as a fixed list in <code>block.json</code>, or, since WordPress 6.7, generated by a PHP file that <code>block.json</code> names in its <code>variations</code> field. A PHP file can ask the database, so the shop gets one variation per genre, plus a fixed "New Arrivals". Create <code>src/blocks/book-list/variations.php</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-list/variations.php"><code class="language-php">&lt;?php
+/**
+ * Variations of the Book List: "New Arrivals", and one list per genre.
+ *
+ * WordPress requires this file only when someone asks for the block's variations
+ * (the editor does, through the REST API), not on every page view.
+ *
+ * @package PagesCo\Books
+ */
+
+use PagesCo\Books\GenreTaxonomy;
+
+$variations = array(
+	array(
+		'name'        =&gt; 'new-arrivals',
+		'title'       =&gt; __( 'New Arrivals', 'pagesco-books' ),
+		'description' =&gt; __( 'The three books most recently added to the catalog.', 'pagesco-books' ),
+		'icon'        =&gt; 'star-filled',
+		'attributes'  =&gt; array(
+			'count'   =&gt; 3,
+			'orderBy' =&gt; 'newest',
+		),
+		'scope'       =&gt; array( 'inserter' ),
+	),
+);
+
+$genres = get_terms(
+	array(
+		'taxonomy'   =&gt; GenreTaxonomy::NAME,
+		'hide_empty' =&gt; false,
+	)
+);
+
+foreach ( is_array( $genres ) ? $genres : array() as $genre ) {
+	$variations[] = array(
+		'name'        =&gt; 'genre-' . $genre-&gt;slug,
+		/* translators: %s: genre name, such as Fantasy. */
+		'title'       =&gt; sprintf( __( '%s Books', 'pagesco-books' ), $genre-&gt;name ),
+		/* translators: %s: genre name, such as Fantasy. */
+		'description' =&gt; sprintf( __( 'Books in the %s genre.', 'pagesco-books' ), $genre-&gt;name ),
+		'attributes'  =&gt; array( 'genre' =&gt; $genre-&gt;slug ),
+		'isActive'    =&gt; array( 'genre' ),
+		'scope'       =&gt; array( 'inserter', 'transform' ),
+	);
+}
+
+return $variations;</code></pre>
+                <ul>
+                    <li><code>attributes</code> are what the variation sets when inserted; anything else keeps its default.</li>
+                    <li><code>isActive</code> tells the editor how to recognize the variation in an existing block: a list whose <code>genre</code> is <code>fantasy</code> shows "Fantasy Books" as its title in the sidebar and List View.</li>
+                    <li><code>scope</code>: <code>inserter</code> lists it in the inserter; <code>transform</code> also offers it in the block's variation switcher, so a list can become another genre's list.</li>
+                    <li>WordPress requires the file only when something asks for the variations (the editor does, through the block-types REST route), not on every front-end view, so the database query here costs the visitors nothing.</li>
+                </ul>
+                <p>Add the field after <code>render</code> in <code>src/blocks/book-list/block.json</code>; the end of the file becomes:</p>
+                <pre><code class="language-json">	"render": "file:./render.php",
+	"variations": "file:./variations.php"
+}</code></pre>
+                <pre data-cli><code class="language-bash">cd wp-content/plugins/pagesco-books/src/blocks/book-list
+sed -i 's|^\t"render": "file:./render.php"$|\t"render": "file:./render.php",\n\t"variations": "file:./variations.php"|' block.json
+tail -n 4 block.json</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>	"style": "file:./style-index.css",
+	"render": "file:./render.php",
+	"variations": "file:./variations.php"
+}</code></pre>
+                </div>
+                <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null
+ls build/blocks/book-list</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>block.json
+index.asset.php
+index.js
+render.php
+style-index-rtl.css
+style-index.css
+variations.php</code></pre>
+                </div>
+                <p>The build copied <code>variations.php</code> too; <code>@wordpress/scripts</code> copies the PHP files that <code>block.json</code> names in <code>render</code> and <code>variations</code>. Ask the registered type for its variations:</p>
+                <pre data-file="list-variations.php" data-wp><code class="language-php">&lt;?php
+$type = WP_Block_Type_Registry::get_instance()-&gt;get_registered( 'pagesco/book-list' );
+
+foreach ( $type-&gt;get_variations() as $variation ) {
+	echo $variation['name'], ': ', $variation['title'], ' ', wp_json_encode( $variation['attributes'] ), "\n";
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>new-arrivals: New Arrivals {"count":3,"orderBy":"newest"}
+genre-classic: Classic Books {"genre":"classic"}
+genre-dystopian: Dystopian Books {"genre":"dystopian"}
+genre-fantasy: Fantasy Books {"genre":"fantasy"}
+genre-fiction: Fiction Books {"genre":"fiction"}
+genre-science-fiction: Science Fiction Books {"genre":"science-fiction"}</code></pre>
+                </div>
+                <p>In the editor, type "fantasy" in the inserter: "Fantasy Books" appears with the Book List's icon. Add a genre on <strong>Books &gt; Genres</strong> and the next editor load offers its list too, with no rebuild. Remove the script: <code>rm list-variations.php</code>.</p>
+                <pre data-cli><code class="language-bash">rm list-variations.php</code></pre>
+            </section>
+
+            <section id="bindings" class="lesson-section">
+                <h2>🔗 Block Bindings: Core Blocks, Live Data</h2>
+                <p>The Book List is a custom block because a list of books is something core does not have. A book's own page is different: it needs an author line, a price, a few facts. Paragraphs and lists can display those perfectly well, if only their text came from the book's meta instead of being typed. That is what <strong>block bindings</strong> do (WordPress 6.5 and later): a block's attribute is <em>bound</em> to a <strong>source</strong>, and on every view WordPress replaces the attribute's value with the source's value. In the block comment it looks like this:</p>
+                <pre><code class="language-html">&lt;!-- wp:paragraph {"metadata":{"bindings":{"content":{"source":"core/post-meta","args":{"key":"pagesco_author"}}}}} --&gt;
+&lt;p&gt;Author&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;</code></pre>
+                <p>The paragraph's <code>content</code> is bound to the source <code>core/post-meta</code>, with the argument <code>key</code>. The stored "Author" is a fallback that shows only when the source has nothing to say. Bindings live in the <code>metadata</code> attribute that every block has (you met it in Lesson 6.2's attribute list), so the block itself needs no code at all.</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: the price gun and the shelf label</h4>
+                    <p>A bound block is a shelf label with an empty slot: the label's design (the paragraph, its font size, its color) is fixed in the template, and the slot says "price of the book on this shelf". The source is the clerk who fills the slot from the stock system every time a customer looks. Change the design without touching the data, or the data without touching the design.</p>
+                </div>
+                <p>Which blocks and attributes can be bound is a fixed list in core, which <code>get_block_bindings_supported_attributes()</code> returns and the <code>block_bindings_supported_attributes</code> filter can extend:</p>
+                <pre data-cli><code class="language-bash">wp eval 'foreach ( array( "core/paragraph", "core/heading", "core/list-item", "core/image", "core/button" ) as $name ) { echo $name, ": ", implode( ", ", get_block_bindings_supported_attributes( $name ) ), "\n"; }'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>core/paragraph: content
+core/heading: content
+core/list-item: content
+core/image: id, url, title, alt, caption
+core/button: url, text, linkTarget, rel</code></pre>
+                </div>
+                <p>Plus <code>core/post-date</code> (<code>datetime</code>) and the navigation link and submenu blocks (<code>url</code>). Core registers four sources; ask the registry:</p>
+                <pre data-cli><code class="language-bash">wp eval 'foreach ( get_all_registered_block_bindings_sources() as $name =&gt; $source ) { echo $name, " (", $source-&gt;label, ")\n"; }'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>core/pattern-overrides (Pattern Overrides)
+core/post-data (Post Data)
+core/post-meta (Post Meta)
+core/term-data (Term Data)</code></pre>
+                </div>
+                <p><code>core/post-meta</code> reads a meta key of the current post; <code>core/post-data</code> reads fields of the post itself (<code>date</code>, <code>modified</code>, <code>link</code>); <code>core/term-data</code> the same for terms; <code>core/pattern-overrides</code> powers the per-instance text in synced patterns (Lesson 3.3's Exercise 4).</p>
+                <div class="card card-info">
+                    <h4>🧩 Version note: list items need WordPress 7.1</h4>
+                    <p>Bindings arrived in 6.5 for paragraphs, headings, images and buttons; 6.9 added <code>core/post-data</code>, <code>core/term-data</code>, the post date and navigation links, and the filter. <strong>List items</strong> joined in 7.1. On a 6.8 to 7.0 site, the list-item bindings below print their fallback text ("Price", "Pages") instead of the data, without an error. If your plugin must support those versions, bind paragraphs instead of list items.</p>
+                </div>
+
+                <h3>core/post-meta on the book pages</h3>
+                <p>The book pages use <code>single.html</code> today (Lesson 3.1's hierarchy: <code>single-book.html</code> would win, but the theme has none), so they show a title, a date and an empty content area. Create <code>wordpress/wp-content/themes/pagesco/templates/single-book.html</code>, a first version that binds an author paragraph and three list items to book meta:</p>
+                <pre data-file="wp-content/themes/pagesco/templates/single-book.html"><code class="language-html">&lt;!-- wp:template-part {"slug":"header","tagName":"header"} /--&gt;
+
+&lt;!-- wp:group {"tagName":"main","style":{"spacing":{"padding":{"top":"var:preset|spacing|medium","bottom":"var:preset|spacing|large"}}},"layout":{"type":"constrained"}} --&gt;
+&lt;main class="wp-block-group" style="padding-top:var(--wp--preset--spacing--medium);padding-bottom:var(--wp--preset--spacing--large)"&gt;
+	&lt;!-- wp:post-title {"level":1} /--&gt;
+
+	&lt;!-- wp:paragraph {"metadata":{"bindings":{"content":{"source":"core/post-meta","args":{"key":"pagesco_author"}}}},"className":"pagesco-book-author"} --&gt;
+	&lt;p class="pagesco-book-author"&gt;Author&lt;/p&gt;
+	&lt;!-- /wp:paragraph --&gt;
+
+	&lt;!-- wp:list {"className":"pagesco-book-facts"} --&gt;
+	&lt;ul class="wp-block-list pagesco-book-facts"&gt;&lt;!-- wp:list-item {"metadata":{"bindings":{"content":{"source":"core/post-meta","args":{"key":"pagesco_price"}}}}} --&gt;
+	&lt;li&gt;Price&lt;/li&gt;
+	&lt;!-- /wp:list-item --&gt;
+
+	&lt;!-- wp:list-item {"metadata":{"bindings":{"content":{"source":"core/post-meta","args":{"key":"pagesco_in_stock"}}}}} --&gt;
+	&lt;li&gt;In stock&lt;/li&gt;
+	&lt;!-- /wp:list-item --&gt;
+
+	&lt;!-- wp:list-item {"metadata":{"bindings":{"content":{"source":"core/post-meta","args":{"key":"pagesco_pages"}}}}} --&gt;
+	&lt;li&gt;Pages&lt;/li&gt;
+	&lt;!-- /wp:list-item --&gt;&lt;/ul&gt;
+	&lt;!-- /wp:list --&gt;
+
+	&lt;!-- wp:post-content {"layout":{"type":"constrained"}} /--&gt;
+&lt;/main&gt;
+&lt;!-- /wp:group --&gt;
+
+&lt;!-- wp:template-part {"slug":"footer","tagName":"footer"} /--&gt;</code></pre>
+                <pre data-web="/books/the-great-gatsby/" data-select="main"><code class="language-text">http://localhost:8080/books/the-great-gatsby/   (View Source: main)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;main id="wp--skip-link--target" class="wp-block-group has-global-padding is-layout-constrained wp-block-group-is-layout-constrained" style="padding-top:var(--wp--preset--spacing--medium);padding-bottom:var(--wp--preset--spacing--large)"&gt;
+	&lt;h1 class="wp-block-post-title"&gt;The Great Gatsby&lt;/h1&gt;
+
+
+	&lt;p class="pagesco-book-author wp-block-paragraph"&gt;F. Scott Fitzgerald&lt;/p&gt;
+
+
+
+	&lt;ul class="wp-block-list pagesco-book-facts"&gt;
+	&lt;li&gt;8.99&lt;/li&gt;
+
+
+
+	&lt;li&gt;&lt;/li&gt;
+
+
+
+	&lt;li&gt;180&lt;/li&gt;
+	&lt;/ul&gt;
+
+
+
+&lt;/main&gt;</code></pre>
+                </div>
+                <p>The binding worked, and that is the problem: <code>core/post-meta</code> returns the raw stored value. The price has no dollar sign, and the stock, a boolean, is <code>false</code> for Gatsby, which arrives as an empty string and leaves an empty list item (Dune's would say <code>1</code>). Binding is not formatting. <code>core/post-meta</code> also only reads keys that are <strong>registered</strong> with <code>show_in_rest</code> and not protected (no leading underscore): that is why Lesson 5.2 registered the book meta the way it did. For formatted values, the plugin registers its own source.</p>
+
+                <h3>A custom source: pagesco/book</h3>
+                <p><code>register_block_bindings_source( $name, $args )</code> on <code>init</code> takes a namespaced name, a <code>label</code>, a <code>get_value_callback</code> and the <code>uses_context</code> it needs. The callback gets the binding's <code>args</code>, the <code>WP_Block</code> being rendered and the attribute's name, and returns the value, or <code>null</code> to leave the fallback alone. It is a feature of the plugin like any other (Lesson 5.1's rule: one class, one line). Create <code>src/BookBindings.php</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/BookBindings.php"><code class="language-php">&lt;?php
+/**
+ * The pagesco/book block bindings source: book details, formatted for the shop.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books;
+
+/**
+ * Lets core blocks show a book's price, stock, pages, year and genres, formatted.
+ */
+final class BookBindings implements Feature {
+
+	/**
+	 * The source's name, as blocks refer to it in metadata.bindings.
+	 */
+	public const SOURCE = 'pagesco/book';
+
+	/**
+	 * Registers the source on init, like core registers core/post-meta.
+	 */
+	public function register(): void {
+		add_action( 'init', array( $this, 'register_source' ) );
+	}
+
+	/**
+	 * Tells WordPress about the source: its label, its callback, and the context it needs.
+	 */
+	public function register_source(): void {
+		register_block_bindings_source(
+			self::SOURCE,
+			array(
+				'label'              =&gt; __( 'Book details', 'pagesco-books' ),
+				'get_value_callback' =&gt; array( $this, 'get_value' ),
+				'uses_context'       =&gt; array( 'postId', 'postType' ),
+			)
+		);
+	}
+
+	/**
+	 * Returns the value for one bound attribute, or null to keep the block's own content.
+	 *
+	 * @param array     $source_args    The binding's args, for example array( 'field' =&gt; 'price' ).
+	 * @param \WP_Block $block_instance The block being rendered; its context names the post.
+	 * @return string|null
+	 */
+	public function get_value( array $source_args, $block_instance ) {
+		$book_id = (int) ( $block_instance-&gt;context['postId'] ?? 0 );
+
+		if ( ! $book_id || BookPostType::NAME !== get_post_type( $book_id ) ) {
+			return null;
+		}
+		// The same rule as core/post-meta: never reveal a book the visitor could not read.
+		if ( ! is_post_publicly_viewable( $book_id ) &amp;&amp; ! current_user_can( 'read_post', $book_id ) ) {
+			return null;
+		}
+
+		switch ( $source_args['field'] ?? '' ) {
+			case 'price':
+				return esc_html( '$' . number_format_i18n( (float) get_post_meta( $book_id, 'pagesco_price', true ), 2 ) );
+
+			case 'stock':
+				return get_post_meta( $book_id, 'pagesco_in_stock', true )
+					? esc_html__( 'In stock', 'pagesco-books' )
+					: esc_html__( 'Sold out', 'pagesco-books' );
+
+			case 'pages':
+				$pages = (int) get_post_meta( $book_id, 'pagesco_pages', true );
+				/* translators: %s: number of pages. */
+				return esc_html( sprintf( _n( '%s page', '%s pages', $pages, 'pagesco-books' ), number_format_i18n( $pages ) ) );
+
+			case 'year':
+				$published = (string) get_post_meta( $book_id, 'pagesco_published', true );
+				/* translators: %s: a year, such as 1965. */
+				return '' === $published ? null : esc_html( sprintf( __( 'First published in %s', 'pagesco-books' ), substr( $published, 0, 4 ) ) );
+
+			case 'genres':
+				$genres = get_the_term_list( $book_id, GenreTaxonomy::NAME, '', ', ' );
+				return is_string( $genres ) ? $genres : null;
+		}
+
+		return null;
+	}
+}</code></pre>
+                <ul>
+                    <li><strong><code>uses_context</code></strong> asks WordPress to pass the <code>postId</code> and <code>postType</code> of the post being shown to every block bound to this source, even blocks that do not ask for context themselves. A paragraph never asks for <code>postId</code> on its own: without this line the price paragraph prints its fallback, "Price", with no error.</li>
+                    <li><strong>The visibility check</strong> copies <code>core/post-meta</code>'s rule. A binding can sit anywhere a block can, including a page that shows another post's blocks; never let a source leak a draft's or a private book's data to a visitor who could not open it.</li>
+                    <li><strong>The values.</strong> One <code>field</code> argument, five fields; the formatting is the shop's (<code>number_format_i18n()</code>, <code>_n()</code> for "1 page" and "412 pages"), escaped as it is built. <code>genres</code> returns links from <code>get_the_term_list()</code>, which are HTML: WordPress passes every bound value through <code>wp_kses_post()</code> before it goes into the block, so simple markup survives and scripts do not.</li>
+                </ul>
+                <p>Make it the plugin's fourteenth feature, after <code>Blocks</code> (in your editor; here with <code>sed</code>), and list the sources again:</p>
+                <pre data-cli><code class="language-bash">sed -i '/\t\t\tBlocks::class,/a\			BookBindings::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+grep -c "::class," wp-content/plugins/pagesco-books/src/Plugin.php
+wp eval 'foreach ( get_all_registered_block_bindings_sources() as $name =&gt; $source ) { echo $name, " (", $source-&gt;label, ")\n"; }'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>14
+core/pattern-overrides (Pattern Overrides)
+core/post-data (Post Data)
+core/post-meta (Post Meta)
+core/term-data (Term Data)
+pagesco/book (Book details)</code></pre>
+                </div>
+                <p>No build: this is PHP only. The project rewrites <code>single-book.html</code> with the new source. Before that, one more look at the safety net. Suppose a careless import wrote a script into Gatsby's author field (WP-CLI and the REST API do not run the meta box's sanitizing from Lesson 5.3):</p>
+                <pre data-cli><code class="language-bash">wp post meta update 33 pagesco_author 'F. Scott Fitzgerald&lt;script&gt;alert(1)&lt;/script&gt;'
+curl -s http://localhost:8080/books/the-great-gatsby/ | grep 'pagesco-book-author'
+wp eval 'echo ( new PagesCo\Books\Shortcodes\BookShortcode() )-&gt;render( array( "id" =&gt; 33 ) ), "\n";'
+wp post meta update 33 pagesco_author 'F. Scott Fitzgerald'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Updated custom field 'pagesco_author'.
+	&lt;p class="pagesco-book-author wp-block-paragraph"&gt;F. Scott Fitzgeraldalert(1)&lt;/p&gt;
+&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/the-great-gatsby/"&gt;The Great Gatsby&lt;/a&gt; by F. Scott Fitzgerald&amp;lt;script&amp;gt;alert(1)&amp;lt;/script&amp;gt;, &lt;span class="pagesco-book__price"&gt;$8.99&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;Sold out&lt;/span&gt;&lt;/span&gt;
+Success: Updated custom field 'pagesco_author'.</code></pre>
+                </div>
+                <p>The bound paragraph lost the <code>&lt;script&gt;</code> tags to <code>wp_kses_post()</code>; <code>BookShortcode::render()</code>, which prints every line of the Book List, turned them into harmless text with <code>esc_html()</code>. Two different filters, the same result: nothing runs. The last command restores the author.</p>
+                <figure>
+                    <img src="images/lesson_21_bindings.png" alt="The Site Editor showing the single-book template: the title placeholder, a large paragraph and four list items that all read Book details; the price paragraph is selected and its toolbar covers the Author paragraph above it; the sidebar's Attributes panel shows content connected to Book details." width="1100" height="700" loading="lazy">
+                    <figcaption>In the Site Editor, bound blocks show the meta field's label or the source's label, and the Attributes panel lists the connection.</figcaption>
+                </figure>
+                <p>In the Site Editor (<strong>Appearance &gt; Editor &gt; Templates</strong>, "single-book"), a template is not about one book, so bound blocks show a label instead of a value: the meta field's registered label ("Author") for <code>core/post-meta</code>, the source's <code>label</code> ("Book details") for <code>pagesco/book</code>. Select one and the sidebar's <strong>Attributes</strong> panel lists what is connected. A source registered only in PHP is enough for the front end; a JavaScript registration with <code>registerBlockBindingsSource()</code> from <code>@wordpress/blocks</code> can show real values in the editor too (Going Further).</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <h3>1. An attribute without a default, read without a check</h3>
+                <p><code>count</code> has no default, so it is simply missing from <code>$attributes</code> when nobody chose a number. A shorter version of the count line looks tempting:</p>
+                <pre data-norun><code class="language-php">$count = absint( $attributes['count'] ) ?: (int) Settings::get( 'books_per_page' );</code></pre>
+                <p>Put it into <code>src/blocks/book-list/render.php</code> (here with <code>sed</code>, keeping a copy), build, and load the List test page:</p>
+                <pre data-cli><code class="language-bash">cd wp-content/plugins/pagesco-books/src/blocks/book-list
+cp render.php render.php.bak
+sed -i "s/isset( \$attributes\['count'\] ) ? absint( \$attributes\['count'\] ) : (int)/absint( \$attributes['count'] ) ?: (int)/" render.php
+grep -n '^\$count = absint' render.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>19:$count = absint( $attributes['count'] ) ?: (int) Settings::get( 'books_per_page' );</code></pre>
+                </div>
+                <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null</code></pre>
+                <pre data-cli data-raises="Warning"><code class="language-bash">curl -s http://localhost:8080/list-test/ | grep 'Warning'</code></pre>
+                <div class="card card-output">
+                    <h4>Error</h4>
+                    <pre><code>Warning: Undefined array key &amp;#8220;count&amp;#8221; in /var/www/html/wp-content/plugins/pagesco-books/build/blocks/book-list/render.php on line 19</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the first list has no <code>count</code> key, and PHP 8 warns about reading a missing array key. The list still renders (the <code>?:</code> falls back to the setting), so in production, with display off, you would only find it in <code>debug.log</code>, once per view. With display on, the message lands in the middle of the page, inside the post content, where WordPress's typography filter even turned its quotes into curly ones (<code>&amp;#8220;</code>): output from <code>render.php</code> is part of the content. WordPress fills in <em>defaults</em> for attributes that have one, and nothing for the rest. Notice also the path: <code>build/blocks/book-list/render.php</code>, the copy WordPress runs, not the one you edit. <strong>Fix:</strong> check optional attributes with <code>isset()</code> or <code>??</code>, or give them a default. Restore the course version and rebuild:</p>
+                <pre data-cli><code class="language-bash">mv wp-content/plugins/pagesco-books/src/blocks/book-list/render.php.bak wp-content/plugins/pagesco-books/src/blocks/book-list/render.php</code></pre>
+                <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null</code></pre>
+
+                <h3>2. A quick fix in build/</h3>
+                <p>The warning above names <code>build/blocks/book-list/render.php</code>, so that is the file a hurried developer opens. Say they add a class to every item there, check the page, and move on:</p>
+                <pre data-cli><code class="language-bash">cd wp-content/plugins/pagesco-books
+sed -i 's/wp-block-pagesco-book-list__item"/wp-block-pagesco-book-list__item is-hotfix"/' build/blocks/book-list/render.php
+curl -s http://localhost:8080/list-test/ | grep -c 'is-hotfix'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>8</code></pre>
+                </div>
+                <p>It works: eight items, eight classes. The next day someone builds the plugin for an unrelated change:</p>
+                <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null</code></pre>
+                <pre data-cli data-exit="1"><code class="language-bash">curl -s http://localhost:8080/list-test/ | grep -c 'is-hotfix'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>0</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the build empties <code>build/blocks/</code> and copies <code>render.php</code> from <code>src/</code> again (Lesson 6.1), so the fix is gone, silently, and <code>grep -c</code> finds nothing (and exits with status 1). PHP files are no exception to the kit-workshop-shelf rule just because they need no compiling. <strong>Fix:</strong> edit <code>src/blocks/book-list/render.php</code> only, then build (or keep <code>npm start</code> running, which copies PHP changes too).</p>
+
+                <h3>3. A binding that quietly does nothing</h3>
+                <p>Bindings fail silently by design: when a source returns <code>null</code>, the block keeps its fallback text, and a visitor would just see a page with the word "Author" on it. Misspell the key in the template (keeping a copy) and look at Dune's page:</p>
+                <pre data-cli><code class="language-bash">cd wp-content/themes/pagesco/templates
+cp single-book.html single-book.html.bak
+sed -i 's/"key":"pagesco_author"/"key":"pagesco_writer"/' single-book.html
+curl -s http://localhost:8080/books/dune/ | grep 'pagesco-book-author'
+mv single-book.html.bak single-book.html
+curl -s http://localhost:8080/books/dune/ | grep 'pagesco-book-author'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>	&lt;p class="pagesco-book-author wp-block-paragraph"&gt;Author&lt;/p&gt;
+	&lt;p class="pagesco-book-author wp-block-paragraph"&gt;Frank Herbert&lt;/p&gt;</code></pre>
+                </div>
+                <p><strong>What it means:</strong> <code>core/post-meta</code> returns <code>null</code> for a key it will not read: one that does not exist, one that is not registered with <code>show_in_rest</code>, or a protected one starting with an underscore. No notice, no log line. <strong>Fix:</strong> use exactly the keys from <code>BookMeta::fields()</code>; when a bound block shows its fallback, check the key with <code>get_registered_meta_keys( 'post', 'book' )</code> first. Choose fallback texts that look wrong on a live page ("Author" rather than an empty paragraph), so a broken binding is noticed rather than hidden.</p>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Book Pages with Live Details</h2>
+                <p>Every book in the shop gets a proper page: the author, a large price, the stock, genres, pages and year, and the three newest books underneath, all from data, with no content typed into any book. Allow about 35 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: The book template <span class="step-time">(15 min)</span></h3>
+                    <p>Replace <code>wordpress/wp-content/themes/pagesco/templates/single-book.html</code>. The author stays on <code>core/post-meta</code> (a plain string needs no formatting); the price paragraph and the four facts use <code>pagesco/book</code>; and under the content, a heading and the New Arrivals variation of the Book List (inserted from the inserter, it is exactly this comment):</p>
+                    <pre data-file="wp-content/themes/pagesco/templates/single-book.html"><code class="language-html">&lt;!-- wp:template-part {"slug":"header","tagName":"header"} /--&gt;
+
+&lt;!-- wp:group {"tagName":"main","style":{"spacing":{"padding":{"top":"var:preset|spacing|medium","bottom":"var:preset|spacing|large"}}},"layout":{"type":"constrained"}} --&gt;
+&lt;main class="wp-block-group" style="padding-top:var(--wp--preset--spacing--medium);padding-bottom:var(--wp--preset--spacing--large)"&gt;
+	&lt;!-- wp:post-title {"level":1} /--&gt;
+
+	&lt;!-- wp:paragraph {"metadata":{"bindings":{"content":{"source":"core/post-meta","args":{"key":"pagesco_author"}}}},"className":"pagesco-book-author"} --&gt;
+	&lt;p class="pagesco-book-author"&gt;Author&lt;/p&gt;
+	&lt;!-- /wp:paragraph --&gt;
+
+	&lt;!-- wp:paragraph {"metadata":{"bindings":{"content":{"source":"pagesco/book","args":{"field":"price"}}}},"fontSize":"large"} --&gt;
+	&lt;p class="has-large-font-size"&gt;Price&lt;/p&gt;
+	&lt;!-- /wp:paragraph --&gt;
+
+	&lt;!-- wp:list {"className":"pagesco-book-facts"} --&gt;
+	&lt;ul class="wp-block-list pagesco-book-facts"&gt;&lt;!-- wp:list-item {"metadata":{"bindings":{"content":{"source":"pagesco/book","args":{"field":"stock"}}}}} --&gt;
+	&lt;li&gt;Stock&lt;/li&gt;
+	&lt;!-- /wp:list-item --&gt;
+
+	&lt;!-- wp:list-item {"metadata":{"bindings":{"content":{"source":"pagesco/book","args":{"field":"genres"}}}}} --&gt;
+	&lt;li&gt;Genres&lt;/li&gt;
+	&lt;!-- /wp:list-item --&gt;
+
+	&lt;!-- wp:list-item {"metadata":{"bindings":{"content":{"source":"pagesco/book","args":{"field":"pages"}}}}} --&gt;
+	&lt;li&gt;Pages&lt;/li&gt;
+	&lt;!-- /wp:list-item --&gt;
+
+	&lt;!-- wp:list-item {"metadata":{"bindings":{"content":{"source":"pagesco/book","args":{"field":"year"}}}}} --&gt;
+	&lt;li&gt;First published&lt;/li&gt;
+	&lt;!-- /wp:list-item --&gt;&lt;/ul&gt;
+	&lt;!-- /wp:list --&gt;
+
+	&lt;!-- wp:post-content {"layout":{"type":"constrained"}} /--&gt;
+
+	&lt;!-- wp:heading {"level":2} --&gt;
+	&lt;h2 class="wp-block-heading"&gt;New in the shop&lt;/h2&gt;
+	&lt;!-- /wp:heading --&gt;
+
+	&lt;!-- wp:pagesco/book-list {"count":3,"orderBy":"newest"} /--&gt;
+&lt;/main&gt;
+&lt;!-- /wp:group --&gt;
+
+&lt;!-- wp:template-part {"slug":"footer","tagName":"footer"} /--&gt;</code></pre>
+                    <p>A theme file using a plugin's block and source is a fair dependency here, because both belong to the same shop. Should the plugin ever be off, the Book List prints nothing and the bound blocks print their fallback text; the page still works.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: Check two books <span class="step-time">(10 min)</span></h3>
+                    <p>Dune is in stock; The Great Gatsby is sold out:</p>
+                    <pre data-web="/books/dune/" data-select="main"><code class="language-text">http://localhost:8080/books/dune/   (View Source: main)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;main id="wp--skip-link--target" class="wp-block-group has-global-padding is-layout-constrained wp-block-group-is-layout-constrained" style="padding-top:var(--wp--preset--spacing--medium);padding-bottom:var(--wp--preset--spacing--large)"&gt;
+	&lt;h1 class="wp-block-post-title"&gt;Dune&lt;/h1&gt;
+
+
+	&lt;p class="pagesco-book-author wp-block-paragraph"&gt;Frank Herbert&lt;/p&gt;
+
+
+
+	&lt;p class="has-large-font-size wp-block-paragraph"&gt;$14.99&lt;/p&gt;
+
+
+
+	&lt;ul class="wp-block-list pagesco-book-facts"&gt;
+	&lt;li&gt;In stock&lt;/li&gt;
+
+
+
+	&lt;li&gt;&lt;a href="http://localhost:8080/genre/fiction/" rel="tag"&gt;Fiction&lt;/a&gt;, &lt;a href="http://localhost:8080/genre/science-fiction/" rel="tag"&gt;Science Fiction&lt;/a&gt;&lt;/li&gt;
+
+
+
+	&lt;li&gt;412 pages&lt;/li&gt;
+
+
+
+	&lt;li&gt;First published in 1965&lt;/li&gt;
+	&lt;/ul&gt;
+
+
+
+
+
+	&lt;h2 class="wp-block-heading"&gt;New in the shop&lt;/h2&gt;
+
+
+	&lt;ul class="wp-block-pagesco-book-list"&gt;
+			&lt;li class="wp-block-pagesco-book-list__item"&gt;&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/animal-farm/"&gt;Animal Farm&lt;/a&gt; by George Orwell, &lt;span class="pagesco-book__price"&gt;$8.49&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
+			&lt;li class="wp-block-pagesco-book-list__item"&gt;&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/fahrenheit-451/"&gt;Fahrenheit 451&lt;/a&gt; by Ray Bradbury, &lt;span class="pagesco-book__price"&gt;$10.49&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
+			&lt;li class="wp-block-pagesco-book-list__item"&gt;&lt;span class="pagesco-book"&gt;&lt;a href="http://localhost:8080/books/lord-of-the-rings/"&gt;Lord of the Rings&lt;/a&gt; by J.R.R. Tolkien, &lt;span class="pagesco-book__price"&gt;$15.99&lt;/span&gt; &lt;span class="pagesco-book__stock"&gt;In stock&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
+	&lt;/ul&gt;
+
+&lt;/main&gt;</code></pre>
+                    </div>
+                    <pre data-web="/books/the-great-gatsby/" data-select="ul.pagesco-book-facts"><code class="language-text">http://localhost:8080/books/the-great-gatsby/   (View Source: the facts list)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;ul class="wp-block-list pagesco-book-facts"&gt;
+	&lt;li&gt;Sold out&lt;/li&gt;
+
+
+
+	&lt;li&gt;&lt;a href="http://localhost:8080/genre/classic/" rel="tag"&gt;Classic&lt;/a&gt;, &lt;a href="http://localhost:8080/genre/fiction/" rel="tag"&gt;Fiction&lt;/a&gt;&lt;/li&gt;
+
+
+
+	&lt;li&gt;180 pages&lt;/li&gt;
+
+
+
+	&lt;li&gt;First published in 1925&lt;/li&gt;
+	&lt;/ul&gt;</code></pre>
+                    </div>
+                    <p>The fallback texts ("Price", "Stock"…) are gone from the HTML: visitors and search engines get finished markup, and none of it is stored in the book posts. The same template serves all eleven books, and the twelfth the shop adds tomorrow.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: Prove it is live, clean up, check <span class="step-time">(10 min)</span></h3>
+                    <p>Put Dune on sale once more, and read its price from its own page and from the List test page; then restore it, delete the List test page, and check the plugin:</p>
+                    <pre data-cli data-checkpoint><code class="language-bash">wp post meta update 30 pagesco_price 12.99 &gt; /dev/null
+curl -s http://localhost:8080/books/dune/ | grep -o 'has-large-font-size wp-block-paragraph"&gt;[^&lt;]*'
+curl -s http://localhost:8080/list-test/ | grep -o 'Dune&lt;/a&gt; by Frank Herbert, &lt;span class="pagesco-book__price"&gt;[^&lt;]*'
+wp post meta update 30 pagesco_price 14.99 &gt; /dev/null
+wp post delete $(wp post list --post_type=page --name=list-test --field=ID) --force &gt; /dev/null
+ls wp-content/plugins/pagesco-books/src/blocks/book-list wp-content/themes/pagesco/templates
+grep -c "::class," wp-content/plugins/pagesco-books/src/Plugin.php</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>has-large-font-size wp-block-paragraph"&gt;$12.99
+Dune&lt;/a&gt; by Frank Herbert, &lt;span class="pagesco-book__price"&gt;$12.99
+wp-content/plugins/pagesco-books/src/blocks/book-list:
+block.json      edit.js         index.js        render.php      style.scss      variations.php
+
+wp-content/themes/pagesco/templates:
+404.html          archive.html      front-page.html   index.html        page.html         search.html       single-book.html  single.html
+14</code></pre>
+                    </div>
+                    <p>One meta update, every page right. In <code>pagesco-plan.txt</code>, under "Blocks", note: "Book List (dynamic, 6.3): render.php + get_posts, default count = Books per list; variations per genre. Book pages: templates/single-book.html, bindings core/post-meta + pagesco/book (BookBindings feature)."</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>src/blocks/book-list/</code> holds <code>block.json</code>, <code>index.js</code>, <code>edit.js</code>, <code>render.php</code>, <code>style.scss</code> and <code>variations.php</code>, with no <code>save.js</code> and no <code>view.js</code></li>
+                        <li>A Book List without a count shows as many books as the Books per list setting says</li>
+                        <li>The inserter offers New Arrivals and one variation per genre</li>
+                        <li><code>BookBindings</code> is the plugin's fourteenth feature and registers <code>pagesco/book</code></li>
+                        <li>Every book page shows its author, price, stock, genres, pages and year from its meta, and three new arrivals</li>
+                        <li>The List test page is deleted and Dune costs $14.99 again</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Each exercise leaves the site as the project did. Try each one before you open the solution.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Test a Binding Without a Browser</h3>
+                    <p>Print every book's title and its formatted price as <code>pagesco/book</code> renders it, by rendering a bound paragraph in PHP for each book, without any template.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>parse_blocks()</code> turns the paragraph's markup into a parsed block. <code>new WP_Block( $parsed, $context )</code> takes the context as its second argument: <code>array( 'postId' =&gt; …, 'postType' =&gt; 'book' )</code>. <code>-&gt;render()</code> processes the bindings; <code>wp_strip_all_tags()</code> leaves the text.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="price-check.php" data-wp><code class="language-php">&lt;?php
+$markup = '&lt;!-- wp:paragraph {"metadata":{"bindings":{"content":{"source":"pagesco/book","args":{"field":"price"}}}}} --&gt;&lt;p&gt;Price&lt;/p&gt;&lt;!-- /wp:paragraph --&gt;';
+$parsed = parse_blocks( $markup )[0];
+
+foreach ( get_posts( array( 'post_type' =&gt; 'book', 'posts_per_page' =&gt; -1, 'orderby' =&gt; 'title', 'order' =&gt; 'ASC' ) ) as $book ) {
+	$block = new WP_Block( $parsed, array( 'postId' =&gt; $book-&gt;ID, 'postType' =&gt; 'book' ) );
+	echo $book-&gt;post_title, ': ', wp_strip_all_tags( $block-&gt;render() ), "\n";
+}</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>1984: $9.99
+Animal Farm: $8.49
+Brave New World: $9.49
+Dune: $14.99
+Fahrenheit 451: $10.49
+Lord of the Rings: $15.99
+Pride and Prejudice: $7.99
+The Catcher in the Rye: $8.99
+The Great Gatsby: $8.99
+The Hobbit: $10.99
+To Kill a Mockingbird: $11.99</code></pre>
+                        </div>
+                        <p>Rendering a block in PHP with a made-up context is how you test a source in isolation, and later in PHPUnit (Lesson 8.1). Remove the script: <code>rm price-check.php</code>.</p>
+                        <pre data-cli><code class="language-bash">rm price-check.php</code></pre>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: An ISBN Field That Knows When to Stay Quiet</h3>
+                    <p>Add a field <code>isbn</code> to <code>pagesco/book</code> that returns "ISBN 978…" when the book has a <code>pagesco_isbn</code>, and <code>null</code> otherwise. Test it on Dune before and after giving it an ISBN, then undo everything.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>One more <code>case</code> before the closing brace of the <code>switch</code>. Returning <code>null</code> keeps the block's fallback text; returning <code>''</code> would empty the block. No book has an ISBN yet (Lesson 5.2), so Dune's is <code>''</code> until you set one with <code>wp post meta update</code>. Test with Exercise 1's technique.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">cd wp-content/plugins/pagesco-books/src
+cp BookBindings.php BookBindings.php.bak
+sed -i "s|^\t\t\tcase 'genres':|\t\t\tcase 'isbn':\n\t\t\t\t\$isbn = (string) get_post_meta( \$book_id, 'pagesco_isbn', true );\n\t\t\t\treturn '' === \$isbn ? null : esc_html( 'ISBN ' . \$isbn );\n\n&amp;|" BookBindings.php
+grep -n -A 3 "case 'isbn'" BookBindings.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>78:			case 'isbn':
+79-				$isbn = (string) get_post_meta( $book_id, 'pagesco_isbn', true );
+80-				return '' === $isbn ? null : esc_html( 'ISBN ' . $isbn );
+81-</code></pre>
+                        </div>
+                        <pre data-file="isbn-check.php" data-wp><code class="language-php">&lt;?php
+$parsed = parse_blocks( '&lt;!-- wp:paragraph {"metadata":{"bindings":{"content":{"source":"pagesco/book","args":{"field":"isbn"}}}}} --&gt;&lt;p&gt;No ISBN yet&lt;/p&gt;&lt;!-- /wp:paragraph --&gt;' )[0];
+
+echo wp_strip_all_tags( ( new WP_Block( $parsed, array( 'postId' =&gt; 30, 'postType' =&gt; 'book' ) ) )-&gt;render() ), "\n";
+update_post_meta( 30, 'pagesco_isbn', '9780441172719' );
+echo wp_strip_all_tags( ( new WP_Block( $parsed, array( 'postId' =&gt; 30, 'postType' =&gt; 'book' ) ) )-&gt;render() ), "\n";</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>No ISBN yet
+ISBN 9780441172719</code></pre>
+                        </div>
+                        <p>Without an ISBN the paragraph keeps its fallback, which in a template you would write as an empty-looking placeholder or put the block where a missing line does not matter. Undo:</p>
+                        <pre data-cli><code class="language-bash">wp post meta update 30 pagesco_isbn '' &gt; /dev/null
+mv wp-content/plugins/pagesco-books/src/BookBindings.php.bak wp-content/plugins/pagesco-books/src/BookBindings.php
+rm isbn-check.php</code></pre>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: Only Books in Stock (Stretch)</h3>
+                    <p>Give the Book List a boolean attribute <code>inStock</code> (default <code>false</code>) that, when on, leaves out sold-out books. Add it to <code>block.json</code> and <code>render.php</code> (the sidebar toggle is optional), build, and compare a Classic list with and without it. Then restore the files and rebuild.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>A <code>meta_query</code> (Lesson 4.2): <code>array( array( 'key' =&gt; 'pagesco_in_stock', 'value' =&gt; '1' ) )</code>. Booleans are stored as <code>'1'</code> for true and <code>''</code> for false, which is why comparing with <code>'1'</code> works. Six Classic books, two of them sold out.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">cd wp-content/plugins/pagesco-books/src/blocks/book-list
+cp block.json block.json.bak
+cp render.php render.php.bak
+sed -i 's|^\t\t"orderBy": {|\t\t"inStock": {\n\t\t\t"type": "boolean",\n\t\t\t"default": false\n\t\t},\n&amp;|' block.json
+sed -i "s|^\$books = get_posts( \$query_args );|if ( \$attributes['inStock'] ) {\n\t\$query_args['meta_query'] = array(\n\t\tarray(\n\t\t\t'key'   =&gt; 'pagesco_in_stock',\n\t\t\t'value' =&gt; '1',\n\t\t),\n\t);\n}\n\n&amp;|" render.php
+grep -n -B 8 '^\$books = get_posts' render.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>49-	$query_args['meta_query'] = array(
+50-		array(
+51-			'key'   =&gt; 'pagesco_in_stock',
+52-			'value' =&gt; '1',
+53-		),
+54-	);
+55-}
+56-
+57:$books = get_posts( $query_args );</code></pre>
+                        </div>
+                        <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null</code></pre>
+                        <pre data-content="page:stock-test" data-title="Stock test"><code class="language-html">&lt;!-- wp:pagesco/book-list {"genre":"classic"} /--&gt;
+
+&lt;!-- wp:pagesco/book-list {"genre":"classic","inStock":true} /--&gt;</code></pre>
+                        <pre data-cli><code class="language-bash">curl -s http://localhost:8080/stock-test/ | grep -o 'Sold out\|In stock' | sort | uniq -c
+curl -s http://localhost:8080/stock-test/ | grep -c '&lt;li class="wp-block-pagesco-book-list__item'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>      8 In stock
+      2 Sold out
+10</code></pre>
+                        </div>
+                        <p>Ten items: six in the first list (two sold out), four in the second. A toggle for it in <code>edit.js</code> is a <code>ToggleControl</code> as in Lesson 6.2. Undo:</p>
+                        <pre data-cli><code class="language-bash">wp post delete $(wp post list --post_type=page --name=stock-test --field=ID) --force &gt; /dev/null
+cd wp-content/plugins/pagesco-books/src/blocks/book-list
+mv block.json.bak block.json
+mv render.php.bak render.php</code></pre>
+                        <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null</code></pre>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> What does <code>post_content</code> hold for a Book List block?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That is a static block. What did the List test page's Code editor show?">
+                                A) The comment and the list's HTML as it was when the post was saved
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="A dynamic block saves only its comment with the non-default attributes; render.php produces the HTML on every view.">
+                                B) Only the block comment with its attributes
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Nothing is written back to the post when a page is viewed. Where does the HTML come from each time?">
+                                C) The HTML from the most recent page view
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> The shop sets Books per list to 8. An editor inserts a Book List and changes nothing. How many books does it show (the catalog has 11)?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="count has no default, so it is missing from the comment and render.php uses Settings::get( 'books_per_page' ), now 8.">
+                                A) 8
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="6 is the setting's default, but the shop changed it. Which value does render.php read when count is missing?">
+                                B) 6
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="24 is only the upper limit of the clamp. What happens when there is no count at all?">
+                                C) 11
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> A paragraph is bound to <code>core/post-meta</code> with the key <code>_pagesco_cost</code>, which is registered with <code>show_in_rest</code>. What does a book page show?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Registration is one condition. What does a leading underscore make a meta key?">
+                                A) The stored cost
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Keys starting with an underscore are protected; core/post-meta returns null for them, so the paragraph keeps its fallback text, silently.">
+                                B) The paragraph's fallback text
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Bindings fail quietly. What did Common Mistake 3 print for a key core would not read?">
+                                C) A PHP warning above the page
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> Book 37 is The Catcher in the Rye, sold out. What does this print?</p>
+                        <pre data-file="quiz-stock.php" data-wp><code class="language-php">&lt;?php
+$parsed = parse_blocks( '&lt;!-- wp:paragraph {"metadata":{"bindings":{"content":{"source":"pagesco/book","args":{"field":"stock"}}}}} --&gt;&lt;p&gt;Stock&lt;/p&gt;&lt;!-- /wp:paragraph --&gt;' )[0];
+$block  = new WP_Block( $parsed, array( 'postId' =&gt; 37, 'postType' =&gt; 'book' ) );
+
+echo wp_strip_all_tags( $block-&gt;render() ), "\n";</code></pre>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The fallback shows only when the source returns null. Does pagesco/book know this book?">
+                                A) Stock
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That is what core/post-meta would give for a true boolean. Which source is this, and what does its stock field return?">
+                                B) 1
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The context names book 37, the source reads pagesco_in_stock, finds it false and returns the formatted Sold out, which replaces the paragraph's content.">
+                                C) Sold out
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> When does WordPress run the Book List's <code>variations.php</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Variations are an editor feature. Would a visitor's page need them?">
+                                A) On every front-end view of a page with a Book List
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The build only copies the file. Could it know the genres in your database?">
+                                B) During npm run build
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="block.json names the file, and WordPress requires it lazily when the variations are requested, for example by the editor through the block-types REST route.">
+                                C) When something asks for the block's variations, such as the editor
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Why not use core's Query Loop block for the book list?</summary>
+                    <p>You could: a Query Loop set to the Book post type, with a Post Title and a few bound paragraphs inside the Post Template, lists books with no custom block at all (bindings read the context the loop provides). Choose it when editors should design each list. Choose a custom dynamic block when the markup is the shop's decision, must be the same everywhere, and should change everywhere at once, or when the logic (a setting as default, a clamp, a reused formatter) is more than a loop's options can express. Many sites use both.</p>
+                </details>
+                <details>
+                    <summary>Is rendering on every view slow?</summary>
+                    <p>One small query per list, and the meta comes in one more query for all the books together; for a shop with a few hundred books that is nothing. Busy sites put a page cache in front, so most visitors never run PHP at all, and a dynamic block can cache its own result in a transient. Lesson 8.2 measures and caches; Lesson 7.3 introduces transients.</p>
+                </details>
+                <details>
+                    <summary>Can visitors' data, or the current user, be bound?</summary>
+                    <p>A source can return anything PHP can compute, including per-user values, but remember that the HTML may be cached for everyone by a page cache. Per-visitor content is better loaded in the browser (Lesson 6.4's Interactivity API, Module 7's REST API). Keep sources about the post being shown, and keep the visibility check.</p>
+                </details>
+                <details>
+                    <summary>Should the template live in the theme or the plugin?</summary>
+                    <p>The course keeps the design in the theme (<code>single-book.html</code>, as Lesson 3.1 planned) and the data in the plugin. A plugin that must ship its own template can register one with <code>register_block_template()</code> (WordPress 6.7); a theme's template of the same slug wins. Lesson 9.1 revisits what goes where before launch.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Make the editor show real values for <code>pagesco/book</code>. In the editor script, register the source in JavaScript with <code>registerBlockBindingsSource( { name: 'pagesco/book', getValues( { select, context, bindings } ) { … } } )</code> from <code>@wordpress/blocks</code>, reading the book's meta with <code>select( 'core' ).getEditedEntityRecord( 'postType', context.postType, context.postId )?.meta</code> and formatting it like the PHP. Where must that script be enqueued so it loads in the post editor and the Site Editor (hint: <code>enqueue_block_editor_assets</code>), and why does a template in the Site Editor still show labels?</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Go through the Pages &amp; Co. site page by page and sort every piece of book data you see into three columns: typed into content (Book Card, the hard-coded staff picks pattern), rendered by PHP (shortcodes, Book List), or bound (book pages). For each item in the first column, decide whether it should move, and to which of the other two. Then write down one place on a client's site where a binding would replace a custom block.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>A dynamic block stores only its comment; <code>"render": "file:./render.php"</code> makes WordPress run the PHP on every view, with <code>$attributes</code>, <code>$content</code> and <code>$block</code></li>
+                        <li>In <code>render.php</code>, treat attributes as input (check, cast, clamp), query with <code>get_posts()</code>, start the wrapper with <code>get_block_wrapper_attributes()</code>, and escape everything you print</li>
+                        <li>An attribute without a default can carry "use the site's setting"; WordPress fills in defaults only for attributes that have one</li>
+                        <li><code>ServerSideRender</code> previews <code>render.php</code> through the <code>block-renderer</code> REST route; <code>@wordpress/core-data</code> gives controls the site's data</li>
+                        <li>Variations are presets of a block; <code>"variations": "file:./variations.php"</code> (6.7) builds them in PHP, lazily</li>
+                        <li>Block bindings connect core blocks' attributes to sources: <code>core/post-meta</code> for registered, public meta, or your own <code>register_block_bindings_source()</code> for formatted values; they fail silently to the fallback</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>A new dynamic block</td><td><code>npx @wordpress/create-block@latest &lt;slug&gt; --no-plugin --variant dynamic --target-dir=src/blocks/&lt;slug&gt; --namespace=pagesco --textdomain=pagesco-books</code></td></tr>
+                            <tr><td>Server rendering</td><td><code>"render": "file:./render.php"</code>; <code>&lt;ul &lt;?php echo get_block_wrapper_attributes(); ?&gt;&gt;</code></td></tr>
+                            <tr><td>An editor preview</td><td><code>&lt;ServerSideRender block="…" attributes={ attributes } skipBlockSupportAttributes /&gt;</code></td></tr>
+                            <tr><td>Site data in a control</td><td><code>useSelect( ( select ) =&gt; select( coreStore ).getEntityRecords( 'taxonomy', 'genre', { per_page: -1 } ), [] )</code></td></tr>
+                            <tr><td>Generated variations</td><td><code>"variations": "file:./variations.php"</code> returning an array of <code>name</code>, <code>title</code>, <code>attributes</code>, <code>isActive</code>, <code>scope</code></td></tr>
+                            <tr><td>Show meta in a core block</td><td><code>{"metadata":{"bindings":{"content":{"source":"core/post-meta","args":{"key":"pagesco_author"}}}}}</code></td></tr>
+                            <tr><td>Your own source</td><td><code>register_block_bindings_source( 'pagesco/book', array( 'label', 'get_value_callback', 'uses_context' ) )</code> on <code>init</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You built the shop's first dynamic block, the Book List, on the PHP query skills from Modules 4 and 5</li>
+                        <li>You made its length a shop setting and its genres the database's, with an accurate editor preview</li>
+                        <li>You generated a variation for every genre from PHP</li>
+                        <li>You gave every book a page whose details come from its meta, through core blocks and your own binding source</li>
+                        <li>You met three quiet failures (a missing key, a fix in <code>build/</code>, a dead binding) and know where to look</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>Everything so far is decided on the server: a visitor who wants only the fantasy books must load another page. In <a href="lesson_22.html"><strong>Lesson 6.4: The Interactivity API</strong></a> you build <code>pagesco/book-filter</code>, a catalog with genre buttons that filter instantly in the browser. The server still renders the HTML (with the same PHP you wrote today), and a small store of state and actions in a script module takes over, with <code>data-wp-*</code> directives instead of hand-written DOM code.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Open two book pages and the editor's inserter (type "books"), and check that the variations and the live details are there</li>
+                    <li>Make sure the List test page is gone and <code>npm run build</code> has run on your final files</li>
+                    <li>Refresh the basics of JavaScript getters (<code>get name() { … }</code>) and of event handlers' <code>event.preventDefault()</code>; the Interactivity API uses both</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Notice how little of today was new syntax. <code>get_posts()</code>, settings, escaping, feature classes, the shortcode's formatter: you wrote all of them before, and today they became a block and a binding source almost unchanged. That is what learning a platform feels like from the inside: each new layer rests on the one before. If the editor side still feels foreign, that is fine; the server side, where the data lives, is now firmly yours.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_20.html" class="prev-lesson">← Previous: Static Blocks: Attributes, Controls &amp; Supports</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_22.html" class="next-lesson">Next: The Interactivity API →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

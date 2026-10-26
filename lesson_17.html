@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Admin pages, the Settings API and the Options API: one array option with defaults, add_options_page, register_setting with a sanitize callback, sections and fields, what options.php does on save, and what uninstall.php removes, on WordPress 7.1 and PHP 8.5. PHP and WordPress Development Lesson 5.4.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Admin Pages, Settings API &amp; Options - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 5: Plugin Development</a></li>
+            <li aria-current="page">Lesson 5.4: Admin Pages, Settings API &amp; Options</li>
+        </ul>
+    </nav>
+    <main id="main-content" data-state="after:lesson_16">
+        <div class="container">
+            <header>
+                <h1>⚙️ Lesson 5.4: Admin Pages, Settings API &amp; Options</h1>
+                <p class="lead">Every time Pages &amp; Co. wants a different sentence in the store notice, someone has to edit PHP. That does not scale: the shop's staff should change their own settings, in the admin, safely. In this lesson you give <code>pagesco-books</code> a settings page under Settings, built with the WordPress Settings API, which brings the nonce, the capability check and the save handler with it. The values live in one option, <code>pagesco_books_settings</code>, and the store notice starts reading it. You will also settle a question Lesson 5.2 left open: what should deleting the plugin delete?</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Store a plugin's settings as one array option with defaults, and read it safely with <code>get_option()</code> and <code>wp_parse_args()</code></li>
+                        <li>Add an admin page with <code>add_options_page()</code> (or a top-level menu) protected by the right capability</li>
+                        <li>Build a settings form with the Settings API: <code>register_setting()</code>, sections, fields, <code>settings_fields()</code> and <code>do_settings_sections()</code></li>
+                        <li>Validate submitted values in a sanitize callback and report problems with <code>add_settings_error()</code></li>
+                        <li>Trace what happens between Save Changes and the database: <code>options.php</code>, the nonce, the allowed options list</li>
+                        <li>Decide what <code>uninstall.php</code> removes, and remove the plugin's own settings</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 125 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_16.html">Lesson 5.3: Security in WordPress</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> a Settings &gt; Pages &amp; Co. Books page that stores <code>pagesco_books_settings</code> and controls the store notice</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (the Settings API has been stable for years; <code>register_setting()</code> defaults need 4.7+)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 5.3, with <code>pagesco-books</code> active</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#options" class="toc-link">Options: Where Settings Live</a></li>
+                        <li><a href="#admin-pages" class="toc-link">Admin Menus and Pages</a></li>
+                        <li><a href="#settings-api" class="toc-link">The Settings API</a></li>
+                        <li><a href="#saving" class="toc-link">What Save Changes Does</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Settings the Shop Can Change</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="options" class="lesson-section">
+                <h2>🗃️ Options: Where Settings Live</h2>
+                <p>You met the <code>wp_options</code> table in Lesson 2.2: one row per option, a name, a value and an autoload flag, with everything that is autoloaded fetched in a single query at the start of every request. Every screen under Settings in the admin is a form over a handful of those rows (Lesson 2.1 matched them up). Your plugin's settings belong there too, with the Options API you already know: <code>get_option()</code>, <code>add_option()</code>, <code>update_option()</code>, <code>delete_option()</code>.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: one labelled box on the shared shelf</h4>
+                    <p>Think of <code>wp_options</code> as a shelf in the back office that every plugin shares. You could put each of your settings on it loose, four little notes with your name on them, or you could put one labelled box there, <code>pagesco_books_settings</code>, with all your notes inside. One box is easier to find, to load in one go, and to throw away when you leave. WordPress stores the box as a serialized PHP array (you saw serialized values in Lesson 2.2) and hands it back to you as an array.</p>
+                </div>
+
+                <p>The Pages &amp; Co. plugin gets exactly one option for its settings, as the course plan says. Ask for it before it exists, and WordPress has nothing to give:</p>
+                <pre data-cli data-raises="Error"><code class="language-bash">wp option get pagesco_books_settings</code></pre>
+                <div class="card card-output">
+                    <h4>Error</h4>
+                    <pre><code>Error: Could not get 'pagesco_books_settings' option. Does it exist?</code></pre>
+                </div>
+                <p>In PHP the same question returns <code>false</code>, or the second argument of <code>get_option( $name, $default )</code> if you pass one. Rather than spreading defaults over every place that reads a setting, the plugin gets one class that knows the option's name, its defaults and how to clean it. Create <code>wordpress/wp-content/plugins/pagesco-books/src/Settings.php</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/Settings.php"><code class="language-php">&lt;?php
+/**
+ * The shop's settings: one option, an array of values with defaults.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books;
+
+/**
+ * Registers the pagesco_books_settings option and reads it for the rest of the plugin.
+ */
+final class Settings implements Feature {
+
+	/**
+	 * The option's name in wp_options.
+	 */
+	public const OPTION = 'pagesco_books_settings';
+
+	/**
+	 * The option group the settings form posts (settings_fields() prints it).
+	 */
+	public const GROUP = 'pagesco_books';
+
+	/**
+	 * Registers the setting on init, so its sanitizing and default apply everywhere, not only in wp-admin.
+	 */
+	public function register(): void {
+		add_action( 'init', array( $this, 'register_setting' ) );
+	}
+
+	/**
+	 * Every setting with its default value.
+	 *
+	 * @return array{notice_extra: string, show_events_link: bool, books_per_page: int, events_limit: int}
+	 */
+	public static function defaults(): array {
+		return array(
+			'notice_extra'     =&gt; __( 'Open until 9 p.m. on Thursdays.', 'pagesco-books' ),
+			'show_events_link' =&gt; true,
+			'books_per_page'   =&gt; 6,
+			'events_limit'     =&gt; 5,
+		);
+	}
+
+	/**
+	 * Returns one setting: the saved value, or its default when nothing is saved yet.
+	 *
+	 * @param string $key A key of defaults().
+	 * @return mixed
+	 */
+	public static function get( string $key ) {
+		$settings = wp_parse_args( get_option( self::OPTION, array() ), self::defaults() );
+
+		return $settings[ $key ] ?? null;
+	}
+
+	/**
+	 * Tells WordPress about the option: its group, type, sanitize callback and default.
+	 */
+	public function register_setting(): void {
+		register_setting(
+			self::GROUP,
+			self::OPTION,
+			array(
+				'type'              =&gt; 'object',
+				'sanitize_callback' =&gt; array( $this, 'sanitize' ),
+				'default'           =&gt; self::defaults(),
+			)
+		);
+	}
+
+	/**
+	 * Cleans the submitted values before WordPress stores them. Out-of-range numbers keep the saved value.
+	 *
+	 * @param mixed $input The submitted settings.
+	 * @return array
+	 */
+	public function sanitize( $input ): array {
+		$input = is_array( $input ) ? $input : array();
+		$saved = wp_parse_args( get_option( self::OPTION, array() ), self::defaults() );
+
+		$clean = array(
+			'notice_extra'     =&gt; sanitize_text_field( $input['notice_extra'] ?? '' ),
+			'show_events_link' =&gt; ! empty( $input['show_events_link'] ),
+			'books_per_page'   =&gt; absint( $input['books_per_page'] ?? $saved['books_per_page'] ),
+			'events_limit'     =&gt; absint( $input['events_limit'] ?? $saved['events_limit'] ),
+		);
+
+		if ( $clean['books_per_page'] &lt; 1 || $clean['books_per_page'] &gt; 24 ) {
+			add_settings_error( self::OPTION, 'books_per_page', __( 'Books per list must be between 1 and 24.', 'pagesco-books' ) );
+			$clean['books_per_page'] = $saved['books_per_page'];
+		}
+		if ( $clean['events_limit'] &lt; 1 || $clean['events_limit'] &gt; 20 ) {
+			add_settings_error( self::OPTION, 'events_limit', __( 'Events to show must be between 1 and 20.', 'pagesco-books' ) );
+			$clean['events_limit'] = $saved['events_limit'];
+		}
+
+		return $clean;
+	}
+}</code></pre>
+                <p>Four settings, chosen because the shop will really use them: the sentence the plugin adds to the store notice (today it is hard-coded in <code>StoreNotice</code>), whether the notice shows its "See events" link, how many books a list shows (the book blocks in Module 6 use it), and how many events the events listing shows (Lesson 5.5). Three parts of the class matter now:</p>
+                <ul>
+                    <li><code>defaults()</code> is the single place the default values live. The notice sentence is the one the shop already shows, so nothing changes on the site until someone saves something different.</li>
+                    <li><code>get( $key )</code> reads the option and fills any missing key from the defaults with <code>wp_parse_args()</code> (Lesson 1.3). That matters when a later version of the plugin adds a fifth setting: sites that saved the old four still get a value for the new one.</li>
+                    <li><code>register_setting()</code> tells WordPress about the option: the group its form belongs to, its type (<code>object</code>: an associative array, in the JSON terms the REST API uses), the callback that cleans every value before it is stored, and its default. The <code>sanitize()</code> method is that callback; you will put it to work when you save the form.</li>
+                </ul>
+                <p>The setting is registered on <code>init</code>, not only in the admin, so its cleaning and its default apply everywhere the option is written or read, WP-CLI included. Add the feature to the list in <code>src/Plugin.php</code> (in your editor, after <code>Admin\StockAction::class,</code>), then ask again:</p>
+                <pre data-cli><code class="language-bash">sed -i '/Admin\\StockAction::class,/a\			Settings::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+wp option get pagesco_books_settings
+wp db query "SELECT COUNT(*) FROM wp_options WHERE option_name = 'pagesco_books_settings'"
+wp eval 'var_dump( PagesCo\Books\Settings::get( "events_limit" ) );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>array (
+  'notice_extra' =&gt; 'Open until 9 p.m. on Thursdays.',
+  'show_events_link' =&gt; true,
+  'books_per_page' =&gt; 6,
+  'events_limit' =&gt; 5,
+)
+COUNT(*)
+0
+
+int(5)</code></pre>
+                </div>
+                <p>Now <code>wp option get</code> answers with the defaults, yet the database still has no row for the option (the count is <code>0</code>). The registered default is handed out whenever the option is missing; nothing is written until someone saves. And <code>Settings::get()</code> returns a real integer, <code>5</code>, not the string a single option row would give you (Lesson 1.3's "all options are strings" rule applies to scalar options; arrays come back with their types).</p>
+
+                <div class="card card-success">
+                    <h4>✅ One array option, or several options?</h4>
+                    <p>One option per plugin (or per screen) is the usual choice: one row, one autoloaded value, one <code>delete_option()</code> on uninstall. Split a value into its own option when it is large and rarely needed (give it autoload <code>off</code>, Lesson 2.2) or when it changes on every request, such as a counter: rewriting a whole settings array to bump one number is wasteful. Never store per-post or per-user data in options; that is what post meta and user meta are for.</p>
+                </div>
+            </section>
+
+            <section id="admin-pages" class="lesson-section">
+                <h2>🧭 Admin Menus and Pages</h2>
+                <p>An admin page is a callback that prints HTML inside the admin's frame, registered on the <code>admin_menu</code> action (Lesson 2.3's table listed it). WordPress gives you one function to add a top-level menu and a family of shortcuts for submenus under the existing ones:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Function</th><th>Adds</th><th>Use it for</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>add_menu_page()</code></td><td>A top-level menu (with a Dashicon and a position)</td><td>A plugin that is a whole application: a shop, a forms builder</td></tr>
+                            <tr><td><code>add_submenu_page( $parent, … )</code></td><td>An item under any menu, by the parent's slug</td><td>Screens that belong to your post type: <code>edit.php?post_type=book</code></td></tr>
+                            <tr><td><code>add_options_page()</code></td><td>An item under Settings (<code>options-general.php</code>)</td><td>Configuration you set once and rarely touch</td></tr>
+                            <tr><td><code>add_management_page()</code>, <code>add_theme_page()</code>, <code>add_users_page()</code>…</td><td>Items under Tools, Appearance, Users…</td><td>Tools and maintenance screens</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Every one of them takes the same core arguments: the page title (the browser tab and the <code>&lt;h1&gt;</code>), the menu title, the <strong>capability</strong> a user needs to see the item and open the page, a <strong>slug</strong> that becomes <code>?page=…</code> in the URL, and the callback that prints the page. The shop's settings are configuration, so they go under Settings, guarded by <code>manage_options</code>, the capability only administrators have. Create <code>src/Admin/SettingsPage.php</code> with the page and a placeholder body:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/Admin/SettingsPage.php"><code class="language-php">&lt;?php
+/**
+ * The Settings &gt; Pages &amp; Co. Books screen.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books\Admin;
+
+use PagesCo\Books\Feature;
+
+/**
+ * Adds the settings page (the form follows in the next section).
+ */
+final class SettingsPage implements Feature {
+
+	/**
+	 * The page's slug: options-general.php?page=pagesco-books.
+	 */
+	public const SLUG = 'pagesco-books';
+
+	/**
+	 * Hooks the menu item into the admin menu.
+	 */
+	public function register(): void {
+		add_action( 'admin_menu', array( $this, 'add_page' ) );
+	}
+
+	/**
+	 * Adds the page under Settings, for users who can manage options.
+	 */
+	public function add_page(): void {
+		add_options_page(
+			__( 'Pages &amp; Co. Books Settings', 'pagesco-books' ),
+			__( 'Pages &amp; Co. Books', 'pagesco-books' ),
+			'manage_options',
+			self::SLUG,
+			array( $this, 'render' )
+		);
+	}
+
+	/**
+	 * Prints the page.
+	 */
+	public function render(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		?&gt;
+		&lt;div class="wrap"&gt;
+			&lt;h1&gt;&lt;?php echo esc_html( get_admin_page_title() ); ?&gt;&lt;/h1&gt;
+			&lt;p&gt;&lt;?php esc_html_e( 'Settings for the Pages &amp; Co. shop features.', 'pagesco-books' ); ?&gt;&lt;/p&gt;
+		&lt;/div&gt;
+		&lt;?php
+	}
+}</code></pre>
+                <p>The <code>current_user_can()</code> check inside <code>render()</code> repeats what the menu already enforces. That is Lesson 5.3's defense in depth: the callback should never depend on how it was reached. List the feature and look at the Settings menu as the administrator sees it (logged in as <code>admin</code>):</p>
+                <pre data-cli><code class="language-bash">sed -i '/Settings::class,/a\			Admin\\SettingsPage::class,' wp-content/plugins/pagesco-books/src/Plugin.php
+grep -n "::class," wp-content/plugins/pagesco-books/src/Plugin.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>76:			StoreNotice::class,
+77:			BookPostType::class,
+78:			GenreTaxonomy::class,
+79:			BookMeta::class,
+80:			Admin\BookMetaBox::class,
+81:			Admin\BookColumns::class,
+82:			Admin\StockAction::class,
+83:			Settings::class,
+84:			Admin\SettingsPage::class,</code></pre>
+                </div>
+                <pre data-web="/wp-admin/options-general.php" data-login="admin" data-select-all="#menu-settings .wp-submenu a"><code class="language-text">http://localhost:8080/wp-admin/options-general.php   (View Source: the Settings submenu)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;a href='options-general.php' class="wp-first-item current" aria-current="page"&gt;General&lt;/a&gt;
+&lt;a href='options-connectors.php'&gt;Connectors&lt;/a&gt;
+&lt;a href='options-writing.php'&gt;Writing&lt;/a&gt;
+&lt;a href='options-reading.php'&gt;Reading&lt;/a&gt;
+&lt;a href='options-discussion.php'&gt;Discussion&lt;/a&gt;
+&lt;a href='options-media.php'&gt;Media&lt;/a&gt;
+&lt;a href='options-permalink.php'&gt;Permalinks&lt;/a&gt;
+&lt;a href='options-privacy.php'&gt;Privacy&lt;/a&gt;
+&lt;a href='options-general.php?page=pagesco-books'&gt;Pages &amp;#038; Co. Books&lt;/a&gt;</code></pre>
+                </div>
+                <p>The new item sits at the end of Settings, after the core screens (Connectors is the screen WordPress 7.0 added). Since WordPress 6.9 the admin also lists every menu item in its command palette, so typing "Pages" after <kbd>Ctrl</kbd>+<kbd>K</kbd> (<kbd>Cmd</kbd>+<kbd>K</kbd> on a Mac) anywhere in the admin finds your page too. Open it:</p>
+                <pre data-web="/wp-admin/options-general.php?page=pagesco-books" data-login="admin" data-select=".wrap"><code class="language-text">http://localhost:8080/wp-admin/options-general.php?page=pagesco-books</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;div class="wrap"&gt;
+			&lt;h1&gt;Pages &amp;amp; Co. Books Settings&lt;/h1&gt;
+			&lt;p&gt;Settings for the Pages &amp;amp; Co. shop features.&lt;/p&gt;
+		&lt;/div&gt;</code></pre>
+                </div>
+                <p>The title came from the first argument of <code>add_options_page()</code> through <code>get_admin_page_title()</code>, escaped on output. Now try the same URL as Maria, the editor from Lesson 2.1:</p>
+                <pre data-web="/wp-admin/options-general.php?page=pagesco-books" data-login="maria" data-headers="" data-select=".wp-die-message"><code class="language-text">http://localhost:8080/wp-admin/options-general.php?page=pagesco-books   (logged in as maria)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>HTTP/1.1 403 Forbidden
+
+&lt;div class="wp-die-message"&gt;Sorry, you are not allowed to access this page.&lt;/div&gt;</code></pre>
+                </div>
+                <p>A <code>403</code> before your callback even runs: editors do not have <code>manage_options</code>, so WordPress refuses the page and hides the menu item from them. Choose the capability for what the page can change, not for who you think will use it.</p>
+            </section>
+
+            <section id="settings-api" class="lesson-section">
+                <h2>📝 The Settings API</h2>
+                <p>You could print a <code>&lt;form&gt;</code> by hand and handle it at <code>admin-post.php</code>, as the stock action in Lesson 5.3 did. For settings, WordPress has done that work for you. The <strong>Settings API</strong> describes a form as data, prints it in the admin's standard layout, and saves it through core's own handler, <code>wp-admin/options.php</code>, which checks a nonce and a capability for you and runs your sanitize callback. You describe four things:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Piece</th><th>Function</th><th>In this plugin</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>The option and its group</td><td><code>register_setting( $group, $option, $args )</code></td><td>group <code>pagesco_books</code>, option <code>pagesco_books_settings</code> (done in <code>Settings</code>)</td></tr>
+                            <tr><td>Sections: headings that group fields</td><td><code>add_settings_section( $id, $title, $callback, $page )</code></td><td>"Store notice", "Catalog and events"</td></tr>
+                            <tr><td>Fields: one row each, with your input</td><td><code>add_settings_field( $id, $title, $callback, $page, $section, $args )</code></td><td>four fields</td></tr>
+                            <tr><td>The form on your page</td><td><code>settings_fields( $group )</code>, <code>do_settings_sections( $page )</code>, <code>submit_button()</code></td><td>inside <code>render()</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Sections and fields are registered on <code>admin_init</code>, the action that fires at the start of every admin request. Replace <code>src/Admin/SettingsPage.php</code> with the full version:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/Admin/SettingsPage.php"><code class="language-php">&lt;?php
+/**
+ * The Settings &gt; Pages &amp; Co. Books screen.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books\Admin;
+
+use PagesCo\Books\Feature;
+use PagesCo\Books\Settings;
+
+/**
+ * Adds the settings page and builds its form with the Settings API.
+ */
+final class SettingsPage implements Feature {
+
+	/**
+	 * The page's slug: options-general.php?page=pagesco-books.
+	 */
+	public const SLUG = 'pagesco-books';
+
+	/**
+	 * Hooks the menu item, the sections and fields, and the Plugins screen link.
+	 */
+	public function register(): void {
+		add_action( 'admin_menu', array( $this, 'add_page' ) );
+		add_action( 'admin_init', array( $this, 'add_fields' ) );
+		add_filter( 'plugin_action_links_' . plugin_basename( PAGESCO_BOOKS_FILE ), array( $this, 'add_settings_link' ) );
+	}
+
+	/**
+	 * Adds the page under Settings, for users who can manage options.
+	 */
+	public function add_page(): void {
+		add_options_page(
+			__( 'Pages &amp; Co. Books Settings', 'pagesco-books' ),
+			__( 'Pages &amp; Co. Books', 'pagesco-books' ),
+			'manage_options',
+			self::SLUG,
+			array( $this, 'render' )
+		);
+	}
+
+	/**
+	 * Describes the form: two sections, four fields.
+	 */
+	public function add_fields(): void {
+		add_settings_section(
+			'pagesco_books_notice',
+			__( 'Store notice', 'pagesco-books' ),
+			array( $this, 'render_notice_intro' ),
+			self::SLUG
+		);
+		add_settings_field(
+			'notice_extra',
+			__( 'Notice addition', 'pagesco-books' ),
+			array( $this, 'render_text_field' ),
+			self::SLUG,
+			'pagesco_books_notice',
+			array(
+				'key'         =&gt; 'notice_extra',
+				'label_for'   =&gt; 'pagesco-notice-extra',
+				'description' =&gt; __( 'Added after the free-shipping text. Leave empty to show only that text.', 'pagesco-books' ),
+			)
+		);
+		add_settings_field(
+			'show_events_link',
+			__( 'Events link', 'pagesco-books' ),
+			array( $this, 'render_checkbox_field' ),
+			self::SLUG,
+			'pagesco_books_notice',
+			array(
+				'key'       =&gt; 'show_events_link',
+				'label_for' =&gt; 'pagesco-show-events-link',
+				'label'     =&gt; __( 'Show a "See events" link in the notice', 'pagesco-books' ),
+			)
+		);
+
+		add_settings_section(
+			'pagesco_books_lists',
+			__( 'Catalog and events', 'pagesco-books' ),
+			'__return_false',
+			self::SLUG
+		);
+		add_settings_field(
+			'books_per_page',
+			__( 'Books per list', 'pagesco-books' ),
+			array( $this, 'render_number_field' ),
+			self::SLUG,
+			'pagesco_books_lists',
+			array(
+				'key'       =&gt; 'books_per_page',
+				'label_for' =&gt; 'pagesco-books-per-page',
+				'max'       =&gt; 24,
+			)
+		);
+		add_settings_field(
+			'events_limit',
+			__( 'Events to show', 'pagesco-books' ),
+			array( $this, 'render_number_field' ),
+			self::SLUG,
+			'pagesco_books_lists',
+			array(
+				'key'       =&gt; 'events_limit',
+				'label_for' =&gt; 'pagesco-events-limit',
+				'max'       =&gt; 20,
+			)
+		);
+	}
+
+	/**
+	 * Prints the page: the form posts to options.php, which checks the nonce and saves the option.
+	 */
+	public function render(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		?&gt;
+		&lt;div class="wrap"&gt;
+			&lt;h1&gt;&lt;?php echo esc_html( get_admin_page_title() ); ?&gt;&lt;/h1&gt;
+			&lt;form action="options.php" method="post"&gt;
+				&lt;?php
+				settings_fields( Settings::GROUP );
+				do_settings_sections( self::SLUG );
+				submit_button();
+				?&gt;
+			&lt;/form&gt;
+		&lt;/div&gt;
+		&lt;?php
+	}
+
+	/**
+	 * Prints the text under the Store notice heading.
+	 */
+	public function render_notice_intro(): void {
+		echo '&lt;p&gt;' . esc_html__( 'The bar at the top of every page of the shop.', 'pagesco-books' ) . '&lt;/p&gt;';
+	}
+
+	/**
+	 * Prints a text input for one setting.
+	 *
+	 * @param array $args The field's arguments from add_settings_field().
+	 */
+	public function render_text_field( $args ): void {
+		printf(
+			'&lt;input type="text" id="%1$s" name="%2$s[%3$s]" value="%4$s" class="regular-text"&gt;&lt;p class="description"&gt;%5$s&lt;/p&gt;',
+			esc_attr( $args['label_for'] ),
+			esc_attr( Settings::OPTION ),
+			esc_attr( $args['key'] ),
+			esc_attr( Settings::get( $args['key'] ) ),
+			esc_html( $args['description'] )
+		);
+	}
+
+	/**
+	 * Prints a checkbox for one setting.
+	 *
+	 * @param array $args The field's arguments from add_settings_field().
+	 */
+	public function render_checkbox_field( $args ): void {
+		printf(
+			'&lt;label&gt;&lt;input type="checkbox" id="%1$s" name="%2$s[%3$s]" value="1"%4$s&gt; %5$s&lt;/label&gt;',
+			esc_attr( $args['label_for'] ),
+			esc_attr( Settings::OPTION ),
+			esc_attr( $args['key'] ),
+			checked( Settings::get( $args['key'] ), true, false ),
+			esc_html( $args['label'] )
+		);
+	}
+
+	/**
+	 * Prints a number input for one setting.
+	 *
+	 * @param array $args The field's arguments from add_settings_field().
+	 */
+	public function render_number_field( $args ): void {
+		printf(
+			'&lt;input type="number" id="%1$s" name="%2$s[%3$s]" value="%4$s" min="1" max="%5$d" step="1" class="small-text"&gt;',
+			esc_attr( $args['label_for'] ),
+			esc_attr( Settings::OPTION ),
+			esc_attr( $args['key'] ),
+			esc_attr( Settings::get( $args['key'] ) ),
+			absint( $args['max'] )
+		);
+	}
+
+	/**
+	 * Adds a Settings link next to Deactivate on the Plugins screen.
+	 *
+	 * @param string[] $links The plugin's action links.
+	 * @return string[]
+	 */
+	public function add_settings_link( $links ) {
+		$url = admin_url( 'options-general.php?page=' . self::SLUG );
+		array_unshift( $links, sprintf( '&lt;a href="%s"&gt;%s&lt;/a&gt;', esc_url( $url ), esc_html__( 'Settings', 'pagesco-books' ) ) );
+
+		return $links;
+	}
+}</code></pre>
+                <p>Read it in the order WordPress uses it:</p>
+                <ul>
+                    <li><strong><code>add_fields()</code></strong> registers two sections on the page <code>pagesco-books</code> and four fields in them. Each field names a callback that prints its input and passes <code>$args</code> to it: the setting's key, and <code>label_for</code>, which WordPress uses to wrap the row's title in a <code>&lt;label for="…"&gt;</code> pointing at your input (clickable labels and screen readers both need that). <code>'__return_false'</code> is a core function that does nothing, handy for a section without intro text.</li>
+                    <li><strong>The field callbacks</strong> print inputs named <code>pagesco_books_settings[notice_extra]</code> and so on. That array syntax is what makes PHP deliver all four values as one array in <code>$_POST['pagesco_books_settings']</code>, ready to be stored as one option. Every value is escaped for its attribute with <code>esc_attr()</code>; the checkbox uses core's <code>checked()</code> helper.</li>
+                    <li><strong><code>render()</code></strong> prints a form that posts to <code>options.php</code>. <code>settings_fields( 'pagesco_books' )</code> prints the hidden fields that tell <code>options.php</code> which group this is, plus its nonce; <code>do_settings_sections()</code> prints the sections and fields; <code>submit_button()</code> prints the standard Save Changes button.</li>
+                    <li><strong><code>add_settings_link()</code></strong> adds a Settings link to the plugin's row on the Plugins screen, through the <code>plugin_action_links_{basename}</code> filter, a small kindness to whoever just activated your plugin.</li>
+                </ul>
+                <p>Look at the rows the Settings API built, one per field:</p>
+                <pre data-web="/wp-admin/options-general.php?page=pagesco-books" data-login="admin" data-select-all=".form-table tr"><code class="language-text">http://localhost:8080/wp-admin/options-general.php?page=pagesco-books   (View Source: the form's rows)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;tr&gt;&lt;th scope="row"&gt;&lt;label for="pagesco-notice-extra"&gt;Notice addition&lt;/label&gt;&lt;/th&gt;&lt;td&gt;&lt;input type="text" id="pagesco-notice-extra" name="pagesco_books_settings[notice_extra]" value="Open until 9 p.m. on Thursdays." class="regular-text"&gt;&lt;p class="description"&gt;Added after the free-shipping text. Leave empty to show only that text.&lt;/p&gt;&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;th scope="row"&gt;&lt;label for="pagesco-show-events-link"&gt;Events link&lt;/label&gt;&lt;/th&gt;&lt;td&gt;&lt;label&gt;&lt;input type="checkbox" id="pagesco-show-events-link" name="pagesco_books_settings[show_events_link]" value="1" checked='checked'&gt; Show a &amp;quot;See events&amp;quot; link in the notice&lt;/label&gt;&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;th scope="row"&gt;&lt;label for="pagesco-books-per-page"&gt;Books per list&lt;/label&gt;&lt;/th&gt;&lt;td&gt;&lt;input type="number" id="pagesco-books-per-page" name="pagesco_books_settings[books_per_page]" value="6" min="1" max="24" step="1" class="small-text"&gt;&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;th scope="row"&gt;&lt;label for="pagesco-events-limit"&gt;Events to show&lt;/label&gt;&lt;/th&gt;&lt;td&gt;&lt;input type="number" id="pagesco-events-limit" name="pagesco_books_settings[events_limit]" value="5" min="1" max="20" step="1" class="small-text"&gt;&lt;/td&gt;&lt;/tr&gt;</code></pre>
+                </div>
+                <p>Each row is a <code>&lt;th&gt;</code> with the label WordPress made from <code>label_for</code> and a <code>&lt;td&gt;</code> with your input, filled with the current value from <code>Settings::get()</code>, the defaults for now. The markup and classes (<code>form-table</code>, <code>regular-text</code>, <code>small-text</code>, <code>description</code>) are the admin's own, so the page looks like every other settings screen, in the 7.0 admin design and in whatever comes after it.</p>
+                <figure>
+                    <img src="images/lesson_17_settings.png" alt="The Settings, Pages and Co. Books screen in the WordPress admin: a Store notice section with a Notice addition text field and an Events link checkbox, a Catalog and events section with Books per list and Events to show number fields, and a Save Changes button." width="1100" height="700" loading="lazy">
+                    <figcaption>The finished page under Settings &gt; Pages &amp; Co. Books.</figcaption>
+                </figure>
+            </section>
+
+            <section id="saving" class="lesson-section">
+                <h2>💾 What Save Changes Does</h2>
+                <p>When you press Save Changes, the browser posts the form to <code>wp-admin/options.php</code>. Core's handler then runs the same checks you wrote by hand in Lesson 5.3, in this order:</p>
+                <div class="mermaid">
+graph TD
+    A["Save Changes: POST options.php"] --> B["check_admin_referer: nonce for pagesco_books-options"]
+    B --> C["current_user_can manage_options"]
+    C --> D["is pagesco_books on the allowed options list?"]
+    D --> E["update_option for each option in the group"]
+    E --> F["sanitize_option runs your sanitize callback"]
+    F --> G["redirect back with settings-updated=true"]
+    G --> H["the page prints Settings saved or your errors"]
+                </div>
+                <p>The nonce action is the group name plus <code>-options</code>, which is why <code>settings_fields()</code> needs the same group as <code>register_setting()</code>. The capability defaults to <code>manage_options</code> (the filter <code>option_page_capability_pagesco_books</code> can change it). The <strong>allowed options list</strong> is built from your <code>register_setting()</code> calls: only options registered in that group can be written through this form, so a forged field such as <code>siteurl</code> is ignored. And the value goes through <code>sanitize_option()</code>, which calls your <code>sanitize()</code> method.</p>
+
+                <h3>Watching the round trip</h3>
+                <p>You can save the form in your browser at any time. To see exactly what travels, and to let the course check every step, here is a small shell script that does what the browser does: log in, open the page, read the hidden fields <code>settings_fields()</code> printed, and post the form. Save it as <code>wordpress/pagesco-save.sh</code> (the WordPress root) and run it from the WP-CLI container, one argument per form field:</p>
+                <pre data-file="pagesco-save.sh"><code class="language-bash">#!/bin/sh
+# Does what your browser does when you press "Save Changes" on
+# Settings &gt; Pages &amp; Co. Books (Lesson 5.4). Run it in the WP-CLI container:
+#   sh pagesco-save.sh 'pagesco_books_settings[events_limit]=5' ...
+# A field you leave out is not sent, exactly like an unticked checkbox.
+
+SITE=http://localhost:8080
+PAGE="$SITE/wp-admin/options-general.php?page=pagesco-books"
+JAR=/tmp/pagesco-cookies.txt
+
+# 1. Log in as admin (WordPress wants its test cookie first).
+curl -s -o /dev/null -c "$JAR" "$SITE/wp-login.php"
+curl -s -o /dev/null -b "$JAR" -c "$JAR" -d log=admin -d pwd=password -d testcookie=1 "$SITE/wp-login.php"
+
+# 2. Open the settings page and read the hidden fields settings_fields() printed.
+FORM=$(curl -s -b "$JAR" "$PAGE")
+GROUP=$(echo "$FORM" | grep -o "name='option_page' value='[^']*'" | cut -d"'" -f4)
+NONCE=$(echo "$FORM" | grep -o 'name="_wpnonce" value="[^"]*"' | cut -d'"' -f4)
+
+# 3. Post the form to options.php, one --data-urlencode per field you passed.
+for FIELD in "$@"; do
+	shift
+	set -- "$@" --data-urlencode "$FIELD"
+done
+ANSWER=$(curl -s -b "$JAR" -c "$JAR" -o /tmp/pagesco-answer.html -w '%{http_code} %{redirect_url}' \
+	-d "option_page=$GROUP" -d action=update -d "_wpnonce=$NONCE" \
+	--data-urlencode "_wp_http_referer=/wp-admin/options-general.php?page=pagesco-books" \
+	"$@" "$SITE/wp-admin/options.php")
+echo "options.php answered: $ANSWER"
+
+# 4. Print the notices the page shows next ("Settings saved." or your errors), or the error page.
+if [ "${ANSWER%% *}" = 302 ]; then
+	curl -s -b "$JAR" "$PAGE&amp;settings-updated=true" | grep -o '&lt;p&gt;&lt;strong&gt;[^&lt;]*&lt;/strong&gt;&lt;/p&gt;' | sed 's/&lt;[^&gt;]*&gt;//g'
+else
+	grep -o '&lt;div class="wp-die-message"&gt;.*&lt;/div&gt;' /tmp/pagesco-answer.html | sed 's/&lt;[^&gt;]*&gt;//g'
+fi</code></pre>
+                <p>Send all four fields, as the browser would with the box ticked, but with an Events to show value the sanitize callback should refuse:</p>
+                <pre data-cli><code class="language-bash">sh pagesco-save.sh 'pagesco_books_settings[notice_extra]=Open until 9 p.m. on Thursdays.' 'pagesco_books_settings[show_events_link]=1' 'pagesco_books_settings[books_per_page]=8' 'pagesco_books_settings[events_limit]=50'
+wp option get pagesco_books_settings</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>options.php answered: 302 http://localhost:8080/wp-admin/options-general.php?page=pagesco-books&amp;settings-updated=true
+Events to show must be between 1 and 20.
+array (
+  'notice_extra' =&gt; 'Open until 9 p.m. on Thursdays.',
+  'show_events_link' =&gt; true,
+  'books_per_page' =&gt; 8,
+  'events_limit' =&gt; 5,
+)</code></pre>
+                </div>
+                <p>Read it from the top. <code>options.php</code> answered with a <code>302</code> redirect back to your page with <code>settings-updated=true</code>: the nonce, the capability and the allowed options list all passed. The page then printed your error, "Events to show must be between 1 and 20.", instead of "Settings saved.". And the option row now exists: Books per list was stored as <code>8</code>, while Events to show kept its old value, <code>5</code>, because <code>sanitize()</code> refused 50 and fell back to the saved value.</p>
+                <div class="card card-info">
+                    <h4>💡 What a sanitize callback must do</h4>
+                    <p>It receives whatever arrived (treat it as hostile: it might not even be an array) and must <strong>return the complete value to store</strong>. Clean each key with the function for its type (<code>sanitize_text_field()</code>, <code>absint()</code>), turn the checkbox into a real boolean (an unticked box sends nothing at all, so "missing" means "off"), and for a value you reject, call <code>add_settings_error( $setting, $code, $message )</code> and keep the old value rather than storing nonsense. Errors are kept for one page load and printed above your form by <code>settings_errors()</code>, which core calls for you on pages under Settings.</p>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <h3>1. Passing the page slug to <code>settings_fields()</code></h3>
+                <p>The page slug (<code>pagesco-books</code>) and the option group (<code>pagesco_books</code>) look alike, and mixing them up is the classic Settings API bug. Make it on purpose: change <code>settings_fields( Settings::GROUP );</code> in <code>render()</code> to <code>settings_fields( self::SLUG );</code> (the <code>sed</code> line does it), then save:</p>
+                <pre data-cli data-raises="Error"><code class="language-bash">sed -i 's/settings_fields( Settings::GROUP );/settings_fields( self::SLUG );/' wp-content/plugins/pagesco-books/src/Admin/SettingsPage.php
+sh pagesco-save.sh 'pagesco_books_settings[events_limit]=5'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>options.php answered: 500
+Error: The pagesco-books options page is not in the allowed options list.</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the form now says it belongs to a group called <code>pagesco-books</code>. The nonce matches (it was made for that same wrong name), so <code>options.php</code> gets as far as the allowed options list, finds no setting registered in that group and stops with a <code>500</code> error page. <strong>Fix:</strong> the argument of <code>settings_fields()</code> is the first argument of <code>register_setting()</code>; the argument of <code>do_settings_sections()</code> is the page slug. Keeping both in constants (<code>Settings::GROUP</code>, <code>SettingsPage::SLUG</code>) is what makes the mix-up visible. Put it back:</p>
+                <pre data-cli><code class="language-bash">sed -i 's/settings_fields( self::SLUG );/settings_fields( Settings::GROUP );/' wp-content/plugins/pagesco-books/src/Admin/SettingsPage.php</code></pre>
+
+                <h3>2. Reading a checkbox that was not sent</h3>
+                <p>An unticked checkbox is not sent as "0": it is not sent at all. A sanitize callback that reads it without checking, here in a throwaway must-use plugin, warns on every save with the box unticked:</p>
+                <pre data-file="wp-content/mu-plugins/mistake-checkbox.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Mistake: Unticked Checkbox
+ */
+
+add_action(
+	'init',
+	function () {
+		register_setting(
+			'pagesco_demo',
+			'pagesco_demo_settings',
+			array(
+				'sanitize_callback' =&gt; function ( $input ) {
+					return array(
+						'show_events_link' =&gt; (bool) $input['show_events_link'],
+					);
+				},
+			)
+		);
+	}
+);</code></pre>
+                <pre data-cli data-raises="Warning"><code class="language-bash">wp eval 'var_export( sanitize_option( "pagesco_demo_settings", array( "notice_extra" =&gt; "Hello" ) ) );'
+rm wp-content/mu-plugins/mistake-checkbox.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Warning: Undefined array key "show_events_link" in /var/www/html/wp-content/mu-plugins/mistake-checkbox.php on line 15
+array (
+  'show_events_link' =&gt; false,
+)</code></pre>
+                </div>
+                <p><strong>What it means:</strong> <code>$input['show_events_link']</code> does not exist, so PHP warns and uses <code>null</code>, which happens to cast to <code>false</code>. The value is right by luck and the warning lands in the debug log on every save with the box unticked. <strong>Fix:</strong> test for the key: <code>! empty( $input['show_events_link'] )</code>, as <code>Settings::sanitize()</code> does, or <code>isset()</code>, or <code>$input['key'] ?? false</code>.</p>
+
+                <h3>3. Updating part of the array from code</h3>
+                <p>The form always sends every field. Code does not have to. A one-line "just change the events limit" goes wrong in a way no error reports:</p>
+                <pre data-cli><code class="language-bash">wp eval 'update_option( "pagesco_books_settings", array( "events_limit" =&gt; 8 ) );'
+wp option get pagesco_books_settings</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>array (
+  'notice_extra' =&gt; '',
+  'show_events_link' =&gt; false,
+  'books_per_page' =&gt; 8,
+  'events_limit' =&gt; 8,
+)</code></pre>
+                </div>
+                <p><strong>What it means:</strong> <code>update_option()</code> replaces the whole value, and your sanitize callback (registered on <code>init</code>, so it runs here too) treats each missing key as empty: the notice sentence is now <code>''</code> and the events link is off. Once the project wires these settings into the store notice, this one line would quietly strip the notice bar. <strong>Fix:</strong> merge before you update, <code>update_option( $name, array_merge( get_option( $name, array() ), array( 'events_limit' =&gt; 8 ) ) )</code>, or from the command line use <code>wp option patch update pagesco_books_settings events_limit 8</code> (Exercise 1). Put the saved settings back the way the form left them:</p>
+                <pre data-cli><code class="language-bash">sh pagesco-save.sh 'pagesco_books_settings[notice_extra]=Open until 9 p.m. on Thursdays.' 'pagesco_books_settings[show_events_link]=1' 'pagesco_books_settings[books_per_page]=6' 'pagesco_books_settings[events_limit]=5'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>options.php answered: 302 http://localhost:8080/wp-admin/options-general.php?page=pagesco-books&amp;settings-updated=true
+Settings saved.</code></pre>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Settings the Shop Can Change</h2>
+                <p>The page saves; nothing reads it yet. Now connect it: the store notice takes its sentence and its link from the settings, the staff change them from the admin, and deleting the plugin cleans up after it. Allow about 30 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: Let the store notice read the settings <span class="step-time">(8 min)</span></h3>
+                    <p>Replace <code>src/StoreNotice.php</code>. The two callbacks keep their names, so anything that unhooks them (Lesson 2.3's removal rules) keeps working; only their bodies change:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/src/StoreNotice.php"><code class="language-php">&lt;?php
+/**
+ * The shop's additions to the store notice from the pagesco-site must-use plugin.
+ *
+ * @package PagesCo\Books
+ */
+
+namespace PagesCo\Books;
+
+/**
+ * Adds the shop's own sentence and an events link to the store notice, as the settings say.
+ */
+final class StoreNotice implements Feature {
+
+	/**
+	 * Hooks into the notice's own filter and action (Lesson 2.3).
+	 */
+	public function register(): void {
+		add_filter( 'pagesco_store_notice', array( $this, 'add_late_opening' ), 20 );
+		add_action( 'pagesco_store_notice_end', array( $this, 'print_events_link' ) );
+	}
+
+	/**
+	 * Adds the "Notice addition" setting to the notice text.
+	 *
+	 * @param string $text The notice text so far.
+	 * @return string
+	 */
+	public function add_late_opening( $text ) {
+		$extra = Settings::get( 'notice_extra' );
+
+		return '' === $extra ? $text : $text . ' ' . $extra;
+	}
+
+	/**
+	 * Prints a link to the events page inside the notice bar, unless the settings turn it off.
+	 */
+	public function print_events_link(): void {
+		if ( ! Settings::get( 'show_events_link' ) ) {
+			return;
+		}
+
+		printf(
+			' &lt;a href="%s"&gt;%s&lt;/a&gt;',
+			esc_url( home_url( '/events/' ) ),
+			esc_html__( 'See events', 'pagesco-books' )
+		);
+	}
+}</code></pre>
+                    <p>With the saved values equal to the defaults, the notice must look exactly as it has since Lesson 2.3:</p>
+                    <pre data-web="/" data-select=".pagesco-notice"><code class="language-text">http://localhost:8080/</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;div class="pagesco-notice"&gt;Free shipping on orders over $35. Open until 9 p.m. on Thursdays. &lt;a href="http://localhost:8080/events/"&gt;See events&lt;/a&gt;&lt;/div&gt;</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: Change the notice from the admin <span class="step-time">(10 min)</span></h3>
+                    <p>Marketing wants to announce signed copies and drop the events link for a week. Open <strong>Settings &gt; Pages &amp; Co. Books</strong>, type "Signed copies of Dune this week." into Notice addition, untick Events link and press Save Changes. Or send the same form with the script (no <code>show_events_link</code> field: that is the unticked box):</p>
+                    <pre data-cli><code class="language-bash">sh pagesco-save.sh 'pagesco_books_settings[notice_extra]=Signed copies of &lt;b&gt;Dune&lt;/b&gt; this week.' 'pagesco_books_settings[books_per_page]=6' 'pagesco_books_settings[events_limit]=5'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>options.php answered: 302 http://localhost:8080/wp-admin/options-general.php?page=pagesco-books&amp;settings-updated=true
+Settings saved.</code></pre>
+                    </div>
+                    <p>(The script sends <code>&lt;b&gt;</code> tags on purpose, the kind of thing someone pastes from a document.) Reload the home page:</p>
+                    <pre data-web="/" data-select=".pagesco-notice"><code class="language-text">http://localhost:8080/</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;div class="pagesco-notice"&gt;Free shipping on orders over $35. Signed copies of Dune this week.&lt;/div&gt;</code></pre>
+                    </div>
+                    <p>The new sentence, without the tags (<code>sanitize_text_field()</code> removed them on the way in), and no link. Nobody touched PHP. Now put the shop's usual notice back the same way, in the browser or with the script:</p>
+                    <pre data-cli><code class="language-bash">sh pagesco-save.sh 'pagesco_books_settings[notice_extra]=Open until 9 p.m. on Thursdays.' 'pagesco_books_settings[show_events_link]=1' 'pagesco_books_settings[books_per_page]=6' 'pagesco_books_settings[events_limit]=5'
+curl -s http://localhost:8080/ | grep -o '&lt;div class="pagesco-notice"&gt;.*&lt;/div&gt;'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>options.php answered: 302 http://localhost:8080/wp-admin/options-general.php?page=pagesco-books&amp;settings-updated=true
+Settings saved.
+&lt;div class="pagesco-notice"&gt;Free shipping on orders over $35. Open until 9 p.m. on Thursdays. &lt;a href="http://localhost:8080/events/"&gt;See events&lt;/a&gt;&lt;/div&gt;</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: Clean up on uninstall <span class="step-time">(10 min)</span></h3>
+                    <p>A plugin that stores an option must remove it when an administrator deletes the plugin (Lesson 5.1's life cycle). Deactivating keeps it, so reactivating restores the shop's settings. Replace <code>uninstall.php</code>; the comment records the decision this lesson's FAQ explains:</p>
+                    <pre data-file="wp-content/plugins/pagesco-books/uninstall.php"><code class="language-php">&lt;?php
+/**
+ * Removes the plugin's data when an administrator deletes the plugin.
+ *
+ * Books, genres and book meta are the shop's content: they stay (Lesson 5.4).
+ *
+ * @package PagesCo\Books
+ */
+
+defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
+
+remove_role( 'pagesco_bookseller' );
+delete_option( 'pagesco_books_settings' );</code></pre>
+                    <p>Test it the way Lesson 5.1 did: run the uninstall procedure without deleting the files, check what is left, and activate the plugin again. Then delete the helper script, which has done its job:</p>
+                    <pre data-cli data-checkpoint><code class="language-bash">wp plugin uninstall pagesco-books --deactivate --skip-delete
+wp option list --search='pagesco_books*'
+echo "books: $(wp post list --post_type=book --post_status=any --format=count)"
+wp plugin activate pagesco-books
+wp role exists pagesco_bookseller
+wp option get pagesco_books_settings
+rm pagesco-save.sh</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Deactivating 'pagesco-books'...
+Plugin 'pagesco-books' deactivated.
+Ran uninstall procedure for 'pagesco-books' plugin without deleting.
+Success: Uninstalled 1 of 1 plugins.
++-------------+--------------+
+| option_name | option_value |
++-------------+--------------+
++-------------+--------------+
+books: 11
+Plugin 'pagesco-books' activated.
+Success: Activated 1 of 1 plugins.
+Success: Role with ID 'pagesco_bookseller' exists.
+array (
+  'notice_extra' =&gt; 'Open until 9 p.m. on Thursdays.',
+  'show_events_link' =&gt; true,
+  'books_per_page' =&gt; 6,
+  'events_limit' =&gt; 5,
+)</code></pre>
+                    </div>
+                    <p>After the uninstall procedure no <code>pagesco_books_*</code> option is left, while the eleven books are still in the database (they are hidden only while the plugin is off, Lesson 5.2). After reactivation the settings answer with their defaults again, so the notice looks the same as before, and the Bookseller role is back (the activator re-creates it). If you had saved your own values, save them again now.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>pagesco-books</code> lists nine features, the last two <code>Settings</code> and <code>Admin\SettingsPage</code></li>
+                        <li>Settings &gt; Pages &amp; Co. Books shows two sections and four fields to administrators, and a 403 to editors</li>
+                        <li>Saving stores one option, <code>pagesco_books_settings</code>, with tags stripped and out-of-range numbers refused with an error</li>
+                        <li>The store notice takes its sentence and its "See events" link from the settings</li>
+                        <li><code>uninstall.php</code> removes the role and the option and keeps the books</li>
+                        <li><code>pagesco-save.sh</code> is deleted from the WordPress root</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Each exercise leaves the site as the project did. Try each one before you open the solution.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Change One Setting from the Command Line</h3>
+                    <p>Common Mistake 3 showed that <code>update_option()</code> with half an array wipes the other half. Use WP-CLI's <code>wp option patch</code> to set only Events to show to 8, show the stored value, and confirm with <code>Settings::get()</code> that the notice sentence survived. Then remove the row again, so the defaults apply as after the project.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>wp option patch update &lt;option&gt; &lt;key&gt; &lt;value&gt;</code> changes one key of an array option. It needs the row to exist, so save the defaults first: <code>wp option add pagesco_books_settings --format=json</code> with the defaults as JSON, or <code>update_option()</code> with <code>Settings::defaults()</code> in a <code>wp eval</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">wp eval 'update_option( PagesCo\Books\Settings::OPTION, PagesCo\Books\Settings::defaults() );'
+wp option patch update pagesco_books_settings events_limit 8
+wp option get pagesco_books_settings --format=json
+wp eval 'echo PagesCo\Books\Settings::get( "notice_extra" ), "\n";'
+wp option delete pagesco_books_settings</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Success: Updated 'pagesco_books_settings' option.
+{"notice_extra":"Open until 9 p.m. on Thursdays.","show_events_link":true,"books_per_page":6,"events_limit":8}
+Open until 9 p.m. on Thursdays.
+Success: Deleted 'pagesco_books_settings' option.</code></pre>
+                        </div>
+                        <p><code>wp option patch</code> reads the whole array, changes one key and writes the whole array back, the "merge first" fix from Common Mistake 3. The value went through your sanitize callback too, which is why <code>events_limit</code> came back as the integer <code>8</code>, not the string WP-CLI received.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Load a Stylesheet Only on Your Page</h3>
+                    <p>Admin pages often need a little CSS. Loading it on every admin screen slows the whole admin and can clash with other plugins. In a throwaway must-use plugin <code>exercise-admin-css.php</code>, enqueue a stylesheet handle <code>pagesco-books-admin</code> only on Settings &gt; Pages &amp; Co. Books, and check that it is printed there and not on the Dashboard.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The <code>admin_enqueue_scripts</code> action passes the current screen's <strong>hook suffix</strong>. For a page added with <code>add_options_page()</code> and slug <code>pagesco-books</code> it is <code>settings_page_pagesco-books</code> (<code>add_options_page()</code> also returns it). <code>wp_enqueue_style()</code> with any URL is enough to see the <code>&lt;link&gt;</code> tag; the file does not have to exist for this check.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/mu-plugins/exercise-admin-css.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Exercise: Settings Page CSS
+ */
+
+add_action(
+	'admin_enqueue_scripts',
+	function ( $hook_suffix ) {
+		if ( 'settings_page_pagesco-books' !== $hook_suffix ) {
+			return;
+		}
+		wp_enqueue_style( 'pagesco-books-admin', plugins_url( 'build/admin.css', PAGESCO_BOOKS_FILE ), array(), PAGESCO_BOOKS_VERSION );
+	}
+);</code></pre>
+                        <pre data-cli><code class="language-bash">curl -s -o /dev/null -c /tmp/ex.txt http://localhost:8080/wp-login.php
+curl -s -o /dev/null -b /tmp/ex.txt -c /tmp/ex.txt -d log=admin -d pwd=password -d testcookie=1 http://localhost:8080/wp-login.php
+echo "settings page: $(curl -s -b /tmp/ex.txt 'http://localhost:8080/wp-admin/options-general.php?page=pagesco-books' | grep -c pagesco-books-admin-css)"
+echo "dashboard:     $(curl -s -b /tmp/ex.txt http://localhost:8080/wp-admin/ | grep -c pagesco-books-admin-css)"
+rm wp-content/mu-plugins/exercise-admin-css.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>settings page: 1
+dashboard:     0</code></pre>
+                        </div>
+                        <p>One <code>&lt;link id="pagesco-books-admin-css"&gt;</code> on your page, none on the Dashboard. The hook suffix is the reliable way to recognize your own screen; it is built from the parent menu and your slug, so it changes if you move the page to another menu.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: A Top-Level Menu</h3>
+                    <p>Suppose the shop grows and its settings deserve a menu of their own. Without editing the plugin, write a throwaway must-use plugin <code>exercise-shop-menu.php</code> that adds a top-level menu "Shop" (Dashicon <code>dashicons-store</code>, position 58, capability <code>manage_options</code>) that opens the same settings form. Find your menu item in the admin's HTML.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>add_menu_page( $page_title, $menu_title, $capability, $menu_slug, $callback, $icon_url, $position )</code>. Reuse the running feature's method as the callback: <code>array( PagesCo\Books\Plugin::instance()-&gt;feature( PagesCo\Books\Admin\SettingsPage::class ), 'render' )</code>. The slug must be new (for example <code>pagesco-shop</code>), so the page lives at <code>admin.php?page=pagesco-shop</code>; the top-level item's <code>&lt;li&gt;</code> gets the id <code>toplevel_page_pagesco-shop</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/mu-plugins/exercise-shop-menu.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Exercise: Shop Menu
+ */
+
+add_action(
+	'admin_menu',
+	function () {
+		add_menu_page(
+			'Shop Settings',
+			'Shop',
+			'manage_options',
+			'pagesco-shop',
+			array( PagesCo\Books\Plugin::instance()-&gt;feature( PagesCo\Books\Admin\SettingsPage::class ), 'render' ),
+			'dashicons-store',
+			58
+		);
+	}
+);</code></pre>
+                        <pre data-web="/wp-admin/admin.php?page=pagesco-shop" data-login="admin" data-select="#toplevel_page_pagesco-shop .wp-menu-name"><code class="language-text">http://localhost:8080/wp-admin/admin.php?page=pagesco-shop   (View Source: the menu item)</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>&lt;div class='wp-menu-name'&gt;Shop&lt;/div&gt;</code></pre>
+                        </div>
+                        <pre data-web="/wp-admin/admin.php?page=pagesco-shop" data-login="admin" data-select=".wrap h1"><code class="language-text">http://localhost:8080/wp-admin/admin.php?page=pagesco-shop   (View Source: the page title)</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>&lt;h1&gt;Shop Settings&lt;/h1&gt;</code></pre>
+                        </div>
+                        <pre data-cli><code class="language-bash">rm wp-content/mu-plugins/exercise-shop-menu.php</code></pre>
+                        <p>The menu item reads "Shop" and the page prints the same form under the new title (<code>get_admin_page_title()</code> follows the page you are on). The form still posts to <code>options.php</code> with the <code>pagesco_books</code> group, so saving works from either page. One page per setting group is still the tidy choice; two routes to it are fine.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 4: Expose the Settings to the REST API (Stretch)</h3>
+                    <p>The block editor and any JavaScript settings screen read and write options through <code>/wp/v2/settings</code>, but only settings registered with <code>show_in_rest</code>. Without editing <code>Settings.php</code>, use the <code>register_setting_args</code> filter in a throwaway must-use plugin to add <code>show_in_rest</code> with a schema for the four keys, and fetch the setting as the administrator.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The filter receives <code>( $args, $defaults, $option_group, $option_name )</code>; change <code>$args</code> only when <code>$option_name</code> is <code>pagesco_books_settings</code>. An <code>object</code> setting needs a schema that lists its properties: <code>'show_in_rest' =&gt; array( 'schema' =&gt; array( 'type' =&gt; 'object', 'properties' =&gt; array( 'notice_extra' =&gt; array( 'type' =&gt; 'string' ), … ) ) )</code>. The settings endpoint requires <code>manage_options</code>, so the request needs the administrator's credentials (Lesson 7.1 explains application passwords).</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/mu-plugins/exercise-rest-settings.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Exercise: Settings in REST
+ */
+
+add_filter(
+	'register_setting_args',
+	function ( $args, $defaults, $option_group, $option_name ) {
+		if ( 'pagesco_books_settings' !== $option_name ) {
+			return $args;
+		}
+		$args['show_in_rest'] = array(
+			'schema' =&gt; array(
+				'type'       =&gt; 'object',
+				'properties' =&gt; array(
+					'notice_extra'     =&gt; array( 'type' =&gt; 'string' ),
+					'show_events_link' =&gt; array( 'type' =&gt; 'boolean' ),
+					'books_per_page'   =&gt; array( 'type' =&gt; 'integer' ),
+					'events_limit'     =&gt; array( 'type' =&gt; 'integer' ),
+				),
+			),
+		);
+		return $args;
+	},
+	10,
+	4
+);</code></pre>
+                        <pre data-web="/wp-json/wp/v2/settings" data-auth="admin" data-json-pick="title,pagesco_books_settings"><code class="language-text">GET http://localhost:8080/wp-json/wp/v2/settings   (as admin)</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>{
+  "title": "Pages &amp;amp; Co.",
+  "pagesco_books_settings": {
+    "notice_extra": "Open until 9 p.m. on Thursdays.",
+    "show_events_link": true,
+    "books_per_page": 6,
+    "events_limit": 5
+  }
+}</code></pre>
+                        </div>
+                        <pre data-cli><code class="language-bash">rm wp-content/mu-plugins/exercise-rest-settings.php</code></pre>
+                        <p>The endpoint now returns the four values with their types, next to core settings such as <code>title</code>. Writes go through the same <code>sanitize()</code> callback, and the schema makes REST reject a string where an integer belongs (as <code>register_post_meta()</code> did in Lesson 5.2). This is also why <code>Settings</code> registers the option as type <code>object</code>: declared as <code>array</code>, a JSON list, WordPress would refuse it here with a "called incorrectly" notice asking for a schema of the list's items. This is how a React-based settings screen would talk to the plugin.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> <code>register_setting( 'pagesco_books', 'pagesco_books_settings', … )</code> is called, and the page slug is <code>pagesco-books</code>. What goes in the form?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="settings_fields takes the option group from register_setting, which names the nonce and the allowed options list; do_settings_sections takes the page slug the sections and fields were added to.">
+                                A) settings_fields( 'pagesco_books' ) and do_settings_sections( 'pagesco-books' )
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That is the mix-up from Common Mistake 1. Which function names the group, and which the page?">
+                                B) settings_fields( 'pagesco-books' ) and do_settings_sections( 'pagesco_books' )
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The option name is the row in wp_options. Which name did register_setting give the group?">
+                                C) settings_fields( 'pagesco_books_settings' ) and do_settings_sections( 'pagesco_books_settings' )
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> The sanitize callback below runs when the form is saved with Events to show set to 0. What is stored for <code>events_limit</code> if 7 was saved before?</p>
+                        <pre data-norun><code class="language-php">$clean['events_limit'] = absint( $input['events_limit'] ?? $saved['events_limit'] );
+if ( $clean['events_limit'] &lt; 1 || $clean['events_limit'] &gt; 20 ) {
+	add_settings_error( self::OPTION, 'events_limit', 'Events to show must be between 1 and 20.' );
+	$clean['events_limit'] = $saved['events_limit'];
+}</code></pre>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The value 0 was sent, so the ?? fallback is not used. What does the range check then do?">
+                                A) 0, with an error message
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="add_settings_error only queues a message; it does not cancel the save. Which value ends up in $clean?">
+                                B) Nothing: add_settings_error stops the save
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="0 fails the range check, so the callback queues the error and puts the saved value, 7, back. The other fields are still stored; the page shows the error instead of Settings saved.">
+                                C) 7, and the page shows the error
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> Maria, an editor, opens <code>options-general.php?page=pagesco-books</code>. What happens?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The capability is checked before the page callback runs. Do editors have manage_options?">
+                                A) She sees the form but cannot save it
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="add_options_page was given manage_options, which editors lack, so WordPress hides the menu item and answers the URL with a 403 Sorry, you are not allowed to access this page.">
+                                B) A 403: Sorry, you are not allowed to access this page
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="WordPress does not redirect here; it refuses the request. What status code did the lesson show?">
+                                C) She is redirected to the Dashboard
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> Why does <code>Settings::get()</code> run the saved option through <code>wp_parse_args()</code> with the defaults?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Sanitizing happens when the value is saved, in the sanitize callback. What can be missing from an older saved array?">
+                                A) To sanitize the values again on every read
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="get_option already caches autoloaded options. What problem do the defaults solve?">
+                                B) To avoid a database query
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="A site that saved the settings before a new key existed has an array without that key. Merging with the defaults gives every key a value, so code can rely on it.">
+                                C) So keys added in a later version still have a value on sites that saved an older array
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> What should <code>uninstall.php</code> of <code>pagesco-books</code> do with the <code>pagesco_books_settings</code> option?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="The option belongs to the plugin and is useless without it, so uninstall deletes it. Deactivation keeps it, so a reactivated plugin finds its settings again.">
+                                A) Delete it, because it only makes sense with the plugin
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Deactivation is the reversible step; uninstall is the one for cleaning up. What should be left behind by a deleted plugin?">
+                                B) Keep it, in case the plugin is installed again
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Autoload decides when an option is loaded, not whether it exists. What removes the row?">
+                                C) Set its autoload to off
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Should deleting the plugin also delete the books?</summary>
+                    <p>Lesson 5.2 left this open, and the course's answer is <strong>no</strong>. The rule used here: <code>uninstall.php</code> removes what belongs to the plugin and is useless without it, and keeps what belongs to the shop. The settings option and the Bookseller role are the plugin's own, so they go (and in Lesson 5.5, the events table and its version option join them). The eleven books, their genres and their meta are the shop's catalog: ordinary rows in <code>wp_posts</code>, <code>wp_terms</code> and <code>wp_postmeta</code> that Tools &gt; Export can still export and that reappear the moment the plugin is installed again. An administrator who clicks Delete on the Plugins screen is usually removing code, not asking to wipe a catalog, and that delete cannot be undone. If a site really needs a full wipe, the professional pattern is opt-in: a constant in <code>wp-config.php</code> or a setting such as "Remove all data when the plugin is deleted", checked in <code>uninstall.php</code> before any books are deleted (with <code>wp_delete_post( $id, true )</code>, never raw SQL, so meta and term links go too). Lesson 8.3 looks at what the plugin directory expects here.</p>
+                </details>
+                <details>
+                    <summary>When should I use the Settings API, and when my own form?</summary>
+                    <p>Use the Settings API for values that are stored as options: it gives you the nonce, the capability check, the allowed options list, the save, the redirect and the messages for free, and a page that looks like the rest of the admin. Use your own form posted to <code>admin-post.php</code> (Lesson 5.3) for actions that are not "store these options": importing a file, sending a test email, clearing a cache. Newer plugins sometimes build settings screens in React with <code>@wordpress/components</code>, saving through <code>/wp/v2/settings</code> (Exercise 4 shows the server side); the option, the registration and the sanitize callback stay exactly as here.</p>
+                </details>
+                <details>
+                    <summary>Should my settings get a top-level menu?</summary>
+                    <p>Only if the plugin is a large part of what the site does. A top-level menu for a handful of options crowds the admin for everyone, and users expect configuration under Settings. Pages &amp; Co.'s Books menu already exists for the catalog; if the settings were about books only, a submenu there (<code>add_submenu_page( 'edit.php?post_type=book', … )</code>) would be a good alternative. Exercise 3 shows the top-level version so you know how.</p>
+                </details>
+                <details>
+                    <summary>What about the Customizer and theme mods?</summary>
+                    <p>The Customizer (Appearance &gt; Customize) and <code>get_theme_mod()</code> store values per theme, for looks. They are legacy for block themes (Lesson 3.1: the menu item is hidden unless something uses it), and they are the wrong home for a plugin's settings anyway: switch themes and the values are gone. Store shop features in your plugin's option; let block themes keep their looks in <code>theme.json</code> and Global Styles.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Add a "Reset to defaults" button below the form. It cannot live inside the Settings API form (that form only saves), so give it its own small form posting to <code>admin-post.php</code> with <code>action=pagesco_books_reset_settings</code>, a <code>wp_nonce_field()</code>, and a handler that checks the nonce and <code>manage_options</code>, calls <code>delete_option( Settings::OPTION )</code>, queues a success message (<code>add_settings_error( …, 'updated' )</code> plus <code>set_transient( 'settings_errors', get_settings_errors(), 30 )</code> is how <code>options.php</code> carries messages across the redirect), and redirects back. Why is deleting the row a better reset than saving the defaults?</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> List everything Pages &amp; Co. now stores: content (posts, pages, books), terms, meta, options, a role. For each one, write who owns it (the shop or the plugin) and what should happen to it when the plugin is deactivated and when it is deleted. Add the list to <code>pagesco-plan.txt</code>; you will add the events table to it next lesson. Then note one setting you would add for a real client, and which section of the page it would go in.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Plugin settings live in <code>wp_options</code>; one array option per plugin, read through one class that knows the name, the defaults and the sanitizing</li>
+                        <li><code>register_setting()</code> (on <code>init</code>) gives the option a group, a type, a <code>sanitize_callback</code> and a default that applies whenever the row is missing</li>
+                        <li>Admin pages hang off <code>admin_menu</code> with <code>add_options_page()</code>, <code>add_submenu_page()</code> or <code>add_menu_page()</code>; the capability guards the menu item and the URL</li>
+                        <li>The Settings API describes the form (<code>add_settings_section()</code>, <code>add_settings_field()</code>) and prints it (<code>settings_fields()</code>, <code>do_settings_sections()</code>, <code>submit_button()</code>); <code>options.php</code> checks the nonce, the capability and the allowed options list, then saves</li>
+                        <li>A sanitize callback returns the complete value, treats a missing checkbox as off, and rejects bad values with <code>add_settings_error()</code> while keeping the old one</li>
+                        <li><code>uninstall.php</code> deletes the plugin's own data (option, role) and keeps the shop's content (books)</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Register an option with cleaning and a default</td><td><code>register_setting( 'pagesco_books', 'pagesco_books_settings', array( 'sanitize_callback' =&gt; …, 'default' =&gt; … ) )</code></td></tr>
+                            <tr><td>Read one value with defaults filled in</td><td><code>wp_parse_args( get_option( $name, array() ), $defaults )</code></td></tr>
+                            <tr><td>A page under Settings</td><td><code>add_options_page( $title, $menu, 'manage_options', 'pagesco-books', $callback )</code> on <code>admin_menu</code></td></tr>
+                            <tr><td>A section and a field</td><td><code>add_settings_section()</code>, <code>add_settings_field( …, array( 'label_for' =&gt; … ) )</code> on <code>admin_init</code></td></tr>
+                            <tr><td>The form</td><td><code>&lt;form action="options.php" method="post"&gt;</code> + <code>settings_fields( $group )</code> + <code>do_settings_sections( $page )</code> + <code>submit_button()</code></td></tr>
+                            <tr><td>Refuse a value</td><td><code>add_settings_error( $option, $code, $message )</code> and return the old value</td></tr>
+                            <tr><td>Change one key from the command line</td><td><code>wp option patch update pagesco_books_settings events_limit 8</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You gave the plugin one settings option with defaults, a sanitize callback and a tidy <code>Settings::get()</code></li>
+                        <li>You built Settings &gt; Pages &amp; Co. Books with the Settings API, guarded by <code>manage_options</code>, with a Settings link on the Plugins screen</li>
+                        <li>You traced a save through <code>options.php</code> and watched validation refuse a bad value</li>
+                        <li>You connected the store notice to the settings, so the shop changes it without touching code</li>
+                        <li>You decided what uninstalling removes, and made <code>uninstall.php</code> do it</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>The Events page from Lesson 2.1 still says "The full calendar is coming soon." In <a href="lesson_18.html"><strong>Lesson 5.5: Shortcodes, $wpdb &amp; Custom Tables</strong></a> you keep that promise: a custom database table for the shop's events, created with <code>dbDelta()</code> and upgraded with versioned migrations, read and written with <code>$wpdb</code> and <code>prepare()</code>, and shown on the page with a <code>[pagesco_events]</code> shortcode that takes its default length from the Events to show setting you just built. A <code>[pagesco_book]</code> shortcode puts a book card into any post.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>pagesco-books</code> lists nine features and Settings &gt; Pages &amp; Co. Books saves in your browser</li>
+                    <li>Check that the store notice reads "Free shipping on orders over $35. Open until 9 p.m. on Thursdays." with its "See events" link</li>
+                    <li>Delete any exercise files left in <code>mu-plugins/</code> (keep <code>pagesco-site.php</code> and <code>mailpit-smtp.php</code>)</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>The Settings API can feel like a lot of ceremony for four input fields: a group, a page, sections, fields, callbacks. Look at what it bought you, though: a nonce, a capability check, an allow-list, a save handler, error messages and a page that matches the admin, none of which you had to write or can forget. You also handed the shop control of its own notice, which is what clients notice first. The ceremony becomes routine after the second settings page you build, and by then you will reach for it without thinking.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_16.html" class="prev-lesson">← Previous: Security in WordPress</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_18.html" class="next-lesson">Next: Shortcodes, $wpdb &amp; Custom Tables →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="How WordPress themes are built and how WordPress picks a template: block, classic and hybrid themes, the anatomy of Twenty Twenty-Five, and the template hierarchy traced on a real WordPress 7.1 site. PHP and WordPress Development Lesson 3.1.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Theme Anatomy &amp; the Template Hierarchy - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 3: Block Themes</a></li>
+            <li aria-current="page">Lesson 3.1: Theme Anatomy &amp; the Template Hierarchy</li>
+        </ul>
+    </nav>
+
+    <main id="main-content" data-state="after:lesson_06">
+        <div class="container">
+            <header>
+                <h1>🎨 Lesson 3.1: Theme Anatomy &amp; the Template Hierarchy</h1>
+                <p class="lead">Your site already has content (Lesson 2.1) and behavior of its own (the store notice from Lesson 2.3). What it does not have yet is a look of its own: every page is still drawn by Twenty Twenty-Five. Before you build the Pages &amp; Co. theme in the next lesson, you will take a theme apart, meet the three kinds of theme you will find on real client sites, and learn the rule WordPress follows to choose a template for every URL: the template hierarchy.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Explain what belongs in a theme and what belongs in a plugin, and where WordPress records which theme is active</li>
+                        <li>Tell block, classic and hybrid themes apart by their files, and confirm it with <code>wp_is_block_theme()</code> and <code>wp_theme_has_theme_json()</code></li>
+                        <li>Find your way around a block theme: <code>style.css</code>, <code>theme.json</code>, <code>templates/</code>, <code>parts/</code>, <code>patterns/</code>, <code>styles/</code> and <code>functions.php</code> in Twenty Twenty-Five</li>
+                        <li>Predict which template WordPress uses for a URL, for block themes and classic themes, from the template hierarchy</li>
+                        <li>Watch WordPress make that choice on a running site with the <code>*_template_hierarchy</code> filters and <code>template_include</code></li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 120 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_06.html">Lesson 2.3: The Hooks System</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> a template map of the Pages &amp; Co. site (the template plan for your own theme) and a throwaway classic theme that you turn hybrid and then block, step by step</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (block themes exist since WordPress 5.9; everything here works on 6.6 and later)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 2.3, with <code>pagesco-site.php</code> in <code>mu-plugins/</code></li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#what-a-theme-does" class="toc-link">What a Theme Does</a></li>
+                        <li><a href="#three-kinds" class="toc-link">Block, Classic and Hybrid Themes</a></li>
+                        <li><a href="#inside-tt25" class="toc-link">Inside Twenty Twenty-Five</a></li>
+                        <li><a href="#hierarchy" class="toc-link">The Template Hierarchy</a></li>
+                        <li><a href="#watching" class="toc-link">Watching WordPress Choose</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Map the Templates of Pages &amp; Co.</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="what-a-theme-does" class="lesson-section">
+                <h2>🖼️ What a Theme Does</h2>
+                <p>A <strong>theme</strong> decides how the site looks: the layout of each kind of page, the colors and fonts, the header and footer, the markup around your content. It does not decide what the site <em>is</em>. Posts, pages, users and settings live in the database (Lesson 2.1), and features such as the store notice live in plugins (Lesson 2.3). Switch the theme and all of that stays; only the presentation changes.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: the shop fit-out</h4>
+                    <p>Think of Pages &amp; Co. moving its stock into a newly decorated shop. The books (content) and the till system (plugins) move across unchanged. The shelving, the signs, the paint and the window display (the theme) are what is new. A good theme is like a good fit-out: you can replace it next year without losing a single book. That is the test to apply whenever you wonder where code belongs: "would we want to keep this after a redesign?" If yes, it goes in a plugin.</p>
+                </div>
+
+                <p>Every theme is a folder in <code>wp-content/themes/</code>. Your site has the three recent default themes; WP-CLI lists them, and the one marked <code>active</code> is drawing your pages:</p>
+                <pre data-cli><code class="language-bash">wp theme list</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+-------------------+----------+--------+---------+----------------+-------------+
+| name              | status   | update | version | update_version | auto_update |
++-------------------+----------+--------+---------+----------------+-------------+
+| twentytwentyfive  | active   | none   | 1.5     |                | off         |
+| twentytwentyfour  | inactive | none   | 1.6     |                | off         |
+| twentytwentythree | inactive | none   | 1.7     |                | off         |
++-------------------+----------+--------+---------+----------------+-------------+</code></pre>
+                </div>
+                <p>WordPress remembers the active theme in two options (you saw their rows, <code>template</code> and <code>stylesheet</code>, in Lesson 2.2). <code>stylesheet</code> is the folder of the active theme; <code>template</code> is the folder of its <em>parent</em>. For a normal theme both are the same. They differ for a child theme, which borrows everything it does not override from a parent (Lesson 3.4):</p>
+                <pre data-cli><code class="language-bash">wp option get template
+wp option get stylesheet</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>twentytwentyfive
+twentytwentyfive</code></pre>
+                </div>
+            </section>
+
+            <section id="three-kinds" class="lesson-section">
+                <h2>🧱 Block, Classic and Hybrid Themes</h2>
+                <p>WordPress has been through one big change in how themes are built. For most of its history, themes were folders of PHP files: <code>index.php</code>, <code>single.php</code>, <code>header.php</code>, each printing HTML around template tags such as <code>the_title()</code>. Since WordPress 5.9 a theme can instead be built from <strong>blocks</strong>: its templates are HTML files full of block markup, the same kind you met in <code>post_content</code> in Lesson 2.1, and its design settings live in a JSON file, <code>theme.json</code>. You will meet both kinds on client sites for years to come, plus a mix of the two.</p>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th></th><th>Block theme</th><th>Classic theme</th><th>Hybrid theme</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Templates</td><td><code>templates/*.html</code> (block markup)</td><td><code>*.php</code> in the theme folder</td><td><code>*.php</code></td></tr>
+                            <tr><td>Reusable pieces</td><td>Template parts in <code>parts/*.html</code></td><td><code>header.php</code>, <code>footer.php</code>, <code>get_template_part()</code></td><td>PHP, sometimes block template parts</td></tr>
+                            <tr><td>Design settings</td><td><code>theme.json</code></td><td>CSS files enqueued in <code>functions.php</code></td><td><code>theme.json</code> plus CSS</td></tr>
+                            <tr><td>Required files</td><td><code>style.css</code> + <code>templates/index.html</code></td><td><code>style.css</code> + <code>index.php</code></td><td>as classic</td></tr>
+                            <tr><td>Site owners edit with</td><td>Appearance &gt; Editor (the Site Editor)</td><td>Customizer, Menus, Widgets</td><td>Customizer, plus block settings in the editors</td></tr>
+                            <tr><td>In this course</td><td><code>pagesco</code> (3.2 to 3.4)</td><td><code>pagesco-classic</code> (Module 4)</td><td>Module 4 adds <code>theme.json</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>"Hybrid" is not an official type; it is what developers call a classic theme that adopted some block features, most often a <code>theme.json</code> file for colors and fonts in the editors. Most existing commercial themes are classic or hybrid, and new default themes have been block themes since Twenty Twenty-Two. You do not have to guess which kind you are looking at. WordPress tells you:</p>
+                <pre data-cli><code class="language-bash">wp eval 'var_dump( wp_is_block_theme(), wp_theme_has_theme_json() );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>bool(true)
+bool(true)</code></pre>
+                </div>
+                <p><code>wp_is_block_theme()</code> is true when the active theme has a <code>templates/index.html</code>; <code>wp_theme_has_theme_json()</code> when it has a <code>theme.json</code>. Twenty Twenty-Five has both. A classic theme answers <code>false, false</code> and a hybrid <code>false, true</code>; you will produce all three answers with one small theme in the project.</p>
+
+                <h3>Same request, two ways of drawing it</h3>
+                <p>Up to the moment WordPress has chosen a template, block and classic themes are handled the same way: the same hierarchy, the same hooks. The difference is what happens next. A classic theme's PHP template is simply included and prints the page itself. For a block theme, WordPress includes its own file, <code>wp-includes/template-canvas.php</code>, which renders the block template to HTML first and then prints the document around it, calling <code>wp_head()</code>, <code>wp_body_open()</code> and <code>wp_footer()</code> for the theme ("core prints the page" in the diagram). A classic theme's template has to call those three itself. That is why your store notice from Lesson 2.3 appeared without Twenty Twenty-Five containing a single line of PHP for it.</p>
+
+                <div class="mermaid">
+graph TD
+    A["GET /about/"] --> B["template-loader.php"]
+    B --> C["hierarchy: candidate names"]
+    C --> D{"block theme?"}
+    D -->|"yes"| E["page.html"]
+    D -->|"no"| F["page.php"]
+    E --> G["core prints the page"]
+    F --> H["theme prints the page"]
+                </div>
+
+                <h3>The legacy screens</h3>
+                <p>Classic themes are edited with three older admin tools: the <strong>Customizer</strong> (live preview of theme options), <strong>Menus</strong> and <strong>Widgets</strong>. With a block theme they step aside. WordPress hides the Customize menu item unless a plugin or theme still hooks into it, and the Menus screen refuses to open. Logged in as admin, try <code>http://localhost:8080/wp-admin/nav-menus.php</code>:</p>
+                <pre data-web="/wp-admin/nav-menus.php" data-login="admin" data-select="body" data-text><code class="language-text">http://localhost:8080/wp-admin/nav-menus.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Your theme does not support navigation menus or widgets.</code></pre>
+                </div>
+                <p>Navigation in a block theme is a block, and the menus it shows are <code>wp_navigation</code> posts (post 4 on your site, Lesson 2.1). The Customizer, Menus and Widgets are <strong>legacy</strong>: not wrong, still fully supported for classic themes, and you will use menus and widget areas in Lesson 4.3. New themes just do not need them.</p>
+            </section>
+
+            <section id="inside-tt25" class="lesson-section">
+                <h2>🔬 Inside Twenty Twenty-Five</h2>
+                <p>The best way to learn how block themes are built is to read one that the WordPress team maintains. From the WP-CLI container (<code>docker compose run --rm wpcli sh</code>, Lesson 1.2), list the top of Twenty Twenty-Five's folder:</p>
+                <pre data-cli><code class="language-bash">ls -1 wp-content/themes/twentytwentyfive</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>assets
+contributing.txt
+functions.php
+package-lock.json
+package.json
+parts
+patterns
+readme.txt
+screenshot.png
+style.css
+style.min.css
+styles
+templates
+theme.json</code></pre>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>File or folder</th><th>What it is for</th><th>Lesson</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>style.css</code></td><td>The theme header (name, version, requirements). In a block theme it holds little or no CSS</td><td>3.2</td></tr>
+                            <tr><td><code>theme.json</code></td><td>Design settings and styles: palette, fonts, sizes, spacing, layout widths, per-block styles</td><td>3.2</td></tr>
+                            <tr><td><code>templates/</code></td><td>One HTML file of block markup per kind of page</td><td>3.2</td></tr>
+                            <tr><td><code>parts/</code></td><td>Template parts: header, footer and other pieces templates include</td><td>3.2</td></tr>
+                            <tr><td><code>patterns/</code></td><td>PHP files that register block patterns (ready-made layouts)</td><td>3.3</td></tr>
+                            <tr><td><code>styles/</code></td><td>Style variations: alternative <code>theme.json</code> designs the owner can switch to</td><td>3.3</td></tr>
+                            <tr><td><code>functions.php</code></td><td>PHP that runs while the theme is active: hooks, block styles, editor styles</td><td>4.3</td></tr>
+                            <tr><td><code>assets/</code></td><td>Fonts, images, CSS files the theme refers to</td><td>3.2, 4.3</td></tr>
+                            <tr><td><code>screenshot.png</code>, <code>readme.txt</code></td><td>The picture on the Themes screen (1200 × 900), the directory readme</td><td>8.3</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>style.css: the ID card</h3>
+                <p>WordPress finds themes by their <code>style.css</code>. The comment at its top is the <strong>theme header</strong>: one <code>Field: value</code> per line. <code>Theme Name</code> is the only field WordPress strictly needs; the requirement fields are checked when someone activates the theme.</p>
+                <pre data-cli><code class="language-bash">head -n 16 wp-content/themes/twentytwentyfive/style.css</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>/*
+Theme Name: Twenty Twenty-Five
+Theme URI: https://wordpress.org/themes/twentytwentyfive/
+Author: the WordPress team
+Author URI: https://wordpress.org
+Description: Twenty Twenty-Five emphasizes simplicity and adaptability. It offers flexible design options, supported by a variety of patterns for different page types, such as services and landing pages, making it ideal for building personal blogs, professional portfolios, online magazines, or business websites. Its templates cater to various blog styles, from text-focused to image-heavy layouts. Additionally, it supports international typography and diverse color palettes, ensuring accessibility and customization for users worldwide.
+Requires at least: 6.7
+Tested up to: 7.1
+Requires PHP: 7.2
+Version: 1.5
+License: GNU General Public License v2 or later
+License URI: http://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: twentytwentyfive
+Tags: one-column, custom-colors, custom-menu, custom-logo, editor-style, featured-images, full-site-editing, block-patterns, rtl-language-support, sticky-post, threaded-comments, translation-ready, wide-blocks, block-styles, style-variations, accessibility-ready, blog, portfolio, news
+*/</code></pre>
+                </div>
+                <p>Notice <code>Text Domain: twentytwentyfive</code>: the same rule as for plugins (Lesson 1.3), the text domain matches the folder name. <code>Tags</code> such as <code>full-site-editing</code> are for the theme directory's filters. The rest of this file is a few lines of CSS that the theme loads from <code>functions.php</code>; almost all of its styling comes from <code>theme.json</code>.</p>
+
+                <h3>theme.json: the design system</h3>
+                <p>Twenty Twenty-Five's <code>theme.json</code> is over 700 lines, but it has only a handful of top-level keys. WordPress reads JSON files with <code>wp_json_file_decode()</code>, so you can ask it for the outline:</p>
+                <pre data-cli><code class="language-bash">wp eval '$json = wp_json_file_decode( get_theme_file_path( "theme.json" ), array( "associative" =&gt; true ) ); echo implode( ", ", array_keys( $json ) ), "\n", implode( ", ", array_keys( $json["settings"] ) ), "\n", implode( ", ", array_keys( $json["styles"] ) ), "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>$schema, version, settings, styles, templateParts, customTemplates
+appearanceTools, color, layout, spacing, typography, useRootPaddingAwareAlignments
+color, spacing, typography, blocks, elements</code></pre>
+                </div>
+                <p>Line one: the schema and version (3, the current format), then <code>settings</code> (what the editors offer: which colors, sizes and controls), <code>styles</code> (what is applied: the actual colors of the page, headings, links and individual blocks), <code>templateParts</code> (names and areas of the parts) and <code>customTemplates</code> (extra templates editors can pick for a page). Lines two and three are the sections inside <code>settings</code> and <code>styles</code>. Lesson 3.2 writes one of these files from scratch.</p>
+
+                <h3>Templates and template parts</h3>
+                <p>Here is the template that draws a single blog post, line for line:</p>
+                <pre data-cli><code class="language-bash">cat wp-content/themes/twentytwentyfive/templates/single.html</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;!-- wp:template-part {"slug":"header"} /--&gt;
+
+&lt;!-- wp:group {"tagName":"main","style":{"spacing":{"margin":{"top":"var:preset|spacing|60"}}},"layout":{"type":"constrained"}} --&gt;
+&lt;main class="wp-block-group" style="margin-top:var(--wp--preset--spacing--60)"&gt;
+	&lt;!-- wp:group {"align":"full","style":{"spacing":{"padding":{"top":"var:preset|spacing|60","bottom":"var:preset|spacing|60"}}},"layout":{"type":"constrained"}} --&gt;
+	&lt;div class="wp-block-group alignfull" style="padding-top:var(--wp--preset--spacing--60);padding-bottom:var(--wp--preset--spacing--60)"&gt;
+		&lt;!-- wp:post-title {"level":1} /--&gt;
+		&lt;!-- wp:post-featured-image {"aspectRatio":"3/2"} /--&gt;
+		&lt;!-- wp:pattern {"slug":"twentytwentyfive/hidden-written-by"} /--&gt;
+		&lt;!-- wp:post-content {"align":"full","layout":{"type":"constrained"}} /--&gt;
+		&lt;!-- wp:group {"style":{"spacing":{"padding":{"top":"var:preset|spacing|60","bottom":"var:preset|spacing|60"}}},"layout":{"type":"constrained"}} --&gt;
+		&lt;div class="wp-block-group" style="padding-top:var(--wp--preset--spacing--60);padding-bottom:var(--wp--preset--spacing--60)"&gt;
+			&lt;!-- wp:post-terms {"term":"post_tag","separator":"  ","className":"is-style-post-terms-1"} /--&gt;
+		&lt;/div&gt;
+		&lt;!-- /wp:group --&gt;
+
+		&lt;!-- wp:pattern {"slug":"twentytwentyfive/post-navigation"} /--&gt;
+		&lt;!-- wp:pattern {"slug":"twentytwentyfive/comments"} /--&gt;
+	&lt;/div&gt;
+	&lt;!-- /wp:group --&gt;
+	&lt;!-- wp:pattern {"slug":"twentytwentyfive/more-posts"} /--&gt;
+&lt;/main&gt;
+&lt;!-- /wp:group --&gt;
+
+&lt;!-- wp:template-part {"slug":"footer"} /--&gt;</code></pre>
+                </div>
+                <p>It is all block markup. <code>wp:template-part {"slug":"header"}</code> pulls in <code>parts/header.html</code>. <code>wp:post-title</code>, <code>wp:post-featured-image</code> and <code>wp:post-content</code> are <strong>dynamic blocks</strong>: they have no HTML of their own in the file because they are rendered by PHP when the page is requested, from whichever post is being viewed. <code>wp:group</code> is a static wrapper with its HTML saved inline. <code>wp:pattern</code> inserts a registered pattern (Lesson 3.3). Template parts are block markup too, and Twenty Twenty-Five's header is a one-liner that only inserts a pattern:</p>
+                <pre data-cli><code class="language-bash">cat wp-content/themes/twentytwentyfive/parts/header.html</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;!-- wp:pattern {"slug":"twentytwentyfive/header"} /--&gt;</code></pre>
+                </div>
+                <p>WordPress keeps a list of every template and part the theme offers. <code>get_block_templates()</code> returns them as objects with an ID of the form <code>theme//slug</code> and a <code>source</code>:</p>
+                <pre data-cli><code class="language-bash">wp eval 'foreach ( get_block_templates() as $t ) { echo $t-&gt;id, "  ", $t-&gt;source, "  ", $t-&gt;title, "\n"; }'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>twentytwentyfive//404  theme  Page: 404
+twentytwentyfive//archive  theme  All Archives
+twentytwentyfive//search  theme  Search Results
+twentytwentyfive//single  theme  Single Posts
+twentytwentyfive//page  theme  Pages
+twentytwentyfive//index  theme  Index
+twentytwentyfive//home  theme  Blog Home
+twentytwentyfive//page-no-title  theme  Page No Title</code></pre>
+                </div>
+                <p><code>theme</code> means "read from the theme's file". When a site owner changes a template in the Site Editor and saves, WordPress does not touch the file: it stores a copy as a <code>wp_template</code> post (one of the post types from Lesson 2.1), the source becomes <code>custom</code>, and the copy wins over the file from then on. Your site has no such copies yet:</p>
+                <pre data-cli><code class="language-bash">wp post list --post_type=wp_template,wp_template_part --fields=ID,post_type,post_name</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+----+-----------+-----------+
+| ID | post_type | post_name |
++----+-----------+-----------+
++----+-----------+-----------+</code></pre>
+                </div>
+                <p>An empty list, only the column names. Remember this table: "I changed the file and nothing happened" is very often a saved copy in it (Lesson 3.2 shows the mistake, Lesson 3.3 how to export edits back to files).</p>
+
+                <h3>functions.php in a block theme</h3>
+                <p>A block theme does not need a <code>functions.php</code> at all, but most have one for the jobs JSON cannot do. What does Twenty Twenty-Five hook into?</p>
+                <pre data-cli><code class="language-bash">grep -n "add_action\|add_filter" wp-content/themes/twentytwentyfive/functions.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>24:add_action( 'after_setup_theme', 'twentytwentyfive_post_format_setup' );
+38:add_action( 'after_setup_theme', 'twentytwentyfive_editor_style' );
+65:add_action( 'wp_enqueue_scripts', 'twentytwentyfive_enqueue_styles' );
+93:add_action( 'init', 'twentytwentyfive_block_styles' );
+122:add_action( 'init', 'twentytwentyfive_pattern_categories' );
+142:add_action( 'init', 'twentytwentyfive_register_block_bindings' );</code></pre>
+                </div>
+                <p>Hooks, exactly as in Lesson 2.3: theme supports and editor styles on <code>after_setup_theme</code>, the small stylesheet on <code>wp_enqueue_scripts</code>, block styles, pattern categories and a block bindings source on <code>init</code>. Every function is wrapped in <code>if ( ! function_exists( ... ) )</code> so a child theme can replace it (Lesson 3.4).</p>
+
+                <div class="card card-danger">
+                    <h4>🛑 Look, do not edit</h4>
+                    <p>Reading Twenty Twenty-Five is encouraged; editing it is not. A theme update replaces the whole folder, the same way a core update replaces <code>wp-includes/</code> (Lesson 1.1), and your changes vanish without a warning. To change a theme someone else maintains, write a child theme (Lesson 3.4) or your own theme (Lesson 3.2).</p>
+                </div>
+            </section>
+
+            <section id="hierarchy" class="lesson-section">
+                <h2>🪜 The Template Hierarchy</h2>
+                <p>A theme does not register "use <code>single.html</code> for posts". It just provides files with the right names, and WordPress works out which one to use. For each request it builds a list of candidate template names, from the most specific to the most general, and uses the first one the theme has. The list is the <strong>template hierarchy</strong>, and it is the same for both kinds of theme: a classic theme answers with <code>single.php</code>, a block theme with <code>templates/single.html</code>.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: asking at the information desk</h4>
+                    <p>A customer asks for <em>Dune</em>. The bookseller checks the most specific place first: is there a display just for this book? No. A shelf for Frank Herbert? No. The science fiction section? Yes: done. If there were no science fiction section either, the customer would be sent to the general shelves, and every shop has those. In WordPress the "general shelves" are <code>index</code>: every theme must have it, so the search always ends somewhere.</p>
+                </div>
+
+                <p>For a single blog post with the slug <code>hello-world</code>, the chain looks like this:</p>
+                <div class="mermaid">
+graph TD
+    A["single-post-hello-world"] -->|"not found"| B["single-post"]
+    B -->|"not found"| C["single"]
+    C -->|"not found"| D["singular"]
+    D -->|"not found"| E["index"]
+                </div>
+                <p>The main chains you need, with Pages &amp; Co. examples (a block theme looks for each name with <code>.html</code> in <code>templates/</code>, a classic theme with <code>.php</code> in its folder):</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Page type</th><th>Example URL</th><th>Candidates, most specific first</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Front page</td><td><code>/</code></td><td><code>front-page</code>, then the blog home chain or the page chain (see Common Mistakes)</td></tr>
+                            <tr><td>Blog home (latest posts)</td><td><code>/</code> while Settings &gt; Reading shows posts</td><td><code>home</code>, <code>index</code></td></tr>
+                            <tr><td>Single post</td><td><code>/hello-world/</code></td><td><code>single-post-hello-world</code>, <code>single-post</code>, <code>single</code>, <code>singular</code>, <code>index</code></td></tr>
+                            <tr><td>Single custom post type</td><td><code>/books/dune/</code> (Lesson 5.2)</td><td><code>single-book-dune</code>, <code>single-book</code>, <code>single</code>, <code>singular</code>, <code>index</code></td></tr>
+                            <tr><td>Page</td><td><code>/about/</code> (ID 12)</td><td>a chosen custom template, <code>page-about</code>, <code>page-12</code>, <code>page</code>, <code>singular</code>, <code>index</code></td></tr>
+                            <tr><td>Category</td><td><code>/category/news/</code> (term 2)</td><td><code>category-news</code>, <code>category-2</code>, <code>category</code>, <code>archive</code>, <code>index</code></td></tr>
+                            <tr><td>Tag</td><td><code>/tag/classics/</code></td><td><code>tag-classics</code>, <code>tag-ID</code>, <code>tag</code>, <code>archive</code>, <code>index</code></td></tr>
+                            <tr><td>Custom taxonomy</td><td><code>/genre/fantasy/</code> (Lesson 5.2)</td><td><code>taxonomy-genre-fantasy</code>, <code>taxonomy-genre</code>, <code>taxonomy</code>, <code>archive</code>, <code>index</code></td></tr>
+                            <tr><td>Post type archive</td><td><code>/books/</code> (Lesson 5.2)</td><td><code>archive-book</code>, <code>archive</code>, <code>index</code></td></tr>
+                            <tr><td>Author</td><td><code>/author/maria/</code> (ID 2)</td><td><code>author-maria</code>, <code>author-2</code>, <code>author</code>, <code>archive</code>, <code>index</code></td></tr>
+                            <tr><td>Date</td><td><code>/2026/09/</code></td><td><code>date</code>, <code>archive</code>, <code>index</code></td></tr>
+                            <tr><td>Search results</td><td><code>/?s=dune</code></td><td><code>search</code>, <code>index</code></td></tr>
+                            <tr><td>Not found</td><td><code>/nothing-here/</code></td><td><code>404</code>, <code>index</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Three details that trip people up. The slug-based names use the <strong>slug</strong>, never the title: <code>page-about</code>, not <code>page-About Us</code>. Post names include the <strong>post type</strong>: <code>single-post-hello-world</code>, not <code>single-hello-world</code>. And <code>home</code> means "the list of latest posts", not "the home page"; that one gets its own Common Mistake.</p>
+
+                <h3>Where the list comes from</h3>
+                <p>The hierarchy is not magic; it is code you can read. <code>wp-includes/template-loader.php</code> asks a series of yes/no questions about the current request (<code>is_404()</code>, <code>is_search()</code>, <code>is_front_page()</code>, <code>is_home()</code> and so on, in a fixed order) and, for the first that is true, calls a function like <code>get_single_template()</code> in <code>wp-includes/template.php</code>, which builds the candidate list. Each list passes through a filter named after its type before WordPress searches for files:</p>
+                <pre data-cli><code class="language-bash">grep -n "_template_hierarchy\", \$templates\|apply_filters( 'template_include'" wp-includes/template.php wp-includes/template-loader.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>wp-includes/template.php:62:	$templates = apply_filters( "{$type}_template_hierarchy", $templates );
+wp-includes/template-loader.php:114:	$template   = apply_filters( 'template_include', $template );</code></pre>
+                </div>
+                <p>Two hooks, two jobs. <code>{$type}_template_hierarchy</code> (for example <code>single_template_hierarchy</code>) filters the list of candidate names; <code>template_include</code> filters the final file path just before WordPress includes it. Plugins use them to supply templates of their own; you will use them right now to watch the decision being made.</p>
+            </section>
+
+            <section id="watching" class="lesson-section">
+                <h2>👀 Watching WordPress Choose</h2>
+                <p>A small must-use plugin can log every candidate list and the template WordPress settles on. It changes nothing: each callback returns what it received (a filter must always return, Lesson 2.3). Create <code>wordpress/wp-content/mu-plugins/pagesco-template-map.php</code>:</p>
+                <pre data-file="wp-content/mu-plugins/pagesco-template-map.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Pages &amp; Co. Template Map
+ * Description: Lesson 3.1 tool: logs which templates WordPress looks for on each front-end request, and which one it uses.
+ */
+
+$pagesco_template_types = array( 'embed', '404', 'search', 'frontpage', 'home', 'privacypolicy', 'archive', 'taxonomy', 'attachment', 'single', 'page', 'singular', 'category', 'tag', 'author', 'date', 'paged', 'index' );
+
+foreach ( $pagesco_template_types as $pagesco_template_type ) {
+	add_filter( "{$pagesco_template_type}_template_hierarchy", 'pagesco_log_template_candidates' );
+}
+
+/**
+ * Logs one list of candidate templates and returns it unchanged.
+ */
+function pagesco_log_template_candidates( $templates ) {
+	error_log( 'looked for: ' . implode( ', ', $templates ) );
+	return $templates;
+}
+
+/**
+ * Logs the file WordPress is about to include and, for a block theme, the block template it rendered.
+ */
+function pagesco_log_chosen_template( $template ) {
+	error_log( 'file: ' . str_replace( ABSPATH, '', $template ) );
+
+	if ( ! empty( $GLOBALS['_wp_current_template_id'] ) ) {
+		error_log( 'block template: ' . $GLOBALS['_wp_current_template_id'] );
+	}
+	return $template;
+}
+add_filter( 'template_include', 'pagesco_log_chosen_template', 99 );</code></pre>
+                <p>The loop adds the same callback to all eighteen hierarchy filters. <code>$_wp_current_template_id</code> is a global core sets when it picks a block template (the admin bar's "Edit site" link uses it); the leading underscore marks it as core-internal, which is fine for a debugging tool but not something to build features on. Now open <code>http://localhost:8080/hello-world/</code> and read the new lines in <code>wordpress/wp-content/debug.log</code>:</p>
+                <pre data-web="/hello-world/" data-log><code class="language-text">http://localhost:8080/hello-world/</code></pre>
+                <div class="card card-output">
+                    <h4>Output (wp-content/debug.log; your timestamps will differ)</h4>
+                    <pre><code>[25-Oct-2026 22:10:35 UTC] looked for: single-post-hello-world.php, single-post.php, single.php
+[25-Oct-2026 22:10:35 UTC] file: wp-includes/template-canvas.php
+[25-Oct-2026 22:10:35 UTC] block template: twentytwentyfive//single</code></pre>
+                </div>
+                <p>Read it top to bottom. WordPress built the single-post list (the names end in <code>.php</code> because the same list serves classic themes; a block theme looks for the same names as <code>.html</code> in <code>templates/</code>). Twenty Twenty-Five has no <code>single-post-hello-world</code> or <code>single-post</code>, but it has <code>templates/single.html</code>, so the search stopped there. The file WordPress included is core's <code>template-canvas.php</code>, which rendered the block template <code>twentytwentyfive//single</code>. Now a category archive:</p>
+                <pre data-web="/category/news/" data-log><code class="language-text">http://localhost:8080/category/news/</code></pre>
+                <div class="card card-output">
+                    <h4>Output (wp-content/debug.log; your timestamps will differ)</h4>
+                    <pre><code>[25-Oct-2026 22:10:35 UTC] looked for: category-news.php, category-2.php, category.php
+[25-Oct-2026 22:10:35 UTC] looked for: archive.php
+[25-Oct-2026 22:10:35 UTC] file: wp-includes/template-canvas.php
+[25-Oct-2026 22:10:35 UTC] block template: twentytwentyfive//archive</code></pre>
+                </div>
+                <p>Two "looked for" lines this time. The category list found nothing (Twenty Twenty-Five has no category template), so <code>template-loader.php</code> moved on to its next question, <code>is_archive()</code>, which built the archive list, and <code>archive.html</code> answered. That fall-through is the hierarchy in action. Keep this plugin for now: Common Mistakes and the project use it, and the project deletes it at the end.</p>
+
+                <div class="card card-success">
+                    <h4>✅ The Site Editor shows the same thing</h4>
+                    <p>In Appearance &gt; Editor &gt; Templates, each template has a description such as "Displays a single post on your website unless a custom template has been applied to that post or a dedicated template exists". When you add a template there ("Add New Template"), the editor offers the hierarchy names for you, for example "Category: News". Under the hood it uses <code>get_template_hierarchy()</code>, the same rules you just logged; you will call it yourself in Exercise 1.</p>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <p>Theme mistakes are often silent: no error, just the wrong page or a missing piece. Make each one on purpose, see what WordPress does, then undo it.</p>
+
+                <h3>1. A theme folder without a template</h3>
+                <p>You start a new theme with just a <code>style.css</code> and try to switch to it:</p>
+                <pre data-file="wp-content/themes/pagesco-broken/style.css"><code class="language-css">/*
+Theme Name: Pages &amp; Co. Broken
+*/</code></pre>
+                <pre data-cli data-raises="Error"><code class="language-bash">wp theme activate pagesco-broken</code></pre>
+                <div class="card card-output">
+                    <h4>Error</h4>
+                    <pre><code>Error: Template is missing. Standalone themes need to have a &lt;code&gt;templates/index.html&lt;/code&gt; or &lt;code&gt;index.php&lt;/code&gt; template file. &lt;a href="https://developer.wordpress.org/themes/advanced-topics/child-themes/"&gt;Child themes&lt;/a&gt; need to have a &lt;code&gt;Template&lt;/code&gt; header in the &lt;code&gt;style.css&lt;/code&gt; stylesheet.</code></pre>
+                </div>
+                <p><strong>What it means:</strong> WordPress found the header, but a theme needs at least one template it can always fall back to: <code>index</code>. (The <code>&lt;code&gt;</code> and <code>&lt;a&gt;</code> tags are there because the same message is shown as HTML on the Themes screen, where the folder appears under "Broken Themes".) <strong>Fix:</strong> add <code>templates/index.html</code> for a block theme or <code>index.php</code> for a classic one. A child theme is the exception: it has a <code>Template:</code> header naming its parent instead (Lesson 3.4).</p>
+                <pre data-cli><code class="language-bash">rm -r wp-content/themes/pagesco-broken</code></pre>
+
+                <h3>2. Making <code>home.html</code> for the home page</h3>
+                <p>The shop decides that the site's front page should be the About Us page, not the latest news. In Settings &gt; Reading that is "Your homepage displays: A static page"; with WP-CLI it is two options. Then load <code>http://localhost:8080/</code>:</p>
+                <pre data-cli><code class="language-bash">wp option update show_on_front page
+wp option update page_on_front 12</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Updated 'show_on_front' option.
+Success: Updated 'page_on_front' option.</code></pre>
+                </div>
+                <pre data-web="/" data-log><code class="language-text">http://localhost:8080/</code></pre>
+                <div class="card card-output">
+                    <h4>Output (wp-content/debug.log; your timestamps will differ)</h4>
+                    <pre><code>[25-Oct-2026 22:10:36 UTC] looked for: front-page.php
+[25-Oct-2026 22:10:36 UTC] looked for: page-about.php, page-12.php, page.php
+[25-Oct-2026 22:10:36 UTC] file: wp-includes/template-canvas.php
+[25-Oct-2026 22:10:36 UTC] block template: twentytwentyfive//page</code></pre>
+                </div>
+                <p><strong>What it means:</strong> <code>home</code> is not in the list at all. With a static front page, the front page is a page, so after <code>front-page</code> WordPress follows the page chain and uses <code>page.html</code>. <code>home</code> means "the blog index" (the "Posts page" you can pick in Settings &gt; Reading), whatever URL it lives at. A developer who wrote <code>home.html</code> to design the shop's front page would see no change at all, and a designer who wanted the front page to look different from other pages needed <code>front-page.html</code>. <strong>Fix:</strong> use <code>front-page</code> for "the site's front page, whatever it shows" and <code>home</code> for "the list of latest posts". Put the setting back:</p>
+                <pre data-cli><code class="language-bash">wp option update show_on_front posts
+wp option update page_on_front 0</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Updated 'show_on_front' option.
+Success: Updated 'page_on_front' option.</code></pre>
+                </div>
+
+                <h3>3. A classic theme that forgets <code>wp_body_open()</code></h3>
+                <p>In a classic theme the PHP template prints the whole document, so the theme itself must call the hooks that core calls for block themes. Here is a minimal classic theme whose <code>index.php</code> calls <code>wp_head()</code> and <code>wp_footer()</code> but not <code>wp_body_open()</code>:</p>
+                <pre data-file="wp-content/themes/pagesco-bare/style.css"><code class="language-css">/*
+Theme Name: Pages &amp; Co. Bare
+*/</code></pre>
+                <pre data-file="wp-content/themes/pagesco-bare/index.php"><code class="language-php">&lt;!DOCTYPE html&gt;
+&lt;html &lt;?php language_attributes(); ?&gt;&gt;
+&lt;head&gt;
+	&lt;meta charset="&lt;?php bloginfo( 'charset' ); ?&gt;"&gt;
+	&lt;?php wp_head(); ?&gt;
+&lt;/head&gt;
+&lt;body &lt;?php body_class(); ?&gt;&gt;
+	&lt;h1&gt;&lt;?php bloginfo( 'name' ); ?&gt;&lt;/h1&gt;
+	&lt;?php wp_footer(); ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+                <pre data-cli data-exit="1"><code class="language-bash">wp theme activate pagesco-bare
+curl -s http://localhost:8080/ | grep -c pagesco-notice</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Switched to 'Pages &amp;amp; Co. Bare' theme.
+0</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the store notice is gone, with no error anywhere. <code>pagesco-site.php</code> still adds its callback to <code>wp_body_open</code>, but nothing ever fires that action. (<code>bloginfo( 'name' )</code> printed the site name, so the theme itself works.) Leave out <code>wp_head()</code> and you lose every stylesheet, script and meta tag that plugins add; leave out <code>wp_footer()</code> and the admin bar disappears for logged-in users. <strong>Fix:</strong> every classic theme calls <code>wp_head()</code> before <code>&lt;/head&gt;</code>, <code>wp_body_open()</code> right after <code>&lt;body&gt;</code> and <code>wp_footer()</code> before <code>&lt;/body&gt;</code>. In a block theme you cannot forget them: <code>template-canvas.php</code> calls all three. Switch back and delete the test theme:</p>
+                <pre data-cli><code class="language-bash">wp theme activate twentytwentyfive
+wp theme delete pagesco-bare</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Switched to 'Twenty Twenty-Five' theme.
+Deleted 'pagesco-bare' theme.
+Success: Deleted 1 of 1 themes.</code></pre>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Map the Templates of Pages &amp; Co.</h2>
+                <p>In Lesson 3.2 you will build the <code>pagesco</code> block theme, and the first design question is "which templates does it need?". In this project you answer it from evidence: you map which template draws each kind of page today, then build a tiny throwaway theme and turn it from classic to hybrid to block, watching the hierarchy react. At the end the site is back to Twenty Twenty-Five with nothing left over. Allow about 40 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: Map the site <span class="step-time">(12 min)</span></h3>
+                    <p>With <code>pagesco-template-map.php</code> still in place, request one URL of each kind and look at the log. From the WP-CLI container, <code>curl -s -o /dev/null</code> requests a page and throws the HTML away, so only the log lines remain:</p>
+                    <pre data-cli data-log><code class="language-bash">for url in / /about/ /author/maria/ /2026/09/ "/?s=dune" /nothing-here/; do curl -s -o /dev/null "http://localhost:8080$url"; done</code></pre>
+                    <div class="card card-output">
+                        <h4>Output (wp-content/debug.log; your timestamps will differ)</h4>
+                        <pre><code>[25-Oct-2026 22:10:37 UTC] looked for: front-page.php
+[25-Oct-2026 22:10:37 UTC] looked for: home.php, index.php
+[25-Oct-2026 22:10:37 UTC] file: wp-includes/template-canvas.php
+[25-Oct-2026 22:10:37 UTC] block template: twentytwentyfive//home
+[25-Oct-2026 22:10:38 UTC] looked for: page-about.php, page-12.php, page.php
+[25-Oct-2026 22:10:38 UTC] file: wp-includes/template-canvas.php
+[25-Oct-2026 22:10:38 UTC] block template: twentytwentyfive//page
+[25-Oct-2026 22:10:38 UTC] looked for: author-maria.php, author-2.php, author.php
+[25-Oct-2026 22:10:38 UTC] looked for: archive.php
+[25-Oct-2026 22:10:38 UTC] file: wp-includes/template-canvas.php
+[25-Oct-2026 22:10:38 UTC] block template: twentytwentyfive//archive
+[25-Oct-2026 22:10:38 UTC] looked for: date.php
+[25-Oct-2026 22:10:38 UTC] looked for: archive.php
+[25-Oct-2026 22:10:38 UTC] file: wp-includes/template-canvas.php
+[25-Oct-2026 22:10:38 UTC] block template: twentytwentyfive//archive
+[25-Oct-2026 22:10:38 UTC] looked for: search.php
+[25-Oct-2026 22:10:38 UTC] file: wp-includes/template-canvas.php
+[25-Oct-2026 22:10:38 UTC] block template: twentytwentyfive//search
+[25-Oct-2026 22:10:38 UTC] looked for: 404.php
+[25-Oct-2026 22:10:38 UTC] file: wp-includes/template-canvas.php
+[25-Oct-2026 22:10:38 UTC] block template: twentytwentyfive//404</code></pre>
+                    </div>
+                    <p>Together with the post and the category from earlier, that is every kind of page Pages &amp; Co. has today. Write your map into <code>pagesco-plan.txt</code>, the planning file you started in Lesson 1.1, and add a column for the theme you are about to build. This is the map the measured log gives you:</p>
+                    <pre><code class="language-text">TEMPLATE MAP (Lesson 3.1)
+URL                  Twenty Twenty-Five uses   pagesco will need (3.2)
+/                    home                      index (the latest news)
+/hello-world/        single                    single
+/about/              page                      page
+/category/news/      archive                   archive
+/author/maria/       archive                   archive
+/2026/09/            archive                   archive
+/?s=dune             search                    search
+/nothing-here/       404                       404
+Later: single-book + archive-book (5.2), front-page if the shop wants one</code></pre>
+                    <p>Six templates cover the whole site: <code>index</code>, <code>single</code>, <code>page</code>, <code>archive</code>, <code>search</code> and <code>404</code>. Twenty Twenty-Five also has <code>home</code>; your theme can let <code>index</code> do that job, because <code>home</code> falls back to it.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: A classic theme in two files <span class="step-time">(10 min)</span></h3>
+                    <p>Now the other side of the table. Create a throwaway classic theme, <code>wordpress/wp-content/themes/pagesco-sketch/</code>, with a header and an <code>index.php</code> that calls all three hooks. The Loop (<code>while ( have_posts() )</code>) prints the title of each post the request found; Lesson 4.1 takes it apart properly.</p>
+                    <pre data-file="wp-content/themes/pagesco-sketch/style.css"><code class="language-css">/*
+Theme Name: Pages &amp; Co. Sketch
+Description: A throwaway theme for Lesson 3.1.
+Version: 1.0.0
+Text Domain: pagesco-sketch
+*/</code></pre>
+                    <pre data-file="wp-content/themes/pagesco-sketch/index.php"><code class="language-php">&lt;!DOCTYPE html&gt;
+&lt;html &lt;?php language_attributes(); ?&gt;&gt;
+&lt;head&gt;
+	&lt;meta charset="&lt;?php bloginfo( 'charset' ); ?&gt;"&gt;
+	&lt;?php wp_head(); ?&gt;
+&lt;/head&gt;
+&lt;body &lt;?php body_class(); ?&gt;&gt;
+&lt;?php wp_body_open(); ?&gt;
+&lt;main&gt;
+	&lt;p class="sketch-file"&gt;index.php&lt;/p&gt;
+	&lt;?php
+	while ( have_posts() ) {
+		the_post();
+		the_title( '&lt;h2&gt;', '&lt;/h2&gt;' );
+	}
+	?&gt;
+&lt;/main&gt;
+&lt;?php wp_footer(); ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+                    <p>Activate it, ask WordPress what kind of theme it is, and request the About page:</p>
+                    <pre data-cli><code class="language-bash">wp theme activate pagesco-sketch
+wp eval 'var_dump( wp_is_block_theme(), wp_theme_has_theme_json() );'
+curl -s http://localhost:8080/about/ | grep -o 'sketch-file[^&gt;]*&gt;[^&lt;]*\|class="pagesco-notice"'
+tail -n 4 wp-content/debug.log</code></pre>
+                    <div class="card card-output">
+                        <h4>Output (the last lines come from debug.log; your timestamps will differ)</h4>
+                        <pre><code>Success: Switched to 'Pages &amp;amp; Co. Sketch' theme.
+bool(false)
+bool(false)
+class="pagesco-notice"
+sketch-file"&gt;index.php
+[25-Oct-2026 22:12:17 UTC] looked for: page-about.php, page-12.php, page.php
+[25-Oct-2026 22:12:17 UTC] looked for: singular.php
+[25-Oct-2026 22:12:17 UTC] looked for: index.php
+[25-Oct-2026 22:12:17 UTC] file: wp-content/themes/pagesco-sketch/index.php</code></pre>
+                    </div>
+                    <p>A classic theme: <code>false, false</code>. WordPress walked the page chain, then <code>singular</code>, then <code>index</code>, and included the theme's own <code>index.php</code> (no <code>template-canvas.php</code>, no block template). The store notice is there because this time the theme calls <code>wp_body_open()</code>.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: More specific, then hybrid <span class="step-time">(8 min)</span></h3>
+                    <p>Copy <code>index.php</code> to <code>page.php</code> and change the marker paragraph to <code>page.php</code>. Then give the theme a <code>theme.json</code> with one palette color. That is all a hybrid is: a classic theme that also has a <code>theme.json</code>.</p>
+                    <pre data-cli><code class="language-bash">sed 's/&gt;index.php&lt;/&gt;page.php&lt;/' wp-content/themes/pagesco-sketch/index.php &gt; wp-content/themes/pagesco-sketch/page.php</code></pre>
+                    <pre data-file="wp-content/themes/pagesco-sketch/theme.json"><code class="language-json">{
+	"$schema": "https://schemas.wp.org/wp/7.1/theme.json",
+	"version": 3,
+	"settings": {
+		"color": {
+			"palette": [
+				{ "slug": "ink", "name": "Ink", "color": "#1f2a2e" }
+			]
+		}
+	}
+}</code></pre>
+                    <pre data-cli><code class="language-bash">wp eval 'var_dump( wp_is_block_theme(), wp_theme_has_theme_json() );'
+curl -s http://localhost:8080/about/ | grep -o 'sketch-file[^&gt;]*&gt;[^&lt;]*\|--wp--preset--color--ink: [^;]*'
+tail -n 2 wp-content/debug.log</code></pre>
+                    <div class="card card-output">
+                        <h4>Output (the last lines come from debug.log; your timestamps will differ)</h4>
+                        <pre><code>bool(false)
+bool(true)
+--wp--preset--color--ink: #1f2a2e
+sketch-file"&gt;page.php
+[25-Oct-2026 22:12:17 UTC] looked for: page-about.php, page-12.php, page.php
+[25-Oct-2026 22:12:17 UTC] file: wp-content/themes/pagesco-sketch/page.php</code></pre>
+                    </div>
+                    <p>Now <code>false, true</code>: hybrid. The About page found <code>page.php</code> at the third candidate and stopped. And <code>theme.json</code> already does something: WordPress turned your palette entry into a CSS custom property, <code>--wp--preset--color--ink</code>, printed in the page's global styles, and the block editor now offers "Ink" in its color pickers. Lesson 3.2 builds on exactly this.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 4: Add one block template <span class="step-time">(5 min)</span></h3>
+                    <p>Add a <code>templates/index.html</code> with a marker paragraph and the post title block, and request a post and the About page again:</p>
+                    <pre data-file="wp-content/themes/pagesco-sketch/templates/index.html"><code class="language-html">&lt;!-- wp:paragraph {"className":"sketch-file"} --&gt;
+&lt;p class="sketch-file"&gt;templates/index.html&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;
+
+&lt;!-- wp:post-title /--&gt;</code></pre>
+                    <pre data-cli><code class="language-bash">wp eval 'var_dump( wp_is_block_theme() );'
+curl -s http://localhost:8080/hello-world/ | grep -o 'sketch-file[^&gt;]*&gt;[^&lt;]*'
+curl -s http://localhost:8080/about/ | grep -o 'sketch-file[^&gt;]*&gt;[^&lt;]*'
+tail -n 7 wp-content/debug.log</code></pre>
+                    <div class="card card-output">
+                        <h4>Output (the last lines come from debug.log; your timestamps will differ)</h4>
+                        <pre><code>bool(true)
+sketch-file wp-block-paragraph"&gt;templates/index.html
+sketch-file"&gt;page.php
+[25-Oct-2026 22:12:17 UTC] looked for: single-post-hello-world.php, single-post.php, single.php
+[25-Oct-2026 22:12:17 UTC] looked for: singular.php
+[25-Oct-2026 22:12:17 UTC] looked for: index.php
+[25-Oct-2026 22:12:17 UTC] file: wp-includes/template-canvas.php
+[25-Oct-2026 22:12:17 UTC] block template: pagesco-sketch//index
+[25-Oct-2026 22:12:17 UTC] looked for: page-about.php, page-12.php, page.php
+[25-Oct-2026 22:12:17 UTC] file: wp-content/themes/pagesco-sketch/page.php</code></pre>
+                    </div>
+                    <p>One file turned the theme into a block theme (<code>true</code>). (The paragraph gained a <code>wp-block-paragraph</code> class: WordPress adds it when it renders a paragraph block, which is how you can tell rendered block markup from the PHP template's own paragraph.) The post had no more specific PHP template, so WordPress rendered <code>pagesco-sketch//index</code> through <code>template-canvas.php</code>. But the About page still used <code>page.php</code>: when the hierarchy finds a PHP template, WordPress only uses a block template that is at least as specific, and <code>index</code> is less specific than <code>page</code>. Real themes are not mixed like this; you now know what WordPress would do if one were.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 5: Put everything back <span class="step-time">(5 min)</span></h3>
+                    <p>Switch back to Twenty Twenty-Five, delete the sketch theme and the template-map tool, and check that only your two must-use plugins remain:</p>
+                    <pre data-cli data-checkpoint><code class="language-bash">wp theme activate twentytwentyfive
+wp theme delete pagesco-sketch
+rm wp-content/mu-plugins/pagesco-template-map.php
+wp plugin list --status=must-use --fields=name,status</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Success: Switched to 'Twenty Twenty-Five' theme.
+Deleted 'pagesco-sketch' theme.
+Success: Deleted 1 of 1 themes.
++--------------+----------+
+| name         | status   |
++--------------+----------+
+| mailpit-smtp | must-use |
+| pagesco-site | must-use |
++--------------+----------+</code></pre>
+                    </div>
+                    <p>Twenty Twenty-Five is drawing your pages again and the store notice is at the top of every page. Your template map stays in <code>pagesco-plan.txt</code>: it is the to-do list for Lesson 3.2.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>pagesco-plan.txt</code> has a template map: each kind of URL, the template Twenty Twenty-Five uses, and the template <code>pagesco</code> will need</li>
+                        <li>You saw a classic theme answer <code>false, false</code>, a hybrid <code>false, true</code> and a block theme <code>true</code></li>
+                        <li>You can explain why <code>/about/</code> used <code>page.php</code> even after <code>templates/index.html</code> existed</li>
+                        <li>Twenty Twenty-Five is active again; <code>pagesco-sketch</code> and <code>pagesco-template-map.php</code> are deleted</li>
+                        <li><code>mu-plugins/</code> holds exactly <code>mailpit-smtp.php</code> and <code>pagesco-site.php</code>, and the notice shows on every page</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>These exercises only read from the site (or undo what they change). Try each one before you open the solution.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Predict, Then Ask Core</h3>
+                    <p>Without looking at the table above, write down the candidate list for each of these: the tag archive <code>tag-staff-picks</code>, the author archive <code>author-maria</code>, the page <code>page-contact</code>, and the date archive <code>date</code>. Then check yourself with <code>get_template_hierarchy( $slug )</code>, the function the Site Editor uses.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Every list ends in <code>index</code>. Archives of any kind pass through <code>archive</code>; pages and posts through <code>singular</code>. <code>get_template_hierarchy()</code> returns an array, so <code>implode()</code> it.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">wp eval 'foreach ( array( "tag-staff-picks", "author-maria", "page-contact", "date" ) as $slug ) { echo $slug, ": ", implode( ", ", get_template_hierarchy( $slug ) ), "\n"; }'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>tag-staff-picks: tag-staff-picks, tag, archive, index
+author-maria: author-maria, author, archive, index
+page-contact: page-contact, page, singular, index
+date: date, archive, index</code></pre>
+                        </div>
+                        <p>Notice that this function works from the slug alone, so it cannot add the ID-based names (<code>author-2</code>, <code>page-13</code>) that a real request adds. For the Book post type of Lesson 5.2 it returns the full <code>single-book-…</code> chain only once the post type is registered.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Twenty Twenty-Five's Palette</h3>
+                    <p>Print the name, slug and color of every color in Twenty Twenty-Five's palette, as WordPress sees it after reading <code>theme.json</code>. Which slug holds the main text color?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>wp_get_global_settings( array( 'color', 'palette', 'theme' ) )</code> returns the theme's palette as an array of arrays with <code>name</code>, <code>slug</code> and <code>color</code> keys. <code>printf()</code> lines them up.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">wp eval 'foreach ( wp_get_global_settings( array( "color", "palette", "theme" ) ) as $c ) { printf( "%-10s %-9s %s\n", $c["slug"], $c["name"], $c["color"] ); }'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>base       Base      #FFFFFF
+contrast   Contrast  #111111
+accent-1   Accent 1  #FFEE58
+accent-2   Accent 2  #F6CFF4
+accent-3   Accent 3  #503AA8
+accent-4   Accent 4  #686868
+accent-5   Accent 5  #FBFAF3
+accent-6   Accent 6  color-mix(in srgb, currentColor 20%, transparent)</code></pre>
+                        </div>
+                        <p><code>contrast</code> (#111111) is the text color and <code>base</code> the background. Twenty Twenty-Five names colors by role, not by hue, so its style variations can swap the values without renaming anything. You will choose your own naming in Lesson 3.2.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: Style Variations</h3>
+                    <p>The <code>styles/</code> folder holds alternative designs. List the titles of all style variations WordPress finds for the active theme. Some are complete designs, others change only colors or only fonts; can you tell which from the titles?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>WP_Theme_JSON_Resolver::get_style_variations()</code> returns an array of decoded variation files; each has a <code>title</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">wp eval 'foreach ( WP_Theme_JSON_Resolver::get_style_variations() as $v ) { echo $v["title"], "\n"; }'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Evening
+Noon
+Dusk
+Afternoon
+Twilight
+Morning
+Sunrise
+Midnight
+Evening
+Noon
+Dusk
+Afternoon
+Twilight
+Morning
+Sunrise
+Midnight
+Beiruti &amp; Literata
+Vollkorn &amp; Fira Code
+Platypi &amp; Ysabeau Office
+Roboto Slab &amp; Manrope
+Literata &amp; Ysabeau Office
+Platypi &amp; Literata
+Literata &amp; Fira Sans</code></pre>
+                        </div>
+                        <p>The first eight are the full variations in <code>styles/*.json</code>, the next eight (same names) the color-only presets in <code>styles/colors/</code>, and the font pairings come from <code>styles/typography/</code>. Section and block styles in <code>styles/sections/</code> and <code>styles/blocks/</code> are not listed here. Lesson 3.3 builds a variation for Pages &amp; Co.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 4: A Custom Page Template (Stretch)</h3>
+                    <p>Twenty Twenty-Five's <code>theme.json</code> declares one entry in <code>customTemplates</code>: "Page No Title". Assign it to the About page with WP-CLI (a page's chosen template is stored in the post meta <code>_wp_page_template</code>), prove from the HTML that the page title is gone, then remove the assignment again.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>wp post meta update 12 _wp_page_template page-no-title</code>. The Post Title block prints an <code>&lt;h1 class="wp-block-post-title"&gt;</code> on pages; <code>grep -c</code> counts it. A chosen template goes to the very front of the candidate list.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli data-exit="1"><code class="language-bash">wp post meta update 12 _wp_page_template page-no-title
+curl -s http://localhost:8080/about/ | grep -c '&lt;h1 class="wp-block-post-title'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Success: Updated custom field '_wp_page_template'.
+0</code></pre>
+                        </div>
+                        <pre data-cli><code class="language-bash">wp post meta delete 12 _wp_page_template
+curl -s http://localhost:8080/about/ | grep -c '&lt;h1 class="wp-block-post-title'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Success: Deleted custom field.
+1</code></pre>
+                        </div>
+                        <p>With the meta set, the candidate list starts with <code>page-no-title</code>, which wins over <code>page-about</code> and <code>page</code>. In the block editor the same choice is the "Template" setting in the page's sidebar.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> A block theme has <code>templates/index.html</code>, <code>single.html</code>, <code>singular.html</code> and <code>archive.html</code>. Which template draws the About page at <code>/about/</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="The page chain is page-about, page-12, page, singular, index. The theme has no page template, so the first match is singular.html.">
+                                A) singular.html
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="single belongs to the chain for posts. Which names does a page's chain contain?">
+                                B) single.html
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="index is the last resort. Is there anything in the page chain the theme has before it?">
+                                C) index.html
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> <code>wp eval 'var_dump( wp_is_block_theme(), wp_theme_has_theme_json() );'</code> prints <code>bool(false)</code> and <code>bool(true)</code> for a client's theme. What kind of theme is it?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="A block theme would answer true to the first question. What does the first function check for?">
+                                A) A block theme
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="A purely classic theme has no theme.json. What does the second answer tell you?">
+                                B) A classic theme with no block features
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="No templates/index.html, so it is not a block theme, but it has a theme.json: a classic theme with block features, a hybrid.">
+                                C) A hybrid: PHP templates plus a theme.json
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> Settings &gt; Reading shows a static page (Contact) as the front page. Your block theme has <code>home.html</code>, <code>page.html</code> and <code>index.html</code>. Which template draws <code>http://localhost:8080/</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="home is the template for the list of latest posts. Is the front page showing posts here?">
+                                A) home.html
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="There is no front-page.html, and with a static front page WordPress follows the page chain next, so page.html draws it.">
+                                B) page.html
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="index is only used when nothing more specific matches. What comes after front-page when the front page is a page?">
+                                C) index.html
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> You changed <code>templates/single.html</code> in your theme, but posts still look the old way, and there is no error. The site owner says she "fixed a typo in the post template in the editor last week". What is the most likely cause?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="WordPress reads template files on every request; there is nothing to clear here. Where did her change go?">
+                                A) WordPress caches template files for a week
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The file is a valid template; it is simply not the one being used. What did saving in the Site Editor create?">
+                                B) single.html is not in the hierarchy for posts
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Saving in the Site Editor stores a wp_template post with the source custom, and that copy wins over the theme file until it is reset.">
+                                C) Her save stored a copy as a wp_template post, and that copy wins over the file
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> Which code changes the list of templates WordPress looks for on single posts, without editing the theme?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="template_redirect is an action that fires before the template is chosen; its return value is ignored. Which hook hands you the list?">
+                                A) add_action( 'template_redirect', ... ) returning a new list
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="single_template_hierarchy is the filter WordPress applies to the candidate list for single posts; a callback receives the array and returns the list to search.">
+                                B) add_filter( 'single_template_hierarchy', ... ) returning a changed array
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="wp_is_block_theme only reports what kind of theme is active. Which filter is named after the template type?">
+                                C) add_filter( 'wp_is_block_theme', ... )
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>If new themes are block themes, why does this course still teach classic themes?</summary>
+                    <p>Because most WordPress sites you will be paid to work on were built before block themes existed, and many popular commercial themes are still classic or hybrid. Classic templates also teach the Loop and <code>WP_Query</code>, which every dynamic block you write in Module 6 uses under the hood. Module 4 builds a classic theme for exactly that reason.</p>
+                </details>
+                <details>
+                    <summary>Can a block theme use the Customizer?</summary>
+                    <p>Only if something hooks into <code>customize_register</code>; then WordPress shows the Customize menu item again. A few plugins do that for their own settings. For colors, fonts and layout, block themes use the Site Editor's Styles panel, which reads and writes the same <code>theme.json</code> data you saw in this lesson.</p>
+                </details>
+                <details>
+                    <summary>Where exactly are Site Editor changes stored?</summary>
+                    <p>As posts. Changed templates are <code>wp_template</code> posts, changed parts <code>wp_template_part</code> posts (both tagged with the theme's slug in the <code>wp_theme</code> taxonomy), and style changes one <code>wp_global_styles</code> post per theme. They live in the database, so they survive theme updates, but they also do not travel with your theme's files until you export them (Lesson 3.3).</p>
+                </details>
+                <details>
+                    <summary>Do I have to create every template in the hierarchy?</summary>
+                    <p>No, only <code>index</code>. Every other template is optional and is used only when it is the most specific match. A small theme with six templates, like the one you will build next, handles every page of a typical site; you add a more specific template only when one kind of page needs to look different.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Plugins can add templates too. <code>register_block_template()</code> (WordPress 6.7 and later) registers a block template from PHP, for example <code>pagesco-books//single-book</code> with block markup as its content, and it then appears in the Site Editor next to the theme's templates. Read its documentation in the Code Reference and the source in <code>wp-includes/block-template.php</code>, then answer: if both the active theme and a plugin provide <code>single-book</code>, which one wins, and why is that the right decision for a site owner?</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Look at your template map. If Pages &amp; Co. wanted its News category to look different from every other archive, which file would you add, and what would the hierarchy do for every other category? Then think of a site you visit often: which of its pages look like they share one template, and which look like they have their own?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>A <strong>theme</strong> owns presentation; content lives in the database and features in plugins, so switching themes keeps both. The <code>template</code> and <code>stylesheet</code> options record the active theme</li>
+                        <li><strong>Block themes</strong> use <code>templates/*.html</code>, <code>parts/*.html</code> and <code>theme.json</code>; <strong>classic themes</strong> use PHP templates; a <strong>hybrid</strong> is a classic theme with block features such as <code>theme.json</code></li>
+                        <li><code>wp_is_block_theme()</code> and <code>wp_theme_has_theme_json()</code> tell you which kind is active</li>
+                        <li>The <strong>template hierarchy</strong> lists candidates from most specific to <code>index</code>; the first one the theme has wins, and every theme must have <code>index</code></li>
+                        <li><code>front-page</code> is the site's front page; <code>home</code> is the latest-posts list, wherever it lives</li>
+                        <li>Block templates are rendered by core's <code>template-canvas.php</code>, which calls <code>wp_head()</code>, <code>wp_body_open()</code> and <code>wp_footer()</code>; classic themes must call them themselves</li>
+                        <li>Site Editor saves are <code>wp_template</code> posts that win over theme files</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Use</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>The active theme</td><td><code>wp theme list</code>, <code>wp option get stylesheet</code></td></tr>
+                            <tr><td>The kind of theme</td><td><code>wp_is_block_theme()</code>, <code>wp_theme_has_theme_json()</code></td></tr>
+                            <tr><td>The theme's templates and parts</td><td><code>get_block_templates()</code>, <code>get_block_templates( array(), 'wp_template_part' )</code></td></tr>
+                            <tr><td>A template's candidate chain</td><td><code>get_template_hierarchy( 'category-news' )</code></td></tr>
+                            <tr><td>Change the candidates</td><td><code>add_filter( 'single_template_hierarchy', ... )</code></td></tr>
+                            <tr><td>Change the final file</td><td><code>add_filter( 'template_include', ... )</code></td></tr>
+                            <tr><td>Saved Site Editor copies</td><td><code>wp post list --post_type=wp_template,wp_template_part</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You took Twenty Twenty-Five apart: header, <code>theme.json</code>, templates, parts, patterns, variations and <code>functions.php</code></li>
+                        <li>You logged the template hierarchy on a running site and mapped every kind of page Pages &amp; Co. has</li>
+                        <li>You built a theme that was classic, then hybrid, then block, and saw how WordPress treats each</li>
+                        <li>You met three silent theme mistakes on purpose, and you know how to spot each one</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>In <a href="lesson_08.html"><strong>Lesson 3.2: Building a Block Theme</strong></a> you turn your template map into a real theme: <code>pagesco</code>, with its own <code>style.css</code> header, a <code>theme.json</code> that holds the Pages &amp; Co. colors, fonts and spacing, a header and a footer part, and the six templates from your map. You will activate it and watch your store notice keep working on top of it.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Check that Twenty Twenty-Five is active and that <code>wp-content/themes/</code> holds only the three default themes</li>
+                    <li>Keep your template map in <code>pagesco-plan.txt</code> where you can see it; the next lesson starts from it</li>
+                    <li>Skim Twenty Twenty-Five's <code>theme.json</code> in your editor: find the palette, the font sizes and the <code>styles.elements</code> section</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>The template hierarchy looks like a lot to memorize, and nobody does. What you now have is better than memory: you know the shape of it (specific to general, ending in <code>index</code>), and you know how to ask WordPress directly with a log or one function call. When a page uses the "wrong" template on a client site, you will not guess; you will look. That habit is what makes a theme developer calm under pressure.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_06.html" class="prev-lesson">← Previous: The Hooks System</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_08.html" class="next-lesson">Next: Building a Block Theme →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

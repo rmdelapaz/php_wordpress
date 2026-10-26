@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="The WordPress content model from a developer's point of view: post types, posts and pages, statuses, categories and tags, media attachments, revisions, users, roles and capabilities, settings as options, and the block markup the editor saves into post_content, verified on WordPress 7.1 and PHP 8.5. PHP and WordPress Development Lesson 2.1.">
+    <meta name="author" content="Ray de la Paz">
+    <title>The Content Model - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 2: WordPress Inside Out</a></li>
+            <li aria-current="page">Lesson 2.1: The Content Model</li>
+        </ul>
+    </nav>
+
+    <main id="main-content" data-state="fresh">
+        <div class="container">
+            <header>
+                <h1>🗂️ Lesson 2.1: The Content Model</h1>
+                <p class="lead">Before you write a theme or a plugin, you need to know what WordPress actually stores and how the pieces relate. Site owners see Posts, Pages, Media, Users and Settings as five different menus. A developer sees a much simpler picture: almost everything is a <em>post</em> of some type, sorted by <em>terms</em>, owned by <em>users</em> whose <em>capabilities</em> decide what they may do, configured by <em>options</em>, and written in <em>block markup</em>. In this lesson you take that picture apart with WP-CLI and PHP, then stock the Pages &amp; Co. site with its first staff, pages and news.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Explain why posts, pages, media, revisions, templates and navigation menus are all posts with a different <code>post_type</code>, and read a <code>WP_Post</code> object</li>
+                        <li>Choose between posts and pages, use post statuses, and organize content with categories, tags and terms</li>
+                        <li>Describe how roles, capabilities and users fit together, and check capabilities rather than roles in code</li>
+                        <li>Find the option behind a Settings screen, and read the block markup the editor stores in <code>post_content</code> with <code>parse_blocks()</code></li>
+                        <li>Create users, pages and posts from the command line, with authors, categories, dates and revisions</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 120 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_03.html">Lesson 1.3: PHP the WordPress Way</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> the Pages &amp; Co. starter content: staff accounts for Maria (editor) and Devon (author), the About Us, Contact and Events pages, and three News posts</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (the content model is the same in every recent version; a few admin labels changed, see the version note)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. development site from Lesson 1.2, with WP-CLI</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#everything-is-a-post" class="toc-link">Everything Is a Post</a></li>
+                        <li><a href="#posts-pages" class="toc-link">Posts, Pages and Statuses</a></li>
+                        <li><a href="#taxonomies" class="toc-link">Categories, Tags and Terms</a></li>
+                        <li><a href="#media" class="toc-link">Media: Attachments Are Posts Too</a></li>
+                        <li><a href="#revisions" class="toc-link">Revisions, Autosaves and Trash</a></li>
+                        <li><a href="#users" class="toc-link">Users, Roles and Capabilities</a></li>
+                        <li><a href="#settings" class="toc-link">Settings Are Options</a></li>
+                        <li><a href="#blocks" class="toc-link">The Block Editor as a Developer Sees It</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Stock the Pages &amp; Co. Site</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="everything-is-a-post" class="lesson-section">
+                <h2>📦 Everything Is a Post</h2>
+                <p>Open the admin and you see separate menus for Posts, Pages and Media, and somewhere in the Site Editor there are templates, patterns and navigation menus. Under the hood they are all rows in one database table, <code>wp_posts</code>, and the column <code>post_type</code> says which kind each row is. WordPress calls each kind a <strong>post type</strong>. Ask your site which ones it has:</p>
+                <pre data-cli><code class="language-bash">wp post-type list --fields=name,label,hierarchical,public</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+---------------------+-----------------------+--------------+--------+
+| name                | label                 | hierarchical | public |
++---------------------+-----------------------+--------------+--------+
+| post                | Posts                 |              | 1      |
+| page                | Pages                 | 1            | 1      |
+| attachment          | Media                 |              | 1      |
+| revision            | Revisions             |              |        |
+| nav_menu_item       | Navigation Menu Items |              |        |
+| custom_css          | Custom CSS            |              |        |
+| customize_changeset | Changesets            |              |        |
+| oembed_cache        | oEmbed Responses      |              |        |
+| user_request        | User Requests         |              |        |
+| wp_block            | Patterns              |              |        |
+| wp_template         | Templates             |              |        |
+| wp_template_part    | Template Parts        |              |        |
+| wp_global_styles    | Global Styles         |              |        |
+| wp_navigation       | Navigation Menus      |              |        |
+| wp_font_family      | Font Families         |              |        |
+| wp_font_face        | Font Faces            |              |        |
++---------------------+-----------------------+--------------+--------+</code></pre>
+                </div>
+                <p>Sixteen types, five of which an editor ever thinks of as "content". <code>post</code>, <code>page</code> and <code>attachment</code> (Media) are public: they have URLs. <code>revision</code> stores old versions. The <code>wp_</code> types belong to block themes and the editor: <code>wp_template</code> and <code>wp_template_part</code> hold templates you edit in the Site Editor (Module 3), <code>wp_block</code> holds synced patterns, <code>wp_global_styles</code> your style changes, and <code>wp_navigation</code> the menus of block themes. <code>nav_menu_item</code> and <code>custom_css</code> serve classic themes. In Lesson 5.2 you will add one more, <code>book</code>, and it will get exactly the same machinery for free: admin screens, revisions, REST API, permissions.</p>
+
+                <div class="mermaid">
+graph TD
+    A["users with roles"] -->|"own"| B["wp_posts rows"]
+    B --> C["post, page, media"]
+    B --> D["revision, template"]
+    C --> E["terms"]
+    C --> F["post meta"]
+                </div>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: one filing cabinet, many labels</h4>
+                    <p>Picture one huge filing cabinet. Every document goes into the same kind of folder with the same fields (title, content, author, date, status), and a colored label says what it is: blog post, page, image, old draft, menu. WordPress code that works on "a folder" (saving, revisions, permissions, the REST API) therefore works on every label at once. That is why a custom post type is so powerful, and why you will find templates and menus in the same table as blog posts.</p>
+                </div>
+
+                <h3>A post as PHP sees it: <code>WP_Post</code></h3>
+                <p><code>get_post()</code> returns one row as a <code>WP_Post</code> object, whose properties are the table's columns. Look at the "Hello world!" post (ID 1):</p>
+                <pre data-cli><code class="language-bash">wp post get 1 --fields=ID,post_type,post_status,post_name,post_title,post_author,post_parent,comment_status</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+----------------+--------------+
+| Field          | Value        |
++----------------+--------------+
+| ID             | 1            |
+| post_author    | 1            |
+| post_title     | Hello world! |
+| post_status    | publish      |
+| comment_status | open         |
+| post_name      | hello-world  |
+| post_parent    | 0            |
+| post_type      | post         |
++----------------+--------------+</code></pre>
+                </div>
+                <p><code>post_name</code> is the <strong>slug</strong>, the last part of the URL (<code>/hello-world/</code>). <code>post_author</code> is a user ID, <code>post_parent</code> a post ID (0 = none). The dates (<code>post_date</code>, <code>post_date_gmt</code>, <code>post_modified</code>) are left out above because they are the moment your site was installed. Fields that every post type shares live here; anything extra, such as a book's price, goes into <strong>post meta</strong>, a key-value table attached to the post (Lesson 2.2 shows the table, Lesson 5.2 registers <code>pagesco_price</code>).</p>
+            </section>
+
+            <section id="posts-pages" class="lesson-section">
+                <h2>📰 Posts, Pages and Statuses</h2>
+                <p>Posts and pages share the table and the editor, but WordPress treats them differently on purpose:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th></th><th>Posts (<code>post</code>)</th><th>Pages (<code>page</code>)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>For</td><td>Dated content that flows: news, articles, announcements</td><td>Timeless content: About, Contact, Shipping, Events</td></tr>
+                            <tr><td>Listed</td><td>On the blog page, in archives by date, category, tag and author, in the RSS feed</td><td>Nowhere automatically; you link or menu them</td></tr>
+                            <tr><td>Organized by</td><td>Categories and tags</td><td>Hierarchy: a parent page and an order (<code>post_parent</code>, <code>menu_order</code>)</td></tr>
+                            <tr><td>Hierarchical</td><td>No</td><td>Yes: <code>/events/book-club/</code></td></tr>
+                            <tr><td>Excerpts, formats</td><td>Yes</td><td>No, by default</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The differences are not hard-coded; they come from each type's registration, which you can query. <code>post_type_supports()</code> answers "does this type have feature X?":</p>
+                <pre data-cli><code class="language-bash">wp eval 'var_dump( is_post_type_hierarchical( "page" ), post_type_supports( "page", "excerpt" ), post_type_supports( "page", "page-attributes" ), get_object_taxonomies( "post" ), get_object_taxonomies( "page" ) );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>bool(true)
+bool(false)
+bool(true)
+array(3) {
+  [0]=&gt;
+  string(8) "category"
+  [1]=&gt;
+  string(8) "post_tag"
+  [2]=&gt;
+  string(11) "post_format"
+}
+array(0) {
+}</code></pre>
+                </div>
+                <p>Pages are hierarchical, have no excerpt, and have "page attributes" (parent and order); posts have three taxonomies, pages none. When you register the <code>book</code> type in Lesson 5.2 you will set exactly these switches yourself.</p>
+
+                <h3>Post statuses</h3>
+                <p>Every row also has a <code>post_status</code>, which decides who can see it:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Status</th><th>Admin label</th><th>Means</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>publish</code></td><td>Published</td><td>Public at its URL</td></tr>
+                            <tr><td><code>future</code></td><td>Scheduled</td><td>Published automatically at its date (by WP-Cron, Lesson 7.3)</td></tr>
+                            <tr><td><code>draft</code></td><td>Draft</td><td>Saved, visible only in the admin</td></tr>
+                            <tr><td><code>pending</code></td><td>Pending Review</td><td>A contributor submitted it; an editor must publish it</td></tr>
+                            <tr><td><code>private</code></td><td>Private</td><td>Published, but only for logged-in users who may read private posts</td></tr>
+                            <tr><td><code>trash</code></td><td>Trash</td><td>Deleted, restorable for 30 days</td></tr>
+                            <tr><td><code>auto-draft</code></td><td>(none)</td><td>An empty post the editor created when you clicked "Add"; cleaned up automatically</td></tr>
+                            <tr><td><code>inherit</code></td><td>(none)</td><td>Revisions and attachments: they take the status of their parent</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Careful when you list content: tools differ in their defaults. Compare WP-CLI's list with <code>get_posts()</code>:</p>
+                <pre data-cli><code class="language-bash">wp post list --post_type=page --orderby=ID --order=ASC --fields=ID,post_title,post_name,post_status
+wp eval 'foreach ( get_posts( array( "post_type" =&gt; "page" ) ) as $page ) { echo $page-&gt;ID, " ", $page-&gt;post_title, " ", $page-&gt;post_status, "\n"; }'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+----+----------------+----------------+-------------+
+| ID | post_title     | post_name      | post_status |
++----+----------------+----------------+-------------+
+| 2  | Sample Page    | sample-page    | publish     |
+| 3  | Privacy Policy | privacy-policy | draft       |
++----+----------------+----------------+-------------+
+2 Sample Page publish</code></pre>
+                </div>
+                <p>WP-CLI lists posts of <em>every</em> status unless you pass <code>--post_status</code>, so the draft Privacy Policy page (which WordPress created for you to finish) is there. <code>get_posts()</code> (Lesson 1.3) and <code>WP_Query</code> (Lesson 4.2) default to <code>'post_status' =&gt; 'publish'</code>, so PHP sees only the Sample Page. The front end follows the PHP rule: a visitor never sees a draft.</p>
+            </section>
+
+            <section id="taxonomies" class="lesson-section">
+                <h2>🏷️ Categories, Tags and Terms</h2>
+                <p>A <strong>taxonomy</strong> is a way of grouping content, and a <strong>term</strong> is one group in it. Categories and tags are the two taxonomies posts get out of the box. The only real difference between them is that categories are hierarchical (Fiction &gt; Science Fiction) and tags are flat; editors use categories for a site's few main sections and tags for many small topics.</p>
+                <pre data-cli><code class="language-bash">wp taxonomy list --fields=name,label,hierarchical,public
+wp term list category --fields=term_id,name,slug,count</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+-----------------------+---------------------+--------------+--------+
+| name                  | label               | hierarchical | public |
++-----------------------+---------------------+--------------+--------+
+| category              | Categories          | 1            | 1      |
+| post_tag              | Tags                |              | 1      |
+| nav_menu              | Navigation Menus    |              |        |
+| post_format           | Formats             |              | 1      |
+| wp_theme              | Themes              |              |        |
+| wp_template_part_area | Template Part Areas |              |        |
+| wp_pattern_category   | Pattern Categories  |              |        |
++-----------------------+---------------------+--------------+--------+
++---------+---------------+---------------+-------+
+| term_id | name          | slug          | count |
++---------+---------------+---------------+-------+
+| 1       | Uncategorized | uncategorized | 1     |
++---------+---------------+---------------+-------+</code></pre>
+                </div>
+                <p>Besides the two you know, <code>post_format</code> (Aside, Gallery, Quote...) is a taxonomy too, and four internal ones help menus, themes and patterns find their items. There is exactly one category, "Uncategorized", with one post: every post must have at least one category, and WordPress assigns the one named in the <code>default_category</code> option when you choose none. You will add a News category in the project. In Lesson 5.2 you register a taxonomy of your own, <code>genre</code>, hierarchical like categories, for books.</p>
+                <p>Terms are stored once and linked to any number of posts; a term's <code>count</code> is how many published posts use it. In PHP:</p>
+                <pre data-cli><code class="language-bash">wp eval 'foreach ( get_the_terms( 1, "category" ) as $term ) { echo $term-&gt;term_id, " ", $term-&gt;name, " (", get_class( $term ), ")\n"; } var_dump( has_term( "uncategorized", "category", 1 ) );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>1 Uncategorized (WP_Term)
+bool(true)</code></pre>
+                </div>
+            </section>
+
+            <section id="media" class="lesson-section">
+                <h2>🖼️ Media: Attachments Are Posts Too</h2>
+                <p>An uploaded file is two things: the file in <code>wp-content/uploads/</code> and a post of type <code>attachment</code> that describes it (title, alt text, caption, the post it was uploaded to). For images, WordPress also generates smaller copies in the sizes defined under Settings &gt; Media. Twenty Twenty-Five ships a picture of a book cover, so you can import it without downloading anything. By default uploads go into year and month folders (<code>uploads/2026/10/</code>); switch that off for this demo so your paths match the lesson exactly, and switch it back afterwards:</p>
+                <pre data-cli><code class="language-bash">wp option update uploads_use_yearmonth_folders 0
+wp media import wp-content/themes/twentytwentyfive/assets/images/book-image.webp --title="The Stories Book cover" --alt="Cover of The Stories Book: a plaster bust on a black background"</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Updated 'uploads_use_yearmonth_folders' option.
+Imported file 'wp-content/themes/twentytwentyfive/assets/images/book-image.webp' as attachment ID 5.
+Success: Imported 1 of 1 images.</code></pre>
+                </div>
+                <pre data-cli><code class="language-bash">wp post get 5 --fields=ID,post_type,post_status,post_title,post_mime_type,post_parent
+wp post meta get 5 _wp_attachment_image_alt
+find wp-content/uploads -name '*.webp' | sort</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+----------------+------------------------+
+| Field          | Value                  |
++----------------+------------------------+
+| ID             | 5                      |
+| post_title     | The Stories Book cover |
+| post_status    | inherit                |
+| post_parent    | 0                      |
+| post_type      | attachment             |
+| post_mime_type | image/webp             |
++----------------+------------------------+
+Cover of The Stories Book: a plaster bust on a black background
+wp-content/uploads/book-image-150x150.webp
+wp-content/uploads/book-image-214x300.webp
+wp-content/uploads/book-image-730x1024.webp
+wp-content/uploads/book-image-768x1077.webp
+wp-content/uploads/book-image.webp</code></pre>
+                </div>
+                <p>Attachment 5 is a post with the status <code>inherit</code> and a MIME type; its alt text lives in post meta under <code>_wp_attachment_image_alt</code> (the leading underscore hides a meta key from the editor's Custom Fields panel). On disk there is the original plus four resized copies. Their widths come from options, and the details are stored in the attachment's metadata:</p>
+                <pre data-cli><code class="language-bash">wp eval '$meta = wp_get_attachment_metadata( 5 ); echo "original: {$meta["width"]}x{$meta["height"]}\n"; foreach ( $meta["sizes"] as $name =&gt; $size ) { echo "$name: {$size["width"]}x{$size["height"]} {$size["file"]}\n"; } echo "medium_size_w option: ", get_option( "medium_size_w" ), "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>original: 826x1158
+medium: 214x300 book-image-214x300.webp
+large: 730x1024 book-image-730x1024.webp
+thumbnail: 150x150 book-image-150x150.webp
+medium_large: 768x1077 book-image-768x1077.webp
+medium_size_w option: 300</code></pre>
+                </div>
+                <p>The cover is taller than wide, so "medium" (300 × 300 at most) became 214 × 300, and "large" (1024 at most) 730 × 1024. No 1536 or 2048 copies were made because the original is smaller. When a theme prints the image, it asks for a size and WordPress writes the <code>srcset</code> that lets the browser choose:</p>
+                <pre data-cli><code class="language-bash">wp eval 'echo wp_get_attachment_image( 5, "medium" ), "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;img width="214" height="300" src="http://localhost:8080/wp-content/uploads/book-image-214x300.webp" class="attachment-medium size-medium" alt="Cover of The Stories Book: a plaster bust on a black background" decoding="async" loading="lazy" srcset="http://localhost:8080/wp-content/uploads/book-image-214x300.webp 214w, http://localhost:8080/wp-content/uploads/book-image-730x1024.webp 730w, http://localhost:8080/wp-content/uploads/book-image-768x1077.webp 768w, http://localhost:8080/wp-content/uploads/book-image.webp 826w" sizes="auto, (max-width: 214px) 100vw, 214px" /&gt;</code></pre>
+                </div>
+                <p>Width, height, alt text from the meta, <code>loading="lazy"</code> for speed and a <code>srcset</code> listing every copy: one function call, and the reason never to hard-code <code>&lt;img&gt;</code> tags for uploaded images (Lesson 8.2 comes back to this). The demo is done: delete the attachment (with <code>--force</code> WordPress also deletes the files) and restore the folder setting.</p>
+                <pre data-cli><code class="language-bash">wp post delete 5 --force
+wp option update uploads_use_yearmonth_folders 1
+find wp-content/uploads -name '*.webp'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Deleted post 5.
+Success: Updated 'uploads_use_yearmonth_folders' option.</code></pre>
+                </div>
+            </section>
+
+            <section id="revisions" class="lesson-section">
+                <h2>🕓 Revisions, Autosaves and Trash</h2>
+                <p>Every time a post or page is updated, WordPress stores a copy of the new version as a <code>revision</code> post whose parent is the post. The editor's Revisions screen lets you compare and restore them. Watch it from the command line with a throwaway post:</p>
+                <pre data-cli><code class="language-bash">wp post create --post_title="Revision demo" --post_content="Version one." --post_status=draft --porcelain
+wp post update 6 --post_content="Version two."
+wp post update 6 --post_content="Version three."
+wp post list --post_type=revision --post_parent=6 --orderby=ID --order=ASC --fields=ID,post_name,post_content,post_status</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>6
+Success: Updated post 6.
+Success: Updated post 6.
++----+---------------+----------------+-------------+
+| ID | post_name     | post_content   | post_status |
++----+---------------+----------------+-------------+
+| 7  | 6-revision-v1 | Version two.   | inherit     |
+| 8  | 6-revision-v1 | Version three. | inherit     |
++----+---------------+----------------+-------------+</code></pre>
+                </div>
+                <p>Two revisions for two updates (sorted by ID here; both happened in the same second), each named <code>&lt;parent&gt;-revision-v1</code>. Look closely at the content: the newest revision <em>equals</em> the current post ("Version three."). Core's own comment in <code>wp-includes/revision.php</code> says it: "every update is a revision, and the most recent revision always matches the current post". The very first version ("Version one.") has no revision, because creating a post is not an update. In the editor you rarely notice, since the first save of a new post is already an update of the auto-draft the editor created.</p>
+                <pre data-cli><code class="language-bash">wp eval 'var_dump( WP_POST_REVISIONS, wp_revisions_to_keep( get_post( 6 ) ), AUTOSAVE_INTERVAL, EMPTY_TRASH_DAYS );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>bool(true)
+int(-1)
+int(60)
+int(30)</code></pre>
+                </div>
+                <ul>
+                    <li><code>WP_POST_REVISIONS</code> is <code>true</code>, so <code>wp_revisions_to_keep()</code> says <code>-1</code>: keep every revision. Many hosts set a number such as <code>define( 'WP_POST_REVISIONS', 10 );</code> in <code>wp-config.php</code> so busy sites do not collect thousands; <code>false</code> turns revisions off.</li>
+                    <li>The editor <strong>autosaves</strong> every 60 seconds (<code>AUTOSAVE_INTERVAL</code>). An autosave is a special revision, one per user and post, named <code>&lt;parent&gt;-autosave-v1</code>, that the editor offers to restore after a crash.</li>
+                    <li>Trash is a status, not a deletion: trashed posts are deleted for good after 30 days (<code>EMPTY_TRASH_DAYS</code>). <code>wp post delete</code> trashes; <code>--force</code> deletes immediately, revisions included.</li>
+                </ul>
+                <pre data-cli><code class="language-bash">wp post delete 6 --force
+wp post list --post_type=revision --format=count</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Deleted post 6.
+0</code></pre>
+                </div>
+            </section>
+
+            <section id="users" class="lesson-section">
+                <h2>👥 Users, Roles and Capabilities</h2>
+                <p>Three ideas, often mixed up:</p>
+                <ul>
+                    <li>A <strong>capability</strong> is one permission with a name: <code>edit_posts</code>, <code>publish_pages</code>, <code>upload_files</code>, <code>manage_options</code>.</li>
+                    <li>A <strong>role</strong> is a named bundle of capabilities: Editor, Author.</li>
+                    <li>A <strong>user</strong> has a role (occasionally several, or extra single capabilities). Code asks "can this user do X?", never "is this user an editor?".</li>
+                </ul>
+                <pre data-cli><code class="language-bash">wp role list
+wp cap list author</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+---------------+---------------+
+| name          | role          |
++---------------+---------------+
+| Administrator | administrator |
+| Editor        | editor        |
+| Author        | author        |
+| Contributor   | contributor   |
+| Subscriber    | subscriber    |
++---------------+---------------+
+upload_files
+edit_posts
+edit_published_posts
+publish_posts
+read
+level_2
+level_1
+level_0
+delete_posts
+delete_published_posts</code></pre>
+                </div>
+                <p>Five roles on a single site (a multisite network adds Super Admin). An author may write, publish, edit and delete <em>their own</em> posts and upload files; the <code>level_*</code> entries are leftovers from WordPress 1.x kept for old plugins. The roles stack up:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Role</th><th>Can, in short</th><th>Typical person at Pages &amp; Co.</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Administrator</td><td>Everything: plugins, themes, users, settings</td><td>The owner, the developer</td></tr>
+                            <tr><td>Editor</td><td>All posts and pages, anyone's, plus categories and comments; no settings or plugins</td><td>Maria, who runs the website content</td></tr>
+                            <tr><td>Author</td><td>Write, publish and edit own posts, upload files; no pages</td><td>Devon, who writes staff picks</td></tr>
+                            <tr><td>Contributor</td><td>Write own posts, submit them for review; cannot publish or upload</td><td>A guest reviewer</td></tr>
+                            <tr><td>Subscriber</td><td>Read, manage own profile</td><td>A registered customer</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>In PHP, <code>current_user_can()</code> checks the logged-in user and <code>user_can()</code> any user. Both take a capability. Some capabilities are <strong>meta capabilities</strong> that need an object: <code>edit_post</code> with a post ID asks "may this user edit <em>this</em> post?", and WordPress maps it to <code>edit_posts</code>, <code>edit_others_posts</code> or <code>edit_published_posts</code> depending on who wrote it and its status.</p>
+                <pre data-cli><code class="language-bash">wp eval 'var_dump( user_can( 1, "manage_options" ), user_can( 1, "edit_post", 1 ), current_user_can( "edit_posts" ) );'
+wp eval 'var_dump( current_user_can( "edit_posts" ) );' --user=admin</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>bool(true)
+bool(true)
+bool(false)
+bool(true)</code></pre>
+                </div>
+                <p>The last two answers differ only because of <code>--user=admin</code>: WP-CLI runs as nobody unless you name a user, and a nobody can do nothing. The same happens in your code when it runs too early or in a scheduled task. Where the role is stored: in user meta, as a serialized array, plus the old user level:</p>
+                <pre data-cli><code class="language-bash">wp user meta list 1 --keys=wp_capabilities,wp_user_level</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+---------+-----------------+---------------------------------+
+| user_id | meta_key        | meta_value                      |
++---------+-----------------+---------------------------------+
+| 1       | wp_capabilities | a:1:{s:13:"administrator";b:1;} |
+| 1       | wp_user_level   | 10                              |
++---------+-----------------+---------------------------------+</code></pre>
+                </div>
+                <p>Notice the key starts with the table prefix, <code>wp_</code>, which is why you always use the API (<code>$user-&gt;roles</code>, <code>$user-&gt;add_role()</code>, <code>add_cap()</code>) rather than this meta. Lesson 5.3 adds capability checks to every form, and the Pages &amp; Co. plugin may add its own capabilities for books.</p>
+            </section>
+
+            <section id="settings" class="lesson-section">
+                <h2>⚙️ Settings Are Options</h2>
+                <p>Every field on every Settings screen is a row in <code>wp_options</code>, a simple name-value table, read with <code>get_option()</code> and written with <code>update_option()</code> (or <code>wp option get</code> / <code>update</code>). Knowing the option behind a field is a daily developer skill: themes and plugins read them, and you set them in scripts and deployments.</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Screen</th><th>Some fields → options</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Settings &gt; General</td><td>Site Title <code>blogname</code>, Tagline <code>blogdescription</code>, WordPress Address <code>siteurl</code>, Site Address <code>home</code>, Administration Email <code>admin_email</code>, Timezone <code>timezone_string</code> / <code>gmt_offset</code>, Date Format <code>date_format</code>, New User Default Role <code>default_role</code></td></tr>
+                            <tr><td>Settings &gt; Writing</td><td>Default Post Category <code>default_category</code>, Default Post Format <code>default_post_format</code></td></tr>
+                            <tr><td>Settings &gt; Reading</td><td>Your homepage displays <code>show_on_front</code> (<code>posts</code> or <code>page</code>), Homepage <code>page_on_front</code>, Posts page <code>page_for_posts</code>, Blog pages show at most <code>posts_per_page</code>, Search engine visibility <code>blog_public</code></td></tr>
+                            <tr><td>Settings &gt; Discussion</td><td>Allow comments on new posts <code>default_comment_status</code>, Comment must be manually approved <code>comment_moderation</code></td></tr>
+                            <tr><td>Settings &gt; Media</td><td>Thumbnail size <code>thumbnail_size_w</code> / <code>_h</code>, Medium <code>medium_size_w</code>, Organize uploads into folders <code>uploads_use_yearmonth_folders</code></td></tr>
+                            <tr><td>Settings &gt; Permalinks</td><td>Permalink structure <code>permalink_structure</code>, Category base <code>category_base</code></td></tr>
+                            <tr><td>Settings &gt; Privacy</td><td>Privacy Policy page <code>wp_page_for_privacy_policy</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <pre data-cli><code class="language-bash">wp eval 'foreach ( array( "show_on_front", "posts_per_page", "date_format", "timezone_string", "gmt_offset", "default_role", "default_category", "wp_page_for_privacy_policy" ) as $name ) { printf( "%-27s %s\n", $name, var_export( get_option( $name ), true ) ); }'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>show_on_front               'posts'
+posts_per_page              '10'
+date_format                 'F j, Y'
+timezone_string             ''
+gmt_offset                  '0'
+default_role                'subscriber'
+default_category            '1'
+wp_page_for_privacy_policy  '3'</code></pre>
+                </div>
+                <p>Notice the types: every value is a string, even <code>posts_per_page</code> (<code>'10'</code>) and the IDs: options are text in the database, the strict-types trap from Lesson 1.3. The home page lists your latest posts (<code>posts</code>), there is no timezone city, only a UTC offset of 0, new users get the role <code>subscriber</code>, new posts land in category 1 (Uncategorized), and the Privacy Policy page is post 3. Settings &gt; <strong>Connectors</strong>, new in WordPress 7.0, is where a site owner connects AI providers for the AI features in core; Lesson 9.2 looks at it. Plugins add their own screens; yours will store its settings in one option, <code>pagesco_books_settings</code> (Lesson 5.4).</p>
+            </section>
+
+            <section id="blocks" class="lesson-section">
+                <h2>🧱 The Block Editor as a Developer Sees It</h2>
+                <p>In Lesson 1.1 you switched the editor to its Code editor (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd>, or the ⋮ Options menu) and saw HTML wrapped in comments. That text is exactly what is stored in <code>post_content</code>:</p>
+                <pre data-cli><code class="language-bash">wp post get 1 --field=post_content</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;Welcome to WordPress. This is your first post. Edit or delete it, then start writing!&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;</code></pre>
+                </div>
+                <p>This is <strong>block markup</strong> (core calls it the serialized block format). Each block is an HTML comment that opens <code>&lt;!-- wp:paragraph --&gt;</code>, the block's saved HTML, and a closing comment. The rules:</p>
+                <ul>
+                    <li>The name after <code>wp:</code> is the block type; core blocks drop their <code>core/</code> namespace (<code>wp:paragraph</code> is <code>core/paragraph</code>), other blocks keep it (<code>wp:pagesco/book-card</code>, Lesson 6.2).</li>
+                    <li><strong>Attributes</strong> that are not visible in the HTML are stored as JSON in the opening comment: <code>&lt;!-- wp:heading {"level":3} --&gt;</code>.</li>
+                    <li>Blocks nest: a list block contains list-item blocks, a group contains anything.</li>
+                    <li><strong>Dynamic</strong> blocks have no saved HTML at all, just a self-closing comment such as <code>&lt;!-- wp:latest-posts {"postsToShow":3} /--&gt;</code>. PHP renders them on every page view (Lesson 6.3).</li>
+                    <li>Content without any block comments is "freeform": the editor shows it in a Classic block (Common Mistakes 4).</li>
+                </ul>
+                <p>Because it is just text, PHP can read it. <code>parse_blocks()</code> turns markup into an array of blocks; save this as <code>wordpress/blocks-demo.php</code>:</p>
+                <pre data-file="blocks-demo.php"><code class="language-php">&lt;?php
+$pagesco_markup = '&lt;!-- wp:heading {"level":3} --&gt;
+&lt;h3 class="wp-block-heading"&gt;Opening hours&lt;/h3&gt;
+&lt;!-- /wp:heading --&gt;
+
+&lt;!-- wp:list --&gt;
+&lt;ul class="wp-block-list"&gt;&lt;!-- wp:list-item --&gt;
+&lt;li&gt;Thursday: 9 a.m. to 9 p.m.&lt;/li&gt;
+&lt;!-- /wp:list-item --&gt;&lt;/ul&gt;
+&lt;!-- /wp:list --&gt;
+
+&lt;!-- wp:latest-posts {"postsToShow":1} /--&gt;';
+
+foreach ( parse_blocks( $pagesco_markup ) as $pagesco_block ) {
+	if ( null === $pagesco_block['blockName'] ) {
+		continue; // The blank lines between blocks come back as empty "freeform" blocks.
+	}
+	printf(
+		"%-18s attrs=%s inner=%d\n",
+		$pagesco_block['blockName'],
+		wp_json_encode( $pagesco_block['attrs'] ),
+		count( $pagesco_block['innerBlocks'] )
+	);
+}
+
+echo "\n", do_blocks( $pagesco_markup ), "\n";</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file blocks-demo.php
+rm blocks-demo.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>core/heading       attrs={"level":3} inner=0
+core/list          attrs=[] inner=1
+core/latest-posts  attrs={"postsToShow":1} inner=0
+
+
+&lt;h3 class="wp-block-heading"&gt;Opening hours&lt;/h3&gt;
+
+
+
+&lt;ul class="wp-block-list"&gt;
+&lt;li&gt;Thursday: 9 a.m. to 9 p.m.&lt;/li&gt;
+&lt;/ul&gt;
+
+
+&lt;ul class="wp-block-latest-posts__list wp-block-latest-posts is-layout-flow wp-block-latest-posts-is-layout-flow"&gt;&lt;li&gt;&lt;a class="wp-block-latest-posts__post-title" href="http://localhost:8080/hello-world/"&gt;Hello world!&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;</code></pre>
+                </div>
+                <p>Three blocks: the heading with its <code>level</code> attribute, the list with one inner block, and Latest Posts with its attribute. <code>do_blocks()</code> renders the markup the way a page view does: static blocks print their saved HTML (with the comments removed), and the dynamic Latest Posts block ran PHP to produce a list with a link to "Hello world!", which never appeared in the markup. On the front end, <code>do_blocks()</code> runs as part of the <code>the_content</code> filter (Lesson 2.3 lists it at priority 9).</p>
+
+                <div class="card card-warning">
+                    <h4>⚠️ The saved HTML must match what the block would save</h4>
+                    <p>For static blocks the editor checks, when it opens a post, that the stored HTML is exactly what the block's own save function produces from the attributes. If you hand-edit the HTML of a block (a different class, a missing <code>wp-block-heading</code>), the front end shows your HTML happily, but the editor marks the block as invalid and offers to recover it. Write block markup in the editor and copy it from the Code editor, or produce it from known-good examples like the ones in this lesson.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h4>🧩 Version note: labels that changed in recent versions</h4>
+                    <p>Older tutorials use names the admin no longer shows. "Reusable blocks" became <strong>synced patterns</strong> in WordPress 6.3 (still the <code>wp_block</code> post type, managed under Patterns in the Site Editor). The "Full Site Editor" is just the <strong>Site Editor</strong> (Appearance &gt; Editor). The WordPress 7.0 admin redesign changed the look and color scheme of every screen, but menu names and the content model are the same as described here; Settings gained Connectors.</p>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <p>None of these produces a PHP error. That is what makes them worth seeing once: WordPress does exactly what you asked, which is not what you meant.</p>
+
+                <h3>1. Forgetting to publish (draft by default)</h3>
+                <pre data-cli><code class="language-bash">wp post create --post_type=page --post_title="Gift Cards" --porcelain
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/gift-cards/
+wp post get 9 --fields=post_status,post_name</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>9
+404
++-------------+-------+
+| Field       | Value |
++-------------+-------+
+| post_status | draft |
+| post_name   |       |
++-------------+-------+</code></pre>
+                </div>
+                <p><strong>What it means:</strong> <code>wp post create</code> and <code>wp_insert_post()</code> default to <code>draft</code>, and a draft has no slug yet (WordPress makes one when it is published), so the URL gives <code>404</code>. Logged in, you might even see the page through a preview link and believe it is live. <strong>Fix:</strong> pass <code>--post_status=publish</code> (in PHP, <code>'post_status' =&gt; 'publish'</code>), and check pages from a logged-out browser or with <code>curl</code>.</p>
+                <pre data-cli><code class="language-bash">wp post delete 9 --force</code></pre>
+
+                <h3>2. A slug that is already taken</h3>
+                <pre data-cli><code class="language-bash">wp post create --post_type=page --post_title="Sample Page" --post_status=publish --porcelain
+wp post list --post_type=page --orderby=ID --order=ASC --fields=ID,post_title,post_name
+wp post delete 10
+wp post list --post_type=page --post_status=trash --fields=ID,post_name</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>10
++----+----------------+----------------+
+| ID | post_title     | post_name      |
++----+----------------+----------------+
+| 2  | Sample Page    | sample-page    |
+| 3  | Privacy Policy | privacy-policy |
+| 10 | Sample Page    | sample-page-2  |
++----+----------------+----------------+
+Success: Trashed post 10.
++----+------------------------+
+| ID | post_name              |
++----+------------------------+
+| 10 | sample-page-2__trashed |
++----+------------------------+</code></pre>
+                </div>
+                <p><strong>What it means:</strong> slugs must be unique among pages, so the second "Sample Page" silently became <code>sample-page-2</code>, and links you wrote to <code>/sample-page/</code> still go to the old one. Trashing renames the slug to <code>sample-page-2__trashed</code>, which frees the name for a new page while the old one waits in the trash. <strong>Fix:</strong> check <code>post_name</code> after creating content, set it explicitly with <code>--post_name</code> (<code>'post_name'</code> in PHP), and empty the trash of pages you replaced.</p>
+                <pre data-cli><code class="language-bash">wp post delete 10 --force</code></pre>
+
+                <h3>3. Checking a role instead of a capability</h3>
+                <pre data-cli><code class="language-bash">wp eval '$user = wp_get_current_user(); var_dump( in_array( "editor", $user-&gt;roles, true ), current_user_can( "edit_others_posts" ) );' --user=admin</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>bool(false)
+bool(true)</code></pre>
+                </div>
+                <p><strong>What it means:</strong> code meant for "people who can edit everyone's posts" asked whether the user is an editor, and locked out the administrator, who can do more than an editor but does not have that role. It would also break on sites with custom roles such as "Shop Manager". <strong>Fix:</strong> always check the capability the feature needs: <code>current_user_can( 'edit_others_posts' )</code>.</p>
+
+                <h3>4. HTML without block comments</h3>
+                <pre data-cli><code class="language-bash">wp eval 'foreach ( parse_blocks( "&lt;h2&gt;Opening hours&lt;/h2&gt;&lt;p&gt;Daily 9 to 6.&lt;/p&gt;" ) as $b ) { var_dump( $b["blockName"] ); }'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>NULL</code></pre>
+                </div>
+                <p><strong>What it means:</strong> content saved without block comments (by an old plugin, an import, or a script that sets <code>post_content</code> to plain HTML) is one block with no name: freeform content. The front end shows it fine, but the editor wraps all of it in a single Classic block, so the editor's heading and paragraph tools do not apply until someone clicks "Convert to blocks". <strong>Fix:</strong> when your code writes content that people will edit, write block markup.</p>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Stock the Pages &amp; Co. Site</h2>
+                <p>Pages &amp; Co. needs real content before you build a theme for it: staff who can log in with the right permissions, the three pages every shop site has, and a News section. You will create it all with WP-CLI from files of block markup, the way developers seed a site for a client. Every later lesson starts from this content, so use the names exactly. Allow about 40 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: Staff accounts <span class="step-time">(8 min)</span></h3>
+                    <p>Maria Lopez runs the website content (Editor); Devon Park writes staff picks (Author). The passwords follow the course pattern for development sites (Lesson 8.4 is about real ones):</p>
+                    <pre data-cli><code class="language-bash">wp user create maria maria@example.com --role=editor --user_pass=maria-pass --first_name=Maria --last_name=Lopez --display_name="Maria Lopez"
+wp user create devon devon@example.com --role=author --user_pass=devon-pass --first_name=Devon --last_name=Park --display_name="Devon Park"
+wp user list --fields=ID,user_login,display_name,user_email,roles</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Success: Created user 2.
+Success: Created user 3.
++----+------------+--------------+-----------------------+---------------+
+| ID | user_login | display_name | user_email            | roles         |
++----+------------+--------------+-----------------------+---------------+
+| 1  | admin      | admin        | wordpress@example.com | administrator |
+| 3  | devon      | Devon Park   | devon@example.com     | author        |
+| 2  | maria      | Maria Lopez  | maria@example.com     | editor        |
++----+------------+--------------+-----------------------+---------------+</code></pre>
+                    </div>
+                    <p>Maria is user 2, Devon user 3. WP-CLI does not email them (it would with <code>--send-email</code>, and Mailpit would catch it). Log in as each in a private browser window at <code>http://localhost:8080/wp-login.php</code> and compare their admin menus with yours.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: The three pages <span class="step-time">(12 min)</span></h3>
+                    <p>Write each page's content as block markup in a file. Create the folder <code>wordpress/pagesco-content/</code> and save these three files in it. (Typing them in the editor and copying the Code editor's text gives the same markup.)</p>
+                    <pre data-file="pagesco-content/about.html"><code class="language-html">&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;Pages &amp;amp; Co. is an independent bookstore with a big reading corner, a small café and staff who love to talk about books.&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;
+
+&lt;!-- wp:heading --&gt;
+&lt;h2 class="wp-block-heading"&gt;Opening hours&lt;/h2&gt;
+&lt;!-- /wp:heading --&gt;
+
+&lt;!-- wp:list --&gt;
+&lt;ul class="wp-block-list"&gt;&lt;!-- wp:list-item --&gt;
+&lt;li&gt;Monday to Wednesday, Friday: 9 a.m. to 6 p.m.&lt;/li&gt;
+&lt;!-- /wp:list-item --&gt;
+
+&lt;!-- wp:list-item --&gt;
+&lt;li&gt;Thursday: 9 a.m. to 9 p.m.&lt;/li&gt;
+&lt;!-- /wp:list-item --&gt;
+
+&lt;!-- wp:list-item --&gt;
+&lt;li&gt;Saturday: 10 a.m. to 5 p.m.&lt;/li&gt;
+&lt;!-- /wp:list-item --&gt;&lt;/ul&gt;
+&lt;!-- /wp:list --&gt;</code></pre>
+                    <pre data-file="pagesco-content/contact.html"><code class="language-html">&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;Visit us at 12 Market Street, call 555-0142, or write to &lt;a href="mailto:hello@example.com"&gt;hello@example.com&lt;/a&gt;.&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;</code></pre>
+                    <pre data-file="pagesco-content/events.html"><code class="language-html">&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;Author readings, book clubs and story time for kids. The full calendar is coming soon.&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;</code></pre>
+                    <p><code>wp post create</code> reads the content from a file when you give it one. Maria creates the pages (<code>--user=maria</code> makes her the author, as if she had used the editor), published, with explicit slugs:</p>
+                    <pre data-cli><code class="language-bash">wp post create pagesco-content/about.html --post_type=page --post_title="About Us" --post_name=about --post_status=publish --user=maria --porcelain
+wp post create pagesco-content/contact.html --post_type=page --post_title="Contact" --post_name=contact --post_status=publish --user=maria --porcelain
+wp post create pagesco-content/events.html --post_type=page --post_title="Events" --post_name=events --post_status=publish --user=maria --porcelain</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>12
+13
+14</code></pre>
+                    </div>
+                    <pre data-web="/about/" data-select=".entry-content" data-text><code class="language-text">http://localhost:8080/about/   (the page's content, as text)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Pages &amp; Co. is an independent bookstore with a big reading corner, a small café and staff who love to talk about books.
+Opening hours
+Monday to Wednesday, Friday: 9 a.m. to 6 p.m.
+Thursday: 9 a.m. to 9 p.m.
+Saturday: 10 a.m. to 5 p.m.</code></pre>
+                    </div>
+                    <p>Open <code>http://localhost:8080/about/</code> in the browser too: Twenty Twenty-Five's header menu now lists your pages automatically, because its navigation menu (the <code>wp_navigation</code> post 4) contains a Page List block, which lists every published page.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: The News category and three posts <span class="step-time">(12 min)</span></h3>
+                    <p>Create the category, then three posts from block-markup files, written by Maria and Devon. The posts get explicit dates in the past (<code>--post_date</code>) so the newest-first order is the same on every site; WordPress fills in <code>post_date_gmt</code> from the site's timezone.</p>
+                    <pre data-cli><code class="language-bash">wp term create category News --slug=news --description="News from the shop" --porcelain</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>2</code></pre>
+                    </div>
+                    <pre data-file="pagesco-content/welcome.html"><code class="language-html">&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;Our new website is open! Browse our pages, read the shop news, and soon you will find our whole catalog here.&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;</code></pre>
+                    <pre data-file="pagesco-content/staff-picks.html"><code class="language-html">&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;Three books we keep pressing into customers' hands this season:&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;
+
+&lt;!-- wp:list --&gt;
+&lt;ul class="wp-block-list"&gt;&lt;!-- wp:list-item --&gt;
+&lt;li&gt;Dune by Frank Herbert&lt;/li&gt;
+&lt;!-- /wp:list-item --&gt;
+
+&lt;!-- wp:list-item --&gt;
+&lt;li&gt;The Hobbit by J.R.R. Tolkien&lt;/li&gt;
+&lt;!-- /wp:list-item --&gt;
+
+&lt;!-- wp:list-item --&gt;
+&lt;li&gt;Fahrenheit 451 by Ray Bradbury&lt;/li&gt;
+&lt;!-- /wp:list-item --&gt;&lt;/ul&gt;
+&lt;!-- /wp:list --&gt;
+
+&lt;!-- wp:quote --&gt;
+&lt;blockquote class="wp-block-quote"&gt;&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;It was a pleasure to burn.&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;&lt;cite&gt;Ray Bradbury, Fahrenheit 451&lt;/cite&gt;&lt;/blockquote&gt;
+&lt;!-- /wp:quote --&gt;</code></pre>
+                    <pre data-file="pagesco-content/book-club.html"><code class="language-html">&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;Our Thursday book club starts with &lt;em&gt;Dune&lt;/em&gt;. Join us at 7 p.m. in the reading corner; the first coffee is on us.&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;</code></pre>
+                    <pre data-cli><code class="language-bash">wp post create pagesco-content/welcome.html --post_title="Welcome to the new Pages &amp; Co. website" --post_name=welcome --post_category=news --post_status=publish --post_date="2026-09-01 10:00:00" --user=maria --porcelain
+wp post create pagesco-content/staff-picks.html --post_title="Staff picks for the season" --post_name=staff-picks --post_category=news --post_status=publish --post_date="2026-09-15 10:00:00" --user=devon --porcelain
+wp post create pagesco-content/book-club.html --post_title="Book club: Dune" --post_name=book-club-dune --post_category=news --post_status=publish --post_date="2026-10-01 10:00:00" --user=maria --porcelain</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>15
+16
+17</code></pre>
+                    </div>
+                    <pre data-web="/category/news/" data-select-all=".wp-block-post-title" data-text><code class="language-text">http://localhost:8080/category/news/   (the post titles, as text)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Book club: Dune
+Staff picks for the season
+Welcome to the new Pages &amp; Co. website</code></pre>
+                    </div>
+                    <p>The category archive lists the three News posts newest first. "Hello world!" stays in Uncategorized; you could delete it, but several lessons use it as a handy test post, so leave it.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 4: An edit, a permission check, and clean-up <span class="step-time">(8 min)</span></h3>
+                    <p>Maria adds a line to the About page, which creates its first revision. Add this paragraph at the end of <code>wordpress/pagesco-content/about.html</code>, then update page 12 (the ID the first create command printed) from the file:</p>
+                    <pre data-append="pagesco-content/about.html"><code class="language-html">&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;Questions about an order? See our Contact page.&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;</code></pre>
+                    <pre data-cli><code class="language-bash">wp post update 12 pagesco-content/about.html --user=maria
+wp post list --post_type=revision --post_parent=12 --fields=ID,post_name,post_author</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Success: Updated post 12.
++----+----------------+-------------+
+| ID | post_name      | post_author |
++----+----------------+-------------+
+| 18 | 12-revision-v1 | 2           |
++----+----------------+-------------+</code></pre>
+                    </div>
+                    <p>Devon is an author: he may publish posts but not touch pages. Log in as devon / devon-pass and open <strong>Pages</strong> by its URL, since the menu item is missing for him:</p>
+                    <pre data-web="/wp-admin/edit.php?post_type=page" data-login="devon" data-select="body" data-text><code class="language-text">http://localhost:8080/wp-admin/edit.php?post_type=page   (logged in as devon)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>You need a higher level of permission.
+Sorry, you are not allowed to edit posts in this post type.</code></pre>
+                    </div>
+                    <p>WordPress checked the capability <code>edit_pages</code>, which authors lack, and stopped. Finally, delete the content files (the content is in the database now) and check the result: the state the next lessons start from.</p>
+                    <pre data-cli data-checkpoint><code class="language-bash">rm -r pagesco-content
+wp post list --post_type=page,post --orderby=ID --order=ASC --fields=ID,post_type,post_title,post_name,post_author,post_status</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>+----+-----------+----------------------------------------+----------------+-------------+-------------+
+| ID | post_type | post_title                             | post_name      | post_author | post_status |
++----+-----------+----------------------------------------+----------------+-------------+-------------+
+| 1  | post      | Hello world!                           | hello-world    | 1           | publish     |
+| 2  | page      | Sample Page                            | sample-page    | 1           | publish     |
+| 3  | page      | Privacy Policy                         | privacy-policy | 1           | draft       |
+| 12 | page      | About Us                               | about          | 2           | publish     |
+| 13 | page      | Contact                                | contact        | 2           | publish     |
+| 14 | page      | Events                                 | events         | 2           | publish     |
+| 15 | post      | Welcome to the new Pages &amp; Co. website | welcome        | 2           | publish     |
+| 16 | post      | Staff picks for the season             | staff-picks    | 3           | publish     |
+| 17 | post      | Book club: Dune                        | book-club-dune | 2           | publish     |
++----+-----------+----------------------------------------+----------------+-------------+-------------+</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li>Users <code>maria</code> (Editor, Maria Lopez) and <code>devon</code> (Author, Devon Park) exist with the course passwords</li>
+                        <li>The pages About Us (<code>/about/</code>), Contact (<code>/contact/</code>) and Events (<code>/events/</code>) are published, written by Maria</li>
+                        <li>The category News (<code>news</code>) holds three published posts by Maria and Devon, listed at <code>/category/news/</code></li>
+                        <li>The About page has one revision, from Maria's edit</li>
+                        <li>Logged in as Devon, the Pages screen refuses access</li>
+                        <li><code>wordpress/pagesco-content/</code> is deleted</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>These explore the content model further. Each one undoes its changes at the end, so your site stays the way the next lesson expects. Try each before you open the solution.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Who May Do What?</h3>
+                    <p>Write one <code>wp eval</code> command (or a small file for <code>wp eval-file</code>) that prints a table: for the users admin, maria and devon, can they <code>publish_posts</code>, <code>edit_pages</code>, <code>edit_others_posts</code>, <code>upload_files</code> and <code>manage_options</code>? Predict the answers first. Then: may Devon edit the "Book club: Dune" post?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>get_user_by( 'login', 'maria' )</code> returns a <code>WP_User</code>; <code>user_can( $user, $cap )</code> checks it. For one specific post, use the meta capability <code>edit_post</code> with the post ID (17 is the book club post on the course site; yours is in the last list of the project).</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="exercise-caps.php"><code class="language-php">&lt;?php
+$pagesco_caps = array( 'publish_posts', 'edit_pages', 'edit_others_posts', 'upload_files', 'manage_options' );
+
+printf( "%-8s %s\n", '', implode( ' ', $pagesco_caps ) );
+foreach ( array( 'admin', 'maria', 'devon' ) as $pagesco_login ) {
+	$pagesco_user = get_user_by( 'login', $pagesco_login );
+	$pagesco_row  = array();
+	foreach ( $pagesco_caps as $pagesco_cap ) {
+		$pagesco_row[] = str_pad( user_can( $pagesco_user, $pagesco_cap ) ? 'yes' : '-', strlen( $pagesco_cap ) );
+	}
+	printf( "%-8s %s\n", $pagesco_login, implode( ' ', $pagesco_row ) );
+}
+
+$pagesco_devon = get_user_by( 'login', 'devon' );
+echo "\nDevon may edit post 17: ", user_can( $pagesco_devon, 'edit_post', 17 ) ? 'yes' : 'no', "\n";</code></pre>
+                        <pre data-cli><code class="language-bash">wp eval-file exercise-caps.php
+rm exercise-caps.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>         publish_posts edit_pages edit_others_posts upload_files manage_options
+admin    yes           yes        yes               yes          yes
+maria    yes           yes        yes               yes          -
+devon    yes           -          -                 yes          -
+
+Devon may edit post 17: no</code></pre>
+                        </div>
+                        <p>Maria can do everything about content but not <code>manage_options</code> (settings). Devon can publish and upload but neither edit pages nor other people's posts, so the meta capability <code>edit_post</code> for Maria's post 17 maps to <code>edit_others_posts</code> and says no.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Count the Blocks</h3>
+                    <p>Write a script that prints every block in the "Staff picks for the season" post, nested blocks indented under their parent, like an outline. How many blocks does the post contain in total?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Get the post by slug with <code>get_page_by_path( 'staff-picks', OBJECT, 'post' )</code>, parse <code>post_content</code>, and walk the array with a recursive function that receives the depth. Skip blocks whose <code>blockName</code> is <code>null</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="exercise-outline.php"><code class="language-php">&lt;?php
+function pagesco_print_blocks( $blocks, $depth = 0 ) {
+	$count = 0;
+	foreach ( $blocks as $block ) {
+		if ( null === $block['blockName'] ) {
+			continue;
+		}
+		echo str_repeat( '  ', $depth ), $block['blockName'], "\n";
+		$count += 1 + pagesco_print_blocks( $block['innerBlocks'], $depth + 1 );
+	}
+	return $count;
+}
+
+$pagesco_post  = get_page_by_path( 'staff-picks', OBJECT, 'post' );
+$pagesco_total = pagesco_print_blocks( parse_blocks( $pagesco_post-&gt;post_content ) );
+echo 'Total: ', $pagesco_total, " blocks\n";</code></pre>
+                        <pre data-cli><code class="language-bash">wp eval-file exercise-outline.php
+rm exercise-outline.php</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>core/paragraph
+core/list
+  core/list-item
+  core/list-item
+  core/list-item
+core/quote
+  core/paragraph
+Total: 7 blocks</code></pre>
+                        </div>
+                        <p>Seven blocks: three at the top (paragraph, list, quote), three list items inside the list and a paragraph inside the quote. The function prints the outline as it recurses and returns the count, which is why the total is computed before it is echoed. The editor's List View shows the same tree.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: A Static Front Page</h3>
+                    <p>Many shop sites show a page, not the latest posts, as their home page. Use WP-CLI to make About Us the home page, keeping the news at <code>/category/news/</code>. Check what <code>http://localhost:8080/</code> shows (the page's <code>&lt;title&gt;</code> is enough), then put the setting back.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Two options from Settings &gt; Reading: <code>show_on_front</code> must be <code>page</code> and <code>page_on_front</code> the page's ID. Read the old values first so you can restore them.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">wp option update show_on_front page
+wp option update page_on_front 12
+curl -s http://localhost:8080/ | grep -o '&lt;title&gt;.*&lt;/title&gt;'
+wp option update show_on_front posts
+wp option update page_on_front 0</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Success: Updated 'show_on_front' option.
+Success: Updated 'page_on_front' option.
+&lt;title&gt;Pages &amp;amp; Co.&lt;/title&gt;
+Success: Updated 'show_on_front' option.
+Success: Updated 'page_on_front' option.</code></pre>
+                        </div>
+                        <p>With a static front page the title is just the site name (WordPress treats the front page as the site's home). Setting both options back restores the list of latest posts.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 4: Deleting a User Safely (Stretch)</h3>
+                    <p>A guest reviewer, <code>sam</code> (Contributor), wrote one draft. When Sam leaves, what happens to the draft if you delete the account? Create Sam and a draft by Sam, delete Sam once <em>without</em> and once (after recreating both) <em>with</em> <code>--reassign=2</code>, and check where the draft went each time. Leave no trace of Sam. (Use the post IDs your own commands print; the ones below are the course site's.)</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>wp user create sam sam@example.com --role=contributor --porcelain</code>, <code>wp post create --post_title="..." --post_author=ID --porcelain</code>, <code>wp user delete sam --yes</code>, then <code>wp post list --post_status=any --title="..."</code>. On a single site, WP-CLI's <code>wp user delete</code> deletes the user's posts unless you reassign them.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">wp user create sam sam@example.com --role=contributor --porcelain
+wp post create --post_title="Review: Animal Farm" --post_author=4 --porcelain
+wp user delete sam --yes
+wp post list --post_status=any --title="Review: Animal Farm" --fields=ID,post_title,post_status,post_author</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>4
+19
+Success: Removed user 4 from http://localhost:8080.
++----+------------+-------------+-------------+
+| ID | post_title | post_status | post_author |
++----+------------+-------------+-------------+
++----+------------+-------------+-------------+</code></pre>
+                        </div>
+                        <pre data-cli><code class="language-bash">wp user create sam sam@example.com --role=contributor --porcelain
+wp post create --post_title="Review: Animal Farm" --post_author=5 --porcelain
+wp user delete sam --reassign=2 --yes
+wp post list --post_status=any --title="Review: Animal Farm" --fields=ID,post_title,post_status,post_author
+wp post delete 21 --force</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>5
+21
+Success: Removed user 5 from http://localhost:8080.
++----+---------------------+-------------+-------------+
+| ID | post_title          | post_status | post_author |
++----+---------------------+-------------+-------------+
+| 21 | Review: Animal Farm | draft       | 2           |
++----+---------------------+-------------+-------------+
+Success: Deleted post 21.</code></pre>
+                        </div>
+                        <p>Without <code>--reassign</code> the draft went with Sam: the list is empty. (A trashed post would still show with <code>--post_status=any</code>; this one was deleted outright.) With <code>--reassign=2</code> the draft now belongs to Maria. The admin's Delete Users screen asks the same question with two radio buttons; on a real site, always reassign. User IDs are never reused, which is why the second Sam is user 5.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> Pages &amp; Co. wants a "Shipping &amp; Returns" text that rarely changes and should sit in the footer menu. What is it?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Posts are dated and flow through the blog, archives and feed. Does shipping information belong in a news stream?">
+                                A) A post in the News category
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Timeless content that is linked from a menu rather than listed by date is what pages are for.">
+                                B) A page
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Options store settings, not content that editors write and revise. Which content type has revisions and an editor?">
+                                C) An option in wp_options
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> What does this print?</p>
+                        <pre data-file="quiz-blocks.php" data-wp><code class="language-php">&lt;?php
+$blocks = parse_blocks( '&lt;!-- wp:heading {"level":4} --&gt;&lt;h4 class="wp-block-heading"&gt;Hours&lt;/h4&gt;&lt;!-- /wp:heading --&gt;' );
+echo $blocks[0]['blockName'], ' ', $blocks[0]['attrs']['level'];</code></pre>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The comment says wp:heading, but parse_blocks reports the full name. Which namespace do core blocks belong to?">
+                                A) heading 4
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The level is not read from the h4 tag. Where are attributes stored in block markup?">
+                                B) core/heading (no level: it is in the HTML)
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Core blocks are core/name in PHP even though the comment omits the namespace, and attributes come from the JSON in the opening comment.">
+                                C) core/heading 4
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> A feature should be available to everyone who can edit other people's posts. Which check is right?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="Check the capability the feature needs. Administrators, editors and any custom role that has it pass; nobody else does.">
+                                A) current_user_can( 'edit_others_posts' )
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="An administrator can edit others' posts but does not have the editor role. Who gets locked out?">
+                                B) in_array( 'editor', wp_get_current_user()-&gt;roles, true )
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That only asks whether someone is logged in. Can a subscriber edit other people's posts?">
+                                C) is_user_logged_in()
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> You update a published page three times in the editor. How many revisions does it have, and what is in the newest one?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="A revision is stored for each update. Is the newest one the version before the last change, or after it?">
+                                A) Three; the newest holds the version before your last update
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Every update stores a revision of the new version, so the most recent revision always matches the current page.">
+                                B) At least three; the newest is identical to the current page
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Look at the WP_POST_REVISIONS value on your site. Does WordPress keep only one copy?">
+                                C) One; WordPress keeps only the last version
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> A client asks where the "Blog pages show at most" setting is stored, so a deployment script can set it. What do you answer?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="wp-config.php holds constants such as database credentials and debug flags. Where do Settings screens save?">
+                                A) In wp-config.php, as a constant
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Reading settings belong to the site, not to the theme. Which table stores site settings?">
+                                B) In the active theme's theme.json
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Every Settings field is an option; this one is posts_per_page, so wp option update posts_per_page 12 sets it.">
+                                C) In the posts_per_page option: wp option update posts_per_page 12
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Should Pages &amp; Co.'s books be posts in a "Books" category?</summary>
+                    <p>That is how many sites started, and it breaks quickly: books need fields posts do not have (author, price, ISBN), their own URLs (<code>/books/dune/</code>), their own archive and their own permissions, and they should not appear in the news feed. That is exactly what a custom post type gives you. Lesson 5.2 registers <code>book</code> with a <code>genre</code> taxonomy and price, author and page-count meta.</p>
+                </details>
+                <details>
+                    <summary>Can I add my own roles?</summary>
+                    <p>Yes, with <code>add_role( 'pagesco_bookseller', 'Bookseller', array( 'read' =&gt; true, ... ) )</code>, usually on plugin activation, because roles are saved in the database (the <code>wp_user_roles</code> option) rather than registered on every request. Often adding one capability to an existing role is enough. Lesson 5.1 covers activation hooks.</p>
+                </details>
+                <details>
+                    <summary>Is it safe to create content with WP-CLI instead of the editor?</summary>
+                    <p>Yes, it calls the same <code>wp_insert_post()</code> as the editor, so hooks run and revisions are stored. One difference matters: the editor and the REST API check the user's capabilities before saving, but <code>wp_insert_post()</code> itself does not. WP-CLI and your own code can therefore do things the user could not do in the admin. That is a feature for scripts and a reason to check capabilities yourself in anything a visitor can trigger (Lesson 5.3).</p>
+                </details>
+                <details>
+                    <summary>Where are comments in all this?</summary>
+                    <p>Comments have their own tables (<code>wp_comments</code>, <code>wp_commentmeta</code>), each linked to a post by ID, and their settings live under Settings &gt; Discussion. Twenty Twenty-Five shows a comment form under posts. Lesson 2.2 shows the tables; the course does not build comment features, but everything you learn about hooks and queries applies to them.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Make the Events page a parent: create a child page "Book Club" (slug <code>book-club</code>) with Events as its parent (<code>--post_parent</code>), and find its URL with <code>wp post url</code> (or <code>get_permalink()</code>). Then open the About page in the editor as Maria, change a word, save, and open the Revisions screen to compare versions. Finally, look at the <code>wp_navigation</code> post (ID 4) with <code>wp post get 4 --field=post_content</code>: what block does Twenty Twenty-Five's menu contain, and why did your new pages appear in the header without you adding them? Undo the child page when you are done.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Open <code>pagesco-plan.txt</code> from Lesson 1.1 and sort every item of your site map into the content model: which are pages, which are posts and in which category, which need a custom post type, which are settings, and who (which role) maintains each. Did anything not fit? Write down the one you are least sure about; Lessons 5.2 and 5.4 will help you decide.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Posts, pages, attachments, revisions, templates and navigation menus are all rows in <code>wp_posts</code>, told apart by <code>post_type</code>; PHP sees them as <code>WP_Post</code> objects</li>
+                        <li>Posts are dated and organized by categories and tags; pages are timeless and hierarchical; <code>post_status</code> decides visibility, and new content defaults to draft</li>
+                        <li>Taxonomies group content into terms; uploads are attachment posts plus files and generated image sizes</li>
+                        <li>Each update stores a revision equal to the new version; trash is a status for 30 days</li>
+                        <li>Roles bundle capabilities; code checks capabilities with <code>current_user_can()</code> / <code>user_can()</code>, including meta capabilities like <code>edit_post</code></li>
+                        <li>Every Settings field is an option; content is stored as block markup that <code>parse_blocks()</code> reads and <code>do_blocks()</code> renders</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>WP-CLI</th><th>PHP</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>One post</td><td><code>wp post get 1</code></td><td><code>get_post( 1 )</code></td></tr>
+                            <tr><td>Create a page</td><td><code>wp post create file.html --post_type=page --post_status=publish</code></td><td><code>wp_insert_post( array( ... ) )</code></td></tr>
+                            <tr><td>A post's terms</td><td><code>wp post term list 1 category</code></td><td><code>get_the_terms( 1, 'category' )</code></td></tr>
+                            <tr><td>A user</td><td><code>wp user create maria ... --role=editor</code></td><td><code>get_user_by( 'login', 'maria' )</code></td></tr>
+                            <tr><td>A permission</td><td><code>wp user list-caps maria</code></td><td><code>user_can( $user, 'edit_pages' )</code></td></tr>
+                            <tr><td>A setting</td><td><code>wp option get posts_per_page</code></td><td><code>get_option( 'posts_per_page' )</code></td></tr>
+                            <tr><td>The blocks of a post</td><td><code>wp post get 1 --field=post_content</code></td><td><code>parse_blocks( $post-&gt;post_content )</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You listed every post type on your site and read a post, an attachment and its image sizes as a developer</li>
+                        <li>You watched revisions, trash and slugs behave exactly as core describes them</li>
+                        <li>You mapped roles to capabilities and Settings screens to options</li>
+                        <li>You parsed and rendered block markup in PHP</li>
+                        <li>You stocked Pages &amp; Co. with two staff accounts, three pages and three News posts</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>In <a href="lesson_05.html"><strong>Lesson 2.2: Core Architecture &amp; the Database</strong></a> you go one level down: the files and folders of a WordPress install, <code>wp-config.php</code>, the order in which WordPress loads itself, and the database tables behind everything you met today (<code>wp_posts</code>, <code>wp_postmeta</code>, the term tables, <code>wp_users</code>, <code>wp_options</code>), queried with SQL and WP-CLI on the content you just created.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Run the last command of the project once more and check that your IDs, slugs and authors match: users 2 and 3, pages 12 to 14, posts 15 to 17</li>
+                    <li>Make sure the exercises left nothing behind: no user <code>sam</code>, Settings &gt; Reading back on "Your latest posts"</li>
+                    <li>Log in as Maria once and look around the editor; it is the view your client's staff will have</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>WordPress's admin can feel like a maze of menus. You now carry the map that experienced developers use: posts with a type, terms, users with capabilities, options, and block markup. Every new feature you meet, in core or in a plugin, will turn out to be one of these in disguise, and you will know where to look for it. That is a big step from "using WordPress" to "building with it".</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_03.html" class="prev-lesson">← Previous: PHP the WordPress Way</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_05.html" class="next-lesson">Next: Core Architecture &amp; the Database →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

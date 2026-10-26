@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Build a WordPress block theme from scratch: the style.css header, theme.json settings and styles, templates and template parts in block markup, activation and verification, on WordPress 7.1 and PHP 8.5. PHP and WordPress Development Lesson 3.2.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Building a Block Theme - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 3: Block Themes</a></li>
+            <li aria-current="page">Lesson 3.2: Building a Block Theme</li>
+        </ul>
+    </nav>
+
+    <main id="main-content" data-state="after:lesson_07">
+        <div class="container">
+            <header>
+                <h1>🏗️ Lesson 3.2: Building a Block Theme</h1>
+                <p class="lead">In Lesson 3.1 you mapped every kind of page on the Pages &amp; Co. site and listed the six templates a theme needs to draw them. Now you build that theme: <code>pagesco</code>, a block theme with its own header, a <code>theme.json</code> design system in the shop's colors, a header and footer, and the six templates. By the end of the lesson it is the active theme, and every later lesson in Module 3 and beyond builds on it.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Write a theme header in <code>style.css</code> that WordPress reads and checks on activation</li>
+                        <li>Define a design system in <code>theme.json</code>: <code>settings</code> (palette, fonts, sizes, spacing, layout) and <code>styles</code> (global, elements, blocks), and read the CSS WordPress generates from it</li>
+                        <li>Write templates and template parts in block markup, combining static blocks with dynamic ones such as the Query Loop, Post Title and Post Content</li>
+                        <li>Activate and verify a block theme with WP-CLI and the Site Editor, with site features such as the store notice still working</li>
+                        <li>Diagnose an invalid <code>theme.json</code>, a missing template part and a Site Editor copy that overrides your file</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 140 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_07.html">Lesson 3.1: Theme Anatomy &amp; the Template Hierarchy</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> the <code>pagesco</code> block theme (style.css, theme.json, two template parts, six templates) and make it the active theme of Pages &amp; Co.</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (<code>theme.json</code> version 3 needs WordPress 6.6 or later)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 3.1 (Twenty Twenty-Five active, <code>pagesco-site.php</code> in <code>mu-plugins/</code>), plus your template map</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#plan" class="toc-link">From Template Map to File List</a></li>
+                        <li><a href="#first-light" class="toc-link">The Smallest Block Theme That Works</a></li>
+                        <li><a href="#theme-json" class="toc-link">theme.json: Settings and Styles</a></li>
+                        <li><a href="#templates" class="toc-link">Templates and Template Parts</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Finish the pagesco Theme</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="plan" class="lesson-section">
+                <h2>🗺️ From Template Map to File List</h2>
+                <p>Your template map from Lesson 3.1 said Pages &amp; Co. needs six templates: <code>index</code>, <code>single</code>, <code>page</code>, <code>archive</code>, <code>search</code> and <code>404</code>. Add the header, the footer, the theme header and the design system, and you have the whole theme. This is what <code>wordpress/wp-content/themes/pagesco/</code> will contain at the end of the lesson:</p>
+                <pre><code class="language-text">pagesco/
+├── style.css            theme header: name, version, requirements, text domain
+├── theme.json           the design system: colors, fonts, sizes, spacing, styles
+├── parts/
+│   ├── header.html      site title + navigation
+│   └── footer.html      address + contact
+└── templates/
+    ├── index.html       the news list (also the blog home), and the last resort
+    ├── single.html      one news post
+    ├── page.html        About Us, Contact, Events...
+    ├── archive.html     category, author and date archives
+    ├── search.html      search results
+    └── 404.html         not found</code></pre>
+                <p>No <code>functions.php</code> and no CSS file: a block theme can be complete without either. You will add patterns and a style variation in Lesson 3.3, and the classic-theme lessons of Module 4 show what <code>functions.php</code> is for.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: style guide, floor plans, signs</h4>
+                    <p>Designing a shop interior, you would write a <strong>style guide</strong> first (the brand colors, the typefaces, the spacing), then draw <strong>floor plans</strong> for each room, reusing the same <strong>signs</strong> at every entrance. A block theme has the same three layers. <code>theme.json</code> is the style guide; every block on every page draws from it. Templates are the floor plans, one per kind of page. Template parts are the signs: the header and footer you design once and hang in every template. Change the style guide and every room follows.</p>
+                </div>
+            </section>
+
+            <section id="first-light" class="lesson-section">
+                <h2>💡 The Smallest Block Theme That Works</h2>
+                <p>Lesson 3.1 showed that a block theme needs two files: <code>style.css</code> and <code>templates/index.html</code>. Start there, so you have a working theme within ten minutes, and grow it from that. Create the folder <code>wordpress/wp-content/themes/pagesco/</code> and in it <code>style.css</code>:</p>
+                <pre data-file="wp-content/themes/pagesco/style.css"><code class="language-css">/*
+Theme Name: Pages &amp; Co.
+Theme URI: https://example.com/pagesco/
+Author: Pages &amp; Co.
+Author URI: https://example.com/
+Description: The block theme of the Pages &amp; Co. independent bookstore.
+Requires at least: 6.6
+Tested up to: 7.1
+Requires PHP: 7.4
+Version: 1.0.0
+License: GNU General Public License v2 or later
+License URI: http://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: pagesco
+*/</code></pre>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Field</th><th>What WordPress does with it</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>Theme Name</code></td><td>The name on the Themes screen and in WP-CLI. The only field WordPress strictly needs</td></tr>
+                            <tr><td><code>Requires at least</code>, <code>Requires PHP</code></td><td>Checked on activation: a site that is too old refuses to switch (Exercise 3). 6.6 because <code>theme.json</code> version 3 arrived in 6.6; 7.4 because that is WordPress's own minimum</td></tr>
+                            <tr><td><code>Tested up to</code></td><td>Informational; the theme directory shows it</td></tr>
+                            <tr><td><code>Version</code></td><td>Your release number; also handy as a cache-busting version for assets (Lesson 4.3)</td></tr>
+                            <tr><td><code>Text Domain</code></td><td>Must equal the folder name, <code>pagesco</code>, for translations (Lessons 1.3 and 8.3)</td></tr>
+                            <tr><td><code>License</code>, <code>License URI</code></td><td>Required by the theme directory; WordPress themes are GPL like WordPress itself</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p>Now the one required template. A first version with the site title and a list of posts is enough to switch to the theme. Create <code>templates/index.html</code>:</p>
+                <pre data-file="wp-content/themes/pagesco/templates/index.html"><code class="language-html">&lt;!-- wp:site-title {"level":0} /--&gt;
+
+&lt;!-- wp:query {"queryId":1,"query":{"inherit":true}} --&gt;
+&lt;div class="wp-block-query"&gt;
+	&lt;!-- wp:post-template --&gt;
+		&lt;!-- wp:post-title {"isLink":true,"level":2} /--&gt;
+	&lt;!-- /wp:post-template --&gt;
+&lt;/div&gt;
+&lt;!-- /wp:query --&gt;</code></pre>
+                <p>Two blocks. The <strong>Site Title</strong> block prints the site name (<code>"level":0</code> means a paragraph rather than a heading). The <strong>Query Loop</strong> (<code>wp:query</code>) repeats its <strong>Post Template</strong> once per post; <code>"inherit":true</code> means "show whatever the main query found", so the same block lists the latest posts on the blog home, the posts of a category on a category archive, and the results on a search page. Switch to the theme:</p>
+                <pre data-cli><code class="language-bash">wp theme activate pagesco
+wp eval 'var_dump( wp_is_block_theme(), wp_theme_has_theme_json() );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Switched to 'Pages &amp;amp; Co.' theme.
+bool(true)
+bool(false)</code></pre>
+                </div>
+                <p>A block theme, without a <code>theme.json</code> yet. (WP-CLI prints the name as <code>Pages &amp;amp; Co.</code> because WordPress stores theme names with the ampersand escaped, the same as the site title in Lesson 1.2.) Open <code>http://localhost:8080/</code>: an unstyled list of post titles, and at the very top, your store notice. Its callback is attached to <code>wp_body_open</code> (Lesson 2.3), and <code>template-canvas.php</code> fires that action for every block theme, so the new theme carries it without knowing it exists:</p>
+                <pre data-web="/" data-select=".pagesco-notice"><code class="language-text">http://localhost:8080/</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;div class="pagesco-notice"&gt;Free shipping on orders over $35. Open until 9 p.m. on Thursdays. &lt;a href="http://localhost:8080/events/"&gt;See events&lt;/a&gt;&lt;/div&gt;</code></pre>
+                </div>
+                <pre data-web="/" data-select="body" data-text><code class="language-text">http://localhost:8080/   (the visible text)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Free shipping on orders over $35. Open until 9 p.m. on Thursdays. See events
+Pages &amp; Co.
+Hello world!
+Book club: Dune
+Staff picks for the season
+Welcome to the new Pages &amp; Co. website</code></pre>
+                </div>
+                <p>The notice, the site name, and the four posts, newest first. Ugly but correct: the content is all there, and from here on every change is about how it looks.</p>
+            </section>
+
+            <section id="theme-json" class="lesson-section">
+                <h2>🎨 theme.json: Settings and Styles</h2>
+                <p><code>theme.json</code> has two halves, and keeping them apart is the key to understanding it:</p>
+                <ul>
+                    <li><strong><code>settings</code></strong> define what is <em>available</em>: the colors in the palette, the font families and sizes, the spacing steps, the content widths, and which design controls the editors show. Each preset becomes a CSS custom property and a set of classes.</li>
+                    <li><strong><code>styles</code></strong> define what is <em>applied</em>: the page background, the body text, links, headings, buttons and individual block types, usually by pointing at a preset.</li>
+                </ul>
+                <p>Here is the first version of the Pages &amp; Co. design system: five colors named for the shop (paper, ink, an oxblood red for links, a pale sage, a slate gray), two font stacks, four font sizes, three spacing steps and two layout widths, plus the page's base colors and text. Create <code>wordpress/wp-content/themes/pagesco/theme.json</code>:</p>
+                <pre data-file="wp-content/themes/pagesco/theme.json"><code class="language-json">{
+	"$schema": "https://schemas.wp.org/wp/7.1/theme.json",
+	"version": 3,
+	"settings": {
+		"color": {
+			"defaultPalette": false,
+			"palette": [
+				{ "slug": "paper", "name": "Paper", "color": "#fbf8f1" },
+				{ "slug": "ink", "name": "Ink", "color": "#1f2a2e" },
+				{ "slug": "oxblood", "name": "Oxblood", "color": "#7a2e2e" },
+				{ "slug": "sage", "name": "Sage", "color": "#e3eadf" },
+				{ "slug": "slate", "name": "Slate", "color": "#56636a" }
+			]
+		},
+		"layout": {
+			"contentSize": "680px",
+			"wideSize": "1180px"
+		},
+		"spacing": {
+			"defaultSpacingSizes": false,
+			"spacingSizes": [
+				{ "slug": "small", "name": "Small", "size": "1rem" },
+				{ "slug": "medium", "name": "Medium", "size": "clamp(1.5rem, 4vw, 2.5rem)" },
+				{ "slug": "large", "name": "Large", "size": "clamp(2.5rem, 8vw, 5rem)" }
+			]
+		},
+		"typography": {
+			"defaultFontSizes": false,
+			"fluid": true,
+			"fontFamilies": [
+				{ "slug": "serif", "name": "Serif", "fontFamily": "Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif" },
+				{ "slug": "sans", "name": "Sans", "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" }
+			],
+			"fontSizes": [
+				{ "slug": "small", "name": "Small", "size": "0.9rem", "fluid": false },
+				{ "slug": "medium", "name": "Medium", "size": "1.125rem", "fluid": false },
+				{ "slug": "large", "name": "Large", "size": "1.75rem", "fluid": { "min": "1.4rem", "max": "1.75rem" } },
+				{ "slug": "x-large", "name": "Extra Large", "size": "2.75rem", "fluid": { "min": "2rem", "max": "2.75rem" } }
+			]
+		}
+	},
+	"styles": {
+		"color": {
+			"background": "var:preset|color|paper",
+			"text": "var:preset|color|ink"
+		},
+		"typography": {
+			"fontFamily": "var:preset|font-family|serif",
+			"fontSize": "var:preset|font-size|medium",
+			"lineHeight": "1.6"
+		}
+	}
+}</code></pre>
+                <p>A few things to notice. <code>"$schema"</code> points your editor (VS Code and most others) at the official schema for WordPress 7.1, so it autocompletes keys and underlines mistakes as you type. <code>"version": 3</code> is the current format of the file, not your theme's version. <code>"defaultPalette": false</code> hides WordPress's own palette of eleven colors from editors, so they choose from the shop's five. The fonts are <strong>system font stacks</strong>: they use fonts already on the visitor's device, so there is nothing to download. (Shipping font files works through <code>fontFace</code> entries, as Twenty Twenty-Five does; Lesson 3.3 points you there.) <code>"fluid"</code> font sizes scale between a minimum and a maximum with the screen width. And in <code>styles</code>, <code>var:preset|color|paper</code> is <code>theme.json</code>'s shorthand for "the preset color with the slug paper".</p>
+
+                <h3>What WordPress makes of it</h3>
+                <p>WordPress merges three layers: core's defaults, your <code>theme.json</code>, and anything the site owner changes in the Site Editor's Styles panel. It then prints the result as CSS in a <code>&lt;style id="global-styles-inline-css"&gt;</code> element on every page. Each palette color became a CSS custom property:</p>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | grep -o -- '--wp--preset--color--[a-z]*: #[0-9a-f]*'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>--wp--preset--color--black: #000000
+--wp--preset--color--white: #ffffff
+--wp--preset--color--paper: #fbf8f1
+--wp--preset--color--ink: #1f2a2e
+--wp--preset--color--oxblood: #7a2e2e
+--wp--preset--color--sage: #e3eadf
+--wp--preset--color--slate: #56636a</code></pre>
+                </div>
+                <p>Your five colors, plus <code>black</code> and <code>white</code>, which WordPress keeps defined even with the default palette switched off. The <code>styles</code> section became a rule for the whole page. <code>var:preset|color|paper</code> turned into <code>var(--wp--preset--color--paper)</code>:</p>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | grep -o 'body{[^}]*}' | head -n 1</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>body{background-color: var(--wp--preset--color--paper);color: var(--wp--preset--color--ink);font-family: var(--wp--preset--font-family--serif);font-size: var(--wp--preset--font-size--medium);line-height: 1.6;padding-top: 0px;padding-right: 0px;padding-bottom: 0px;padding-left: 0px;}</code></pre>
+                </div>
+                <p>The same data is available in PHP, which is how you read design values from your own code instead of repeating hex numbers. <code>wp_get_global_settings()</code> takes a path into the merged settings:</p>
+                <pre data-cli><code class="language-bash">wp eval 'foreach ( wp_get_global_settings( array( "color", "palette", "theme" ) ) as $c ) { echo $c["slug"], " ", $c["color"], "\n"; } echo wp_get_global_settings( array( "layout", "contentSize" ) ), "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>paper #fbf8f1
+ink #1f2a2e
+oxblood #7a2e2e
+sage #e3eadf
+slate #56636a
+680px</code></pre>
+                </div>
+
+                <div class="card card-success">
+                    <h4>✅ Use the presets, not the hex values</h4>
+                    <p>When a template needs the sage background, it says <code>"backgroundColor":"sage"</code>, which becomes the class <code>has-sage-background-color</code>, which uses <code>var(--wp--preset--color--sage)</code>. Never <code>#e3eadf</code>. Then a style variation (Lesson 3.3) or a site owner in the Styles panel can change "sage" once and every template follows. Hard-coded values are the main reason old themes are hard to restyle.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h4>💡 Contrast is part of the design system</h4>
+                    <p>Check text and background pairs when you choose a palette. Ink on paper is about 14:1 and oxblood links on paper about 8.8:1, both well above the 4.5:1 that WCAG AA asks for normal text; slate on paper, used for small dates, is about 5.8:1. Pale sage is a background color only. Lesson 8.3 goes through accessibility checks properly.</p>
+                </div>
+            </section>
+
+            <section id="templates" class="lesson-section">
+                <h2>📐 Templates and Template Parts</h2>
+                <p>Templates are where your block markup skills from Lesson 2.1 pay off. Every template is a list of blocks, and two kinds of block do almost all the work:</p>
+                <ul>
+                    <li><strong>Static blocks</strong> such as Group, Heading and Paragraph save their HTML in the file, between the block comments: <code>&lt;!-- wp:group --&gt;&lt;div class="wp-block-group"&gt;…&lt;/div&gt;&lt;!-- /wp:group --&gt;</code>. That HTML must be exactly what the block would save itself, or the Site Editor flags the block as invalid (see the tip below).</li>
+                    <li><strong>Dynamic blocks</strong> such as Site Title, Navigation, Post Title, Post Content, Post Date and Query Loop are rendered by PHP on every request and are written self-closing: <code>&lt;!-- wp:post-title {"level":1} /--&gt;</code>. Their attributes go in the JSON; their HTML is never in the file.</li>
+                </ul>
+
+                <h3>The header part</h3>
+                <p>A template part is a file in <code>parts/</code> that templates include with the <strong>Template Part</strong> block. Create <code>wordpress/wp-content/themes/pagesco/parts/header.html</code>: a full-width sage band with the site title on the left and the navigation on the right.</p>
+                <pre data-file="wp-content/themes/pagesco/parts/header.html"><code class="language-html">&lt;!-- wp:group {"align":"full","style":{"spacing":{"padding":{"top":"var:preset|spacing|small","bottom":"var:preset|spacing|small"}}},"backgroundColor":"sage","layout":{"type":"constrained"}} --&gt;
+&lt;div class="wp-block-group alignfull has-sage-background-color has-background" style="padding-top:var(--wp--preset--spacing--small);padding-bottom:var(--wp--preset--spacing--small)"&gt;
+	&lt;!-- wp:group {"align":"wide","layout":{"type":"flex","flexWrap":"wrap","justifyContent":"space-between"}} --&gt;
+	&lt;div class="wp-block-group alignwide"&gt;
+		&lt;!-- wp:site-title {"level":0} /--&gt;
+		&lt;!-- wp:navigation {"layout":{"type":"flex","justifyContent":"right","flexWrap":"wrap"}} /--&gt;
+	&lt;/div&gt;
+	&lt;!-- /wp:group --&gt;
+&lt;/div&gt;
+&lt;!-- /wp:group --&gt;</code></pre>
+                <p>Read it from the outside in. The outer Group is full width (<code>"align":"full"</code>), uses the <code>sage</code> preset as its background and the <code>small</code> spacing preset as padding, and has a <strong>constrained</strong> layout: its children are centered and kept to the content width from <code>theme.json</code>, unless they ask for <code>wide</code> or <code>full</code>. The inner Group asks for the wide width (1180px) and uses a <strong>flex</strong> layout to put its two children in a row with the space between them. Notice that the layout settings live only in the JSON; WordPress adds the layout classes when it renders the page. The Navigation block has no menu of its own, so WordPress uses the site's existing navigation menu: the <code>wp_navigation</code> post 4 that Twenty Twenty-Five created, which lists your pages.</p>
+
+                <h3>The finished index template</h3>
+                <p>Now replace <code>templates/index.html</code> with the real thing: the header part, a <code>main</code> landmark with a heading and the Query Loop, and the footer part (you create the footer in the project; until then WordPress leaves the space empty). This is the template for the news list, and because every other template falls back to <code>index</code>, it is also the safety net for any page type you do not cover.</p>
+                <pre data-file="wp-content/themes/pagesco/templates/index.html"><code class="language-html">&lt;!-- wp:template-part {"slug":"header","tagName":"header"} /--&gt;
+
+&lt;!-- wp:group {"tagName":"main","style":{"spacing":{"padding":{"top":"var:preset|spacing|medium","bottom":"var:preset|spacing|large"}}},"layout":{"type":"constrained"}} --&gt;
+&lt;main class="wp-block-group" style="padding-top:var(--wp--preset--spacing--medium);padding-bottom:var(--wp--preset--spacing--large)"&gt;
+	&lt;!-- wp:heading {"level":1} --&gt;
+	&lt;h1 class="wp-block-heading"&gt;News from the shop&lt;/h1&gt;
+	&lt;!-- /wp:heading --&gt;
+
+	&lt;!-- wp:query {"queryId":1,"query":{"inherit":true}} --&gt;
+	&lt;div class="wp-block-query"&gt;
+		&lt;!-- wp:post-template --&gt;
+			&lt;!-- wp:post-title {"isLink":true,"level":2} /--&gt;
+			&lt;!-- wp:post-date /--&gt;
+			&lt;!-- wp:post-excerpt /--&gt;
+		&lt;!-- /wp:post-template --&gt;
+
+		&lt;!-- wp:query-pagination --&gt;
+			&lt;!-- wp:query-pagination-previous /--&gt;
+			&lt;!-- wp:query-pagination-numbers /--&gt;
+			&lt;!-- wp:query-pagination-next /--&gt;
+		&lt;!-- /wp:query-pagination --&gt;
+
+		&lt;!-- wp:query-no-results --&gt;
+			&lt;!-- wp:paragraph --&gt;
+			&lt;p&gt;Nothing here yet.&lt;/p&gt;
+			&lt;!-- /wp:paragraph --&gt;
+		&lt;!-- /wp:query-no-results --&gt;
+	&lt;/div&gt;
+	&lt;!-- /wp:query --&gt;
+&lt;/main&gt;
+&lt;!-- /wp:group --&gt;
+
+&lt;!-- wp:template-part {"slug":"footer","tagName":"footer"} /--&gt;</code></pre>
+                <p><code>"tagName":"header"</code> on the Template Part block wraps the part in a <code>&lt;header&gt;</code> element, and <code>"tagName":"main"</code> makes the Group a <code>&lt;main&gt;</code>: that gives screen-reader users the page landmarks (banner, main, contentinfo) they navigate by. The Query Loop gained a date and an excerpt per post, pagination (Settings &gt; Reading shows 10 posts per page) and a message for an empty result. Check the landmarks and the first post in the list:</p>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | grep -o '&lt;header[^&gt;]*&gt;\|&lt;main[^&gt;]*&gt;\|&lt;h1[^&gt;]*&gt;[^&lt;]*\|&lt;h2 class="wp-block-post-title"&gt;&lt;a [^&gt;]*&gt;[^&lt;]*' | head -n 4</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;header class="wp-block-template-part"&gt;
+&lt;main id="wp--skip-link--target" class="wp-block-group is-layout-constrained wp-block-group-is-layout-constrained" style="padding-top:var(--wp--preset--spacing--medium);padding-bottom:var(--wp--preset--spacing--large)"&gt;
+&lt;h1 class="wp-block-heading"&gt;News from the shop
+&lt;h2 class="wp-block-post-title"&gt;&lt;a href="http://localhost:8080/hello-world/" target="_self" &gt;Hello world!</code></pre>
+                </div>
+                <p>The part arrived as <code>&lt;header class="wp-block-template-part"&gt;</code>, and WordPress added layout classes (<code>is-layout-constrained</code>) and an <code>id</code> to your <code>main</code> group. That <code>id</code> is the target of the "Skip to content" link core adds to every block theme.</p>
+
+                <div class="card card-success">
+                    <h4>✅ Let the editor write static markup for you</h4>
+                    <p>Hand-writing the HTML of static blocks is where mistakes creep in: one class in the wrong order and the Site Editor shows "This block contains unexpected or invalid content". The professional shortcut: build the section in the Site Editor (Appearance &gt; Editor), open the Options menu (⋮), switch to the <strong>Code editor</strong>, and copy the markup into your file. Every template in this lesson was checked that way, and Lesson 3.3 shows how to export a whole edited theme back to files.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h4>🧩 Version note: theme.json versions</h4>
+                    <p>Version 3 of the <code>theme.json</code> format arrived in WordPress 6.6 and is still current in 7.1. The main change from version 2 is that <code>defaultFontSizes</code> and <code>defaultSpacingSizes</code> now default to <code>true</code>, so a theme that wants only its own presets sets them to <code>false</code>, as yours does. A theme with <code>"version": 2</code> still works: WordPress migrates the file in memory. On a client site running WordPress older than 6.6, your theme would refuse to activate because of <code>Requires at least: 6.6</code>, which is exactly what that header is for.</p>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <p>Block themes fail quietly. A broken file rarely stops the site; it just stops your design from appearing. Make each mistake on purpose, then fix it.</p>
+
+                <h3>1. A trailing comma in theme.json</h3>
+                <p>JSON is stricter than PHP arrays: no comma after the last item, double quotes only, no comments. Add a comma after <code>"wideSize": "1180px"</code> in <code>theme.json</code> (the last entry of <code>layout</code>):</p>
+                <pre data-cli data-raises="Notice"><code class="language-bash">sed -i 's/"wideSize": "1180px"/"wideSize": "1180px",/' wp-content/themes/pagesco/theme.json
+curl -s http://localhost:8080/ | head -n 3
+curl -s http://localhost:8080/ | grep -c -- '--wp--preset--color--oxblood'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Notice: wp_json_file_decode(): Error when decoding a JSON file at path /var/www/html/wp-content/themes/pagesco/theme.json: Syntax error in /var/www/html/wp-includes/functions.php on line 6260
+&lt;!DOCTYPE html&gt;
+0</code></pre>
+                </div>
+                <p><strong>What it means:</strong> <code>wp_json_file_decode()</code> could not parse the file ("Syntax error"), so WordPress used no <code>theme.json</code> at all: your palette, fonts and page colors are gone (zero <code>oxblood</code> variables) and the site falls back to core's defaults. With <code>WP_DEBUG</code> on you get this Notice at the top of every page (above <code>&lt;!DOCTYPE html&gt;</code>, as with any notice in a block theme, Lesson 2.3) and in <code>debug.log</code>; on a live site there is no message at all, only a suddenly plain design. The notice names the file but not the line. <strong>Fix:</strong> remove the comma. Your editor finds the line for you: with the <code>$schema</code> line in place, VS Code underlines the error as you type, and <code>php -r 'json_decode( file_get_contents( "theme.json" ) ); echo json_last_error_msg(), "\n";'</code> checks the file from a terminal.</p>
+                <pre data-cli><code class="language-bash">sed -i 's/"wideSize": "1180px",/"wideSize": "1180px"/' wp-content/themes/pagesco/theme.json
+curl -s http://localhost:8080/ | grep -c -- '--wp--preset--color--oxblood'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>1</code></pre>
+                </div>
+
+                <h3>2. A template part slug that does not exist</h3>
+                <p>You start the page template and mistype the header slug as <code>heder</code>:</p>
+                <pre data-file="wp-content/themes/pagesco/templates/page.html"><code class="language-html">&lt;!-- wp:template-part {"slug":"heder","tagName":"header"} /--&gt;
+
+&lt;!-- wp:post-title {"level":1} /--&gt;
+&lt;!-- wp:post-content /--&gt;</code></pre>
+                <p>A visitor sees the About page without a header and gets no message. Count the site titles on the page, first logged out, then logged in as admin:</p>
+                <pre data-cli data-exit="1"><code class="language-bash">curl -s http://localhost:8080/about/ | grep -c 'wp-block-site-title'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>0</code></pre>
+                </div>
+                <pre data-web="/about/" data-login="admin" data-select=".wp-site-blocks" data-text><code class="language-text">http://localhost:8080/about/   (logged in as admin)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Template part has been deleted or is unavailable: heder
+About Us
+...</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the Template Part block looked for a part with the slug <code>heder</code> in the database and in <code>parts/</code>, found neither, and rendered nothing. Only logged-in users get a hint, in place of the header. There is no PHP error, so <code>debug.log</code> stays silent too. <strong>Fix:</strong> the slug is the file name without <code>.html</code>. When a header or footer is missing, check the slug first, logged in. You write the real page template in the project; delete this one for now:</p>
+                <pre data-cli><code class="language-bash">rm wp-content/themes/pagesco/templates/page.html</code></pre>
+
+                <h3>3. The Site Editor's copy wins over your file</h3>
+                <p>The shop manager opens Appearance &gt; Editor, changes the index template, and clicks Save. Saving sends the new block markup to the REST API, exactly like this request (you can make the same change by hand in the Site Editor instead):</p>
+                <pre data-web="/wp-json/wp/v2/templates/pagesco//index" data-auth="admin" data-body='{"content":"&lt;!-- wp:paragraph --&gt;&lt;p&gt;Edited in the Site Editor&lt;/p&gt;&lt;!-- /wp:paragraph --&gt;"}' data-json-pick="id,source,has_theme_file"><code class="language-json">POST http://localhost:8080/wp-json/wp/v2/templates/pagesco//index
+{"content":"&lt;!-- wp:paragraph --&gt;&lt;p&gt;Edited in the Site Editor&lt;/p&gt;&lt;!-- /wp:paragraph --&gt;"}</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>{
+  "id": "pagesco//index",
+  "source": "custom",
+  "has_theme_file": true
+}</code></pre>
+                </div>
+                <p>A week later you improve <code>templates/index.html</code> and reload the home page. Your change does not appear, because the page is drawn from the saved copy:</p>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | grep -c 'Edited in the Site Editor'
+wp post list --post_type=wp_template --fields=ID,post_name,post_status</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your ID will differ)</h4>
+                    <pre><code>1
++----+-----------+-------------+
+| ID | post_name | post_status |
++----+-----------+-------------+
+| 19 | index     | publish     |
++----+-----------+-------------+</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the template's <code>source</code> is now <code>custom</code>: a <code>wp_template</code> post (Lesson 3.1) that WordPress prefers over the file, and <code>has_theme_file</code> says the file still exists underneath. Nothing is broken; this is the feature that lets site owners customize a theme without touching code. It just means files and database can disagree. <strong>Fix:</strong> decide which version is right. To go back to the file, use "Reset" on the template in the Site Editor (Templates, then the template's ⋮ menu), or delete the copy with WP-CLI, using the ID from your list. To keep the owner's change, export it into the theme first (Lesson 3.3).</p>
+                <pre data-cli><code class="language-bash">wp post delete 19 --force
+curl -s http://localhost:8080/ | grep -c 'News from the shop'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Deleted post 19.
+1</code></pre>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Finish the pagesco Theme</h2>
+                <p>You have a working block theme with a header and an index template. Now complete it to match your template map: the full design system, the footer, and the five remaining templates. Then verify the whole site from the command line. Allow about 55 minutes. When you are done, <code>pagesco</code> is the theme the rest of the course builds on.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: Complete the design system <span class="step-time">(15 min)</span></h3>
+                    <p>Replace <code>theme.json</code> with the full version. It keeps everything from before and adds: <code>appearanceTools</code> (turns on the border, spacing and typography controls in the editors), root padding so content never touches the screen edge on phones, styles for links, headings, buttons, the site title and post dates, a little custom CSS for the store notice, and the two template part areas.</p>
+                    <pre data-file="wp-content/themes/pagesco/theme.json"><code class="language-json">{
+	"$schema": "https://schemas.wp.org/wp/7.1/theme.json",
+	"version": 3,
+	"settings": {
+		"appearanceTools": true,
+		"color": {
+			"defaultPalette": false,
+			"defaultGradients": false,
+			"defaultDuotone": false,
+			"palette": [
+				{ "slug": "paper", "name": "Paper", "color": "#fbf8f1" },
+				{ "slug": "ink", "name": "Ink", "color": "#1f2a2e" },
+				{ "slug": "oxblood", "name": "Oxblood", "color": "#7a2e2e" },
+				{ "slug": "sage", "name": "Sage", "color": "#e3eadf" },
+				{ "slug": "slate", "name": "Slate", "color": "#56636a" }
+			]
+		},
+		"layout": {
+			"contentSize": "680px",
+			"wideSize": "1180px"
+		},
+		"spacing": {
+			"defaultSpacingSizes": false,
+			"spacingSizes": [
+				{ "slug": "small", "name": "Small", "size": "1rem" },
+				{ "slug": "medium", "name": "Medium", "size": "clamp(1.5rem, 4vw, 2.5rem)" },
+				{ "slug": "large", "name": "Large", "size": "clamp(2.5rem, 8vw, 5rem)" }
+			]
+		},
+		"typography": {
+			"defaultFontSizes": false,
+			"fluid": true,
+			"fontFamilies": [
+				{ "slug": "serif", "name": "Serif", "fontFamily": "Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif" },
+				{ "slug": "sans", "name": "Sans", "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" }
+			],
+			"fontSizes": [
+				{ "slug": "small", "name": "Small", "size": "0.9rem", "fluid": false },
+				{ "slug": "medium", "name": "Medium", "size": "1.125rem", "fluid": false },
+				{ "slug": "large", "name": "Large", "size": "1.75rem", "fluid": { "min": "1.4rem", "max": "1.75rem" } },
+				{ "slug": "x-large", "name": "Extra Large", "size": "2.75rem", "fluid": { "min": "2rem", "max": "2.75rem" } }
+			]
+		},
+		"useRootPaddingAwareAlignments": true
+	},
+	"styles": {
+		"color": {
+			"background": "var:preset|color|paper",
+			"text": "var:preset|color|ink"
+		},
+		"spacing": {
+			"blockGap": "1.25rem",
+			"padding": {
+				"left": "var:preset|spacing|small",
+				"right": "var:preset|spacing|small"
+			}
+		},
+		"typography": {
+			"fontFamily": "var:preset|font-family|serif",
+			"fontSize": "var:preset|font-size|medium",
+			"lineHeight": "1.6"
+		},
+		"elements": {
+			"link": {
+				"color": { "text": "var:preset|color|oxblood" },
+				":hover": { "typography": { "textDecoration": "none" } }
+			},
+			"heading": {
+				"typography": {
+					"fontFamily": "var:preset|font-family|sans",
+					"fontWeight": "700",
+					"lineHeight": "1.2"
+				}
+			},
+			"h1": { "typography": { "fontSize": "var:preset|font-size|x-large" } },
+			"h2": { "typography": { "fontSize": "var:preset|font-size|large" } },
+			"button": {
+				"color": {
+					"background": "var:preset|color|oxblood",
+					"text": "var:preset|color|paper"
+				}
+			}
+		},
+		"blocks": {
+			"core/site-title": {
+				"typography": {
+					"fontFamily": "var:preset|font-family|sans",
+					"fontSize": "var:preset|font-size|large",
+					"fontWeight": "700"
+				},
+				"elements": {
+					"link": { "color": { "text": "var:preset|color|ink" } }
+				}
+			},
+			"core/post-date": {
+				"color": { "text": "var:preset|color|slate" },
+				"typography": { "fontSize": "var:preset|font-size|small" }
+			}
+		},
+		"css": ".pagesco-notice { background: var(--wp--preset--color--ink); color: var(--wp--preset--color--paper); font-family: var(--wp--preset--font-family--sans); font-size: var(--wp--preset--font-size--small); padding: 0.5rem 1rem; text-align: center; } .pagesco-notice a { color: inherit; }"
+	},
+	"templateParts": [
+		{ "name": "header", "title": "Header", "area": "header" },
+		{ "name": "footer", "title": "Footer", "area": "footer" }
+	]
+}</code></pre>
+                    <p>Three layers of styles, from general to specific: <code>styles</code> itself (the whole page), <code>styles.elements</code> (HTML elements wherever they appear: every link, every <code>h1</code>, every button) and <code>styles.blocks</code> (one block type, here the site title and the post date). <code>styles.css</code> is plain CSS for what presets cannot express; the store notice's markup comes from the site plugin, but how it <em>looks</em> is the theme's job, so its CSS lives here. <code>templateParts</code> tells the Site Editor that <code>header</code> belongs in the Header area and <code>footer</code> in the Footer area. Check that the new rules arrived:</p>
+                    <pre data-cli><code class="language-bash">curl -s http://localhost:8080/ | grep -o 'a:where(:not(.wp-element-button)){color[^}]*}\|\.pagesco-notice {[^}]*}'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>a:where(:not(.wp-element-button)){color: var(--wp--preset--color--oxblood);}
+.pagesco-notice { background: var(--wp--preset--color--ink); color: var(--wp--preset--color--paper); font-family: var(--wp--preset--font-family--sans); font-size: var(--wp--preset--font-size--small); padding: 0.5rem 1rem; text-align: center; }</code></pre>
+                    </div>
+                    <p>The link rule's selector is <code>a:where(:not(.wp-element-button))</code>: every link except buttons (they get the button colors), and <code>:where()</code> adds no specificity, so the rule is as weak as a plain <code>a</code> selector. A link color an editor sets on a single block therefore still wins over the theme's default. That is deliberate: the theme sets defaults, content can override them. Your <code>css</code> string arrived as written.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: The footer part <span class="step-time">(8 min)</span></h3>
+                    <p>Create <code>parts/footer.html</code>: an ink band with the shop's address. Text and links are set to the paper color on the Group, so the links stay readable on the dark background:</p>
+                    <pre data-file="wp-content/themes/pagesco/parts/footer.html"><code class="language-html">&lt;!-- wp:group {"align":"full","style":{"spacing":{"padding":{"top":"var:preset|spacing|medium","bottom":"var:preset|spacing|medium"}},"elements":{"link":{"color":{"text":"var:preset|color|paper"}}}},"backgroundColor":"ink","textColor":"paper","layout":{"type":"constrained"}} --&gt;
+&lt;div class="wp-block-group alignfull has-paper-color has-ink-background-color has-text-color has-background has-link-color" style="padding-top:var(--wp--preset--spacing--medium);padding-bottom:var(--wp--preset--spacing--medium)"&gt;
+	&lt;!-- wp:paragraph {"fontSize":"small"} --&gt;
+	&lt;p class="has-small-font-size"&gt;Pages &amp;amp; Co. · 12 Market Street · 555-0142&lt;/p&gt;
+	&lt;!-- /wp:paragraph --&gt;
+
+	&lt;!-- wp:paragraph {"fontSize":"small"} --&gt;
+	&lt;p class="has-small-font-size"&gt;Open Monday to Saturday · &lt;a href="mailto:hello@example.com"&gt;hello@example.com&lt;/a&gt;&lt;/p&gt;
+	&lt;!-- /wp:paragraph --&gt;
+&lt;/div&gt;
+&lt;!-- /wp:group --&gt;</code></pre>
+                    <p>The class list follows the attributes: <code>has-paper-color</code> and <code>has-ink-background-color</code> from <code>textColor</code> and <code>backgroundColor</code>, the generic <code>has-text-color has-background</code>, and <code>has-link-color</code> from the link color under <code>style.elements</code>. The <code>&amp;amp;</code> is how an ampersand is written in HTML. Every template already includes the footer, so the index page now shows it:</p>
+                    <pre data-web="/" data-select="footer" data-text><code class="language-text">http://localhost:8080/   (the footer, as text)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>Pages &amp; Co. · 12 Market Street · 555-0142
+Open Monday to Saturday · hello@example.com</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: The other five templates <span class="step-time">(20 min)</span></h3>
+                    <p>Each template uses the same frame as <code>index.html</code> (header part, a <code>main</code> group, footer part) and changes only what is inside <code>main</code>. Create all five in <code>templates/</code>. First <code>single.html</code>, for one news post: title, date, the content, its categories and links to the neighboring posts.</p>
+                    <pre data-file="wp-content/themes/pagesco/templates/single.html"><code class="language-html">&lt;!-- wp:template-part {"slug":"header","tagName":"header"} /--&gt;
+
+&lt;!-- wp:group {"tagName":"main","style":{"spacing":{"padding":{"top":"var:preset|spacing|medium","bottom":"var:preset|spacing|large"}}},"layout":{"type":"constrained"}} --&gt;
+&lt;main class="wp-block-group" style="padding-top:var(--wp--preset--spacing--medium);padding-bottom:var(--wp--preset--spacing--large)"&gt;
+	&lt;!-- wp:post-title {"level":1} /--&gt;
+	&lt;!-- wp:post-date /--&gt;
+	&lt;!-- wp:post-content {"layout":{"type":"constrained"}} /--&gt;
+	&lt;!-- wp:post-terms {"term":"category","prefix":"Filed under: "} /--&gt;
+	&lt;!-- wp:post-navigation-link {"type":"previous","label":"Previous post"} /--&gt;
+	&lt;!-- wp:post-navigation-link {"label":"Next post"} /--&gt;
+&lt;/main&gt;
+&lt;!-- /wp:group --&gt;
+
+&lt;!-- wp:template-part {"slug":"footer","tagName":"footer"} /--&gt;</code></pre>
+                    <p><code>page.html</code> is simpler: pages have no date, categories or neighbors.</p>
+                    <pre data-file="wp-content/themes/pagesco/templates/page.html"><code class="language-html">&lt;!-- wp:template-part {"slug":"header","tagName":"header"} /--&gt;
+
+&lt;!-- wp:group {"tagName":"main","style":{"spacing":{"padding":{"top":"var:preset|spacing|medium","bottom":"var:preset|spacing|large"}}},"layout":{"type":"constrained"}} --&gt;
+&lt;main class="wp-block-group" style="padding-top:var(--wp--preset--spacing--medium);padding-bottom:var(--wp--preset--spacing--large)"&gt;
+	&lt;!-- wp:post-title {"level":1} /--&gt;
+	&lt;!-- wp:post-content {"layout":{"type":"constrained"}} /--&gt;
+&lt;/main&gt;
+&lt;!-- /wp:group --&gt;
+
+&lt;!-- wp:template-part {"slug":"footer","tagName":"footer"} /--&gt;</code></pre>
+                    <p><code>archive.html</code> serves categories, authors and dates. The <strong>Query Title</strong> block prints "Category: News", "Author: Maria Lopez" and so on, and <strong>Term Description</strong> shows a category's description when there is one:</p>
+                    <pre data-file="wp-content/themes/pagesco/templates/archive.html"><code class="language-html">&lt;!-- wp:template-part {"slug":"header","tagName":"header"} /--&gt;
+
+&lt;!-- wp:group {"tagName":"main","style":{"spacing":{"padding":{"top":"var:preset|spacing|medium","bottom":"var:preset|spacing|large"}}},"layout":{"type":"constrained"}} --&gt;
+&lt;main class="wp-block-group" style="padding-top:var(--wp--preset--spacing--medium);padding-bottom:var(--wp--preset--spacing--large)"&gt;
+	&lt;!-- wp:query-title {"type":"archive"} /--&gt;
+	&lt;!-- wp:term-description /--&gt;
+
+	&lt;!-- wp:query {"queryId":1,"query":{"inherit":true}} --&gt;
+	&lt;div class="wp-block-query"&gt;
+		&lt;!-- wp:post-template --&gt;
+			&lt;!-- wp:post-title {"isLink":true,"level":2} /--&gt;
+			&lt;!-- wp:post-date /--&gt;
+			&lt;!-- wp:post-excerpt /--&gt;
+		&lt;!-- /wp:post-template --&gt;
+
+		&lt;!-- wp:query-pagination --&gt;
+			&lt;!-- wp:query-pagination-previous /--&gt;
+			&lt;!-- wp:query-pagination-numbers /--&gt;
+			&lt;!-- wp:query-pagination-next /--&gt;
+		&lt;!-- /wp:query-pagination --&gt;
+	&lt;/div&gt;
+	&lt;!-- /wp:query --&gt;
+&lt;/main&gt;
+&lt;!-- /wp:group --&gt;
+
+&lt;!-- wp:template-part {"slug":"footer","tagName":"footer"} /--&gt;</code></pre>
+                    <p><code>search.html</code> repeats the search form above the results and says something helpful when nothing matched:</p>
+                    <pre data-file="wp-content/themes/pagesco/templates/search.html"><code class="language-html">&lt;!-- wp:template-part {"slug":"header","tagName":"header"} /--&gt;
+
+&lt;!-- wp:group {"tagName":"main","style":{"spacing":{"padding":{"top":"var:preset|spacing|medium","bottom":"var:preset|spacing|large"}}},"layout":{"type":"constrained"}} --&gt;
+&lt;main class="wp-block-group" style="padding-top:var(--wp--preset--spacing--medium);padding-bottom:var(--wp--preset--spacing--large)"&gt;
+	&lt;!-- wp:query-title {"type":"search"} /--&gt;
+	&lt;!-- wp:search {"label":"Search","buttonText":"Search"} /--&gt;
+
+	&lt;!-- wp:query {"queryId":1,"query":{"inherit":true}} --&gt;
+	&lt;div class="wp-block-query"&gt;
+		&lt;!-- wp:post-template --&gt;
+			&lt;!-- wp:post-title {"isLink":true,"level":2} /--&gt;
+			&lt;!-- wp:post-excerpt /--&gt;
+		&lt;!-- /wp:post-template --&gt;
+
+		&lt;!-- wp:query-no-results --&gt;
+			&lt;!-- wp:paragraph --&gt;
+			&lt;p&gt;No books or posts matched your search. Try another word.&lt;/p&gt;
+			&lt;!-- /wp:paragraph --&gt;
+		&lt;!-- /wp:query-no-results --&gt;
+	&lt;/div&gt;
+	&lt;!-- /wp:query --&gt;
+&lt;/main&gt;
+&lt;!-- /wp:group --&gt;
+
+&lt;!-- wp:template-part {"slug":"footer","tagName":"footer"} /--&gt;</code></pre>
+                    <p>And <code>404.html</code>, in the shop's voice, with a way forward:</p>
+                    <pre data-file="wp-content/themes/pagesco/templates/404.html"><code class="language-html">&lt;!-- wp:template-part {"slug":"header","tagName":"header"} /--&gt;
+
+&lt;!-- wp:group {"tagName":"main","style":{"spacing":{"padding":{"top":"var:preset|spacing|medium","bottom":"var:preset|spacing|large"}}},"layout":{"type":"constrained"}} --&gt;
+&lt;main class="wp-block-group" style="padding-top:var(--wp--preset--spacing--medium);padding-bottom:var(--wp--preset--spacing--large)"&gt;
+	&lt;!-- wp:heading {"level":1} --&gt;
+	&lt;h1 class="wp-block-heading"&gt;This page is not on our shelves&lt;/h1&gt;
+	&lt;!-- /wp:heading --&gt;
+
+	&lt;!-- wp:paragraph --&gt;
+	&lt;p&gt;The page you asked for does not exist, or it has moved. Try a search:&lt;/p&gt;
+	&lt;!-- /wp:paragraph --&gt;
+
+	&lt;!-- wp:search {"label":"Search","buttonText":"Search"} /--&gt;
+&lt;/main&gt;
+&lt;!-- /wp:group --&gt;
+
+&lt;!-- wp:template-part {"slug":"footer","tagName":"footer"} /--&gt;</code></pre>
+                    <p>Ask WordPress what the theme now offers:</p>
+                    <pre data-cli><code class="language-bash">wp eval 'foreach ( get_block_templates() as $t ) { echo $t-&gt;id, "  ", $t-&gt;source, "  ", $t-&gt;title, "\n"; } foreach ( get_block_templates( array(), "wp_template_part" ) as $t ) { echo $t-&gt;id, "  ", $t-&gt;area, "\n"; }'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>pagesco//404  theme  Page: 404
+pagesco//archive  theme  All Archives
+pagesco//search  theme  Search Results
+pagesco//single  theme  Single Posts
+pagesco//page  theme  Pages
+pagesco//index  theme  Index
+pagesco//footer  footer
+pagesco//header  header</code></pre>
+                    </div>
+                    <p>Six templates, all from your files (<code>theme</code>), with the titles WordPress gives the standard names, and two parts in their areas. A <code>custom</code> in that list would mean a Site Editor copy (Common Mistakes, number 3).</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 4: Verify the whole site <span class="step-time">(12 min)</span></h3>
+                    <p>Check every row of your template map at once. For each URL, this prints the HTTP status, how many notice bars, headers and footers the page has, and its <code>&lt;h1&gt;</code>:</p>
+                    <pre data-cli data-checkpoint><code class="language-bash">for url in / /hello-world/ /about/ /category/news/ /author/maria/ /2026/09/ "/?s=dune" /nothing-here/; do
+	page=$(curl -s -w '\n%{http_code}' "http://localhost:8080$url")
+	echo "$url  $(echo "$page" | tail -n 1)  notice:$(echo "$page" | grep -c '&lt;div class="pagesco-notice"')  header:$(echo "$page" | grep -c '&lt;header class="wp-block-template-part"')  footer:$(echo "$page" | grep -c '&lt;footer class="wp-block-template-part"')  h1: $(echo "$page" | grep -o '&lt;h1.*&lt;/h1&gt;' | head -n 1 | sed 's/&lt;[^&gt;]*&gt;//g')"
+done</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>/  200  notice:1  header:1  footer:1  h1: News from the shop
+/hello-world/  200  notice:1  header:1  footer:1  h1: Hello world!
+/about/  200  notice:1  header:1  footer:1  h1: About Us
+/category/news/  200  notice:1  header:1  footer:1  h1: Category: News
+/author/maria/  200  notice:1  header:1  footer:1  h1: Author: Maria Lopez
+/2026/09/  200  notice:1  header:1  footer:1  h1: Month: September 2026
+/?s=dune  200  notice:1  header:1  footer:1  h1: Search results for: &amp;#8220;dune&amp;#8221;
+/nothing-here/  404  notice:1  header:1  footer:1  h1: This page is not on our shelves</code></pre>
+                    </div>
+                    <p>Every page has the notice, a header and a footer, and an <code>&lt;h1&gt;</code> that names it: the Query Title block wrote "Category: News", "Author: Maria Lopez" and "Month: September 2026" for you, and the search title wraps the search term in curly quotes (<code>&amp;#8220;</code> and <code>&amp;#8221;</code> are their HTML entities). The 404 page answers with status 404, not 200, so search engines do not index it. Now look at the result in your browser. The home page should look like this:</p>
+                    <figure>
+                        <img src="images/lesson_08_front.png" alt="The Pages &amp; Co. home page in the pagesco theme: a dark notice bar, a pale green header with the site title and page links, and the news list in serif type with dark red post titles." width="1100" height="700" loading="lazy">
+                        <figcaption>The <code>pagesco</code> theme on the home page.</figcaption>
+                    </figure>
+                    <p>Finally, open Appearance &gt; Editor &gt; Templates. Your six templates are listed with their descriptions, and opening one shows it with live data inside the frame of your header and footer:</p>
+                    <figure>
+                        <img src="images/lesson_08_site_editor.png" alt="The Site Editor showing the Single Posts template of the pagesco theme: the sage header with Pages and Co. and the page links, a placeholder title and post content, and the Template sidebar listing the Header and Footer parts." width="1100" height="700" loading="lazy">
+                        <figcaption>The Single Posts template in the Site Editor. Look, but do not save: a save stores a copy (Common Mistakes, number 3).</figcaption>
+                    </figure>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>wp-content/themes/pagesco/</code> holds <code>style.css</code>, <code>theme.json</code>, <code>parts/header.html</code>, <code>parts/footer.html</code> and six templates</li>
+                        <li><code>wp theme list</code> shows <code>pagesco</code> as active, and <code>wp_is_block_theme()</code> is true</li>
+                        <li>The page is paper-colored with ink text, serif body type, sans-serif headings and oxblood links</li>
+                        <li>Every URL from your template map has the notice bar, the header, the footer and one <code>&lt;h1&gt;</code>; <code>/nothing-here/</code> returns 404</li>
+                        <li><code>get_block_templates()</code> lists six templates with the source <code>theme</code> (no Site Editor copies)</li>
+                        <li>You updated <code>pagesco-plan.txt</code>: tick off the six templates in your template map</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Each exercise changes the theme a little. Later lessons expect <code>pagesco</code> exactly as the project left it, so undo each change when you have seen it work (the solutions show how).</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: A Sixth Color</h3>
+                    <p>Add a color "Gold" (<code>#b58a2a</code>, slug <code>gold</code>) to the palette and prove that WordPress generated both its custom property and its text-color class rule. Then remove it again.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>One more object in <code>settings.color.palette</code>. Each palette color produces <code>--wp--preset--color--gold</code> and a class rule <code>.has-gold-color</code> in the global styles. You can edit the file in your editor; the solution uses <code>sed</code> to keep it to one command.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">sed -i 's|{ "slug": "slate", "name": "Slate", "color": "#56636a" }|{ "slug": "slate", "name": "Slate", "color": "#56636a" },\n\t\t\t\t{ "slug": "gold", "name": "Gold", "color": "#b58a2a" }|' wp-content/themes/pagesco/theme.json
+curl -s http://localhost:8080/ | grep -o -- '--wp--preset--color--gold: [^;]*\|\.has-gold-color{[^}]*}'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>--wp--preset--color--gold: #b58a2a
+.has-gold-color{color: var(--wp--preset--color--gold) !important;}</code></pre>
+                        </div>
+                        <p>The class rule uses the custom property, with <code>!important</code> so a color chosen for one block beats every other rule. To undo, delete the Gold line again (here with <code>sed</code>, which also removes the comma it added):</p>
+                        <pre data-cli data-exit="1"><code class="language-bash">sed -i -e '/"slug": "gold"/d' -e 's|"color": "#56636a" },|"color": "#56636a" }|' wp-content/themes/pagesco/theme.json
+curl -s http://localhost:8080/ | grep -c -- '--wp--preset--color--gold'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>0</code></pre>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: A Template for the News Category</h3>
+                    <p>Pages &amp; Co. wants its News category to open with a short welcome line. Use the hierarchy from Lesson 3.1: create the most specific template for <code>/category/news/</code>, copy <code>archive.html</code> into it, and add a paragraph "Shop news, events and staff picks, newest first." after the Query Title. Check that the News archive shows it and the author archive does not. Then delete the template.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The category chain was <code>category-news</code>, <code>category-2</code>, <code>category</code>, <code>archive</code>, <code>index</code>. Prefer the slug version over the ID. A Paragraph block is <code>&lt;!-- wp:paragraph --&gt;&lt;p&gt;…&lt;/p&gt;&lt;!-- /wp:paragraph --&gt;</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli data-exit="1"><code class="language-bash">sed 's|\(&lt;!-- wp:query-title {"type":"archive"} /--&gt;\)|\1\n\t&lt;!-- wp:paragraph --&gt;\n\t&lt;p&gt;Shop news, events and staff picks, newest first.&lt;/p&gt;\n\t&lt;!-- /wp:paragraph --&gt;|' wp-content/themes/pagesco/templates/archive.html &gt; wp-content/themes/pagesco/templates/category-news.html
+grep -n "Shop news" wp-content/themes/pagesco/templates/category-news.html
+curl -s http://localhost:8080/category/news/ | grep -c "Shop news"
+curl -s http://localhost:8080/author/maria/ | grep -c "Shop news"</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>7:	&lt;p&gt;Shop news, events and staff picks, newest first.&lt;/p&gt;
+1
+0</code></pre>
+                        </div>
+                        <p>The News archive found <code>category-news.html</code> first; every other archive still falls through to <code>archive.html</code>. (<code>grep -c</code> printing 0 makes the last command exit with status 1; that is expected.) Delete the template to get back to the project state:</p>
+                        <pre data-cli><code class="language-bash">rm wp-content/themes/pagesco/templates/category-news.html</code></pre>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: The Requirements Check</h3>
+                    <p>Change <code>Requires at least</code> in <code>style.css</code> to a version that does not exist yet, <code>7.9</code>. Switch to Twenty Twenty-Five and back to <code>pagesco</code>. What happens, and why does WordPress only check this on activation? Put the header back to <code>6.6</code> and make sure <code>pagesco</code> ends up active.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>sed -i 's/Requires at least: 6.6/Requires at least: 7.9/'</code> changes the header. <code>wp theme activate</code> runs the same checks as the Activate button.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli data-raises="Error"><code class="language-bash">sed -i 's/Requires at least: 6.6/Requires at least: 7.9/' wp-content/themes/pagesco/style.css
+wp theme activate twentytwentyfive
+wp theme activate pagesco</code></pre>
+                        <div class="card card-output">
+                            <h4>Error</h4>
+                            <pre><code>Success: Switched to 'Twenty Twenty-Five' theme.
+Error: Error: Current WordPress version does not meet minimum requirements for Pages &amp; Co..</code></pre>
+                        </div>
+                        <p>WordPress refuses the switch (WP-CLI repeats the word "Error:" because it wraps core's own error message). The check runs on activation because that is the moment a site owner can still choose; a theme that is already active keeps running, since switching it off by surprise would be worse. Put it back:</p>
+                        <pre data-cli><code class="language-bash">sed -i 's/Requires at least: 7.9/Requires at least: 6.6/' wp-content/themes/pagesco/style.css
+wp theme activate pagesco</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>Success: Switched to 'Pages &amp;amp; Co.' theme.</code></pre>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 4: Style One Block Type (Stretch)</h3>
+                    <p>The "Staff picks for the season" post (Lesson 2.1) contains a quote from <em>Fahrenheit 451</em>. Give every Quote block on the site a 4px oxblood left border and italic text, using <code>theme.json</code> only, and find the rule WordPress generated. Then remove your change.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Add a <code>"core/quote"</code> entry next to <code>"core/post-date"</code> in <code>styles.blocks</code>, with <code>"border": { "left": { "color": …, "width": "4px", "style": "solid" } }</code> and <code>"typography": { "fontStyle": "italic" }</code>. The generated selector is <code>:root :where(.wp-block-quote)</code>. Keep a copy of <code>theme.json</code> (the solution puts it in the WordPress root as <code>theme.json.bak</code>) so undoing is one command.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">cp wp-content/themes/pagesco/theme.json theme.json.bak
+sed -i 's|"core/post-date": {|"core/quote": {\n\t\t\t\t"border": { "left": { "color": "var:preset\|color\|oxblood", "width": "4px", "style": "solid" } },\n\t\t\t\t"typography": { "fontStyle": "italic" }\n\t\t\t},\n\t\t\t"core/post-date": {|' wp-content/themes/pagesco/theme.json
+curl -s http://localhost:8080/staff-picks/ | grep -o ':root :where(.wp-block-quote){[^}]*}'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>:root :where(.wp-block-quote){border-left-color: var(--wp--preset--color--oxblood);border-left-width: 4px;border-left-style: solid;font-style: italic;}</code></pre>
+                        </div>
+                        <p>One entry in <code>theme.json</code>, and every quote on the site follows, in the editor as well as on the front end. Restore your copy:</p>
+                        <pre data-cli data-exit="1"><code class="language-bash">mv theme.json.bak wp-content/themes/pagesco/theme.json
+curl -s http://localhost:8080/staff-picks/ | grep -c ':root :where(.wp-block-quote){border'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>0</code></pre>
+                        </div>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> Your <code>theme.json</code> palette has <code>{ "slug": "oxblood", "name": "Oxblood", "color": "#7a2e2e" }</code>. Which CSS custom property can your styles use?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="WordPress namespaces its custom properties so they cannot clash with a plugin's. What prefix did the global styles show?">
+                                A) --oxblood
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Every palette color becomes --wp--preset--color--SLUG in the global styles, which is what var:preset|color|oxblood stands for.">
+                                B) --wp--preset--color--oxblood
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Close, but presets have their own segment in the name. Look at the grep output in the theme.json section.">
+                                C) --wp--color--oxblood
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> Which two files does a block theme need at the very least?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="style.css carries the theme header and templates/index.html is the template every request can fall back to. theme.json and functions.php are optional.">
+                                A) style.css and templates/index.html
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="A block theme can work without any PHP at all. Which file did Lesson 3.1 call the last resort?">
+                                B) style.css and functions.php
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Your theme was a block theme before you wrote theme.json. What did wp_is_block_theme check for?">
+                                C) theme.json and templates/index.html
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> A template contains <code>&lt;!-- wp:template-part {"slug":"site-footer"} /--&gt;</code>, but the theme's part is <code>parts/footer.html</code>. What does a visitor who is not logged in see?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="A missing part is not a PHP error. Did debug.log say anything in Common Mistakes?">
+                                A) A critical error page
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That message exists, but who saw it in Common Mistakes?">
+                                B) The message Template part has been deleted or is unavailable
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The Template Part block finds no part with that slug and renders nothing. Only logged-in users see a hint, so check slugs while logged in.">
+                                C) The page without a footer, and no message
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> Editors should be able to pick the five shop colors but not open a free color picker. Where does that belong?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="What the editors offer is a setting: settings.color.palette lists the colors and settings.color.custom set to false removes the free picker.">
+                                A) In settings.color: the palette, plus custom set to false
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="styles decides what is applied to the page. Which half of theme.json decides what the editors can choose from?">
+                                B) In styles.color: the background and text colors
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="templateParts only names the parts and their areas. Which section controls the color tools?">
+                                C) In templateParts
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> You changed <code>parts/header.html</code>, but the site still shows the old header. <code>wp post list --post_type=wp_template_part</code> lists a post named <code>header</code>. What do you do?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="WordPress reads theme files on every request; there is no file cache to clear here. What is that wp_template_part post?">
+                                A) Clear the browser cache and reload
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The post is a Site Editor copy that wins over the file. Reset it in the Site Editor or delete it with wp post delete ID --force, after exporting it if the owner's change should be kept.">
+                                B) Decide which version is right, then reset or delete the saved copy (exporting it first if it should be kept)
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The slug is fine: the copy is found because its name matches. What does the copy do to your file?">
+                                C) Rename the file to header-2.html
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Why is style.css almost empty? Where does my CSS go?</summary>
+                    <p>In a block theme most styling belongs in <code>theme.json</code>, because there it becomes presets and controls the editors understand. A block theme does not even load <code>style.css</code> on the front end unless <code>functions.php</code> enqueues it. Small additions go in <code>styles.css</code> (or per block in <code>styles.blocks.core/…css</code>); larger stylesheets are enqueued from <code>functions.php</code> (Lesson 4.3) or attached to a block style (Lesson 3.3).</p>
+                </details>
+                <details>
+                    <summary>Do I need a screenshot.png?</summary>
+                    <p>Not to work; without it the Themes screen shows a blank card. For a theme you hand over or publish, add a 1200 × 900 PNG or JPG of the home page named <code>screenshot.png</code>. Take it once the design is finished (Lesson 3.3 adds the front-page patterns).</p>
+                </details>
+                <details>
+                    <summary>How do I use a web font such as one from Google Fonts?</summary>
+                    <p>Download the font files into the theme (for example <code>assets/fonts/</code>) and add a <code>fontFace</code> array to the font family in <code>theme.json</code>, as Twenty Twenty-Five does; WordPress then loads them from your own site, with no request to a third-party server (better for privacy and speed). Site owners can also install fonts themselves in Appearance &gt; Fonts.</p>
+                </details>
+                <details>
+                    <summary>Should templates be written by hand or in the Site Editor?</summary>
+                    <p>Both, in a loop. Write structure and dynamic blocks by hand (they are short and easy to read), build visual sections with many static blocks in the editor and copy the markup, and keep the files in Git (Lesson 8.4). What you should not do is leave important design in the database only, where it is not versioned and does not travel with the theme.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>On a phone, the Navigation block in your header collapses into a menu button, because its <code>overlayMenu</code> attribute defaults to "mobile". Resize your browser to about 400 pixels wide, open the menu, and decide whether the overlay's default colors fit the shop. Then look up the Navigation block's <code>overlayBackgroundColor</code> and <code>overlayTextColor</code> attributes (Twenty Twenty-Five's header pattern uses them) and set them to presets from your palette in <code>parts/header.html</code>. Which of your colors give the overlay text enough contrast?</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> You wrote a style guide (<code>theme.json</code>) before the floor plans (templates). Imagine the shop rebrands next year with new colors and a new typeface. List exactly which files of <code>pagesco</code> you would have to touch, and which you would not. What does that tell you about where design decisions should live?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>A block theme starts with <code>style.css</code> (the header WordPress reads and checks on activation) and <code>templates/index.html</code></li>
+                        <li><code>theme.json</code> <strong>settings</strong> define what is available (presets, controls, layout widths); <strong>styles</strong> define what is applied (page, elements, blocks)</li>
+                        <li>Each preset becomes a CSS custom property (<code>--wp--preset--color--oxblood</code>) and classes; refer to presets, never to raw values</li>
+                        <li>Templates are block markup: static blocks carry their exact HTML, dynamic blocks are self-closing and rendered by PHP; template parts are included by slug</li>
+                        <li>Block themes get <code>wp_head</code>, <code>wp_body_open</code> and <code>wp_footer</code> from core, so plugin output such as the store notice keeps working</li>
+                        <li>Invalid JSON and wrong part slugs fail quietly; Site Editor saves are database copies that win over files</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>A brand color</td><td><code>settings.color.palette</code>: <code>{ "slug": "oxblood", "name": "Oxblood", "color": "#7a2e2e" }</code></td></tr>
+                            <tr><td>Use it in theme.json</td><td><code>"var:preset|color|oxblood"</code></td></tr>
+                            <tr><td>Use it in CSS</td><td><code>var(--wp--preset--color--oxblood)</code></td></tr>
+                            <tr><td>Use it on a block</td><td><code>"backgroundColor":"oxblood"</code> (class <code>has-oxblood-background-color</code>)</td></tr>
+                            <tr><td>Style all links / one block type</td><td><code>styles.elements.link</code> / <code>styles.blocks["core/quote"]</code></td></tr>
+                            <tr><td>Include the header</td><td><code>&lt;!-- wp:template-part {"slug":"header","tagName":"header"} /--&gt;</code></td></tr>
+                            <tr><td>List the posts of any archive</td><td><code>&lt;!-- wp:query {"query":{"inherit":true}} --&gt;</code> with a Post Template</td></tr>
+                            <tr><td>Read design values in PHP</td><td><code>wp_get_global_settings( array( 'color', 'palette', 'theme' ) )</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You built <code>pagesco</code>, the Pages &amp; Co. block theme, from an empty folder to an active theme with a design system, two parts and six templates</li>
+                        <li>You read the CSS WordPress generates from <code>theme.json</code> and the design values it exposes to PHP</li>
+                        <li>You verified every page type from the command line: status, landmarks, notice bar and heading</li>
+                        <li>You broke the theme three quiet ways on purpose and know how to spot and fix each one</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>In <a href="lesson_09.html"><strong>Lesson 3.3: Patterns, Style Variations &amp; the Site Editor</strong></a> you make <code>pagesco</code> richer and easier to use for the shop's staff: PHP pattern files with ready-made sections (a hero, a featured-books row, a call to action), synced patterns, section styles, a style variation that recolors the whole site from one JSON file, and the workflow for exporting Site Editor changes back into your theme's files.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>pagesco</code> is the active theme and your files match the project exactly (exercise changes undone)</li>
+                    <li>Run <code>wp post list --post_type=wp_template,wp_template_part</code>: it should list no posts. If you saved in the Site Editor, reset those templates</li>
+                    <li>Browse your site on a phone-sized window and note one thing you would like to look different; Lesson 3.3 gives you the tools</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>You just built a complete WordPress theme, from an empty folder, and it draws every page of a real site. That is a milestone many WordPress users never reach. If the long JSON and the block markup felt like a lot to type, that is normal; after a few themes you will copy your own <code>theme.json</code> as a starting point and spend your time on design instead. And when something does not show up, you now have a short list of quiet causes to check before you start doubting yourself.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_07.html" class="prev-lesson">← Previous: Theme Anatomy &amp; the Template Hierarchy</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_09.html" class="next-lesson">Next: Patterns, Style Variations &amp; the Site Editor →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

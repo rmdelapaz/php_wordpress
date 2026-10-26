@@ -1,0 +1,1417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="WordPress core architecture and its database: the files of an install, wp-config.php, how wp-settings.php loads WordPress, the twelve wp_* tables with their keys and indexes, joins, the post meta key-value pattern, serialized values, and options with autoload, queried with SQL and WP-CLI on WordPress 7.1 and PHP 8.5. PHP and WordPress Development Lesson 2.2.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Core Architecture &amp; the Database - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#72aee6', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#f0f6fc', primaryTextColor: '#1e293b', primaryBorderColor: '#2271b1', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 2: WordPress Inside Out</a></li>
+            <li aria-current="page">Lesson 2.2: Core Architecture &amp; the Database</li>
+        </ul>
+    </nav>
+
+    <main id="main-content" data-state="after:lesson_04">
+        <div class="container">
+            <header>
+                <h1>🏛️ Lesson 2.2: Core Architecture &amp; the Database</h1>
+                <p class="lead">In Lesson 2.1 you met the content model through WP-CLI and PHP: posts with a type, terms, users, options and block markup. Now you open the hood. You will walk the files of a WordPress install, read <code>wp-config.php</code> line by line, follow <code>wp-settings.php</code> as it loads WordPress, and then go into the database you already know how to query from MySQL Foundations. Twelve tables hold everything, and once you see their keys, their joins and the key-value pattern WordPress uses for extra fields, the content model stops being magic and becomes SQL you can read.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Find your way around a WordPress install: what lives in <code>wp-admin/</code>, <code>wp-includes/</code> and <code>wp-content/</code>, and what a drop-in is</li>
+                        <li>Read <code>wp-config.php</code> and explain its settings, including the table prefix and the security keys</li>
+                        <li>Trace how <code>wp-settings.php</code> loads WordPress, and say what is available at each stage</li>
+                        <li>Map the twelve <code>wp_*</code> tables, their keys and indexes, and join them with SQL the way WordPress's own queries do</li>
+                        <li>Explain the meta (key-value) pattern, serialized values and options autoloading, with their trade-offs</li>
+                        <li>Query the Pages &amp; Co. site with <code>wp db cli</code>, <code>wp db query</code> and WP-CLI, and choose the API over raw SQL in your code</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 140 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_04.html">Lesson 2.1: The Content Model</a>, and <a href="https://rays-mysql.netlify.app/" target="_blank" rel="noopener">MySQL Foundations</a> (SELECT, joins, keys, indexes)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> a database inventory of the Pages &amp; Co. site, once in SQL and once in PHP with <code>$wpdb</code> (the site itself stays unchanged)</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (the autoload values changed in WordPress 6.6, see the version note)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. development site with the content from Lesson 2.1, WP-CLI and its <code>wp db</code> commands</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#files" class="toc-link">The Files of a WordPress Install</a></li>
+                        <li><a href="#wp-config" class="toc-link">wp-config.php: The File You Configure</a></li>
+                        <li><a href="#load-order" class="toc-link">How WordPress Loads: wp-settings.php</a></li>
+                        <li><a href="#tables" class="toc-link">The Twelve Tables</a></li>
+                        <li><a href="#keys" class="toc-link">Keys, Indexes and No Foreign Keys</a></li>
+                        <li><a href="#joins" class="toc-link">Joining the Tables</a></li>
+                        <li><a href="#meta" class="toc-link">Meta Tables: The Key-Value Pattern</a></li>
+                        <li><a href="#options" class="toc-link">Options and Autoload</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: A Database Inventory of Pages &amp; Co.</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="files" class="lesson-section">
+                <h2>📁 The Files of a WordPress Install</h2>
+                <p>Lesson 1.1 showed you the WordPress root and drew one line through it: everything belongs to core except <code>wp-content/</code> (yours) and <code>wp-config.php</code> (your site's settings). Today you look inside core, not to change it, but because reading it is how you answer questions no tutorial covers. Run these from the WP-CLI container (<code>docker compose run --rm wpcli sh</code>, Lesson 1.2), where the current folder is the WordPress root:</p>
+                <pre data-cli><code class="language-bash">find wp-includes -name '*.php' | wc -l
+find wp-admin -name '*.php' | wc -l</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>1059
+242</code></pre>
+                </div>
+                <p>About thirteen hundred PHP files. You will never read them all, and you do not need to: a handful hold the APIs this course uses, and their names tell you what is inside. Count the lines of the ones you will open most often:</p>
+                <pre data-cli><code class="language-bash">wc -l wp-includes/plugin.php wp-includes/option.php wp-includes/meta.php wp-includes/post.php wp-includes/class-wp-query.php wp-includes/class-wpdb.php wp-includes/default-filters.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>     1032 wp-includes/plugin.php
+     3275 wp-includes/option.php
+     1859 wp-includes/meta.php
+     8869 wp-includes/post.php
+     5148 wp-includes/class-wp-query.php
+     4221 wp-includes/class-wpdb.php
+      837 wp-includes/default-filters.php
+    25241 total</code></pre>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>File</th><th>What is in it</th><th>You use it in</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>wp-includes/plugin.php</code></td><td>The hooks API: <code>add_action()</code>, <code>apply_filters()</code> and friends</td><td>Lesson 2.3</td></tr>
+                            <tr><td><code>wp-includes/option.php</code></td><td><code>get_option()</code>, <code>update_option()</code>, autoloading, transients</td><td>This lesson, 5.4, 7.3</td></tr>
+                            <tr><td><code>wp-includes/meta.php</code></td><td>The metadata API shared by posts, users, terms and comments</td><td>This lesson, 5.2</td></tr>
+                            <tr><td><code>wp-includes/post.php</code></td><td><code>wp_insert_post()</code>, <code>wp_delete_post()</code>, <code>register_post_type()</code></td><td>2.1, 5.2</td></tr>
+                            <tr><td><code>wp-includes/class-wp-query.php</code></td><td><code>WP_Query</code>, which turns arguments into SQL</td><td>This lesson, 4.2</td></tr>
+                            <tr><td><code>wp-includes/class-wpdb.php</code></td><td><code>wpdb</code>, the database connection behind the global <code>$wpdb</code></td><td>This lesson, 5.5</td></tr>
+                            <tr><td><code>wp-includes/default-filters.php</code></td><td>Every hook core attaches to itself: the list of "what WordPress does by default"</td><td>Lesson 2.3</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The rest of the root follows the same logic. <code>wp-admin/</code> holds the dashboard screens (<code>edit.php</code> is the Posts list, <code>options-general.php</code> Settings &gt; General) plus <code>wp-admin/includes/</code>, helper functions the admin needs, and two endpoints you will use for forms and JavaScript: <code>admin-post.php</code> (Lesson 5.4) and <code>admin-ajax.php</code>. In the root, besides the loader files from Lesson 1.1, sit <code>wp-login.php</code>, <code>wp-cron.php</code> (runs scheduled tasks, Lesson 7.3), <code>xmlrpc.php</code> (an old remote API that many hosts block, Lesson 8.4) and <code>wp-comments-post.php</code> (where comment forms are sent).</p>
+
+                <h3>Drop-ins: special files in wp-content</h3>
+                <p>A few file names in <code>wp-content/</code> itself are reserved: if a file with that name exists, WordPress loads it <em>instead of</em> part of core. They are called <strong>drop-ins</strong>, and hosts and caching plugins install them. WordPress keeps the list in a function:</p>
+                <pre data-cli><code class="language-bash">wp eval 'echo implode( "\n", array_keys( _get_dropins() ) ), "\n";'
+wp plugin list --status=dropin</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>advanced-cache.php
+db.php
+db-error.php
+install.php
+maintenance.php
+object-cache.php
+php-error.php
+fatal-error-handler.php
++------+--------+--------+---------+----------------+-------------+
+| name | status | update | version | update_version | auto_update |
++------+--------+--------+---------+----------------+-------------+
++------+--------+--------+---------+----------------+-------------+</code></pre>
+                </div>
+                <p>The most important ones: <code>db.php</code> replaces the database class, <code>object-cache.php</code> plugs in a persistent cache such as Redis (Lesson 8.2), <code>advanced-cache.php</code> serves cached pages before WordPress even loads, and <code>maintenance.php</code>, <code>db-error.php</code> and <code>php-error.php</code> replace the pages shown during updates, database outages and fatal errors. Your site has none, which is why the plugin list is empty. (The leading underscore in <code>_get_dropins()</code> marks a function as private to core: fine to call for a look, not something to build on.) When a site behaves strangely, <code>wp plugin list --status=dropin</code> is a good early check: a forgotten <code>object-cache.php</code> explains many "my change does not show up" mysteries.</p>
+            </section>
+
+            <section id="wp-config" class="lesson-section">
+                <h2>⚙️ wp-config.php: The File You Configure</h2>
+                <p><code>wp-config.php</code> is plain PHP that runs on every request before anything else of WordPress. It defines how to reach the database, a set of secret keys, the table prefix and any switches you add, and its last line hands over to the loader. The Docker image wrote yours from the settings in <code>compose.yaml</code> (Lesson 1.2), so most values are read with <code>getenv_docker()</code>. Look at its skeleton, leaving out the secret keys (their values are unique to your site):</p>
+                <pre data-cli><code class="language-bash">grep -n "define(\|table_prefix =\|stop editing\|require_once" wp-config.php | grep -v "_KEY\|_SALT"</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>44:define( 'DB_NAME', getenv_docker('WORDPRESS_DB_NAME', 'wordpress') );
+47:define( 'DB_USER', getenv_docker('WORDPRESS_DB_USER', 'example username') );
+50:define( 'DB_PASSWORD', getenv_docker('WORDPRESS_DB_PASSWORD', 'example password') );
+59:define( 'DB_HOST', getenv_docker('WORDPRESS_DB_HOST', 'mysql') );
+62:define( 'DB_CHARSET', getenv_docker('WORDPRESS_DB_CHARSET', 'utf8mb4') );
+65:define( 'DB_COLLATE', getenv_docker('WORDPRESS_DB_COLLATE', '') );
+102:$table_prefix = getenv_docker('WORDPRESS_TABLE_PREFIX', 'wp_');
+116:define( 'WP_DEBUG', !!getenv_docker('WORDPRESS_DEBUG', '') );
+118:/* Add any custom values between this line and the "stop editing" line. */
+131:/* That's all, stop editing! Happy publishing. */
+135:	define( 'ABSPATH', __DIR__ . '/' );
+139:require_once ABSPATH . 'wp-settings.php';</code></pre>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Setting</th><th>What it does</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>DB_NAME</code>, <code>DB_USER</code>, <code>DB_PASSWORD</code>, <code>DB_HOST</code></td><td>The database connection. <code>DB_HOST</code> is <code>db</code>, the name of the database service in your Compose project; on a typical host it is <code>localhost</code></td></tr>
+                            <tr><td><code>DB_CHARSET</code>, <code>DB_COLLATE</code></td><td><code>utf8mb4</code>, real 4-byte UTF-8 (MySQL Foundations Lesson 2.2); an empty collation lets WordPress pick the best one the server supports</td></tr>
+                            <tr><td><code>AUTH_KEY</code> ... <code>NONCE_SALT</code></td><td>Eight random secrets that sign login cookies and nonces (Lesson 5.3). Changing them logs everybody out, which is exactly what you do after a break-in (<code>wp config shuffle-salts</code>)</td></tr>
+                            <tr><td><code>$table_prefix</code></td><td>The first letters of every table name, <code>wp_</code> here. A variable, not a constant. Changing it on a running site makes WordPress think it is not installed, because it looks for tables that do not exist</td></tr>
+                            <tr><td><code>WP_DEBUG</code> (+ the lines from <code>WORDPRESS_CONFIG_EXTRA</code>)</td><td>The debugging switches from Lesson 1.2</td></tr>
+                            <tr><td><code>ABSPATH</code>, <code>require_once ABSPATH . 'wp-settings.php';</code></td><td>The WordPress root folder, and the hand-over to the loader</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The comment "That's all, stop editing!" is not decoration: anything defined after the <code>require_once</code> line is defined too late, because <code>wp-settings.php</code> has already loaded WordPress with the old values. WP-CLI reads the file for you, which is handy in scripts:</p>
+                <pre data-cli><code class="language-bash">wp config list --fields=name,type
+wp config get table_prefix
+wp config get DB_HOST</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+---------------------+----------+
+| name                | type     |
++---------------------+----------+
+| table_prefix        | variable |
+| configExtra         | variable |
+| DB_NAME             | constant |
+| DB_USER             | constant |
+| DB_PASSWORD         | constant |
+| DB_HOST             | constant |
+| DB_CHARSET          | constant |
+| DB_COLLATE          | constant |
+| AUTH_KEY            | constant |
+| SECURE_AUTH_KEY     | constant |
+| LOGGED_IN_KEY       | constant |
+| NONCE_KEY           | constant |
+| AUTH_SALT           | constant |
+| SECURE_AUTH_SALT    | constant |
+| LOGGED_IN_SALT      | constant |
+| NONCE_SALT          | constant |
+| WP_DEBUG            | constant |
+| WP_ENVIRONMENT_TYPE | constant |
+| WP_DEBUG_LOG        | constant |
+| WP_DEBUG_DISPLAY    | constant |
+| SCRIPT_DEBUG        | constant |
++---------------------+----------+
+wp_
+db</code></pre>
+                </div>
+                <p><code>configExtra</code> is the Docker image's helper variable that holds your <code>WORDPRESS_CONFIG_EXTRA</code> lines; the constants after it (<code>WP_ENVIRONMENT_TYPE</code> to <code>SCRIPT_DEBUG</code>) are the ones those lines define. On a normal host you add such lines by hand, above the "stop editing" comment. These are the ones you will meet most:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Constant</th><th>Example</th><th>Effect</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>WP_HOME</code>, <code>WP_SITEURL</code></td><td><code>define( 'WP_HOME', 'https://pagesco.example.com' );</code></td><td>Override the <code>home</code> and <code>siteurl</code> options (useful when moving a site, Lesson 8.4)</td></tr>
+                            <tr><td><code>WP_POST_REVISIONS</code></td><td><code>define( 'WP_POST_REVISIONS', 10 );</code></td><td>Keep at most 10 revisions per post (Lesson 2.1)</td></tr>
+                            <tr><td><code>DISALLOW_FILE_EDIT</code></td><td><code>define( 'DISALLOW_FILE_EDIT', true );</code></td><td>Removes the theme and plugin file editors from the admin, a standard hardening step</td></tr>
+                            <tr><td><code>WP_MEMORY_LIMIT</code></td><td><code>define( 'WP_MEMORY_LIMIT', '256M' );</code></td><td>Asks PHP for more memory on the front end</td></tr>
+                            <tr><td><code>WP_CACHE</code></td><td><code>define( 'WP_CACHE', true );</code></td><td>Loads the <code>advanced-cache.php</code> drop-in (set by caching plugins)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-danger">
+                    <h4>🛑 wp-config.php holds secrets</h4>
+                    <p>The database password and the eight keys in this file are enough to take over a site. Never put a real site's <code>wp-config.php</code> in Git or in a support forum post, never e-mail it, and never let your web server show it as text. Two habits help: version only your theme and plugin folders (Lesson 8.4), and know that <code>wp-load.php</code> also looks for <code>wp-config.php</code> one folder <em>above</em> the WordPress root, outside the web root, where many hosts keep it. On your development site the values come from <code>compose.yaml</code>, and the passwords are throwaway ones that only work on your computer.</p>
+                </div>
+            </section>
+
+            <section id="load-order" class="lesson-section">
+                <h2>🚦 How WordPress Loads: wp-settings.php</h2>
+                <p>Lesson 1.1 promised a closer look at <code>wp-settings.php</code>, the file that turns an empty PHP process into a running WordPress. It is about 800 lines long and reads from top to bottom like a checklist. These are its milestones, with their line numbers in WordPress 7.1.3:</p>
+                <pre data-cli><code class="language-bash">grep -n "^require_wp_db\|^wp_start_object_cache\|^foreach ( wp_get_mu_plugins\|^foreach ( wp_get_active_and_valid_plugins\|^require ABSPATH . WPINC . '/pluggable.php'\|^foreach ( wp_get_active_and_valid_themes\|^\$GLOBALS\['wp'\]->init\|^do_action( '" wp-settings.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>136:require_wp_db();
+151:wp_start_object_cache();
+506:foreach ( wp_get_mu_plugins() as $mu_plugin ) {
+548:do_action( 'muplugins_loaded' );
+582:foreach ( wp_get_active_and_valid_plugins() as $plugin ) {
+612:require ABSPATH . WPINC . '/pluggable.php';
+630:do_action( 'plugins_loaded' );
+643:do_action( 'sanitize_comment_cookies' );
+705:do_action( 'setup_theme' );
+741:foreach ( wp_get_active_and_valid_themes() as $theme ) {
+757:do_action( 'after_setup_theme' );
+766:$GLOBALS['wp']-&gt;init();
+779:do_action( 'init' );
+801:do_action( 'wp_loaded' );</code></pre>
+                </div>
+                <p>Read it as the order in which things become available:</p>
+                <ol>
+                    <li><strong>The database</strong> (line 136, <code>require_wp_db()</code>): the global <code>$wpdb</code> connects, using the constants from <code>wp-config.php</code>. Then the object cache starts, an in-memory store for this one request (unless an <code>object-cache.php</code> drop-in makes it persistent).</li>
+                    <li><strong>Must-use plugins</strong> (line 506): every PHP file in <code>wp-content/mu-plugins/</code>, in alphabetical order, then the <code>muplugins_loaded</code> action.</li>
+                    <li><strong>Active plugins</strong> (line 582), then <code>plugins_loaded</code>. Only after them, at line 612, comes <code>pluggable.php</code>: functions such as <code>wp_mail()</code> and <code>wp_get_current_user()</code> that a plugin may replace by defining them first. That is why calling <code>wp_get_current_user()</code> at the top of a plugin file is a fatal "Call to undefined function": it does not exist yet.</li>
+                    <li><strong>The theme</strong> (line 741): the active theme's <code>functions.php</code> (a child theme's first, then its parent's, Lesson 3.4), then <code>after_setup_theme</code>.</li>
+                    <li><strong>The current user</strong> (line 766, <code>$GLOBALS['wp']-&gt;init()</code>) is worked out from the login cookie, and then <code>init</code> fires: everything is loaded, and this is where plugins register post types, taxonomies and blocks. <code>wp_loaded</code> closes the file.</li>
+                </ol>
+                <p>Only then does <code>wp-blog-header.php</code> call <code>wp()</code> to run the main query and load the template, as you saw in Lesson 1.1. Notice where the options are: <code>$wpdb</code> is ready at line 136, and the first thing WordPress reads with it, before any plugin runs, is the set of <em>autoloaded</em> options. You will see why that matters in the options section below. The admin follows the same path (<code>wp-admin/admin.php</code> loads <code>wp-load.php</code> too), and so does WP-CLI, which is why <code>wp eval</code> can call any WordPress function.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: opening the shop in the morning</h4>
+                    <p>Think of a bookseller opening Pages &amp; Co. First the lights and the till (the database and the cache). Then the things that are always there, no matter what (must-use plugins), then the departments that are open today (active plugins), then the window display (the theme). Only when the staff member on duty has signed in (the current user) does the shop open its doors (<code>init</code>) and serve the first customer (the main query). Code that tries to serve a customer while the lights are still off is the "too early" bug that Lesson 2.3 teaches you to avoid with hooks.</p>
+                </div>
+            </section>
+
+            <section id="tables" class="lesson-section">
+                <h2>🗄️ The Twelve Tables</h2>
+                <p>Time for SQL. WP-CLI opens a MySQL prompt with the credentials from <code>wp-config.php</code>, so you never have to type the database password:</p>
+                <pre data-norun><code class="language-bash">wp db cli</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your connection id will differ)</h4>
+                    <pre><code>Welcome to the MariaDB monitor.  Commands end with ; or \g.
+Your MySQL connection id is 1738
+Server version: 9.7.2 MySQL Community Server - GPL
+
+Copyright (c) 2000, 2018, Oracle, MariaDB Corporation Ab and others.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+MySQL [wordpress]&gt;</code></pre>
+                </div>
+                <p>The server is your MySQL 9.7; the client program in the WP-CLI container happens to be MariaDB's, which is why it greets you as "the MariaDB monitor" and shows the prompt as <code>MySQL [wordpress]&gt;</code> (database <code>wordpress</code>) rather than the <code>mysql&gt;</code> you know from MySQL Foundations. Everything you type works the same. Leave with <code>exit</code>. For one quick query, <code>wp db query "SELECT ..."</code> runs it without the prompt and prints tab-separated rows (Lesson 1.2). The SQL blocks in this lesson are written for the prompt; the prompt also prints a line such as <code>3 rows in set (0.001 sec)</code> after each result, left out of the output cards.</p>
+                <pre data-sql><code class="language-sql">SELECT TABLE_NAME, ENGINE, TABLE_COLLATION
+FROM information_schema.TABLES
+WHERE TABLE_SCHEMA = DATABASE()
+ORDER BY TABLE_NAME;</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+-----------------------+--------+------------------------+
+| TABLE_NAME            | ENGINE | TABLE_COLLATION        |
++-----------------------+--------+------------------------+
+| wp_commentmeta        | InnoDB | utf8mb4_unicode_520_ci |
+| wp_comments           | InnoDB | utf8mb4_unicode_520_ci |
+| wp_links              | InnoDB | utf8mb4_unicode_520_ci |
+| wp_options            | InnoDB | utf8mb4_unicode_520_ci |
+| wp_postmeta           | InnoDB | utf8mb4_unicode_520_ci |
+| wp_posts              | InnoDB | utf8mb4_unicode_520_ci |
+| wp_term_relationships | InnoDB | utf8mb4_unicode_520_ci |
+| wp_term_taxonomy      | InnoDB | utf8mb4_unicode_520_ci |
+| wp_termmeta           | InnoDB | utf8mb4_unicode_520_ci |
+| wp_terms              | InnoDB | utf8mb4_unicode_520_ci |
+| wp_usermeta           | InnoDB | utf8mb4_unicode_520_ci |
+| wp_users              | InnoDB | utf8mb4_unicode_520_ci |
++-----------------------+--------+------------------------+</code></pre>
+                </div>
+                <p>(<code>SHOW TABLES;</code> prints the same twelve names under the heading <code>Tables_in_wordpress</code>; <code>information_schema</code> also tells you the storage engine and the collation.) Twelve InnoDB tables in <code>utf8mb4_unicode_520_ci</code>, the collation WordPress picked because <code>DB_COLLATE</code> is empty, and the same twelve on every WordPress site since version 4.4, whatever plugins it runs (plugins may add their own, as you will in Lesson 5.5). They fall into five groups, linked by ID columns:</p>
+
+                <div class="mermaid">
+graph TD
+    U["wp_users"] -->|"ID = post_author"| P["wp_posts"]
+    U -->|"ID = user_id"| UM["wp_usermeta"]
+    P -->|"ID = post_id"| PM["wp_postmeta"]
+    P -->|"ID = object_id"| TR["wp_term_relationships"]
+    TR -->|"term_taxonomy_id"| TT["wp_term_taxonomy"]
+    TT -->|"term_id"| T["wp_terms"]
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Group</th><th>Tables</th><th>Holds</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Content</td><td><code>wp_posts</code>, <code>wp_postmeta</code></td><td>Every post of every type (Lesson 2.1's filing cabinet) and their extra fields</td></tr>
+                            <tr><td>Taxonomies</td><td><code>wp_terms</code>, <code>wp_term_taxonomy</code>, <code>wp_term_relationships</code>, <code>wp_termmeta</code></td><td>Terms (News), which taxonomy each belongs to (category), and which posts have which terms</td></tr>
+                            <tr><td>Users</td><td><code>wp_users</code>, <code>wp_usermeta</code></td><td>Logins, password hashes, e-mail; roles and preferences as meta</td></tr>
+                            <tr><td>Comments</td><td><code>wp_comments</code>, <code>wp_commentmeta</code></td><td>Comments, linked to a post by <code>comment_post_ID</code></td></tr>
+                            <tr><td>Settings and legacy</td><td><code>wp_options</code>, <code>wp_links</code></td><td>Every setting (Lesson 2.1); <code>wp_links</code> is the old "Links" manager, hidden since WordPress 3.5 and empty</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>How much is in them on your Pages &amp; Co. site? A <code>UNION ALL</code> of counts (MySQL Foundations Lesson 3.3) answers it in one go:</p>
+                <pre data-sql><code class="language-sql">SELECT 'wp_posts' AS table_name, COUNT(*) AS row_count FROM wp_posts
+UNION ALL SELECT 'wp_postmeta', COUNT(*) FROM wp_postmeta
+UNION ALL SELECT 'wp_users', COUNT(*) FROM wp_users
+UNION ALL SELECT 'wp_terms', COUNT(*) FROM wp_terms
+UNION ALL SELECT 'wp_term_relationships', COUNT(*) FROM wp_term_relationships
+UNION ALL SELECT 'wp_comments', COUNT(*) FROM wp_comments;</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+-----------------------+-----------+
+| table_name            | row_count |
++-----------------------+-----------+
+| wp_posts              |        11 |
+| wp_postmeta           |         5 |
+| wp_users              |         3 |
+| wp_terms              |         2 |
+| wp_term_relationships |         4 |
+| wp_comments           |         1 |
++-----------------------+-----------+</code></pre>
+                </div>
+                <p>Eleven rows in <code>wp_posts</code>: the three default posts, the navigation menu (4), your six pages and posts (12 to 17) and the About page's revision (18). If you opened posts in the editor after Lesson 2.1, you will have a few more revisions and meta rows; that is fine. Your site's numbers follow what you did, and the queries work the same.</p>
+
+                <h3>The prefix, in code</h3>
+                <p>At the prompt you type <code>wp_posts</code>. In PHP you never do, because the prefix comes from <code>wp-config.php</code> and is <code>pc_</code> or <code>wp7f3_</code> on many real sites. <code>$wpdb</code> knows every table's full name:</p>
+                <pre data-cli><code class="language-bash">wp eval 'global $wpdb; echo $wpdb-&gt;prefix, "\n", $wpdb-&gt;posts, "\n", $wpdb-&gt;postmeta, "\n", $wpdb-&gt;options, "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>wp_
+wp_posts
+wp_postmeta
+wp_options</code></pre>
+                </div>
+                <p>That is the rule for the whole course: SQL at the prompt may say <code>wp_posts</code>; SQL in a theme or plugin says <code>{$wpdb-&gt;posts}</code>, and its own tables use <code>$wpdb-&gt;prefix</code> (Lesson 5.5).</p>
+            </section>
+
+            <section id="keys" class="lesson-section">
+                <h2>🔑 Keys, Indexes and No Foreign Keys</h2>
+                <p>Look at a table the way MySQL Foundations taught you. <code>wp db columns</code> is WP-CLI's <code>DESCRIBE</code>:</p>
+                <pre data-cli><code class="language-bash">wp db columns wp_postmeta</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+------------+-----------------+------+-----+---------+----------------+
+| Field      | Type            | Null | Key | Default | Extra          |
++------------+-----------------+------+-----+---------+----------------+
+| meta_id    | bigint unsigned | NO   | PRI |         | auto_increment |
+| post_id    | bigint unsigned | NO   | MUL | 0       |                |
+| meta_key   | varchar(255)    | YES  | MUL |         |                |
+| meta_value | longtext        | YES  |     |         |                |
++------------+-----------------+------+-----+---------+----------------+</code></pre>
+                </div>
+                <p>A surrogate primary key (<code>meta_id</code>, <code>BIGINT UNSIGNED AUTO_INCREMENT</code>), the post it belongs to, a key name, and the value as <code>LONGTEXT</code>: any meta value, a number, a date or a whole serialized array, is stored as text. <code>MUL</code> means "part of a non-unique index". Which indexes exist on the two content tables? <code>information_schema</code> knows:</p>
+                <pre data-sql><code class="language-sql">SELECT TABLE_NAME, INDEX_NAME,
+       GROUP_CONCAT(CONCAT(COLUMN_NAME, IFNULL(CONCAT('(', SUB_PART, ')'), '')) ORDER BY SEQ_IN_INDEX) AS columns
+FROM information_schema.STATISTICS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('wp_posts', 'wp_postmeta')
+GROUP BY TABLE_NAME, INDEX_NAME
+ORDER BY TABLE_NAME, INDEX_NAME;</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+-------------+--------------------+------------------------------------+
+| TABLE_NAME  | INDEX_NAME         | columns                            |
++-------------+--------------------+------------------------------------+
+| wp_postmeta | meta_key           | meta_key(191)                      |
+| wp_postmeta | post_id            | post_id                            |
+| wp_postmeta | PRIMARY            | meta_id                            |
+| wp_posts    | post_author        | post_author                        |
+| wp_posts    | post_name          | post_name(191)                     |
+| wp_posts    | post_parent        | post_parent                        |
+| wp_posts    | PRIMARY            | ID                                 |
+| wp_posts    | type_status_author | post_type,post_status,post_author  |
+| wp_posts    | type_status_date   | post_type,post_status,post_date,ID |
++-------------+--------------------+------------------------------------+</code></pre>
+                </div>
+                <p>Every index matches a question WordPress asks all the time, which is the indexing advice of MySQL Foundations Lesson 6.1 applied:</p>
+                <ul>
+                    <li><code>type_status_date</code> (<code>post_type, post_status, post_date, ID</code>) is a composite index for the most common query of all, "the latest published posts of this type", the query behind every blog page and archive. <code>type_status_author</code> serves author archives and the admin's "Mine" filter.</li>
+                    <li><code>post_name(191)</code> finds a post by its slug, which is how <code>/about/</code> becomes page 12.</li>
+                    <li><code>post_id</code> and <code>meta_key(191)</code> on <code>wp_postmeta</code> find a post's meta, and the posts that have a given key. There is no index on <code>meta_value</code>: it is <code>LONGTEXT</code>.</li>
+                </ul>
+                <p>Why <code>(191)</code>? These are <strong>prefix indexes</strong> on the first 191 characters. In <code>utf8mb4</code> a character can take 4 bytes, and 191 × 4 = 764 bytes fits under the 767-byte index limit of older MySQL versions that WordPress still supports. Now the surprising part, for anyone who took MySQL Foundations Lesson 4.2:</p>
+                <pre data-sql><code class="language-sql">SELECT COUNT(*) AS foreign_keys
+FROM information_schema.REFERENTIAL_CONSTRAINTS
+WHERE CONSTRAINT_SCHEMA = DATABASE();</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+--------------+
+| foreign_keys |
++--------------+
+|            0 |
++--------------+</code></pre>
+                </div>
+                <p><strong>Zero.</strong> <code>wp_postmeta.post_id</code> points at <code>wp_posts.ID</code>, but no <code>FOREIGN KEY</code> constraint says so, and the same goes for every arrow in the diagram above. The tables are InnoDB today, but the schema dates from the time of MyISAM, which had no foreign keys, and WordPress keeps it portable across every MySQL and MariaDB version it supports. Referential integrity therefore lives in PHP: <code>wp_delete_post()</code> removes a post's term links, revisions, comments and meta itself, before deleting the row.</p>
+                <pre data-cli><code class="language-bash">grep -n "wp_delete_object_term_relationships( \$post_id, get_object_taxonomies\|wp_delete_post_revision( \$revision_id\|wp_delete_comment( \$comment_id, true\|delete_metadata_by_mid( 'post', \$mid" wp-includes/post.php | head -n 4</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>3892:	wp_delete_object_term_relationships( $post_id, get_object_taxonomies( $post-&gt;post_type ) );
+3919:		wp_delete_post_revision( $revision_id );
+3932:		wp_delete_comment( $comment_id, true );
+3942:		delete_metadata_by_mid( 'post', $mid );</code></pre>
+                </div>
+                <p>Those four lines of <code>wp_delete_post()</code> are WordPress's <code>ON DELETE CASCADE</code>, written by hand. The consequence is the most important database rule in this course: <strong>change WordPress data through WordPress</strong> (its functions or WP-CLI), not with <code>DELETE</code> and <code>UPDATE</code> at the prompt. Common Mistakes 2 shows what happens otherwise.</p>
+            </section>
+
+            <section id="joins" class="lesson-section">
+                <h2>🔗 Joining the Tables</h2>
+                <p>With the keys in mind, the joins from MySQL Foundations Lesson 4.3 work as you would expect. Who wrote each published post and page?</p>
+                <pre data-sql><code class="language-sql">SELECT p.ID, p.post_type, p.post_title, u.display_name AS author
+FROM wp_posts AS p
+JOIN wp_users AS u ON u.ID = p.post_author
+WHERE p.post_type IN ('post', 'page') AND p.post_status = 'publish'
+ORDER BY p.ID;</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+----+-----------+----------------------------------------+-------------+
+| ID | post_type | post_title                             | author      |
++----+-----------+----------------------------------------+-------------+
+|  1 | post      | Hello world!                           | admin       |
+|  2 | page      | Sample Page                            | admin       |
+| 12 | page      | About Us                               | Maria Lopez |
+| 13 | page      | Contact                                | Maria Lopez |
+| 14 | page      | Events                                 | Maria Lopez |
+| 15 | post      | Welcome to the new Pages &amp; Co. website | Maria Lopez |
+| 16 | post      | Staff picks for the season             | Devon Park  |
+| 17 | post      | Book club: Dune                        | Maria Lopez |
++----+-----------+----------------------------------------+-------------+</code></pre>
+                </div>
+                <p>Categories take three tables, because WordPress separates the <em>term</em> (a name and slug, in <code>wp_terms</code>) from its use in a <em>taxonomy</em> (<code>wp_term_taxonomy</code>, which also holds the description, the parent and the post count), and links posts to the second (<code>wp_term_relationships</code>). Which posts are filed where?</p>
+                <pre data-sql><code class="language-sql">SELECT p.ID, p.post_title, t.name AS term, tt.taxonomy
+FROM wp_posts AS p
+JOIN wp_term_relationships AS tr ON tr.object_id = p.ID
+JOIN wp_term_taxonomy AS tt ON tt.term_taxonomy_id = tr.term_taxonomy_id
+JOIN wp_terms AS t ON t.term_id = tt.term_id
+ORDER BY p.ID;</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+----+----------------------------------------+---------------+----------+
+| ID | post_title                             | term          | taxonomy |
++----+----------------------------------------+---------------+----------+
+|  1 | Hello world!                           | Uncategorized | category |
+| 15 | Welcome to the new Pages &amp; Co. website | News          | category |
+| 16 | Staff picks for the season             | News          | category |
+| 17 | Book club: Dune                        | News          | category |
++----+----------------------------------------+---------------+----------+</code></pre>
+                </div>
+                <p>Hello world! in Uncategorized, your three posts in News, and no pages at all (pages have no taxonomies, Lesson 2.1). Now compare with the way WordPress asks the same question. <code>WP_Query</code> (Lesson 4.2) takes arguments and <em>writes the SQL for you</em>; its <code>request</code> property shows what it sent. Save this as <code>wordpress/query-news.php</code> (the WordPress root, so WP-CLI finds it; the <code>preg_replace()</code> only removes core's indentation):</p>
+                <pre data-file="query-news.php"><code class="language-php">&lt;?php
+$pagesco_query = new WP_Query(
+	array(
+		'category_name' =&gt; 'news',
+		'fields'        =&gt; 'ids',
+	)
+);
+
+echo trim( preg_replace( '/\n\s+/', "\n", $pagesco_query-&gt;request ) ), "\n\n";
+echo 'Found: ', implode( ', ', $pagesco_query-&gt;posts ), "\n";</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file query-news.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>SELECT SQL_CALC_FOUND_ROWS  wp_posts.ID
+FROM wp_posts  LEFT JOIN wp_term_relationships ON (wp_posts.ID = wp_term_relationships.object_id)
+WHERE 1=1  AND (
+wp_term_relationships.term_taxonomy_id IN (2)
+) AND ((wp_posts.post_type = 'post' AND (wp_posts.post_status = 'publish')))
+GROUP BY wp_posts.ID
+ORDER BY wp_posts.post_date DESC
+LIMIT 0, 10
+
+Found: 17, 16, 15</code></pre>
+                </div>
+                <p>Read it like any query you wrote in MySQL Foundations. WordPress first looked up the slug <code>news</code> (a small query of its own) and then joined only <code>wp_term_relationships</code>, filtering on <code>term_taxonomy_id IN (2)</code>: one join instead of three. It added the defaults you did not ask for (<code>post_type = 'post'</code>, <code>post_status = 'publish'</code>, newest first, 10 per page) and <code>SQL_CALC_FOUND_ROWS</code>, which lets it count all matches for pagination (see the FAQ). This is why the course says "core APIs before SQL": the API knows the schema, the defaults and the shortcuts, and it caches the results. Delete the file when you have read it:</p>
+                <pre data-cli><code class="language-bash">rm query-news.php</code></pre>
+            </section>
+
+            <section id="meta" class="lesson-section">
+                <h2>🧷 Meta Tables: The Key-Value Pattern</h2>
+                <p>Here is everything in <code>wp_postmeta</code> on your site right now:</p>
+                <pre data-sql><code class="language-sql">SELECT * FROM wp_postmeta ORDER BY meta_id;</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+---------+---------+-------------------+------------+
+| meta_id | post_id | meta_key          | meta_value |
++---------+---------+-------------------+------------+
+|       1 |       2 | _wp_page_template | default    |
+|       2 |       3 | _wp_page_template | default    |
+|       9 |      15 | _pingme           | 1          |
+|      11 |      16 | _pingme           | 1          |
+|      13 |      17 | _pingme           | 1          |
++---------+---------+-------------------+------------+</code></pre>
+                </div>
+                <p>Five rows, all written by core. The two pages that came with the install store which template they use (<code>_wp_page_template</code>, "default"). Your three News posts carry <code>_pingme</code>: when a post is published WordPress plans to notify the sites it links to, and on a <code>local</code> environment WordPress 7.1 never sends those pings, so the flag stays (if you opened posts in the editor you will also see <code>_edit_lock</code> and <code>_edit_last</code>). A leading underscore marks a key as "protected": the editor's Custom Fields panel hides it.</p>
+                <p>This table is the <strong>key-value</strong> pattern, known in database design as <strong>EAV</strong> (entity-attribute-value): instead of one column per field, each field of each post is a row of <em>which post</em> (entity), <em>which field</em> (attribute) and <em>its value</em>. In MySQL Foundations you designed a <code>books</code> table with a <code>price</code> column. WordPress cannot add a column to <code>wp_posts</code> for every plugin's fields, so a book's price becomes a row in <code>wp_postmeta</code>: <code>post_id</code> 25, <code>meta_key</code> <code>pagesco_price</code>, <code>meta_value</code> <code>'14.99'</code> (Lesson 5.2 registers that key). <code>wp_usermeta</code>, <code>wp_termmeta</code> and <code>wp_commentmeta</code> have the same shape, and one API, in <code>wp-includes/meta.php</code>, serves all four:</p>
+                <pre data-cli><code class="language-bash">wp eval 'var_dump( get_post_meta( 2, "_wp_page_template", true ), get_user_meta( 2, "first_name", true ), get_metadata( "user", 2, "last_name", true ) );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>string(7) "default"
+string(5) "Maria"
+string(5) "Lopez"</code></pre>
+                </div>
+                <p><code>get_post_meta()</code> and <code>get_user_meta()</code> are short forms of <code>get_metadata( 'post' | 'user', ... )</code>. The third argument, <code>true</code>, means "one value"; Common Mistakes 4 shows what you get without it.</p>
+
+                <h3>Every value is a string</h3>
+                <p>Give the three News posts an estimated reading time in minutes, as a plugin might. <code>wp post meta add</code> calls <code>add_post_meta()</code>:</p>
+                <pre data-cli><code class="language-bash">wp post meta add 15 pagesco_reading_minutes 2
+wp post meta add 16 pagesco_reading_minutes 12
+wp post meta add 17 pagesco_reading_minutes 4</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Added custom field.
+Success: Added custom field.
+Success: Added custom field.</code></pre>
+                </div>
+                <p>Now sort the posts by reading time, quickest first, as you would sort a numeric column:</p>
+                <pre data-sql><code class="language-sql">SELECT post_id, meta_value
+FROM wp_postmeta
+WHERE meta_key = 'pagesco_reading_minutes'
+ORDER BY meta_value;</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+---------+------------+
+| post_id | meta_value |
++---------+------------+
+|      16 | 12         |
+|      15 | 2          |
+|      17 | 4          |
++---------+------------+</code></pre>
+                </div>
+                <p>Twelve minutes "before" two. <code>meta_value</code> is text, so MySQL compares character by character, and <code>'1'</code> comes before <code>'2'</code>: the data-type lesson of MySQL Foundations Lesson 2.2 in a WordPress costume. The fix in SQL is a cast, <code>ORDER BY CAST(meta_value AS UNSIGNED)</code>. In WordPress you tell <code>WP_Query</code> the value is a number, <code>'orderby' =&gt; 'meta_value_num'</code>, and it writes the conversion for you (as <code>meta_value+0</code>) together with the <code>INNER JOIN</code> on <code>wp_postmeta</code>:</p>
+                <pre data-file="query-reading.php"><code class="language-php">&lt;?php
+$pagesco_query = new WP_Query(
+	array(
+		'meta_key' =&gt; 'pagesco_reading_minutes',
+		'orderby'  =&gt; 'meta_value_num',
+		'order'    =&gt; 'ASC',
+		'fields'   =&gt; 'ids',
+	)
+);
+
+echo trim( preg_replace( '/\n\s+/', "\n", $pagesco_query-&gt;request ) ), "\n\n";
+echo 'Found: ', implode( ', ', $pagesco_query-&gt;posts ), "\n";</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file query-reading.php
+rm query-reading.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>SELECT SQL_CALC_FOUND_ROWS  wp_posts.ID
+FROM wp_posts  INNER JOIN wp_postmeta ON ( wp_posts.ID = wp_postmeta.post_id )
+WHERE 1=1  AND (
+wp_postmeta.meta_key = 'pagesco_reading_minutes'
+) AND ((wp_posts.post_type = 'post' AND (wp_posts.post_status = 'publish')))
+GROUP BY wp_posts.ID
+ORDER BY wp_postmeta.meta_value+0 ASC
+LIMIT 0, 10
+
+Found: 15, 17, 16</code></pre>
+                </div>
+                <p>Posts 15 (2 minutes), 17 (4) and 16 (12): right. Every condition on meta costs one more join of <code>wp_postmeta</code>, and a condition on the <em>value</em> cannot use an index. <code>EXPLAIN</code> (MySQL Foundations Lesson 6.1) shows the difference between searching by key and by value alone. Run these with <code>wp db query</code>; <code>\G</code> prints each row vertically, as in MySQL Foundations:</p>
+                <pre data-cli><code class="language-bash">wp db query "EXPLAIN SELECT post_id FROM wp_postmeta WHERE meta_key = 'pagesco_reading_minutes' AND meta_value = '4'\G"
+wp db query "EXPLAIN SELECT post_id FROM wp_postmeta WHERE meta_value = '4'\G"</code></pre>
+                <div class="card card-output">
+                    <h4>Output (cost and row estimates differ from server to server)</h4>
+                    <pre><code>*************************** 1. row ***************************
+EXPLAIN: -&gt; Filter: ((wp_postmeta.meta_key = 'pagesco_reading_minutes') and (wp_postmeta.meta_value = '4'))  (cost=0.537 rows=0.375)
+    -&gt; Index lookup on wp_postmeta using meta_key (meta_key = 'pagesco_reading_minutes')  (cost=0.537 rows=3)
+*************************** 1. row ***************************
+EXPLAIN: -&gt; Filter: (wp_postmeta.meta_value = '4')  (cost=1.05 rows=1)
+    -&gt; Table scan on wp_postmeta  (cost=1.05 rows=8)</code></pre>
+                </div>
+                <p>With the key, MySQL uses the <code>meta_key</code> index and then filters three rows; with only the value it reads the whole table. On eight rows nobody notices. On a shop with 50,000 products and a million meta rows, "find every product whose color is red" is a full scan, which is the classic WordPress performance problem (Lesson 8.2). Keep the reading times for now; Common Mistakes uses them, and then you delete them.</p>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Where to keep a field</th><th>Good at</th><th>Costs</th><th>In this course</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Post meta (key-value)</td><td>Any plugin can add fields without changing the schema; revisions, REST API, block bindings and the editor understand it</td><td>Values are text; each condition is a join; values are not indexed</td><td>Book author, price, pages (5.2)</td></tr>
+                            <tr><td>A taxonomy</td><td>Grouping and filtering: "all science fiction"; indexed, with archive pages for free</td><td>Only for shared labels, not unique values</td><td>Genres (5.2)</td></tr>
+                            <tr><td>A custom table</td><td>Real columns, types, indexes and SQL of your own design</td><td>You write the schema, the migrations and the queries</td><td>Events (5.5)</td></tr>
+                            <tr><td>A JSON column (MySQL Foundations 7.3)</td><td>Flexible attributes in one row</td><td>Not used by core; WordPress stores arrays as serialized PHP instead</td><td>Not used</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Serialized values</h3>
+                <p>When a meta value or an option is an array, WordPress stores it with PHP's <code>serialize()</code> and turns it back with <code>maybe_unserialize()</code> when you read it. You met one in Lesson 2.1, the role of a user:</p>
+                <pre data-sql><code class="language-sql">SELECT user_id, meta_value
+FROM wp_usermeta
+WHERE meta_key = 'wp_capabilities'
+ORDER BY user_id;</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+---------+---------------------------------+
+| user_id | meta_value                      |
++---------+---------------------------------+
+|       1 | a:1:{s:13:"administrator";b:1;} |
+|       2 | a:1:{s:6:"editor";b:1;}         |
+|       3 | a:1:{s:6:"author";b:1;}         |
++---------+---------------------------------+</code></pre>
+                </div>
+                <p><code>a:1:{s:6:"editor";b:1;}</code> reads "an array with 1 element: the string of 6 characters <code>editor</code> =&gt; boolean 1". The lengths are part of the data, which is exactly why you must never edit such a value as text (Common Mistakes 1). In PHP you never see this form: <code>get_user_meta( 2, 'wp_capabilities', true )</code> returns <code>array( 'editor' =&gt; true )</code>.</p>
+            </section>
+
+            <section id="options" class="lesson-section">
+                <h2>🎛️ Options and Autoload</h2>
+                <p><code>wp_options</code> is the simplest table: <code>option_id</code>, <code>option_name</code> (unique), <code>option_value</code> (<code>LONGTEXT</code>) and <code>autoload</code>. Some of the most important rows:</p>
+                <pre data-sql><code class="language-sql">SELECT option_id, option_name, option_value, autoload
+FROM wp_options
+WHERE option_name IN ('siteurl', 'home', 'blogname', 'permalink_structure', 'active_plugins', 'template', 'stylesheet', 'db_version')
+ORDER BY option_id;</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+-----------+---------------------+-----------------------+----------+
+| option_id | option_name         | option_value          | autoload |
++-----------+---------------------+-----------------------+----------+
+|         2 | siteurl             | http://localhost:8080 | on       |
+|         3 | home                | http://localhost:8080 | on       |
+|         4 | blogname            | Pages &amp;amp; Co.       | on       |
+|        29 | permalink_structure | /%postname%/          | on       |
+|        34 | active_plugins      | a:0:{}                | on       |
+|        41 | template            | twentytwentyfive      | on       |
+|        42 | stylesheet          | twentytwentyfive      | on       |
+|        47 | db_version          | 61833                 | on       |
++-----------+---------------------+-----------------------+----------+</code></pre>
+                </div>
+                <p>The two URLs, the title (stored escaped, Lesson 1.2), the permalink structure, the list of active plugins (a serialized empty array: none), the active theme as <code>template</code> (the parent) and <code>stylesheet</code> (the theme itself; they differ for a child theme, Lesson 3.4), and <code>db_version</code>, the schema version WordPress compares with its own after an update to decide whether the tables need upgrading. All are <code>on</code> in the <code>autoload</code> column.</p>
+                <p><strong>Autoload</strong> is a performance decision. Early in <code>wp-settings.php</code> WordPress loads all autoloaded options in <em>one</em> query and keeps them in memory, so every later <code>get_option()</code> for them is free. Options that are not autoloaded cost one query the first time they are read in a request. Count the queries yourself; <code>$wpdb-&gt;num_queries</code> counts every query this request has run. Save as <code>wordpress/options-cost.php</code>:</p>
+                <pre data-file="options-cost.php"><code class="language-php">&lt;?php
+global $wpdb;
+
+foreach ( array( 'blogname', 'fresh_site', 'fresh_site', 'pagesco_no_such_option' ) as $pagesco_name ) {
+	$pagesco_before = $wpdb-&gt;num_queries;
+	$pagesco_value  = get_option( $pagesco_name );
+	printf( "%-24s %-18s queries: %d\n", $pagesco_name, var_export( $pagesco_value, true ), $wpdb-&gt;num_queries - $pagesco_before );
+}</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file options-cost.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>blogname                 'Pages &amp;amp; Co.'  queries: 0
+fresh_site               '0'                queries: 1
+fresh_site               '0'                queries: 0
+pagesco_no_such_option   false              queries: 1</code></pre>
+                </div>
+                <p><code>blogname</code> is autoloaded: zero queries. <code>fresh_site</code> is not: one query the first time, zero the second (it is cached for the rest of the request). Even an option that does not exist costs a query, because WordPress cannot know it is missing without asking. The flip side: everything autoloaded is loaded on <em>every</em> request, used or not, so a plugin that autoloads a 2 MB option slows down every page of the site.</p>
+
+                <h3>Who decides: the autoload values</h3>
+                <p><code>add_option( $name, $value, '', $autoload )</code> and <code>update_option( $name, $value, $autoload )</code> take the decision as their last argument. Leave it out and WordPress decides. Watch all three cases; save as <code>wordpress/autoload-demo.php</code>:</p>
+                <pre data-file="autoload-demo.php"><code class="language-php">&lt;?php
+add_option( 'pagesco_demo_small', 'a short value' );
+add_option( 'pagesco_demo_large', str_repeat( 'x', 200000 ) );
+add_option( 'pagesco_demo_off', 'only needed on one screen', '', false );
+
+echo "Added three options.\n";</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file autoload-demo.php
+wp db query "SELECT option_name, LENGTH(option_value) AS bytes, autoload FROM wp_options WHERE option_name LIKE 'pagesco_demo%' ORDER BY option_name"</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Added three options.
+option_name	bytes	autoload
+pagesco_demo_large	200000	auto-off
+pagesco_demo_off	25	off
+pagesco_demo_small	13	auto</code></pre>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th><code>autoload</code></th><th>Means</th><th>Loaded with the others?</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>on</code> / <code>off</code></td><td>The code said so (<code>true</code> / <code>false</code>)</td><td>yes / no</td></tr>
+                            <tr><td><code>auto</code></td><td>Nobody said; WordPress's default</td><td>yes (WordPress's default heuristics decide, and today they load it)</td></tr>
+                            <tr><td><code>auto-on</code> / <code>auto-off</code></td><td>WordPress decided by itself, here because the value is larger than 150,000 bytes (filter <code>wp_max_autoloaded_option_size</code>)</td><td>yes / no</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The 200,000-byte option became <code>auto-off</code> without anyone asking. The rule for your plugins (Lesson 5.4): pass <code>true</code> for small settings you read on every page, and <code>false</code> for anything big or rarely needed. Clean up, then look at the whole table by autoload value, a <code>GROUP BY</code> from MySQL Foundations Lesson 3.3:</p>
+                <pre data-cli><code class="language-bash">wp option delete pagesco_demo_small pagesco_demo_large pagesco_demo_off
+rm autoload-demo.php options-cost.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Deleted 'pagesco_demo_small' option.
+Success: Deleted 'pagesco_demo_large' option.
+Success: Deleted 'pagesco_demo_off' option.</code></pre>
+                </div>
+                <pre data-sql><code class="language-sql">SELECT autoload, COUNT(*) AS options, SUM(LENGTH(option_value)) AS bytes
+FROM wp_options
+GROUP BY autoload
+ORDER BY autoload;</code></pre>
+                <div class="card card-output">
+                    <h4>Output (your numbers will differ)</h4>
+                    <pre><code>+----------+---------+-------+
+| autoload | options | bytes |
++----------+---------+-------+
+| auto     |      20 |  1553 |
+| off      |      15 | 33949 |
+| on       |     100 | 48862 |
++----------+---------+-------+</code></pre>
+                </div>
+                <p>About 120 autoloaded options, around 50 KB, loaded on every request: a healthy small site. The numbers change as WordPress works (scheduled update checks, for example, store their results as options), which is why yours differ. Site Health (Tools &gt; Site Health) warns when autoloaded options grow past 800 KB. The <code>off</code> rows include the <code>_site_transient_...</code> options: transients, WordPress's cache with an expiry date, live in this table too (Lesson 7.3).</p>
+
+                <div class="card card-info">
+                    <h4>🧩 Version note: <code>yes</code> and <code>no</code> before WordPress 6.6</h4>
+                    <p>Until WordPress 6.5 the <code>autoload</code> column held only <code>yes</code> or <code>no</code>, and countless tutorials and Stack Overflow answers query <code>WHERE autoload = 'yes'</code>. On WordPress 6.6 and later, including 7.1, that query finds nothing on a new site; use <code>WHERE autoload IN ('yes', 'on', 'auto-on', 'auto')</code>, the list that <code>wp_autoload_values_to_autoload()</code> returns. Sites upgraded from older versions keep their old <code>yes</code>/<code>no</code> rows until those options are saved again, which is why <code>yes</code> is still in the list. In PHP, the third argument of <code>update_option()</code> used to be <code>'yes'</code>/<code>'no'</code>; pass <code>true</code>/<code>false</code> now.</p>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <p>The database is where WordPress mistakes are quiet: most of these produce no error at all. Each one is reversible on your development site, which is the place to make them.</p>
+
+                <h3>1. Editing serialized data with SQL</h3>
+                <p>The shop's details are stored as one option holding an array (WP-CLI turns the JSON into a PHP array). Then someone renames the city with a quick SQL <code>REPLACE()</code>:</p>
+                <pre data-cli data-raises="Error"><code class="language-bash">wp option add pagesco_demo_shop '{"city":"Springfield","phone":"555-0142"}' --format=json
+wp db query "UPDATE wp_options SET option_value = REPLACE(option_value, 'Springfield', 'Portland') WHERE option_name = 'pagesco_demo_shop'"
+wp db query "SELECT option_value FROM wp_options WHERE option_name = 'pagesco_demo_shop'"
+wp option get pagesco_demo_shop</code></pre>
+                <div class="card card-output">
+                    <h4>Error</h4>
+                    <pre><code>Success: Added 'pagesco_demo_shop' option.
+Success: Query succeeded. Rows affected: 1
+option_value
+a:2:{s:4:"city";s:11:"Portland";s:5:"phone";s:8:"555-0142";}
+
+Error: Could not get 'pagesco_demo_shop' option. Does it exist?</code></pre>
+                </div>
+                <p><strong>What it means:</strong> the stored text still says <code>s:11:"Portland"</code>, "a string of 11 characters", but Portland has 8. PHP's <code>unserialize()</code> fails, WordPress returns <code>false</code>, and WP-CLI reports that the option does not exist. In a theme, <code>get_option()</code> silently returns <code>false</code> and the shop's address disappears from the page. The same happens to widgets, theme settings and plugin settings when a site moves to a new domain and someone runs <code>REPLACE()</code> on the old URL. <strong>Fix:</strong> change values through WordPress (<code>update_option()</code>, or <code>wp option patch update pagesco_demo_shop city Portland</code>), and for whole-site changes use <code>wp search-replace</code>, which unserializes, replaces and serializes again (Lesson 8.4). Remove the broken option:</p>
+                <pre data-cli><code class="language-bash">wp option delete pagesco_demo_shop</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Deleted 'pagesco_demo_shop' option.</code></pre>
+                </div>
+
+                <h3>2. Deleting rows with SQL (orphans)</h3>
+                <p>A draft post with a reading time, deleted the "database way":</p>
+                <pre data-cli><code class="language-bash">wp post create --post_title="Orphan demo" --porcelain
+wp post meta add 19 pagesco_reading_minutes 1
+wp db query "DELETE FROM wp_posts WHERE ID = 19"</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>19
+Success: Added custom field.
+Success: Query succeeded. Rows affected: 1</code></pre>
+                </div>
+                <p>No error. But a <code>LEFT JOIN</code> that looks for meta and term rows whose post is gone (MySQL Foundations Lesson 4.3) finds the leftovers:</p>
+                <pre data-sql><code class="language-sql">SELECT 'wp_postmeta' AS in_table, pm.post_id AS missing_post, pm.meta_key AS detail
+FROM wp_postmeta AS pm LEFT JOIN wp_posts AS p ON p.ID = pm.post_id
+WHERE p.ID IS NULL
+UNION ALL
+SELECT 'wp_term_relationships', tr.object_id, tr.term_taxonomy_id
+FROM wp_term_relationships AS tr LEFT JOIN wp_posts AS p ON p.ID = tr.object_id
+WHERE p.ID IS NULL;</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+-----------------------+--------------+-------------------------+
+| in_table              | missing_post | detail                  |
++-----------------------+--------------+-------------------------+
+| wp_postmeta           |           19 | pagesco_reading_minutes |
+| wp_term_relationships |           19 | 1                       |
++-----------------------+--------------+-------------------------+</code></pre>
+                </div>
+                <p><strong>What it means:</strong> two orphans, the reading time and the draft's link to Uncategorized (term_taxonomy_id 1; every post gets a category, even a draft). With no foreign keys, MySQL had no reason to stop you or to cascade. Orphans waste space, confuse reports, and can resurface: some plugins count meta rows, and a later post that reused the ID would inherit them if IDs were ever reset. <strong>Fix:</strong> delete content with <code>wp_delete_post()</code> or <code>wp post delete --force</code>, which clean up after themselves. Here, finish the job with two multi-table <code>DELETE</code>s, the one situation where SQL is the right tool:</p>
+                <pre data-sql><code class="language-sql">DELETE pm FROM wp_postmeta AS pm LEFT JOIN wp_posts AS p ON p.ID = pm.post_id WHERE p.ID IS NULL;
+DELETE tr FROM wp_term_relationships AS tr LEFT JOIN wp_posts AS p ON p.ID = tr.object_id WHERE p.ID IS NULL;
+SELECT COUNT(*) AS orphan_meta FROM wp_postmeta AS pm LEFT JOIN wp_posts AS p ON p.ID = pm.post_id WHERE p.ID IS NULL;</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>+-------------+
+| orphan_meta |
++-------------+
+|           0 |
++-------------+</code></pre>
+                </div>
+
+                <h3>3. A table name typed by hand</h3>
+                <p>Code that writes its own table names breaks on the first site with another prefix, and a typo breaks it everywhere. Both fail the same way. Save as <code>wordpress/count-posts.php</code>:</p>
+                <pre data-file="count-posts.php"><code class="language-php">&lt;?php
+global $wpdb;
+
+$pagesco_count = $wpdb-&gt;get_var( 'SELECT COUNT(*) FROM wp_post' );
+var_dump( $pagesco_count );</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file count-posts.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;div id="error"&gt;&lt;p class="wpdberror"&gt;&lt;strong&gt;WordPress database error:&lt;/strong&gt; [Table &amp;#039;wordpress.wp_post&amp;#039; doesn&amp;#039;t exist]&lt;br /&gt;&lt;code&gt;SELECT COUNT(*) FROM wp_post&lt;/code&gt;&lt;/p&gt;&lt;/div&gt;NULL</code></pre>
+                </div>
+                <p><strong>What it means:</strong> MySQL said <code>Table 'wordpress.wp_post' doesn't exist</code>; because <code>WP_DEBUG</code> is on, <code>$wpdb</code> printed it as an HTML error box meant for a browser (hence <code>&amp;#039;</code> for each quote), and <code>get_var()</code> returned <code>NULL</code>. The same line also went to <code>debug.log</code> as "WordPress database error ... for query ... made by ...", followed by the chain of functions that ran the query. On a live site visitors see nothing, and your code carries on with <code>NULL</code>. <strong>Fix:</strong> <code>{$wpdb-&gt;posts}</code> instead of a typed name, and check <code>$wpdb-&gt;last_error</code> after a query when something comes back empty. Better still for this job: <code>wp_count_posts( 'post' )-&gt;publish</code> needs no SQL at all.</p>
+                <pre data-cli><code class="language-bash">rm count-posts.php</code></pre>
+
+                <h3>4. Forgetting the third argument of get_post_meta() (silent)</h3>
+                <p>A theme wants to label long reads, posts of more than 10 minutes:</p>
+                <pre data-cli><code class="language-bash">wp eval 'var_dump( get_post_meta( 15, "pagesco_reading_minutes" ), get_post_meta( 15, "pagesco_reading_minutes" ) &gt; 10, get_post_meta( 15, "pagesco_reading_minutes", true ) &gt; 10 );'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>array(1) {
+  [0]=&gt;
+  string(1) "2"
+}
+bool(true)
+bool(false)</code></pre>
+                </div>
+                <p><strong>What it means:</strong> without <code>true</code>, <code>get_post_meta()</code> returns <em>every</em> value of that key as an array, because a post may have the same meta key several times (<code>add_post_meta()</code> adds another row each time). In PHP 8 an array compared with a number is always greater, so the two-minute post counts as a long read, with no warning. With <code>true</code> you get the single value, the string <code>'2'</code>, which PHP compares as a number. <strong>Fix:</strong> pass <code>true</code> whenever a key holds one value, which is almost always; Lesson 5.2 registers keys as <code>'single' =&gt; true</code> so the REST API knows it too. That was the last use of the reading times: delete them.</p>
+                <pre data-cli><code class="language-bash">wp post meta delete 15 pagesco_reading_minutes
+wp post meta delete 16 pagesco_reading_minutes
+wp post meta delete 17 pagesco_reading_minutes</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>Success: Deleted custom field.
+Success: Deleted custom field.
+Success: Deleted custom field.</code></pre>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: A Database Inventory of Pages &amp; Co.</h2>
+                <p>Before a developer changes a client's site, they take an inventory: what content is there, who owns it, how it is filed, and whether the settings are healthy. You will do that for Pages &amp; Co. twice: once at the SQL prompt, as an auditor would, and once in PHP with <code>$wpdb</code>, the way a plugin would, checked against the WordPress API. Nothing on the site changes; you keep the queries and the script in your notes. Allow about 35 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: Content by type and status <span class="step-time">(7 min)</span></h3>
+                    <p>Open <code>wp db cli</code> and count the rows of <code>wp_posts</code> by type and status, most common first:</p>
+                    <pre data-sql><code class="language-sql">SELECT post_type, post_status, COUNT(*) AS items
+FROM wp_posts
+GROUP BY post_type, post_status
+ORDER BY items DESC, post_type, post_status;</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>+---------------+-------------+-------+
+| post_type     | post_status | items |
++---------------+-------------+-------+
+| page          | publish     |     4 |
+| post          | publish     |     4 |
+| page          | draft       |     1 |
+| revision      | inherit     |     1 |
+| wp_navigation | publish     |     1 |
++---------------+-------------+-------+</code></pre>
+                    </div>
+                    <p>Four published posts and four published pages (the Sample Page counts), the Privacy Policy draft, the navigation menu and one revision. Compare with what WordPress itself counts: <code>wp_count_posts()</code> runs one <code>GROUP BY</code> like yours, per post type.</p>
+                    <pre data-cli><code class="language-bash">wp eval '$pagesco_posts = wp_count_posts( "post" ); $pagesco_pages = wp_count_posts( "page" ); echo "posts: {$pagesco_posts-&gt;publish} published\npages: {$pagesco_pages-&gt;publish} published, {$pagesco_pages-&gt;draft} draft\n";'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>posts: 4 published
+pages: 4 published, 1 draft</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: Who wrote what, and where it is filed <span class="step-time">(10 min)</span></h3>
+                    <p>One report of every published post and page with its author and its categories. Pages have no categories, so the term tables join with <code>LEFT JOIN</code>, and <code>GROUP_CONCAT()</code> folds several categories into one cell:</p>
+                    <pre data-sql><code class="language-sql">SELECT p.ID, p.post_type, p.post_name, u.user_login AS author,
+       GROUP_CONCAT(t.name ORDER BY t.name) AS categories
+FROM wp_posts AS p
+JOIN wp_users AS u ON u.ID = p.post_author
+LEFT JOIN wp_term_relationships AS tr ON tr.object_id = p.ID
+LEFT JOIN wp_term_taxonomy AS tt ON tt.term_taxonomy_id = tr.term_taxonomy_id AND tt.taxonomy = 'category'
+LEFT JOIN wp_terms AS t ON t.term_id = tt.term_id
+WHERE p.post_type IN ('post', 'page') AND p.post_status = 'publish'
+GROUP BY p.ID, p.post_type, p.post_name, u.user_login
+ORDER BY p.ID;</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>+----+-----------+----------------+--------+---------------+
+| ID | post_type | post_name      | author | categories    |
++----+-----------+----------------+--------+---------------+
+|  1 | post      | hello-world    | admin  | Uncategorized |
+|  2 | page      | sample-page    | admin  | NULL          |
+| 12 | page      | about          | maria  | NULL          |
+| 13 | page      | contact        | maria  | NULL          |
+| 14 | page      | events         | maria  | NULL          |
+| 15 | post      | welcome        | maria  | News          |
+| 16 | post      | staff-picks    | devon  | News          |
+| 17 | post      | book-club-dune | maria  | News          |
++----+-----------+----------------+--------+---------------+</code></pre>
+                    </div>
+                    <p>Eight published items: admin owns the two that came with the install, Maria the three shop pages and two posts, Devon the staff picks. <code>NULL</code> means "no category", which for a page is correct. Notice the condition <code>tt.taxonomy = 'category'</code> sits in the <code>ON</code> clause, not in <code>WHERE</code>: in <code>WHERE</code> it would throw away the pages, turning the <code>LEFT JOIN</code> back into an inner join (a classic from MySQL Foundations Lesson 4.3). Save both queries in a file called <code>pagesco-inventory.sql</code> in your course notes.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: The same report from PHP <span class="step-time">(12 min)</span></h3>
+                    <p>A plugin would produce this report with <code>$wpdb</code>: the table names come from <code>$wpdb</code>, the value goes in through <code>$wpdb-&gt;prepare()</code> (Lesson 1.3 previewed it; Lesson 5.5 covers it fully), and the result is cross-checked with the API. Save as <code>wordpress/pagesco-inventory.php</code>:</p>
+                    <pre data-file="pagesco-inventory.php"><code class="language-php">&lt;?php
+/**
+ * Pages &amp; Co. inventory: published posts and pages with author and categories.
+ * Run with: wp eval-file pagesco-inventory.php
+ */
+
+global $wpdb;
+
+$pagesco_rows = $wpdb-&gt;get_results(
+	$wpdb-&gt;prepare(
+		"SELECT p.ID, p.post_type, p.post_title, u.display_name
+		FROM {$wpdb-&gt;posts} AS p
+		JOIN {$wpdb-&gt;users} AS u ON u.ID = p.post_author
+		WHERE p.post_type IN ( 'post', 'page' ) AND p.post_status = %s
+		ORDER BY p.ID",
+		'publish'
+	)
+);
+
+foreach ( $pagesco_rows as $pagesco_row ) {
+	$pagesco_terms = wp_list_pluck( get_the_category( $pagesco_row-&gt;ID ), 'name' );
+
+	printf(
+		"%3d  %-4s  %-40s %-12s %s\n",
+		$pagesco_row-&gt;ID,
+		$pagesco_row-&gt;post_type,
+		$pagesco_row-&gt;post_title,
+		$pagesco_row-&gt;display_name,
+		$pagesco_terms ? implode( ', ', $pagesco_terms ) : '-'
+	);
+}
+
+printf( "%d items; the API counts %d published posts and %d published pages.\n", count( $pagesco_rows ), wp_count_posts( 'post' )-&gt;publish, wp_count_posts( 'page' )-&gt;publish );</code></pre>
+                    <pre data-cli><code class="language-bash">wp eval-file pagesco-inventory.php</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>  1  post  Hello world!                             admin        Uncategorized
+  2  page  Sample Page                              admin        -
+ 12  page  About Us                                 Maria Lopez  -
+ 13  page  Contact                                  Maria Lopez  -
+ 14  page  Events                                   Maria Lopez  -
+ 15  post  Welcome to the new Pages &amp; Co. website   Maria Lopez  News
+ 16  post  Staff picks for the season               Devon Park   News
+ 17  post  Book club: Dune                          Maria Lopez  News
+8 items; the API counts 4 published posts and 4 published pages.</code></pre>
+                    </div>
+                    <p>The SQL found the rows and the names; <code>get_the_category()</code> (Lesson 2.1's <code>get_the_terms()</code> for categories) filled in the categories from WordPress's term cache instead of a three-table join, and the two totals agree with <code>wp_count_posts()</code>. Each row is an object with one property per selected column, like <code>PDO::FETCH_OBJ</code> in PHP Foundations Lesson 6.2. The titles show as stored; in a page you would escape them with <code>esc_html()</code> on output.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 4: The settings check, and clean-up <span class="step-time">(6 min)</span></h3>
+                    <p>Finish with the largest autoloaded options, the place a performance audit starts:</p>
+                    <pre data-sql><code class="language-sql">SELECT option_name, LENGTH(option_value) AS bytes
+FROM wp_options
+WHERE autoload IN ('yes', 'on', 'auto-on', 'auto')
+ORDER BY bytes DESC
+LIMIT 5;</code></pre>
+                    <div class="card card-output">
+                        <h4>Output (your numbers will differ)</h4>
+                        <pre><code>+------------------------------------+-------+
+| option_name                        | bytes |
++------------------------------------+-------+
+| _transient_wp_core_block_css_files | 23778 |
+| _transient_wp_styles_for_blocks    | 11341 |
+| rewrite_rules                      |  8494 |
+| wp_user_roles                      |  3133 |
+| cron                               |  1704 |
++------------------------------------+-------+</code></pre>
+                    </div>
+                    <p>At the top are two transients in which core caches the CSS of its blocks, then core's own lists: the URL patterns in <code>rewrite_rules</code>, the roles and their capabilities in <code>wp_user_roles</code>, the schedule in <code>cron</code>. Each is a few kilobytes: nothing to worry about. On a client's site, a plugin option of hundreds of kilobytes here is a finding for your report. Now copy <code>pagesco-inventory.php</code> into your notes, delete it from the WordPress root, and check that the site is exactly as Lesson 2.1 left it:</p>
+                    <pre data-cli data-checkpoint><code class="language-bash">rm pagesco-inventory.php
+wp post list --post_type=page,post --orderby=ID --order=ASC --fields=ID,post_type,post_name,post_author,post_status
+wp db query "SELECT COUNT(*) AS meta_rows FROM wp_postmeta"</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>+----+-----------+----------------+-------------+-------------+
+| ID | post_type | post_name      | post_author | post_status |
++----+-----------+----------------+-------------+-------------+
+| 1  | post      | hello-world    | 1           | publish     |
+| 2  | page      | sample-page    | 1           | publish     |
+| 3  | page      | privacy-policy | 1           | draft       |
+| 12 | page      | about          | 2           | publish     |
+| 13 | page      | contact        | 2           | publish     |
+| 14 | page      | events         | 2           | publish     |
+| 15 | post      | welcome        | 2           | publish     |
+| 16 | post      | staff-picks    | 3           | publish     |
+| 17 | post      | book-club-dune | 2           | publish     |
++----+-----------+----------------+-------------+-------------+
+meta_rows
+5</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li>You counted the content of <code>wp_posts</code> by type and status, and the numbers agree with <code>wp_count_posts()</code></li>
+                        <li>Your report lists all eight published posts and pages with their author and categories, pages included, thanks to <code>LEFT JOIN</code></li>
+                        <li><code>pagesco-inventory.php</code> uses <code>$wpdb-&gt;posts</code> / <code>$wpdb-&gt;users</code> and <code>$wpdb-&gt;prepare()</code>, never a typed <code>wp_</code> table name</li>
+                        <li>You know the five largest autoloaded options on your site and their size</li>
+                        <li>The queries and the script are saved in your notes, and the WordPress root holds none of this lesson's files</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Each exercise reads the database and leaves the site unchanged. Try the SQL yourself before you open the solution; the API comparison in each one is part of the answer.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: The Only Comment</h3>
+                    <p>Every new site has one comment. With SQL, show its ID, its author, whether it is approved, and the title of the post it belongs to. Then get the same comment through WordPress with <code>get_comments()</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The comment links to its post through <code>comment_post_ID</code>. <code>comment_approved</code> holds <code>'1'</code> for approved comments. <code>get_comments( array( 'post_id' =&gt; 1 ) )</code> returns <code>WP_Comment</code> objects.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-sql><code class="language-sql">SELECT c.comment_ID, c.comment_author, c.comment_approved, p.post_title
+FROM wp_comments AS c
+JOIN wp_posts AS p ON p.ID = c.comment_post_ID;</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>+------------+-----------------------+------------------+--------------+
+| comment_ID | comment_author        | comment_approved | post_title   |
++------------+-----------------------+------------------+--------------+
+|          1 | A WordPress Commenter | 1                | Hello world! |
++------------+-----------------------+------------------+--------------+</code></pre>
+                        </div>
+                        <pre data-cli><code class="language-bash">wp eval 'foreach ( get_comments( array( "post_id" =&gt; 1 ) ) as $pagesco_comment ) { echo $pagesco_comment-&gt;comment_ID, " ", $pagesco_comment-&gt;comment_author, " on ", get_the_title( $pagesco_comment-&gt;comment_post_ID ), " (", get_class( $pagesco_comment ), ")\n"; }'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>1 A WordPress Commenter on Hello world! (WP_Comment)</code></pre>
+                        </div>
+                        <p>The same comment both ways. <code>get_comments()</code> defaults to approved comments only, just as <code>get_posts()</code> defaults to published posts; the SQL shows every status unless you filter on <code>comment_approved</code>.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Roles from the Database</h3>
+                    <p>List every user's login with the raw value of their <code>wp_capabilities</code> meta, using a join of <code>wp_users</code> and <code>wp_usermeta</code>. Then explain why <code>WHERE meta_value LIKE '%editor%'</code> is a fragile way to find editors, and get the logins and roles with WP-CLI instead.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Put the meta key condition in the join: <code>JOIN wp_usermeta AS um ON um.user_id = u.ID AND um.meta_key = 'wp_capabilities'</code>. For the second part, think about a role named <code>shop_editor</code>, and about the prefix in the key. <code>wp user list</code> takes <code>--fields</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-sql><code class="language-sql">SELECT u.ID, u.user_login, um.meta_value AS capabilities
+FROM wp_users AS u
+JOIN wp_usermeta AS um ON um.user_id = u.ID AND um.meta_key = 'wp_capabilities'
+ORDER BY u.ID;</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>+----+------------+---------------------------------+
+| ID | user_login | capabilities                    |
++----+------------+---------------------------------+
+|  1 | admin      | a:1:{s:13:"administrator";b:1;} |
+|  2 | maria      | a:1:{s:6:"editor";b:1;}         |
+|  3 | devon      | a:1:{s:6:"author";b:1;}         |
++----+------------+---------------------------------+</code></pre>
+                        </div>
+                        <pre data-cli><code class="language-bash">wp user list --orderby=ID --fields=ID,user_login,roles</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>+----+------------+---------------+
+| ID | user_login | roles         |
++----+------------+---------------+
+| 1  | admin      | administrator |
+| 2  | maria      | editor        |
+| 3  | devon      | author        |
++----+------------+---------------+</code></pre>
+                        </div>
+                        <p><code>LIKE '%editor%'</code> also matches a custom role such as <code>shop_editor</code> or a capability with "editor" in its name, and the meta key itself changes with the table prefix (<code>pc_capabilities</code> on a site with the prefix <code>pc_</code>). The API reads the array properly, and as Lesson 2.1 taught, code should check capabilities rather than roles anyway.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: Content Without Any Meta</h3>
+                    <p>Which published posts and pages have no row at all in <code>wp_postmeta</code>? Write it with a <code>LEFT JOIN</code> and <code>IS NULL</code>, then once more with <code>NOT EXISTS</code> (MySQL Foundations Lesson 3.4). Both must give the same answer.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Join on <code>pm.post_id = p.ID</code> and keep the rows where <code>pm.meta_id IS NULL</code>. A correlated subquery: <code>NOT EXISTS ( SELECT 1 FROM wp_postmeta AS pm WHERE pm.post_id = p.ID )</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-sql><code class="language-sql">SELECT p.ID, p.post_title
+FROM wp_posts AS p
+LEFT JOIN wp_postmeta AS pm ON pm.post_id = p.ID
+WHERE p.post_type IN ('post', 'page') AND p.post_status = 'publish' AND pm.meta_id IS NULL
+ORDER BY p.ID;
+
+SELECT p.ID, p.post_title
+FROM wp_posts AS p
+WHERE p.post_type IN ('post', 'page') AND p.post_status = 'publish'
+  AND NOT EXISTS ( SELECT 1 FROM wp_postmeta AS pm WHERE pm.post_id = p.ID )
+ORDER BY p.ID;</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>+----+--------------+
+| ID | post_title   |
++----+--------------+
+|  1 | Hello world! |
+| 12 | About Us     |
+| 13 | Contact      |
+| 14 | Events       |
++----+--------------+
++----+--------------+
+| ID | post_title   |
++----+--------------+
+|  1 | Hello world! |
+| 12 | About Us     |
+| 13 | Contact      |
+| 14 | Events       |
++----+--------------+</code></pre>
+                        </div>
+                        <p>Hello world! and your three pages have no meta; the Sample Page has its template, the News posts their <code>_pingme</code> flag. (If you edited content in the editor, <code>_edit_lock</code> rows move those posts out of the list.) MySQL usually runs both forms with the same plan; pick the one you find easier to read.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 4: Watch WordPress Query (Stretch)</h3>
+                    <p>How many queries does WordPress run to build the home page, and which one is the main query? Write a must-use plugin <code>exercise-queries.php</code> that turns on the <code>SAVEQUERIES</code> constant, and on <code>shutdown</code> writes the number of queries and the main query to the debug log, for front-end requests only. Then explain why the big "load all autoloaded options" query is <em>not</em> in your list.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>With <code>SAVEQUERIES</code> defined as <code>true</code>, <code>$wpdb-&gt;queries</code> collects every query as an array whose first element is the SQL. The main query of a blog page starts with <code>SELECT SQL_CALC_FOUND_ROWS</code>. For the last question, look at where must-use plugins load in <code>wp-settings.php</code>, and when the options were read.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/mu-plugins/exercise-queries.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Exercise: Queries
+ */
+
+define( 'SAVEQUERIES', true );
+
+add_action(
+	'shutdown',
+	function () {
+		global $wpdb;
+
+		if ( is_admin() || wp_doing_cron() || defined( 'WP_CLI' ) ) {
+			return;
+		}
+
+		error_log( sprintf( '%d queries', $wpdb-&gt;num_queries ) );
+		foreach ( $wpdb-&gt;queries as $pagesco_query ) {
+			if ( str_contains( $pagesco_query[0], 'SQL_CALC_FOUND_ROWS' ) ) {
+				error_log( 'main query: ' . preg_replace( '/\s+/', ' ', $pagesco_query[0] ) );
+			}
+		}
+	}
+);</code></pre>
+                        <pre data-web="/" data-log><code class="language-text">http://localhost:8080/</code></pre>
+                        <div class="card card-output">
+                            <h4>Output (wp-content/debug.log; your numbers and timestamps will differ)</h4>
+                            <pre><code>[25-Oct-2026 21:40:27 UTC] 24 queries
+[25-Oct-2026 21:40:27 UTC] main query: SELECT SQL_CALC_FOUND_ROWS wp_posts.ID FROM wp_posts WHERE 1=1 AND ((wp_posts.post_type = 'post' AND (wp_posts.post_status = 'publish'))) ORDER BY wp_posts.post_date DESC LIMIT 0, 10</code></pre>
+                        </div>
+                        <p>A couple of dozen queries for the home page, and the main query is the plain "latest published posts" query that the <code>type_status_date</code> index exists for. The autoloaded options are missing from <code>$wpdb-&gt;queries</code> because WordPress read them before must-use plugins load, before your <code>define()</code> ran: <code>SAVEQUERIES</code> only records queries made after it is defined. Defined in <code>wp-config.php</code> it would catch them; Query Monitor (Lesson 8.1) shows the full list without any code. Delete the file afterwards: saving every query costs memory on every request.</p>
+                        <pre data-cli><code class="language-bash">rm wp-content/mu-plugins/exercise-queries.php</code></pre>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> A plugin stores a "featured" flag for each post. Where does it end up in the database?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="Extra fields of a post are rows in wp_postmeta: post_id, meta_key, meta_value. That is what update_post_meta writes.">
+                                A) A row in wp_postmeta with the post's ID, a meta_key and a meta_value
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="WordPress never changes the schema of wp_posts for plugins. Where do the extra fields of a post go?">
+                                B) A new column added to wp_posts when the plugin is activated
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Options are site-wide settings, one value per site. The flag belongs to each post separately.">
+                                C) One row per post in wp_options
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> Three posts have the meta values <code>'9'</code>, <code>'10'</code> and <code>'100'</code> for one key. In what order does <code>ORDER BY meta_value</code> return them?</p>
+                        <pre data-sql><code class="language-sql">SELECT v FROM ( SELECT '9' AS v UNION ALL SELECT '10' UNION ALL SELECT '100' ) AS t ORDER BY v;</code></pre>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That is numeric order. What type is meta_value, and how does MySQL compare text?">
+                                A) 9, 10, 100
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="meta_value is LONGTEXT, so the values are compared as text, character by character: 1 sorts before 9. Cast them, or use meta_value_num in WP_Query, for numeric order.">
+                                B) 10, 100, 9
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Ascending is the default for ORDER BY. Compare the first characters of the three values.">
+                                C) 100, 10, 9
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> On WordPress 7.1 a plugin runs <code>add_option( 'pagesco_banner', 'Summer sale' );</code> with no autoload argument. What lands in the <code>autoload</code> column?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="yes and no are the values from before WordPress 6.6. What does a new site store now?">
+                                A) yes
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="off is stored when the code passes false. Here nobody decided anything.">
+                                B) off
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="With no decision from the code and a small value, WordPress stores auto, which is autoloaded today. Large values become auto-off.">
+                                C) auto
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> Someone deletes a post with <code>DELETE FROM wp_posts WHERE ID = 42;</code> at the MySQL prompt. What happens to its meta?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="A cascade needs a foreign key constraint. How many did information_schema find in your WordPress database?">
+                                A) MySQL deletes it too, through ON DELETE CASCADE
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="WordPress tables have no foreign keys, so MySQL neither refuses nor cascades. The meta and term rows stay as orphans; wp_delete_post would have removed them.">
+                                B) It stays in wp_postmeta as orphaned rows
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Refusing needs a foreign key constraint too. Does WordPress declare any?">
+                                C) MySQL refuses the DELETE with error 1451
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> A must-use plugin calls <code>wp_get_current_user()</code> on its first line, outside any function, and every page dies with "Call to undefined function wp_get_current_user()". Why?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Must-use plugins run on every request, front end and admin alike. Look at where they load in wp-settings.php.">
+                                A) Must-use plugins only run in the admin
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The function is core's, not a plugin's. When does wp-settings.php load the file that defines it?">
+                                B) The plugin forgot to require wp-includes/user.php
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="wp_get_current_user lives in pluggable.php, which wp-settings.php loads after all plugins so they can replace its functions. Call it from a hook such as init instead.">
+                                C) pluggable.php, which defines it, loads only after all plugins
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>My host runs MariaDB, or MySQL 8.4. Does anything change?</summary>
+                    <p>Almost nothing. WordPress supports MySQL 5.5.5 and later and MariaDB, and its own SQL uses only features they all share; wp-env (Lesson 1.2) runs MariaDB, and everything in this lesson works there. The differences you might notice are around the edges: <code>SELECT VERSION()</code> prints a version ending in <code>-MariaDB</code>, <code>EXPLAIN</code> output looks different (MariaDB prints a table, not MySQL 9.7's tree), MariaDB's <code>JSON</code> type is an alias for <code>LONGTEXT</code>, and a few MySQL-only functions from MySQL Foundations' later lessons may be missing. Write your plugin's SQL in the plain style core uses and you will not meet them.</p>
+                </details>
+                <details>
+                    <summary>Why doesn't WordPress use foreign keys or JSON columns?</summary>
+                    <p>History and reach. The schema was designed when MyISAM, which supports neither, was MySQL's default, and WordPress has never broken old sites to adopt newer features: it runs on servers twenty years apart. Serialized PHP predates MySQL's JSON type by a decade. The price is what you saw today: integrity is enforced in PHP, so you change data through the API, and arrays are opaque to SQL.</p>
+                </details>
+                <details>
+                    <summary>Can my plugin add a column to wp_posts?</summary>
+                    <p>Technically yes, and you should not. A WordPress update may alter the table, other plugins and backup tools do not know your column, and nothing in core (REST API, revisions, exports) will carry it. Use post meta for fields of a post, a taxonomy for groupings, or your own table for data with its own life, like the events you build in Lesson 5.5.</p>
+                </details>
+                <details>
+                    <summary>MySQL warns that SQL_CALC_FOUND_ROWS is deprecated. Is WP_Query broken?</summary>
+                    <p>No. MySQL 9.7 still runs it and only records warning 1287 ("SQL_CALC_FOUND_ROWS is deprecated and will be removed in a future release") if you ask with <code>SHOW WARNINGS</code>; WordPress 7.1 still uses it to count matches for pagination. When you do not need page numbers, pass <code>'no_found_rows' =&gt; true</code> to <code>WP_Query</code> and it leaves it out, which is also faster (Lessons 4.2 and 8.2).</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p><code>wp-settings.php</code> stops early when the constant <code>SHORTINIT</code> is true (look at line 169): you get <code>$wpdb</code> and the options, but no plugins, no theme and no post functions. Write a standalone script in the WordPress root that defines <code>SHORTINIT</code>, requires <code>wp-load.php</code>, and prints the site title with <code>get_option()</code>; run it with <code>php</code> in the WP-CLI container. Then try calling <code>get_post( 1 )</code> in it and read the error. Why would someone want such a stripped-down WordPress, and what does it cost them? Delete the script afterwards: a PHP file in the web root that you forget about is a security risk.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Picture the bookstore database you built in MySQL Foundations next to WordPress's twelve tables. Where would a book, its author, its price and its genres live in WordPress? Write down one thing your own design did better (types, foreign keys, indexes) and one thing WordPress's design does better (flexibility, one API for everything). Which would you choose for an online shop, and why?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Core is <code>wp-admin/</code>, <code>wp-includes/</code> and the root files; yours is <code>wp-content/</code>, where drop-ins such as <code>object-cache.php</code> can also replace parts of core</li>
+                        <li><code>wp-config.php</code> holds the database connection, eight secret keys and the table prefix, and ends by loading <code>wp-settings.php</code>; nothing after that line takes effect</li>
+                        <li><code>wp-settings.php</code> loads in a fixed order: database, must-use plugins, plugins, pluggable functions, theme, current user, then <code>init</code> and <code>wp_loaded</code></li>
+                        <li>Twelve tables, linked by ID columns but with <strong>no foreign keys</strong>: integrity lives in PHP, so change data through WordPress, not with <code>UPDATE</code>/<code>DELETE</code></li>
+                        <li>Meta tables store extra fields as key-value rows: flexible, but values are text, each condition is a join, and values are not indexed</li>
+                        <li>Arrays are stored serialized (never edit them as text); options are autoloaded (<code>on</code>, <code>auto</code>, <code>auto-on</code>) or read on demand (<code>off</code>, <code>auto-off</code>)</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>WP-CLI / SQL</th><th>In PHP</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>A SQL prompt / one query</td><td><code>wp db cli</code> / <code>wp db query "..."</code></td><td><code>$wpdb-&gt;get_results( $wpdb-&gt;prepare( ... ) )</code></td></tr>
+                            <tr><td>A table's name</td><td><code>wp_posts</code> at the prompt</td><td><code>$wpdb-&gt;posts</code>, <code>$wpdb-&gt;prefix</code></td></tr>
+                            <tr><td>A table's structure</td><td><code>wp db columns wp_postmeta</code></td><td>(read the schema, do not query it)</td></tr>
+                            <tr><td>A config value</td><td><code>wp config get table_prefix</code></td><td>the constant itself, <code>DB_HOST</code></td></tr>
+                            <tr><td>One meta value</td><td><code>wp post meta get 2 _wp_page_template</code></td><td><code>get_post_meta( 2, '_wp_page_template', true )</code></td></tr>
+                            <tr><td>An option</td><td><code>wp option get blogname</code></td><td><code>get_option( 'blogname' )</code></td></tr>
+                            <tr><td>Change part of an array option</td><td><code>wp option patch update NAME KEY VALUE</code></td><td><code>update_option( NAME, $array, false )</code></td></tr>
+                            <tr><td>Delete a post completely</td><td><code>wp post delete 19 --force</code></td><td><code>wp_delete_post( 19, true )</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You toured core's files, found the drop-in slots and read your <code>wp-config.php</code> as a developer</li>
+                        <li>You followed <code>wp-settings.php</code> from the database connection to <code>init</code>, with real line numbers</li>
+                        <li>You mapped the twelve tables, their indexes and their missing foreign keys, and joined them in SQL</li>
+                        <li>You watched <code>WP_Query</code> write SQL, sorted meta as text and as numbers, and measured what autoload saves</li>
+                        <li>You broke serialized data, created orphans and fixed both, on purpose</li>
+                        <li>You took an inventory of Pages &amp; Co. in SQL and in PHP with <code>$wpdb</code></li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>In <a href="lesson_06.html"><strong>Lesson 2.3: The Hooks System</strong></a> you put the load order to work. The actions you saw in <code>wp-settings.php</code> (<code>plugins_loaded</code>, <code>after_setup_theme</code>, <code>init</code>) and hundreds more are hooks: named moments where your code can run, or change a value on its way through. You will write your first actions and filters, learn to remove hooks and add your own, and build the Pages &amp; Co. store notice as a must-use plugin, the first file of the project that stays.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure the WordPress root holds none of today's files (<code>query-news.php</code>, <code>options-cost.php</code>, <code>pagesco-inventory.php</code>...) and <code>mu-plugins/</code> only <code>mailpit-smtp.php</code></li>
+                    <li>Run the orphan query from Common Mistakes 2 once more: it should return no rows</li>
+                    <li>Open <code>wp-includes/default-filters.php</code> in your editor and skim it for five minutes: it is the list of hooks core adds to itself, and you will read it with new eyes next lesson</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>You did something many WordPress developers never do: you looked at the database behind the admin and understood it. Your MySQL skills were not a detour; they are why <code>WP_Query</code>'s SQL read like a sentence today and why a missing foreign key surprised you. When a client's site behaves strangely, the developer who can open a SQL prompt, read the tables and find the orphan or the giant autoloaded option is the one who fixes it. That is now you.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_04.html" class="prev-lesson">← Previous: The Content Model</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_06.html" class="next-lesson">Next: The Hooks System →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

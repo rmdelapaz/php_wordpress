@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Static blocks on WordPress 7.1: attributes and their sources, RichText, InspectorControls, block supports for colors, spacing and typography, block validation and deprecations, building the Pages & Co. staff-pick Book Card. PHP and WordPress Development Lesson 6.2.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Static Blocks: Attributes, Controls &amp; Supports - PHP and WordPress Development</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">PHP and WordPress Development</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 6: Block Development</a></li>
+            <li aria-current="page">Lesson 6.2: Static Blocks: Attributes, Controls &amp; Supports</li>
+        </ul>
+    </nav>
+    <main id="main-content" data-state="after:lesson_19">
+        <div class="container">
+            <header>
+                <h1>🃏 Lesson 6.2: Static Blocks: Attributes, Controls &amp; Supports</h1>
+                <p class="lead">The Book Card from Lesson 6.1 says "a staff pick is coming soon" and nothing else. Today it becomes the real thing: a card in which a bookseller types the title, the author and why they love the book, directly on the canvas, picks a heading level and a link in the sidebar, and colors it from the theme's palette without a line of CSS from you. Along the way you will learn the one rule that makes static blocks both simple and strict: the saved HTML <em>is</em> the data, so changing <code>save</code> later needs care.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Declare attributes in <code>block.json</code> and choose where each one is stored: in the saved HTML (<code>source</code> and <code>selector</code>) or in the block's comment</li>
+                        <li>Make text editable on the canvas with <code>RichText</code> and save it with <code>RichText.Content</code></li>
+                        <li>Add settings to the block sidebar with <code>InspectorControls</code> and components from <code>@wordpress/components</code></li>
+                        <li>Opt into color, spacing and typography <strong>block supports</strong> and read the classes and styles they save</li>
+                        <li>Explain block validation, and change <code>save</code> safely with a <code>deprecated</code> entry and <code>migrate</code></li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 140 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_19.html">Lesson 6.1: Block Development Setup</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> the finished static <code>pagesco/book-card</code> block (title, author, recommendation, link, heading level, "Staff pick" badge, colors and spacing, one deprecation), with a staff pick for <em>The Hobbit</em> on the Staff picks post</li>
+                    <li><span class="meta-label">🧩 WordPress</span> 7.1 on PHP 8.5 (block supports and the sidebar's Styles tab as in 7.x; everything here works from 6.8, the plugin's minimum)</li>
+                    <li><span class="meta-label">🧱 Site</span> your Pages &amp; Co. site from Lesson 6.1, with Node 24 and the plugin's <code>npm run build</code>; a browser for the editor</li>
+                </ul>
+            </header>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#attributes" class="toc-link">Attributes: Where a Block Keeps Its Data</a></li>
+                        <li><a href="#controls" class="toc-link">Controls in the Sidebar</a></li>
+                        <li><a href="#supports" class="toc-link">Block Supports: Features for Free</a></li>
+                        <li><a href="#deprecations" class="toc-link">Changing save(): Validation and Deprecations</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: A Staff Pick on the Staff Picks Post</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="attributes" class="lesson-section">
+                <h2>🗃️ Attributes: Where a Block Keeps Its Data</h2>
+                <p>In Lesson 1.3 you wrote <code>pagesco_book_card( $book, $args )</code>: an array of book data in, escaped HTML out. A block does the same job, split across the editor and the stored post. Its data are <strong>attributes</strong>, declared in <code>block.json</code> with a <code>type</code> and, optionally, a <code>default</code>. <code>edit</code> receives them and changes them with <code>setAttributes()</code>; <code>save</code> receives them and returns HTML. What makes block attributes different from PHP arguments is the question of where they are <em>stored</em>, and there are two answers:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Declared with</th><th>Stored</th><th>Read back by</th><th>Good for</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>"source": "html"</code> (or <code>"text"</code>, <code>"attribute"</code>, <code>"query"</code>) and a <code>"selector"</code></td><td>inside the saved HTML itself</td><td>the editor, by finding the selector in the HTML</td><td>Content people type: titles, text, links, image URLs</td></tr>
+                            <tr><td>no <code>source</code></td><td>as JSON in the block comment: <code>&lt;!-- wp:pagesco/book-card {"headingLevel":2} --&gt;</code></td><td>the editor <em>and</em> PHP (<code>parse_blocks()</code>)</td><td>Settings: levels, toggles, choices, IDs</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Content stored in the HTML is not duplicated: "Dune" is in the post once, inside the <code>&lt;h3&gt;</code>, and the editor finds it again through the selector. Values equal to their <code>default</code> are left out of the comment altogether. (Old tutorials also show <code>"source": "meta"</code>; it is deprecated, and Lesson 6.3 does the same job with block bindings.)</p>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: a printed card with a sticky note</h4>
+                    <p>A static block in a post is like a printed shop card with a sticky note on the back. The printed side, the HTML, is what every visitor sees, and the bookseller's words are printed right on it. The sticky note, the comment JSON, holds the few settings that are not visible as words, such as "heading level 2". The editor reads both to rebuild the card for editing. PHP can read the sticky note easily, but would have to read the print to find the words (Common Mistake 1).</p>
+                </div>
+
+                <h3>The card's first three fields</h3>
+                <p>The Book Card gets three content attributes, each sourced from an element with its own class. Replace <code>src/blocks/book-card/block.json</code>. Besides the attributes, the version moves to 0.2.0 and the block gets keywords and an <code>example</code> for the inserter preview:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-card/block.json"><code class="language-json">{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "pagesco/book-card",
+	"version": "0.2.0",
+	"title": "Book Card",
+	"category": "widgets",
+	"icon": "book",
+	"description": "A book recommended by the Pages &amp; Co. staff.",
+	"keywords": [ "staff pick", "recommendation" ],
+	"textdomain": "pagesco-books",
+	"attributes": {
+		"title": {
+			"type": "string",
+			"source": "html",
+			"selector": ".wp-block-pagesco-book-card__title"
+		},
+		"author": {
+			"type": "string",
+			"source": "html",
+			"selector": ".wp-block-pagesco-book-card__author"
+		},
+		"pick": {
+			"type": "string",
+			"source": "html",
+			"selector": ".wp-block-pagesco-book-card__pick"
+		}
+	},
+	"supports": {
+		"html": false
+	},
+	"example": {
+		"attributes": {
+			"title": "The Hobbit",
+			"author": "J.R.R. Tolkien",
+			"pick": "The perfect first fantasy novel, at any age."
+		}
+	},
+	"editorScript": "file:./index.js",
+	"editorStyle": "file:./index.css",
+	"style": "file:./style-index.css"
+}</code></pre>
+                <p>On the canvas, editable text comes from <strong><code>RichText</code></strong>, a component of <code>@wordpress/block-editor</code>: an element you can type into, with a toolbar for the formats you allow. It takes the tag to render, its current <code>value</code> and an <code>onChange</code> that stores the new value with <code>setAttributes()</code>, React's usual "controlled input" pattern. Replace <code>src/blocks/book-card/edit.js</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-card/edit.js"><code class="language-js">import { __ } from '@wordpress/i18n';
+import { RichText, useBlockProps } from '@wordpress/block-editor';
+import './editor.scss';
+
+export default function Edit( { attributes, setAttributes } ) {
+	const { title, author, pick } = attributes;
+
+	return (
+		&lt;div { ...useBlockProps() }&gt;
+			&lt;RichText
+				tagName="h3"
+				className="wp-block-pagesco-book-card__title"
+				value={ title }
+				onChange={ ( value ) =&gt; setAttributes( { title: value } ) }
+				placeholder={ __( 'Book title', 'pagesco-books' ) }
+				allowedFormats={ [] }
+			/&gt;
+			&lt;RichText
+				tagName="p"
+				className="wp-block-pagesco-book-card__author"
+				value={ author }
+				onChange={ ( value ) =&gt; setAttributes( { author: value } ) }
+				placeholder={ __( 'Author', 'pagesco-books' ) }
+				allowedFormats={ [] }
+			/&gt;
+			&lt;RichText
+				tagName="p"
+				className="wp-block-pagesco-book-card__pick"
+				value={ pick }
+				onChange={ ( value ) =&gt; setAttributes( { pick: value } ) }
+				placeholder={ __( 'Why do you recommend it?', 'pagesco-books' ) }
+				allowedFormats={ [ 'core/bold', 'core/italic' ] }
+			/&gt;
+		&lt;/div&gt;
+	);
+}</code></pre>
+                <p><code>allowedFormats={ [] }</code> keeps the title and author plain; the recommendation may be bold or italic, nothing else. <code>save</code> is the mirror image: <code>RichText.Content</code> prints a stored value inside the tag you name. Replace <code>src/blocks/book-card/save.js</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-card/save.js"><code class="language-js">import { RichText, useBlockProps } from '@wordpress/block-editor';
+
+export default function save( { attributes } ) {
+	const { title, author, pick } = attributes;
+
+	return (
+		&lt;div { ...useBlockProps.save() }&gt;
+			&lt;RichText.Content
+				tagName="h3"
+				className="wp-block-pagesco-book-card__title"
+				value={ title }
+			/&gt;
+			&lt;RichText.Content
+				tagName="p"
+				className="wp-block-pagesco-book-card__author"
+				value={ author }
+			/&gt;
+			&lt;RichText.Content
+				tagName="p"
+				className="wp-block-pagesco-book-card__pick"
+				value={ pick }
+			/&gt;
+		&lt;/div&gt;
+	);
+}</code></pre>
+                <p>The class names follow the BEM pattern core uses (<code>block__element</code>), so the selectors in <code>block.json</code> find exactly one element each. The text in <code>save</code> is never escaped by hand: <code>RichText.Content</code> writes the HTML the editor's RichText produced (only the formats you allowed), and when a user without the <code>unfiltered_html</code> capability saves the post, WordPress filters the content through KSES as for any post (Lesson 5.3). Last, the styles. Replace <code>src/blocks/book-card/style.scss</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-card/style.scss"><code class="language-css">.wp-block-pagesco-book-card {
+	border: 1px solid currentColor;
+	border-radius: 4px;
+	padding: 1.25rem 1.5rem;
+}
+
+.wp-block-pagesco-book-card__title {
+	margin: 0;
+}
+
+.wp-block-pagesco-book-card__author {
+	margin: 0.25rem 0 0;
+	font-style: italic;
+}
+
+.wp-block-pagesco-book-card__pick {
+	margin: 0.75rem 0 0;
+}</code></pre>
+                <p>Build, and ask WordPress which attributes the registered block has:</p>
+                <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null</code></pre>
+                <pre data-cli><code class="language-bash">wp eval 'echo implode( ", ", array_keys( WP_Block_Type_Registry::get_instance()-&gt;get_registered( "pagesco/book-card" )-&gt;get_attributes() ) ), "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>title, author, pick, lock, metadata, className, style</code></pre>
+                </div>
+                <p>Your three, plus attributes WordPress adds to every block: <code>lock</code> (locking in the editor), <code>metadata</code> (a custom name in List View, and the bindings of Lesson 6.3), <code>className</code> (the "Additional CSS class(es)" field under <strong>Advanced</strong>) and <code>style</code>, where block supports keep per-block design values (the supports section fills it).</p>
+
+                <h3>Try it</h3>
+                <p>Reload the editor, create a post called "Card test", insert a Book Card and type: title <em>Fahrenheit 451</em>, author <em>Ray Bradbury</em>, and as the recommendation "Short, fierce and <strong>more relevant every year</strong>." with the last words in bold (<kbd>Ctrl</kbd>+<kbd>B</kbd>). Publish it. The Code editor shows what was stored:</p>
+                <pre data-content="post:card-test" data-title="Card test"><code class="language-html">&lt;!-- wp:pagesco/book-card --&gt;
+&lt;div class="wp-block-pagesco-book-card"&gt;&lt;h3 class="wp-block-pagesco-book-card__title"&gt;Fahrenheit 451&lt;/h3&gt;&lt;p class="wp-block-pagesco-book-card__author"&gt;Ray Bradbury&lt;/p&gt;&lt;p class="wp-block-pagesco-book-card__pick"&gt;Short, fierce and &lt;strong&gt;more relevant every year&lt;/strong&gt;.&lt;/p&gt;&lt;/div&gt;
+&lt;!-- /wp:pagesco/book-card --&gt;</code></pre>
+                <pre data-web="/card-test/" data-select=".wp-block-pagesco-book-card"><code class="language-text">http://localhost:8080/card-test/   (View Source: the card)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;div class="wp-block-pagesco-book-card"&gt;&lt;h3 class="wp-block-pagesco-book-card__title"&gt;Fahrenheit 451&lt;/h3&gt;&lt;p class="wp-block-pagesco-book-card__author"&gt;Ray Bradbury&lt;/p&gt;&lt;p class="wp-block-pagesco-book-card__pick"&gt;Short, fierce and &lt;strong&gt;more relevant every year&lt;/strong&gt;.&lt;/p&gt;&lt;/div&gt;</code></pre>
+                </div>
+                <p>The front end prints the stored HTML as it is. Now ask PHP what it sees in that post, with <code>parse_blocks()</code> from Lesson 2.1:</p>
+                <pre data-file="read-card.php" data-wp><code class="language-php">&lt;?php
+$post  = get_page_by_path( 'card-test', OBJECT, 'post' );
+$block = parse_blocks( $post-&gt;post_content )[0];
+
+echo $block['blockName'], "\n";
+var_export( $block['attrs'] );
+echo "\n";</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>pagesco/book-card
+array (
+)</code></pre>
+                </div>
+                <p>An empty array: all three attributes live in the HTML, so the comment carries nothing. That is efficient and keeps the content readable, and it has a consequence you will meet in Common Mistake 1. Keep the "Card test" post; the next sections change the block and come back to it.</p>
+            </section>
+
+            <section id="controls" class="lesson-section">
+                <h2>🎚️ Controls in the Sidebar</h2>
+                <p>Some settings are not text on the card: the link to the book's page in the shop and the heading level (an <code>&lt;h3&gt;</code> fits under a post's <code>&lt;h2&gt;</code> sections, but a card at the top of a page might need an <code>&lt;h2&gt;</code>). Lesson 1.3's helper took exactly this as <code>$args['heading_level']</code>. In the editor such settings go into the block sidebar through <strong><code>InspectorControls</code></strong>: anything you render inside it appears in the sidebar's Settings tab while the block is selected. The controls themselves come from <code>@wordpress/components</code>, WordPress's library of admin UI: <code>PanelBody</code> (a collapsible panel), <code>TextControl</code>, <code>SelectControl</code>, <code>ToggleControl</code> and many more.</p>
+                <p>Two new attributes. <code>url</code> is sourced from the <code>href</code> of a link, so it lives in the HTML too; <code>headingLevel</code> has no source and a default of 3, so it goes into the comment only when it is not 3. Replace <code>src/blocks/book-card/block.json</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-card/block.json"><code class="language-json">{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "pagesco/book-card",
+	"version": "0.2.0",
+	"title": "Book Card",
+	"category": "widgets",
+	"icon": "book",
+	"description": "A book recommended by the Pages &amp; Co. staff.",
+	"keywords": [ "staff pick", "recommendation" ],
+	"textdomain": "pagesco-books",
+	"attributes": {
+		"title": {
+			"type": "string",
+			"source": "html",
+			"selector": ".wp-block-pagesco-book-card__title"
+		},
+		"author": {
+			"type": "string",
+			"source": "html",
+			"selector": ".wp-block-pagesco-book-card__author"
+		},
+		"pick": {
+			"type": "string",
+			"source": "html",
+			"selector": ".wp-block-pagesco-book-card__pick"
+		},
+		"url": {
+			"type": "string",
+			"source": "attribute",
+			"selector": ".wp-block-pagesco-book-card__link",
+			"attribute": "href"
+		},
+		"headingLevel": {
+			"type": "integer",
+			"default": 3
+		}
+	},
+	"supports": {
+		"html": false
+	},
+	"example": {
+		"attributes": {
+			"title": "The Hobbit",
+			"author": "J.R.R. Tolkien",
+			"pick": "The perfect first fantasy novel, at any age."
+		}
+	},
+	"editorScript": "file:./index.js",
+	"editorStyle": "file:./index.css",
+	"style": "file:./style-index.css"
+}</code></pre>
+                <p>Replace <code>src/blocks/book-card/edit.js</code>. The component now returns two things side by side, the sidebar panel and the card, wrapped in a fragment (<code>&lt;&gt; … &lt;/&gt;</code>), React's way of returning several elements without an extra wrapper:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-card/edit.js"><code class="language-js">import { __ } from '@wordpress/i18n';
+import {
+	InspectorControls,
+	RichText,
+	useBlockProps,
+} from '@wordpress/block-editor';
+import { PanelBody, SelectControl, TextControl } from '@wordpress/components';
+import './editor.scss';
+
+export default function Edit( { attributes, setAttributes } ) {
+	const { title, author, pick, url, headingLevel } = attributes;
+
+	return (
+		&lt;&gt;
+			&lt;InspectorControls&gt;
+				&lt;PanelBody title={ __( 'Card settings', 'pagesco-books' ) }&gt;
+					&lt;TextControl
+						__next40pxDefaultSize
+						label={ __( 'Link to the book', 'pagesco-books' ) }
+						type="url"
+						value={ url || '' }
+						onChange={ ( value ) =&gt; setAttributes( { url: value } ) }
+					/&gt;
+					&lt;SelectControl
+						__next40pxDefaultSize
+						label={ __( 'Heading level', 'pagesco-books' ) }
+						value={ headingLevel }
+						options={ [ 2, 3, 4, 5, 6 ].map( ( level ) =&gt; ( {
+							label: 'H' + level,
+							value: level,
+						} ) ) }
+						onChange={ ( value ) =&gt;
+							setAttributes( { headingLevel: Number( value ) } )
+						}
+					/&gt;
+				&lt;/PanelBody&gt;
+			&lt;/InspectorControls&gt;
+			&lt;div { ...useBlockProps() }&gt;
+				&lt;RichText
+					tagName={ 'h' + headingLevel }
+					className="wp-block-pagesco-book-card__title"
+					value={ title }
+					onChange={ ( value ) =&gt; setAttributes( { title: value } ) }
+					placeholder={ __( 'Book title', 'pagesco-books' ) }
+					allowedFormats={ [] }
+				/&gt;
+				&lt;RichText
+					tagName="p"
+					className="wp-block-pagesco-book-card__author"
+					value={ author }
+					onChange={ ( value ) =&gt; setAttributes( { author: value } ) }
+					placeholder={ __( 'Author', 'pagesco-books' ) }
+					allowedFormats={ [] }
+				/&gt;
+				&lt;RichText
+					tagName="p"
+					className="wp-block-pagesco-book-card__pick"
+					value={ pick }
+					onChange={ ( value ) =&gt; setAttributes( { pick: value } ) }
+					placeholder={ __( 'Why do you recommend it?', 'pagesco-books' ) }
+					allowedFormats={ [ 'core/bold', 'core/italic' ] }
+				/&gt;
+			&lt;/div&gt;
+		&lt;/&gt;
+	);
+}</code></pre>
+                <ul>
+                    <li><code>tagName={ 'h' + headingLevel }</code> makes the title an <code>h2</code> to <code>h6</code> on the canvas too, so the editor shows what visitors will get.</li>
+                    <li>A <code>SelectControl</code> returns the chosen value as a string; <code>Number( value )</code> keeps the attribute an integer, as <code>block.json</code> declares. A value of the wrong type is dropped when the block is read back.</li>
+                    <li><code>__next40pxDefaultSize</code> opts the controls into the 40-pixel input height that WordPress components are moving to; without it, recent versions log a deprecation notice in the browser console.</li>
+                    <li>The link is not editable on the canvas, so the editor needs no <code>&lt;a&gt;</code> around the title; clicking a link while editing would only get in the way.</li>
+                </ul>
+                <p>In <code>save</code>, the heading is wrapped in the link only when there is a URL. The link wraps the heading rather than sitting inside it, which matters for the selectors (Common Mistake 2 shows why). Replace <code>src/blocks/book-card/save.js</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-card/save.js"><code class="language-js">import { RichText, useBlockProps } from '@wordpress/block-editor';
+
+export default function save( { attributes } ) {
+	const { title, author, pick, url, headingLevel } = attributes;
+
+	const heading = (
+		&lt;RichText.Content
+			tagName={ 'h' + headingLevel }
+			className="wp-block-pagesco-book-card__title"
+			value={ title }
+		/&gt;
+	);
+
+	return (
+		&lt;div { ...useBlockProps.save() }&gt;
+			{ url ? (
+				&lt;a className="wp-block-pagesco-book-card__link" href={ url }&gt;
+					{ heading }
+				&lt;/a&gt;
+			) : (
+				heading
+			) }
+			&lt;RichText.Content
+				tagName="p"
+				className="wp-block-pagesco-book-card__author"
+				value={ author }
+			/&gt;
+			&lt;RichText.Content
+				tagName="p"
+				className="wp-block-pagesco-book-card__pick"
+				value={ pick }
+			/&gt;
+		&lt;/div&gt;
+	);
+}</code></pre>
+                <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null</code></pre>
+                <p>Reload the "Card test" post in the editor and select the card. The sidebar's Settings tab has a "Card settings" panel. Enter <code>http://localhost:8080/books/fahrenheit-451/</code> as the link (Lesson 5.2's book page) and choose H2:</p>
+                <figure>
+                    <img src="images/lesson_20_settings.png" alt="The Card test post in the editor with the Book Card selected, showing Fahrenheit 451, Ray Bradbury and the recommendation; the Block sidebar shows a Card settings panel with a Link to the book field containing the book's URL and a Heading level select set to H2." width="1100" height="700" loading="lazy">
+                    <figcaption>The Card settings panel, rendered by <code>InspectorControls</code>.</figcaption>
+                </figure>
+                <p>Your existing card opened without complaint: with no URL and level 3, the new <code>save</code> produces exactly the HTML stored before, so the block is valid (the deprecation section explains why that matters). Update the post. The stored version now:</p>
+                <pre data-content="post:card-test" data-title="Card test"><code class="language-html">&lt;!-- wp:pagesco/book-card {"headingLevel":2} --&gt;
+&lt;div class="wp-block-pagesco-book-card"&gt;&lt;a class="wp-block-pagesco-book-card__link" href="http://localhost:8080/books/fahrenheit-451/"&gt;&lt;h2 class="wp-block-pagesco-book-card__title"&gt;Fahrenheit 451&lt;/h2&gt;&lt;/a&gt;&lt;p class="wp-block-pagesco-book-card__author"&gt;Ray Bradbury&lt;/p&gt;&lt;p class="wp-block-pagesco-book-card__pick"&gt;Short, fierce and &lt;strong&gt;more relevant every year&lt;/strong&gt;.&lt;/p&gt;&lt;/div&gt;
+&lt;!-- /wp:pagesco/book-card --&gt;</code></pre>
+                <pre data-cli><code class="language-bash">wp eval-file read-card.php</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>pagesco/book-card
+array (
+  'headingLevel' =&gt; 2,
+)</code></pre>
+                </div>
+                <p>The heading level is now on the sticky note, <code>{"headingLevel":2}</code>, and PHP sees it as an integer. The URL is in the <code>href</code>, where the editor found it. Remove the script: <code>rm read-card.php</code>.</p>
+                <pre data-cli><code class="language-bash">rm read-card.php</code></pre>
+
+                <div class="card card-info">
+                    <h4>💡 The block toolbar is the other place for controls</h4>
+                    <p><code>InspectorControls</code> fills the sidebar; its sibling <code>BlockControls</code> fills the toolbar that floats above the selected block, where core puts alignment, bold or the heading level of the Heading block. Use the toolbar for the one or two settings people change constantly, and the sidebar for everything else. The card's heading level could live in either place; Going Further moves it to the toolbar.</p>
+                </div>
+            </section>
+
+            <section id="supports" class="lesson-section">
+                <h2>🎨 Block Supports: Features for Free</h2>
+                <p>A shop will want a sage card for summer and an ink one for the book club. You could add color attributes, controls and CSS yourself, or you could say "this block supports background color" and let WordPress do all of it: the controls, the attributes, the classes and the inline styles, using the palette of the active theme. That is what <strong>block supports</strong> are, the same switches core blocks use. Add <code>color</code>, <code>spacing</code> and <code>typography</code> to <code>supports</code>; this is the only change to <code>src/blocks/book-card/block.json</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-card/block.json"><code class="language-json">{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "pagesco/book-card",
+	"version": "0.2.0",
+	"title": "Book Card",
+	"category": "widgets",
+	"icon": "book",
+	"description": "A book recommended by the Pages &amp; Co. staff.",
+	"keywords": [ "staff pick", "recommendation" ],
+	"textdomain": "pagesco-books",
+	"attributes": {
+		"title": {
+			"type": "string",
+			"source": "html",
+			"selector": ".wp-block-pagesco-book-card__title"
+		},
+		"author": {
+			"type": "string",
+			"source": "html",
+			"selector": ".wp-block-pagesco-book-card__author"
+		},
+		"pick": {
+			"type": "string",
+			"source": "html",
+			"selector": ".wp-block-pagesco-book-card__pick"
+		},
+		"url": {
+			"type": "string",
+			"source": "attribute",
+			"selector": ".wp-block-pagesco-book-card__link",
+			"attribute": "href"
+		},
+		"headingLevel": {
+			"type": "integer",
+			"default": 3
+		}
+	},
+	"supports": {
+		"html": false,
+		"color": {
+			"background": true,
+			"text": true,
+			"link": true
+		},
+		"spacing": {
+			"margin": true,
+			"padding": true
+		},
+		"typography": {
+			"fontSize": true,
+			"lineHeight": true
+		}
+	},
+	"example": {
+		"attributes": {
+			"title": "The Hobbit",
+			"author": "J.R.R. Tolkien",
+			"pick": "The perfect first fantasy novel, at any age."
+		}
+	},
+	"editorScript": "file:./index.js",
+	"editorStyle": "file:./index.css",
+	"style": "file:./style-index.css"
+}</code></pre>
+                <p>Nothing changes in <code>edit.js</code> or <code>save.js</code>, because both already spread <code>useBlockProps()</code> and <code>useBlockProps.save()</code> onto the wrapper: those are the hooks that carry the support's classes and styles onto your element. Build, and look at the attributes again:</p>
+                <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null</code></pre>
+                <pre data-cli><code class="language-bash">wp eval 'echo implode( ", ", array_keys( WP_Block_Type_Registry::get_instance()-&gt;get_registered( "pagesco/book-card" )-&gt;get_attributes() ) ), "\n";'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>title, author, pick, url, headingLevel, lock, metadata, className, style, backgroundColor, textColor, fontSize</code></pre>
+                </div>
+                <p><code>backgroundColor</code>, <code>textColor</code> and <code>fontSize</code> were added by the supports, and <code>style</code> will now hold the spacing values. Reload the editor, select the card and open the sidebar's second tab, <strong>Styles</strong> (the half-filled circle). Set the background to Sage, the font size to S, and the vertical padding to Medium:</p>
+                <figure>
+                    <img src="images/lesson_20_styles.png" alt="The Card test post in the editor: the Book Card now has a light sage background and smaller text; the Styles tab of the block sidebar shows Typography with Font size S selected, Background with a sage Color, Dimensions with Padding and Margin sliders, and Elements." width="1100" height="900" loading="lazy">
+                    <figcaption>The Styles tab: every panel comes from <code>supports</code>, the choices from the theme's <code>theme.json</code>.</figcaption>
+                </figure>
+                <p>The panels in 7.1: <strong>Typography</strong> (font size, line height, and the text color), <strong>Background</strong> (the background color), <strong>Dimensions</strong> (padding and margin) and <strong>Elements</strong> (the link color). Options you have not used stay behind each panel's ⋮ menu. The choices are the <code>pagesco</code> theme's: the five palette colors, the font sizes Small to Extra Large and the spacing sizes from Lesson 3.2's <code>theme.json</code>. Update the post and read what was stored:</p>
+                <pre data-content="post:card-test" data-title="Card test"><code class="language-html">&lt;!-- wp:pagesco/book-card {"headingLevel":2,"style":{"spacing":{"padding":{"top":"var:preset|spacing|medium","bottom":"var:preset|spacing|medium"}}},"backgroundColor":"sage","fontSize":"small"} --&gt;
+&lt;div class="wp-block-pagesco-book-card has-sage-background-color has-background has-small-font-size" style="padding-top:var(--wp--preset--spacing--medium);padding-bottom:var(--wp--preset--spacing--medium)"&gt;&lt;a class="wp-block-pagesco-book-card__link" href="http://localhost:8080/books/fahrenheit-451/"&gt;&lt;h2 class="wp-block-pagesco-book-card__title"&gt;Fahrenheit 451&lt;/h2&gt;&lt;/a&gt;&lt;p class="wp-block-pagesco-book-card__author"&gt;Ray Bradbury&lt;/p&gt;&lt;p class="wp-block-pagesco-book-card__pick"&gt;Short, fierce and &lt;strong&gt;more relevant every year&lt;/strong&gt;.&lt;/p&gt;&lt;/div&gt;
+&lt;!-- /wp:pagesco/book-card --&gt;</code></pre>
+                <pre data-web="/card-test/" data-select=".wp-block-pagesco-book-card"><code class="language-text">http://localhost:8080/card-test/   (View Source: the card)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;div class="wp-block-pagesco-book-card has-sage-background-color has-background has-small-font-size" style="padding-top:var(--wp--preset--spacing--medium);padding-bottom:var(--wp--preset--spacing--medium)"&gt;&lt;a class="wp-block-pagesco-book-card__link" href="http://localhost:8080/books/fahrenheit-451/"&gt;&lt;h2 class="wp-block-pagesco-book-card__title"&gt;Fahrenheit 451&lt;/h2&gt;&lt;/a&gt;&lt;p class="wp-block-pagesco-book-card__author"&gt;Ray Bradbury&lt;/p&gt;&lt;p class="wp-block-pagesco-book-card__pick"&gt;Short, fierce and &lt;strong&gt;more relevant every year&lt;/strong&gt;.&lt;/p&gt;&lt;/div&gt;</code></pre>
+                </div>
+                <p>Preset choices are saved as classes (<code>has-sage-background-color</code>, <code>has-small-font-size</code>) and their slugs in the comment; the padding, a value per side, as an inline <code>style</code> that points at the theme's spacing preset. The classes work because the theme's global styles define them, for every block alike:</p>
+                <pre data-cli><code class="language-bash">curl -s http://localhost:8080/card-test/ | grep -o '\.has-sage-background-color{[^}]*}'</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>.has-sage-background-color{background-color: var(--wp--preset--color--sage) !important;}</code></pre>
+                </div>
+                <p>Change Sage's hex value in <code>theme.json</code> and every sage card follows, because the post stores the slug, never the color. That is the main reason to prefer supports over color attributes of your own.</p>
+                <div class="card card-success">
+                    <h4>✅ What to opt into</h4>
+                    <p>Support what an editor should reasonably change, and leave out what would break the design. A card benefits from background and text color, padding and font size. Other supports worth knowing: <code>align</code> (wide and full width, or floating left and right), <code>anchor</code> (an HTML <code>id</code> for links to the card), <code>shadow</code>, and <code>"className": false</code> or <code>"customClassName": false</code> to switch off the generated or the custom class. The block.json reference in the Block Editor Handbook lists them all.</p>
+                </div>
+            </section>
+
+            <section id="deprecations" class="lesson-section">
+                <h2>🧬 Changing save(): Validation and Deprecations</h2>
+                <p>Every time the editor opens a post, it checks each static block: it runs your <em>current</em> <code>save</code> with the attributes it read, and compares the result with the HTML stored in the post. If they differ (beyond insignificant details such as attribute order or whitespace), the block is <strong>invalid</strong>. This check, <strong>block validation</strong>, is what keeps the editor from silently rewriting content it does not understand. It also means the stored HTML is a contract: once posts contain your block, its <code>save</code> output may not change without telling the editor about the old version.</p>
+                <p>Time to test the contract. The shop wants a small "Staff pick" badge on top of each card, with a sidebar toggle to hide it. That needs a boolean attribute, <code>showBadge</code>, defaulting to <code>true</code>. Replace <code>src/blocks/book-card/block.json</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-card/block.json"><code class="language-json">{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "pagesco/book-card",
+	"version": "0.2.0",
+	"title": "Book Card",
+	"category": "widgets",
+	"icon": "book",
+	"description": "A book recommended by the Pages &amp; Co. staff.",
+	"keywords": [ "staff pick", "recommendation" ],
+	"textdomain": "pagesco-books",
+	"attributes": {
+		"title": {
+			"type": "string",
+			"source": "html",
+			"selector": ".wp-block-pagesco-book-card__title"
+		},
+		"author": {
+			"type": "string",
+			"source": "html",
+			"selector": ".wp-block-pagesco-book-card__author"
+		},
+		"pick": {
+			"type": "string",
+			"source": "html",
+			"selector": ".wp-block-pagesco-book-card__pick"
+		},
+		"url": {
+			"type": "string",
+			"source": "attribute",
+			"selector": ".wp-block-pagesco-book-card__link",
+			"attribute": "href"
+		},
+		"headingLevel": {
+			"type": "integer",
+			"default": 3
+		},
+		"showBadge": {
+			"type": "boolean",
+			"default": true
+		}
+	},
+	"supports": {
+		"html": false,
+		"color": {
+			"background": true,
+			"text": true,
+			"link": true
+		},
+		"spacing": {
+			"margin": true,
+			"padding": true
+		},
+		"typography": {
+			"fontSize": true,
+			"lineHeight": true
+		}
+	},
+	"example": {
+		"attributes": {
+			"title": "The Hobbit",
+			"author": "J.R.R. Tolkien",
+			"pick": "The perfect first fantasy novel, at any age."
+		}
+	},
+	"editorScript": "file:./index.js",
+	"editorStyle": "file:./index.css",
+	"style": "file:./style-index.css"
+}</code></pre>
+                <p>Replace <code>src/blocks/book-card/edit.js</code>, with the toggle in the panel and the badge on the canvas:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-card/edit.js"><code class="language-js">import { __ } from '@wordpress/i18n';
+import {
+	InspectorControls,
+	RichText,
+	useBlockProps,
+} from '@wordpress/block-editor';
+import {
+	PanelBody,
+	SelectControl,
+	TextControl,
+	ToggleControl,
+} from '@wordpress/components';
+import './editor.scss';
+
+export default function Edit( { attributes, setAttributes } ) {
+	const { title, author, pick, url, headingLevel, showBadge } = attributes;
+
+	return (
+		&lt;&gt;
+			&lt;InspectorControls&gt;
+				&lt;PanelBody title={ __( 'Card settings', 'pagesco-books' ) }&gt;
+					&lt;TextControl
+						__next40pxDefaultSize
+						label={ __( 'Link to the book', 'pagesco-books' ) }
+						type="url"
+						value={ url || '' }
+						onChange={ ( value ) =&gt; setAttributes( { url: value } ) }
+					/&gt;
+					&lt;SelectControl
+						__next40pxDefaultSize
+						label={ __( 'Heading level', 'pagesco-books' ) }
+						value={ headingLevel }
+						options={ [ 2, 3, 4, 5, 6 ].map( ( level ) =&gt; ( {
+							label: 'H' + level,
+							value: level,
+						} ) ) }
+						onChange={ ( value ) =&gt;
+							setAttributes( { headingLevel: Number( value ) } )
+						}
+					/&gt;
+					&lt;ToggleControl
+						label={ __( 'Show the "Staff pick" badge', 'pagesco-books' ) }
+						checked={ showBadge }
+						onChange={ ( value ) =&gt; setAttributes( { showBadge: value } ) }
+					/&gt;
+				&lt;/PanelBody&gt;
+			&lt;/InspectorControls&gt;
+			&lt;div { ...useBlockProps() }&gt;
+				{ showBadge &amp;&amp; (
+					&lt;p className="wp-block-pagesco-book-card__badge"&gt;Staff pick&lt;/p&gt;
+				) }
+				&lt;RichText
+					tagName={ 'h' + headingLevel }
+					className="wp-block-pagesco-book-card__title"
+					value={ title }
+					onChange={ ( value ) =&gt; setAttributes( { title: value } ) }
+					placeholder={ __( 'Book title', 'pagesco-books' ) }
+					allowedFormats={ [] }
+				/&gt;
+				&lt;RichText
+					tagName="p"
+					className="wp-block-pagesco-book-card__author"
+					value={ author }
+					onChange={ ( value ) =&gt; setAttributes( { author: value } ) }
+					placeholder={ __( 'Author', 'pagesco-books' ) }
+					allowedFormats={ [] }
+				/&gt;
+				&lt;RichText
+					tagName="p"
+					className="wp-block-pagesco-book-card__pick"
+					value={ pick }
+					onChange={ ( value ) =&gt; setAttributes( { pick: value } ) }
+					placeholder={ __( 'Why do you recommend it?', 'pagesco-books' ) }
+					allowedFormats={ [ 'core/bold', 'core/italic' ] }
+				/&gt;
+			&lt;/div&gt;
+		&lt;/&gt;
+	);
+}</code></pre>
+                <p>Replace <code>src/blocks/book-card/save.js</code>. The badge text is written as a plain string, not with <code>__()</code>; Common Mistake 3 explains why:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-card/save.js"><code class="language-js">import { RichText, useBlockProps } from '@wordpress/block-editor';
+
+export default function save( { attributes } ) {
+	const { title, author, pick, url, headingLevel, showBadge } = attributes;
+
+	const heading = (
+		&lt;RichText.Content
+			tagName={ 'h' + headingLevel }
+			className="wp-block-pagesco-book-card__title"
+			value={ title }
+		/&gt;
+	);
+
+	return (
+		&lt;div { ...useBlockProps.save() }&gt;
+			{ showBadge &amp;&amp; (
+				&lt;p className="wp-block-pagesco-book-card__badge"&gt;Staff pick&lt;/p&gt;
+			) }
+			{ url ? (
+				&lt;a className="wp-block-pagesco-book-card__link" href={ url }&gt;
+					{ heading }
+				&lt;/a&gt;
+			) : (
+				heading
+			) }
+			&lt;RichText.Content
+				tagName="p"
+				className="wp-block-pagesco-book-card__author"
+				value={ author }
+			/&gt;
+			&lt;RichText.Content
+				tagName="p"
+				className="wp-block-pagesco-book-card__pick"
+				value={ pick }
+			/&gt;
+		&lt;/div&gt;
+	);
+}</code></pre>
+                <p>And give the badge its style; replace <code>src/blocks/book-card/style.scss</code>:</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-card/style.scss"><code class="language-css">.wp-block-pagesco-book-card {
+	border: 1px solid currentColor;
+	border-radius: 4px;
+	padding: 1.25rem 1.5rem;
+}
+
+.wp-block-pagesco-book-card__badge {
+	display: inline-block;
+	margin: 0 0 0.5rem;
+	padding: 0.1rem 0.5rem;
+	border: 1px solid currentColor;
+	font-size: 0.75em;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+}
+
+.wp-block-pagesco-book-card__title {
+	margin: 0;
+}
+
+.wp-block-pagesco-book-card__author {
+	margin: 0.25rem 0 0;
+	font-style: italic;
+}
+
+.wp-block-pagesco-book-card__pick {
+	margin: 0.75rem 0 0;
+}</code></pre>
+                <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null</code></pre>
+                <p>Reload the "Card test" post in the editor. Do <em>not</em> click anything in the card yet:</p>
+                <figure>
+                    <img src="images/lesson_20_invalid.png" alt="The editor canvas showing the Card test post: the sage Fahrenheit 451 card is covered by a warning bar reading Block contains unexpected or invalid content, with an Attempt recovery button and a more options menu." width="820" height="464" loading="lazy">
+                    <figcaption>An invalid block: the stored HTML no longer matches what <code>save</code> produces.</figcaption>
+                </figure>
+                <p>"Block contains unexpected or invalid content." The browser's developer console (<kbd>F12</kbd>) says why:</p>
+                <pre><code class="language-text">Block validation: Expected tag name `p`, instead saw `a`.
+Block validation: Block validation failed for `pagesco/book-card` (Object).
+
+Content generated by `save` function:
+
+&lt;div class="wp-block-pagesco-book-card has-sage-background-color has-background has-small-font-size" style="…"&gt;&lt;p class="wp-block-pagesco-book-card__badge"&gt;Staff pick&lt;/p&gt;&lt;a class="wp-block-pagesco-book-card__link" …
+
+Content retrieved from post body:
+
+&lt;div class="wp-block-pagesco-book-card has-sage-background-color has-background has-small-font-size" style="…"&gt;&lt;a class="wp-block-pagesco-book-card__link" …</code></pre>
+                <p>The stored card has no <code>showBadge</code> in its comment, so the attribute took its default, <code>true</code>, and the new <code>save</code> produced a badge paragraph where the stored HTML has the link. The two disagree at the first element, and the editor refuses to guess. The front end, meanwhile, is untouched, because it prints what is stored:</p>
+                <pre data-web="/card-test/" data-select=".wp-block-pagesco-book-card"><code class="language-text">http://localhost:8080/card-test/   (View Source: the card)</code></pre>
+                <div class="card card-output">
+                    <h4>Output</h4>
+                    <pre><code>&lt;div class="wp-block-pagesco-book-card has-sage-background-color has-background has-small-font-size" style="padding-top:var(--wp--preset--spacing--medium);padding-bottom:var(--wp--preset--spacing--medium)"&gt;&lt;a class="wp-block-pagesco-book-card__link" href="http://localhost:8080/books/fahrenheit-451/"&gt;&lt;h2 class="wp-block-pagesco-book-card__title"&gt;Fahrenheit 451&lt;/h2&gt;&lt;/a&gt;&lt;p class="wp-block-pagesco-book-card__author"&gt;Ray Bradbury&lt;/p&gt;&lt;p class="wp-block-pagesco-book-card__pick"&gt;Short, fierce and &lt;strong&gt;more relevant every year&lt;/strong&gt;.&lt;/p&gt;&lt;/div&gt;</code></pre>
+                </div>
+                <p>The warning offers <strong>Attempt recovery</strong>, which rebuilds the block from the attributes it could read (here it would quietly add a badge), and under ⋮ <strong>Resolve</strong> (compare the two versions and pick one) and <strong>Convert to HTML</strong>. An editor facing this on twenty posts would rightly lose patience. The developer's fix is to describe the old version.</p>
+
+                <h3>The deprecated array</h3>
+                <p>A block's <code>deprecated</code> setting is a list of earlier versions, newest first. Each entry repeats what that version had: its <code>attributes</code>, its <code>supports</code> (deprecations do not inherit them, and the color classes come from supports) and its <code>save</code>. When the stored HTML fails validation against the current <code>save</code>, the editor tries each deprecation in turn; the first whose <code>save</code> reproduces the stored HTML wins, and the block opens as a normal, valid block of the <em>current</em> version. An optional <code>migrate( attributes )</code> converts the old attributes to the new shape on the way. Create <code>src/blocks/book-card/deprecated.js</code>, with the version from the start of this section (the <code>save</code> you replaced, unchanged):</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-card/deprecated.js"><code class="language-js">import { RichText, useBlockProps } from '@wordpress/block-editor';
+
+/**
+ * Earlier versions of the block, newest first. Each one describes the
+ * attributes and the save() output that cards saved back then still have.
+ */
+const v1 = {
+	attributes: {
+		title: {
+			type: 'string',
+			source: 'html',
+			selector: '.wp-block-pagesco-book-card__title',
+		},
+		author: {
+			type: 'string',
+			source: 'html',
+			selector: '.wp-block-pagesco-book-card__author',
+		},
+		pick: {
+			type: 'string',
+			source: 'html',
+			selector: '.wp-block-pagesco-book-card__pick',
+		},
+		url: {
+			type: 'string',
+			source: 'attribute',
+			selector: '.wp-block-pagesco-book-card__link',
+			attribute: 'href',
+		},
+		headingLevel: {
+			type: 'integer',
+			default: 3,
+		},
+	},
+	supports: {
+		html: false,
+		color: { background: true, text: true, link: true },
+		spacing: { margin: true, padding: true },
+		typography: { fontSize: true, lineHeight: true },
+	},
+	// Cards saved before the badge existed keep looking as they did.
+	migrate( attributes ) {
+		return { ...attributes, showBadge: false };
+	},
+	save( { attributes } ) {
+		const { title, author, pick, url, headingLevel } = attributes;
+
+		const heading = (
+			&lt;RichText.Content
+				tagName={ 'h' + headingLevel }
+				className="wp-block-pagesco-book-card__title"
+				value={ title }
+			/&gt;
+		);
+
+		return (
+			&lt;div { ...useBlockProps.save() }&gt;
+				{ url ? (
+					&lt;a className="wp-block-pagesco-book-card__link" href={ url }&gt;
+						{ heading }
+					&lt;/a&gt;
+				) : (
+					heading
+				) }
+				&lt;RichText.Content
+					tagName="p"
+					className="wp-block-pagesco-book-card__author"
+					value={ author }
+				/&gt;
+				&lt;RichText.Content
+					tagName="p"
+					className="wp-block-pagesco-book-card__pick"
+					value={ pick }
+				/&gt;
+			&lt;/div&gt;
+		);
+	},
+};
+
+export default [ v1 ];</code></pre>
+                <p><code>migrate</code> sets <code>showBadge</code> to <code>false</code> for old cards, so they keep looking exactly as they did; without it they would get the default, and a badge would appear on every old card the next time someone edits its post. Register the list in <code>src/blocks/book-card/index.js</code>, which you replace for the first time (the scaffold's comments go; the code gains one import and one line):</p>
+                <pre data-file="wp-content/plugins/pagesco-books/src/blocks/book-card/index.js"><code class="language-js">import { registerBlockType } from '@wordpress/blocks';
+import './style.scss';
+import Edit from './edit';
+import save from './save';
+import deprecated from './deprecated';
+import metadata from './block.json';
+
+registerBlockType( metadata.name, {
+	edit: Edit,
+	save,
+	deprecated,
+} );</code></pre>
+                <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null</code></pre>
+                <p>Reload the "Card test" post. The card opens normally, sage and without a badge, and the console logs the hand-over instead of an error: "Updated Block: pagesco/book-card … Block successfully updated for `pagesco/book-card`". Select it: the badge toggle is off. Nothing is written until the post is saved; when you next change the card and update the post, the editor stores it in the current format, with <code>{"showBadge":false}</code> in its comment. Posts nobody edits keep their old HTML forever, and that is fine: the deprecation stays in the plugin as long as such posts may exist.</p>
+                <div class="card card-warning">
+                    <h4>⚠️ Which changes need a deprecation?</h4>
+                    <p>Anything that changes the HTML <code>save</code> returns for content that already exists: a new element, a different tag or class, a reordered element, a new attribute whose default renders something. CSS changes never do (styles are not part of the stored HTML), and neither do changes to <code>edit</code> alone. A new attribute whose default renders nothing new is safe too, as <code>url</code> and <code>headingLevel</code> were in the controls section. When in doubt, open an old post in the editor after the build: the console tells you.</p>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <h3>1. Reading HTML-sourced attributes in PHP</h3>
+                <p>A PHP developer wants to log every Book Card's title as it is rendered, and filters the block's output with <code>render_block_{name}</code>, which passes the parsed block as the second argument. As a throwaway must-use plugin:</p>
+                <pre data-file="wp-content/mu-plugins/mistake-card-title.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Mistake: Card Title in PHP
+ */
+
+add_filter(
+	'render_block_pagesco/book-card',
+	function ( $block_content, $block ) {
+		return '&lt;!-- Book Card: ' . esc_html( $block['attrs']['title'] ) . ' --&gt;' . $block_content;
+	},
+	10,
+	2
+);</code></pre>
+                <pre data-cli data-raises="Warning"><code class="language-bash">curl -s http://localhost:8080/card-test/ | head -n 2
+curl -s http://localhost:8080/card-test/ | grep -o '&lt;!-- Book Card:[^&gt;]*&gt;'</code></pre>
+                <div class="card card-output">
+                    <h4>Error</h4>
+                    <pre><code>Warning: Undefined array key "title" in /var/www/html/wp-content/mu-plugins/mistake-card-title.php on line 9
+&lt;!-- Book Card:  --&gt;</code></pre>
+                </div>
+                <p><strong>What it means:</strong> <code>title</code> is sourced from the HTML, so it is not in the comment, so <code>parse_blocks()</code> never puts it into <code>$block['attrs']</code>: PHP does not run the editor's selectors. The warning comes before the doctype (the block theme renders the content first), and the comment ends up empty. Even the <code>WP_Block</code> object WordPress passes as a third argument only fills in <em>defaults</em> of comment attributes (it would report <code>showBadge</code> as <code>true</code> for the old card, which has no badge). <strong>Fix:</strong> in PHP, treat a static block's content as finished HTML. If PHP must know a value, either store it as a comment attribute (no <code>source</code>), read it out of the HTML with the HTML API (Exercise 1), or make the block dynamic so PHP renders it in the first place (Lesson 6.3). Remove the plugin:</p>
+                <pre data-cli><code class="language-bash">rm wp-content/mu-plugins/mistake-card-title.php</code></pre>
+
+                <h3>2. A selector that catches more than you meant</h3>
+                <p>The first draft of this lesson's <code>save</code> put the link <em>inside</em> the heading, which looks natural, while <code>title</code> kept its selector <code>.wp-block-pagesco-book-card__title</code>:</p>
+                <pre><code class="language-js">&lt;Heading className="wp-block-pagesco-book-card__title"&gt;
+	&lt;a href={ url }&gt;
+		&lt;RichText.Content value={ title } /&gt;
+	&lt;/a&gt;
+&lt;/Heading&gt;</code></pre>
+                <p>Inserting and saving a card worked. Reopening the post showed "Block contains unexpected or invalid content", with this in the console:</p>
+                <pre><code class="language-text">Block validation: Expected token of type `StartTag` (Object), instead saw `Chars` (Object).
+Block validation: Block validation failed for `pagesco/book-card` (Object).
+
+Content generated by `save` function:
+
+… &lt;h3 class="wp-block-pagesco-book-card__title"&gt;&lt;a href="http://localhost:8080/books/the-hobbit/"&gt;&lt;a href="http://localhost:8080/books/the-hobbit/"&gt;The Hobbit&lt;/a&gt;&lt;/a&gt;&lt;/h3&gt; …
+
+Content retrieved from post body:
+
+… &lt;h3 class="wp-block-pagesco-book-card__title"&gt;&lt;a href="http://localhost:8080/books/the-hobbit/"&gt;The Hobbit&lt;/a&gt;&lt;/h3&gt; …</code></pre>
+                <p><strong>What it means:</strong> <code>"source": "html"</code> reads the <em>inner HTML</em> of the selected element, and the heading's inner HTML included the link. So on reload <code>title</code> became <code>&lt;a href="…"&gt;The Hobbit&lt;/a&gt;</code>, <code>save</code> wrapped it in a second link, and the two versions no longer matched. Nothing warned at save time; the first sign was the next edit. <strong>Fix:</strong> let each sourced element contain only its own value. The course's <code>save</code> puts the link <em>around</em> the heading (valid in HTML5) and sources <code>url</code> from the link's own class. After every change to selectors or <code>save</code>, insert a block, save, and <em>reload</em> before you trust it.</p>
+
+                <h3>3. Translating text in save()</h3>
+                <p>The badge text looks like a classic case for <code>__()</code>: <code>&lt;p className="…__badge"&gt;{ __( 'Staff pick', 'pagesco-books' ) }&lt;/p&gt;</code>. Built that way, a card saved on an English editor and reopened by an editor whose language has a translation for "Staff pick" (simulated here with Spanish "Recomendado") fails validation:</p>
+                <pre><code class="language-text">Block validation: Expected text `Recomendado`, saw `Staff pick`.
+Block validation: Block validation failed for `pagesco/book-card` (Object).</code></pre>
+                <p><strong>What it means:</strong> <code>save</code> must return the same HTML for the same attributes, on every computer, in every language. A translated string makes the output depend on the user's locale, so every card turns invalid the moment someone edits in another language (or the site language changes). The same goes for dates, random IDs or anything else that is not an attribute. <strong>Fix:</strong> text in <code>save</code> is content: write it as a literal, as the course does, or make it an attribute the editor can change. Translate the <em>editor's</em> interface (labels, placeholders, the panel title) freely: <code>edit</code> is never compared with anything. The course's <code>edit</code> keeps the badge literal too, so the canvas shows what the page will.</p>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: A Staff Pick on the Staff Picks Post</h2>
+                <p>The block is finished: three content attributes, three settings, three supports and a deprecation. Now it earns its place on the site. Lesson 2.1's "Staff picks for the season" post lists three books in a plain list; the shop wants the first full staff pick, for <em>The Hobbit</em>, right under that list. Allow about 30 minutes.</p>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 1: Write the staff pick <span class="step-time">(12 min)</span></h3>
+                    <p>Open "Staff picks for the season" in the editor. Click the list, then insert a Book Card after it (the <strong>+</strong> between blocks, or type <code>/book</code> in a new paragraph). Fill it in:</p>
+                    <ul>
+                        <li>Title <em>The Hobbit</em>, author <em>J.R.R. Tolkien</em></li>
+                        <li>Recommendation: "Read it aloud: <em>everyone</em> at the table will want one more chapter." (the word "everyone" in italics)</li>
+                        <li>Settings tab: link <code>http://localhost:8080/books/the-hobbit/</code>, heading level H3, badge on</li>
+                        <li>Styles tab: background Sage</li>
+                    </ul>
+                    <p>Update the post. The whole post, as the Code editor shows it:</p>
+                    <pre data-content="post:staff-picks" data-title="Staff picks for the season"><code class="language-html">&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;Three books we keep pressing into customers' hands this season:&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;
+
+&lt;!-- wp:list --&gt;
+&lt;ul class="wp-block-list"&gt;&lt;!-- wp:list-item --&gt;
+&lt;li&gt;Dune by Frank Herbert&lt;/li&gt;
+&lt;!-- /wp:list-item --&gt;
+
+&lt;!-- wp:list-item --&gt;
+&lt;li&gt;The Hobbit by J.R.R. Tolkien&lt;/li&gt;
+&lt;!-- /wp:list-item --&gt;
+
+&lt;!-- wp:list-item --&gt;
+&lt;li&gt;Fahrenheit 451 by Ray Bradbury&lt;/li&gt;
+&lt;!-- /wp:list-item --&gt;&lt;/ul&gt;
+&lt;!-- /wp:list --&gt;
+
+&lt;!-- wp:pagesco/book-card {"backgroundColor":"sage"} --&gt;
+&lt;div class="wp-block-pagesco-book-card has-sage-background-color has-background"&gt;&lt;p class="wp-block-pagesco-book-card__badge"&gt;Staff pick&lt;/p&gt;&lt;a class="wp-block-pagesco-book-card__link" href="http://localhost:8080/books/the-hobbit/"&gt;&lt;h3 class="wp-block-pagesco-book-card__title"&gt;The Hobbit&lt;/h3&gt;&lt;/a&gt;&lt;p class="wp-block-pagesco-book-card__author"&gt;J.R.R. Tolkien&lt;/p&gt;&lt;p class="wp-block-pagesco-book-card__pick"&gt;Read it aloud: &lt;em&gt;everyone&lt;/em&gt; at the table will want one more chapter.&lt;/p&gt;&lt;/div&gt;
+&lt;!-- /wp:pagesco/book-card --&gt;
+
+&lt;!-- wp:quote --&gt;
+&lt;blockquote class="wp-block-quote"&gt;&lt;!-- wp:paragraph --&gt;
+&lt;p&gt;It was a pleasure to burn.&lt;/p&gt;
+&lt;!-- /wp:paragraph --&gt;&lt;cite&gt;Ray Bradbury, Fahrenheit 451&lt;/cite&gt;&lt;/blockquote&gt;
+&lt;!-- /wp:quote --&gt;</code></pre>
+                    <p>The core blocks around the card are stored exactly as before; the card's comment holds only what differs from the defaults, <code>{"backgroundColor":"sage"}</code>.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 2: Check the front end <span class="step-time">(8 min)</span></h3>
+                    <pre data-web="/staff-picks/" data-select=".wp-block-pagesco-book-card"><code class="language-text">http://localhost:8080/staff-picks/   (View Source: the card)</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>&lt;div class="wp-block-pagesco-book-card has-sage-background-color has-background"&gt;&lt;p class="wp-block-pagesco-book-card__badge"&gt;Staff pick&lt;/p&gt;&lt;a class="wp-block-pagesco-book-card__link" href="http://localhost:8080/books/the-hobbit/"&gt;&lt;h3 class="wp-block-pagesco-book-card__title"&gt;The Hobbit&lt;/h3&gt;&lt;/a&gt;&lt;p class="wp-block-pagesco-book-card__author"&gt;J.R.R. Tolkien&lt;/p&gt;&lt;p class="wp-block-pagesco-book-card__pick"&gt;Read it aloud: &lt;em&gt;everyone&lt;/em&gt; at the table will want one more chapter.&lt;/p&gt;&lt;/div&gt;</code></pre>
+                    </div>
+                    <p>In the browser the card sits between the list and the Bradbury quote: the badge, the linked title in the theme's link color, the author in italics and the recommendation, on sage, with the border in the text color:</p>
+                    <figure>
+                        <img src="images/lesson_20_front.png" alt="The Staff picks for the season post on the front end: an intro sentence, a three-item list, then the Book Card on a sage background with a bordered STAFF PICK badge, the linked title The Hobbit, the author J.R.R. Tolkien in italics and the recommendation, followed by the quote It was a pleasure to burn." width="980" height="450" loading="lazy">
+                        <figcaption>The first staff pick, rendered from the HTML stored in the post.</figcaption>
+                    </figure>
+                    <p>Follow the title link: it opens the Hobbit's book page from Lesson 5.2.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🛠️ Step 3: Compare, clean up and check <span class="step-time">(10 min)</span></h3>
+                    <p>Take out the copy of <code>pagesco_book_card()</code> you kept from Lesson 1.3 and set it next to the block. The two do the same job in different places:</p>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr><th>Lesson 1.3 helper</th><th>Book Card block</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><code>$book</code> array, filled by PHP code</td><td>sourced attributes, typed on the canvas with <code>RichText</code></td></tr>
+                                <tr><td><code>wp_parse_args()</code> defaults (<code>heading_level</code> 3, <code>show_price</code> true)</td><td><code>block.json</code> defaults (<code>headingLevel</code> 3, <code>showBadge</code> true)</td></tr>
+                                <tr><td><code>esc_html()</code>, <code>esc_url()</code>, <code>esc_attr()</code> when building the HTML</td><td>React escapes strings; <code>RichText</code> allows only the formats you list; KSES on save for users without <code>unfiltered_html</code></td></tr>
+                                <tr><td><code>$args['class']</code></td><td><code>className</code> and the color, spacing and typography supports</td></tr>
+                                <tr><td>runs on every page view, always current</td><td>runs once in the editor; the HTML is stored and printed as is</td></tr>
+                                <tr><td>a price from data</td><td>no price: it would go stale in stored HTML (Lesson 6.3's dynamic block shows live prices)</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p>The last two rows are the static block's trade-off: no PHP at view time, and no data that can change behind its back. Now delete the "Card test" post (in the editor: <strong>Move to trash</strong>, then empty the trash; here with WP-CLI) and check the result:</p>
+                    <pre data-cli data-checkpoint><code class="language-bash">wp post delete $(wp post list --post_type=post --name=card-test --field=ID) --force &gt; /dev/null
+ls wp-content/plugins/pagesco-books/src/blocks/book-card
+wp eval '$post = get_page_by_path( "staff-picks", OBJECT, "post" );
+foreach ( parse_blocks( $post-&gt;post_content ) as $block ) {
+	if ( $block["blockName"] ) {
+		echo $block["blockName"], " ", wp_json_encode( $block["attrs"] ), "\n";
+	}
+}'</code></pre>
+                    <div class="card card-output">
+                        <h4>Output</h4>
+                        <pre><code>block.json     deprecated.js  edit.js        editor.scss    index.js       save.js        style.scss
+core/paragraph []
+core/list []
+pagesco/book-card {"backgroundColor":"sage"}
+core/quote []</code></pre>
+                    </div>
+                    <p>Seven source files for the block, and the Staff picks post holds four blocks, the Book Card among them with its one non-default setting. In <code>pagesco-plan.txt</code>, under "Blocks", note: "Book Card (static, 6.2): title/author/pick in the HTML; headingLevel, showBadge, colors in the comment; deprecation v1 = no badge."</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul class="checklist">
+                        <li><code>block.json</code> declares <code>title</code>, <code>author</code>, <code>pick</code> and <code>url</code> with sources, and <code>headingLevel</code> and <code>showBadge</code> with defaults</li>
+                        <li>The card is edited on the canvas with <code>RichText</code>; the link, heading level and badge are set in a "Card settings" panel</li>
+                        <li>Color, spacing and typography supports show in the Styles tab and use the <code>pagesco</code> palette and sizes</li>
+                        <li><code>deprecated.js</code> describes the version without the badge, with a <code>migrate</code> that keeps old cards badge-free, and <code>index.js</code> registers it</li>
+                        <li>The Staff picks post shows the sage <em>The Hobbit</em> card with its badge, and the Card test post is deleted</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Each exercise leaves the site and the block as the project did. Try each one before you open the solution.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Read the Card in PHP, Properly</h3>
+                    <p>Common Mistake 1 showed that <code>$block['attrs']</code> has no title. Read the title and the link of every Book Card in the Staff picks post from the block's HTML instead, with WordPress's HTML API, and print <code>title =&gt; url</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Each parsed block has the stored HTML in <code>$block['innerHTML']</code>. <code>WP_HTML_Tag_Processor</code> walks the tags: <code>next_tag( array( 'class_name' =&gt; 'wp-block-pagesco-book-card__link' ) )</code>, then <code>get_attribute( 'href' )</code>. For the text inside the title, <code>WP_HTML_Processor::create_fragment()</code> can also visit text: after <code>next_tag()</code> on the title, <code>next_token()</code> moves to its text and <code>get_modifiable_text()</code> returns it.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="card-titles.php" data-wp><code class="language-php">&lt;?php
+$post = get_page_by_path( 'staff-picks', OBJECT, 'post' );
+
+foreach ( parse_blocks( $post-&gt;post_content ) as $block ) {
+	if ( 'pagesco/book-card' !== $block['blockName'] ) {
+		continue;
+	}
+
+	$tags = new WP_HTML_Tag_Processor( $block['innerHTML'] );
+	$tags-&gt;next_tag( array( 'class_name' =&gt; 'wp-block-pagesco-book-card__link' ) );
+	$url = $tags-&gt;get_attribute( 'href' );
+
+	$html = WP_HTML_Processor::create_fragment( $block['innerHTML'] );
+	$html-&gt;next_tag( array( 'class_name' =&gt; 'wp-block-pagesco-book-card__title' ) );
+	$html-&gt;next_token();
+
+	echo $html-&gt;get_modifiable_text(), ' =&gt; ', $url, "\n";
+}</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>The Hobbit =&gt; http://localhost:8080/books/the-hobbit/</code></pre>
+                        </div>
+                        <p>The HTML API parses HTML the way browsers do, so it is safe where regular expressions are not (attribute order, quotes, entities). It is the right tool whenever PHP must look inside stored block HTML. Remove the script: <code>rm card-titles.php</code>.</p>
+                        <pre data-cli><code class="language-bash">rm card-titles.php</code></pre>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Change Supports from PHP</h3>
+                    <p>A client's designer wants no font-size control on cards on their site, without a rebuild of the plugin. In a must-use plugin, use the <code>register_block_type_args</code> filter to switch off the typography support of <code>pagesco/book-card</code>, check the registered supports, then delete the plugin.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The filter receives <code>( $args, $block_type )</code> before the block type is created; <code>$args['supports']</code> is the array from <code>block.json</code>. Compare <code>$block_type</code> with the name and <code>unset()</code> the <code>typography</code> key. The registered type's <code>supports</code> property shows the result.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-file="wp-content/mu-plugins/exercise-card-supports.php"><code class="language-php">&lt;?php
+/**
+ * Plugin Name: Exercise: Card Supports
+ */
+
+add_filter(
+	'register_block_type_args',
+	function ( $args, $block_type ) {
+		if ( 'pagesco/book-card' === $block_type ) {
+			unset( $args['supports']['typography'] );
+		}
+		return $args;
+	},
+	10,
+	2
+);</code></pre>
+                        <pre data-cli><code class="language-bash">wp eval 'echo implode( ", ", array_keys( WP_Block_Type_Registry::get_instance()-&gt;get_registered( "pagesco/book-card" )-&gt;supports ) ), "\n";'
+rm wp-content/mu-plugins/exercise-card-supports.php
+wp eval 'echo implode( ", ", array_keys( WP_Block_Type_Registry::get_instance()-&gt;get_registered( "pagesco/book-card" )-&gt;supports ) ), "\n";'</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>html, color, spacing
+html, color, spacing, typography</code></pre>
+                        </div>
+                        <p>The editor receives the block's settings from the server, so the Typography panel disappears from the card's Styles tab with no JavaScript change. Existing cards with a font size keep their class in the stored HTML (it is content), so the front end does not change either. The same filter can add supports, change a <code>default</code> or the <code>category</code>: a handy tool when you adapt someone else's block.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: A "Plain" Style Variation (Stretch)</h3>
+                    <p>Block style variations are named alternatives the editor offers in the Styles tab, such as core's "Rounded" image. Give the Book Card a second style, "Plain", without the border, using the <code>styles</code> field of <code>block.json</code> and a CSS rule. Build, confirm that WordPress registered it, then take it out again and rebuild.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>"styles": [ { "name": "default", "label": "Bordered", "isDefault": true }, { "name": "plain", "label": "Plain" } ]</code> next to <code>supports</code>. Choosing a style adds the class <code>is-style-plain</code> to the wrapper, so the CSS is <code>.wp-block-pagesco-book-card.is-style-plain { border: 0; }</code>. Because the class goes through <code>className</code>, choosing a style never invalidates existing cards.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-cli><code class="language-bash">cd wp-content/plugins/pagesco-books/src/blocks/book-card
+cp block.json block.json.bak
+cp style.scss style.scss.bak
+sed -i 's|^\t"supports": {|\t"styles": [\n\t\t{ "name": "default", "label": "Bordered", "isDefault": true },\n\t\t{ "name": "plain", "label": "Plain" }\n\t],\n&amp;|' block.json
+printf '\n.wp-block-pagesco-book-card.is-style-plain {\n\tborder: 0;\n}\n' &gt;&gt; style.scss
+grep -A 3 '"styles"' block.json</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>	"styles": [
+		{ "name": "default", "label": "Bordered", "isDefault": true },
+		{ "name": "plain", "label": "Plain" }
+	],</code></pre>
+                        </div>
+                        <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null</code></pre>
+                        <pre data-cli><code class="language-bash">wp eval 'foreach ( WP_Block_Type_Registry::get_instance()-&gt;get_registered( "pagesco/book-card" )-&gt;styles as $style ) { echo $style["name"], ": ", $style["label"], "\n"; }'
+grep -o 'is-style-plain{[^}]*}' wp-content/plugins/pagesco-books/build/blocks/book-card/style-index.css</code></pre>
+                        <div class="card card-output">
+                            <h4>Output</h4>
+                            <pre><code>default: Bordered
+plain: Plain
+is-style-plain{border:0}</code></pre>
+                        </div>
+                        <pre data-cli><code class="language-bash">cd wp-content/plugins/pagesco-books/src/blocks/book-card
+mv block.json.bak block.json
+mv style.scss.bak style.scss</code></pre>
+                        <pre data-node="wp-content/plugins/pagesco-books"><code class="language-bash">npm run build &gt; /dev/null</code></pre>
+                        <p>In the editor the Styles tab now starts with two previews, Bordered and Plain. Variations suit visual alternatives a designer defines once; supports suit values an editor tunes per card. Themes can register variations for your block too, in PHP with <code>register_block_style()</code> or in a theme's <code>styles/</code> folder (Lesson 3.3's section styles work the same way).</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> The Book Card's <code>title</code> attribute has <code>"source": "html"</code>. Where is "The Hobbit" stored?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="A sourced attribute lives only in the saved HTML; the editor reads it back with the selector, and the comment JSON stays free of it.">
+                                A) In the saved HTML, inside the element the selector points to
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The comment holds attributes without a source. What did parse_blocks() show for the Card test post?">
+                                B) In the block comment as JSON
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Block attributes are part of post_content. Which table holds post_content?">
+                                C) In post meta
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> Which code puts a control into the block sidebar's Settings tab?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="BlockControls fills the floating toolbar. Which component renders into the sidebar?">
+                                A) A ToggleControl inside BlockControls
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Whatever edit renders inside InspectorControls appears in the sidebar while the block is selected; PanelBody groups it into a collapsible panel.">
+                                B) A ToggleControl inside InspectorControls, in edit
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="save only produces the stored HTML; it never renders editor UI. Where did the Card settings panel come from?">
+                                C) A ToggleControl returned by save
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> You add <code>"color": { "background": true }</code> to <code>supports</code>, but colors chosen in the editor never reach the front end. Which line is most likely missing?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The palette comes from the theme automatically. How does the support get its class onto your element?">
+                                A) A color attribute in block.json
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Supports need no CSS from you; the theme defines the has-…-background-color classes. What carries those classes into the HTML?">
+                                B) A CSS rule for every palette color
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Supports add their classes and styles through useBlockProps.save(); a wrapper without it saves none of them.">
+                                C) Spreading useBlockProps.save() onto the wrapper in save
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> What does this print?</p>
+                        <pre data-file="quiz-attrs.php" data-wp><code class="language-php">&lt;?php
+$html  = '&lt;!-- wp:pagesco/book-card {"headingLevel":4} --&gt;&lt;div class="wp-block-pagesco-book-card"&gt;&lt;h4 class="wp-block-pagesco-book-card__title"&gt;Dune&lt;/h4&gt;&lt;/div&gt;&lt;!-- /wp:pagesco/book-card --&gt;';
+$block = parse_blocks( $html )[0];
+echo wp_json_encode( $block['attrs'] ), "\n";</code></pre>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="parse_blocks only reads the comment. Is the title in the comment?">
+                                A) {"headingLevel":4,"title":"Dune"}
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="parse_blocks does not apply block.json defaults; it returns what the comment says. What does the comment say?">
+                                B) {"headingLevel":4,"showBadge":true}
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="parse_blocks returns exactly the comment JSON: the sourced title stays in the HTML, and defaults such as showBadge are not filled in.">
+                                C) {"headingLevel":4}
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> You change the card's <code>save</code> to wrap the author in a <code>&lt;cite&gt;</code>. Posts already contain cards. What should you add?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Version numbers do not tell the editor how old HTML looked. What does it need to recognize old cards?">
+                                A) A higher version in block.json, nothing else
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="A deprecated entry with the old attributes, supports and save lets the editor recognize existing cards and open them as valid blocks of the new version.">
+                                B) A deprecated entry with the previous attributes, supports and save
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Recovery rewrites each block one by one and may change it. Who has to click it, on how many posts?">
+                                C) Nothing; editors can click Attempt recovery
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>When should a block be static, and when dynamic?</summary>
+                    <p>Static when the content is written by an editor and belongs to the post, as a recommendation does: it costs nothing at view time and survives even if the plugin is removed (the HTML stays). Dynamic when the output depends on data that changes elsewhere (prices, stock, the latest books, the current user) or must change everywhere at once when the design changes: then PHP renders it on every view, and <code>save</code> returns <code>null</code>. Lesson 6.3 builds the dynamic book list and binds card fields to book meta.</p>
+                </details>
+                <details>
+                    <summary>What if I deactivate pagesco-books?</summary>
+                    <p>The front end keeps showing the stored card, styled only by the theme (the block's CSS is gone, but the color classes are the theme's). In the editor, the block becomes "unsupported" and can be kept as is or converted to HTML. Reactivate and everything is back. That robustness is a quiet advantage of static blocks over shortcodes, whose brackets would appear as text.</p>
+                </details>
+                <details>
+                    <summary>Do I need a deprecation while I am still developing?</summary>
+                    <p>Only for content you want to keep. While a block exists only on your test site, delete the test posts and move on, as this lesson did after the demo. The moment a block is on a client's site, or released, every change to <code>save</code> needs one. Many teams also keep a test post with one block of every version, so a quick look in the editor after each build shows any validation errors.</p>
+                </details>
+                <details>
+                    <summary>Can a block be edited through the REST API or WP-CLI, without the editor?</summary>
+                    <p>Yes, as you did with the course tools: <code>post_content</code> is text, and any tool can write block markup. The catch is the validation from this lesson: markup that does not match what <code>save</code> produces opens as invalid in the editor. So scripts should write markup copied from the editor's Code editor, or leave static blocks to people and generate dynamic blocks, whose stored form is just the comment.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Move the heading level from the sidebar to the block toolbar, as core's Heading block has it. Render <code>&lt;BlockControls group="block"&gt;</code> in <code>edit</code> with a <code>ToolbarDropdownMenu</code> (from <code>@wordpress/components</code>) whose <code>controls</code> are one entry per level, each with a <code>title</code> such as "Heading 2", <code>isActive</code> for the current level and an <code>onClick</code> that calls <code>setAttributes()</code>. Does this change need a deprecation? (Think about what <code>save</code> produces.) Then check the console after reopening the Staff picks post.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five minutes to write in your learning journal (a notebook or a plain text file works fine). Jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> List every piece of data in the Book Card and, for each, write where it is stored (HTML or comment), who can change it (the editor on the canvas, the sidebar, the theme) and what happens to it when the plugin is updated. Then pick one content element a client of yours would want as a block (a team member, a testimonial, an opening-hours box) and sketch its <code>block.json</code> attributes with a source for each, and the supports you would turn on.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Attributes with a <code>source</code> and <code>selector</code> live in the saved HTML; attributes without one live in the comment JSON, and only when they differ from their default. PHP's <code>parse_blocks()</code> sees only the comment</li>
+                        <li><code>RichText</code> edits text on the canvas, <code>RichText.Content</code> saves it; <code>setAttributes()</code> is the only way to change attributes</li>
+                        <li><code>InspectorControls</code> puts <code>@wordpress/components</code> controls into the sidebar; <code>BlockControls</code> into the toolbar</li>
+                        <li>Block supports (<code>color</code>, <code>spacing</code>, <code>typography</code>…) add the attributes, controls, classes and styles for you, through <code>useBlockProps</code>, with the theme's presets</li>
+                        <li><code>save</code> must be a pure function of the attributes: no translations, dates or random values. The editor validates stored HTML against it</li>
+                        <li>Changing <code>save</code> for existing content needs a <code>deprecated</code> entry (old attributes, supports and save, optional <code>migrate</code>)</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want</th><th>Write</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Text typed on the card</td><td><code>"title": { "type": "string", "source": "html", "selector": ".x__title" }</code> + <code>&lt;RichText … /&gt;</code> / <code>&lt;RichText.Content … /&gt;</code></td></tr>
+                            <tr><td>A link's URL</td><td><code>"source": "attribute", "selector": ".x__link", "attribute": "href"</code></td></tr>
+                            <tr><td>A setting</td><td><code>"headingLevel": { "type": "integer", "default": 3 }</code> (no source)</td></tr>
+                            <tr><td>A sidebar control</td><td><code>&lt;InspectorControls&gt;&lt;PanelBody&gt;&lt;SelectControl … /&gt;&lt;/PanelBody&gt;&lt;/InspectorControls&gt;</code></td></tr>
+                            <tr><td>Colors, spacing, font size</td><td><code>"supports": { "color": {…}, "spacing": {…}, "typography": {…} }</code> + <code>useBlockProps.save()</code></td></tr>
+                            <tr><td>Change save() safely</td><td><code>deprecated: [ { attributes, supports, migrate, save } ]</code> in <code>registerBlockType()</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You turned the Book Card into a real staff-pick block with six attributes of its own</li>
+                        <li>You gave it sidebar settings and the theme's colors, sizes and spacing through supports</li>
+                        <li>You changed its <code>save</code> after content existed, watched validation catch it, and fixed it with a deprecation and a migration</li>
+                        <li>You put the first staff pick on the Staff picks post</li>
+                        <li>You learned three ways a static block breaks quietly, and how to read the console when it does</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>The Book Card holds what a bookseller writes. A list of books, with prices and stock that change every week, cannot be static. In <a href="lesson_21.html"><strong>Lesson 6.3: Dynamic Blocks &amp; Block Bindings</strong></a> you build <code>pagesco/book-list</code>, a block whose <code>render.php</code> queries the catalog on every view (its default length is the <strong>Books per list</strong> setting from Lesson 5.4), and connect core blocks to book meta such as <code>pagesco_price</code> with block bindings, so a paragraph can show a live price without any JavaScript of yours.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Open the Staff picks post in the editor and on the front end, and check that the card is valid and the badge shows</li>
+                    <li>Make sure the Card test post is gone and <code>npm run build</code> has run on your final files</li>
+                    <li>Reread Lesson 4.2's <code>WP_Query</code> arguments: the dynamic block's <code>render.php</code> uses them</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Today you broke a block in the editor on purpose, read a validation error, and fixed it for every post at once. Many developers who have shipped blocks for years still dread that warning, because they never learned what it is checking. You know exactly what it checks and how to answer it. The rest of block development builds on what you now have: attributes, controls and supports are the same in every block you will write.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_19.html" class="prev-lesson">← Previous: Block Development Setup</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_21.html" class="next-lesson">Next: Dynamic Blocks &amp; Block Bindings →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. PHP and WordPress Development. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>
